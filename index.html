@@ -501,7 +501,7 @@ let CLIENT_LOCATION_1 = '';
 let CLIENT_LOCATION_2 = '';
 let CLIENT_DELIVERY = {};
 /* ========= CONFIG ========= */
-const CUTOFF_HOUR = 00;
+
 
 let MENU = {};
 let DATES = [];
@@ -561,52 +561,17 @@ async function fetchClient() {
 
   MENU = data.menu || {};
   DATES = Object.keys(MENU).sort();
-  applyCutoff();
+  
+  /* ✅ ADMIN MODE — NO CUTOFF */
+  VISIBLE_DATES = DATES.filter(d => MENU[d]);
+  currentIndex = 0;
+  
   initState();
   renderCurrentDay();
+
 }
 
 
-/* ========= CUTOFF ========= */
-function applyCutoff() {
-
-  const now = new Date();
-  const today = new Date(
-    now.getFullYear(),
-    now.getMonth(),
-    now.getDate()
-  );
-
-  const todayStr =
-    today.getFullYear() + '-' +
-    String(today.getMonth() + 1).padStart(2, '0') + '-' +
-    String(today.getDate()).padStart(2, '0');
-
-  const todayExists = DATES.includes(todayStr);
-
-  if (!todayExists) {
-    // Show only valid dates that exist in MENU
-    VISIBLE_DATES = DATES.filter(d => MENU[d]);
-    currentIndex = 0;
-    return;
-  }
-
-  let targetDate = new Date(today);
-  targetDate.setDate(today.getDate() + 1);
-
-  if (CUTOFF_HOUR > 0 && now.getHours() >= CUTOFF_HOUR) {
-    targetDate.setDate(targetDate.getDate() + 1);
-  }
-
-  const targetStr =
-    targetDate.getFullYear() + '-' +
-    String(targetDate.getMonth() + 1).padStart(2, '0') + '-' +
-    String(targetDate.getDate()).padStart(2, '0');
-
-  VISIBLE_DATES = DATES.filter(d => d >= targetStr && MENU[d]);
-
-  currentIndex = 0;
-}
 
 /* ========= STATE ========= */
 function initState(){
