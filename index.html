@@ -1,0 +1,1347 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" 
+      content="width=device-width, initial-scale=1, maximum-scale=5, user-scalable=yes">
+
+    <style>
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #f4f6f8;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  .app {
+    width: 100%;
+    max-width: 100%;
+    padding: 12px;
+  }
+
+  /* HEADER */
+  .topbar {
+    text-align: center;
+    margin-bottom: 8px;
+  }
+
+  .logo {
+    max-width: 150px;
+    height: auto;
+  }
+
+  h2 {
+    font-size: 22px;
+    margin: 10px 0 20px;
+    text-align: center;
+  }
+
+  h3 {
+    font-size: 18px;
+    margin-bottom: 14px;
+  }
+
+  h4 {
+    font-size: 16px;
+    margin: 18px 0 10px;
+  }
+
+  /* CARD */
+  .box {
+    background: #fff;
+    border-radius: 16px;
+    padding: 16px;
+    margin-bottom: 16px;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.05);
+  }
+
+  /* FORM */
+  label {
+    font-size: 14px;
+    margin-bottom: 6px;
+    display: block;
+    font-weight: 500;
+  }
+
+  input[type="text"],
+  select {
+    width: 100%;
+    padding: 16px;
+    font-size: 18px; /* prevents mobile zoom */
+    border-radius: 12px;
+    border: 1px solid #ccc;
+    background: #fff;
+    box-sizing: border-box;
+  }
+  #phone {
+    font-size: 20px;
+    padding: 18px;
+  }
+
+  input[readonly] {
+    background: #f9f9f9;
+  }
+
+  /* BUTTONS */
+  .btn {
+    width: 100%;
+    padding: 14px;
+    font-size: 16px;
+    border-radius: 12px;
+    border: none;
+    background: #1976d2;
+    color: #fff;
+    margin-top: 14px;
+    font-weight: 600;
+  }
+
+  .btn:active {
+    transform: scale(0.98);
+  }
+
+  .btn.secondary {
+    background: #e0e0e0;
+    color: #000;
+  }
+
+  /* SECTION HEADER */
+  .section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.section-header h4 {
+  margin: 0;
+  font-size: 16px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.section-controls {
+  display: flex;
+  gap: 6px;
+}
+
+.section-controls select {
+  width: 110px !important;
+  padding: 10px !important;
+  font-size: 14px !important;
+}
+
+@media (max-width: 480px) {
+  .section-controls select {
+    width: 100px !important;
+    font-size: 13px !important;
+  }
+}
+  /* ===== PRESET COMPACT STYLE ===== */
+
+#presetBox {
+  padding: 8px 14px;          /* reduce box padding */
+  margin-bottom: 10px;
+}
+
+#presetBox details {
+  margin: 0;
+}
+
+#presetBox summary {
+  font-size: 15px;
+  font-weight: 600;
+  padding: 4px 0;
+  list-style: none;
+  cursor: pointer;
+}
+
+#presetBox summary::-webkit-details-marker {
+  display: none;              /* remove default arrow */
+}
+
+#presetBox summary::after {
+  content: "▾";
+  float: right;
+  transition: 0.2s ease;
+}
+
+#presetBox details[open] summary::after {
+  transform: rotate(180deg);
+}
+
+.preset-grid {
+  padding-top: 8px;
+}
+
+ /* DISH */
+  .dish {
+    background: #f7f7f7;
+    border-radius: 12px;
+    padding: 6px 10px;       /* reduced vertical padding */
+    margin-bottom: 4px;      /* less space between dishes */
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .dish-name {
+    font-size: 15px;         /* slightly bigger for clarity */
+    line-height: 1.25;       /* tighter text */
+    flex: 1;
+    padding-right: 8px;
+  }
+
+  /* QTY CONTROL */
+  .qty {
+    display: flex;
+    align-items: center;
+    gap: 6px;                /* tighter gap */
+  }
+
+  .qty button {
+  width: 30px;
+  height: 30px;
+  font-size: 18px;
+  border-radius: 50%;              /* perfect round */
+  border: none;
+  background: #1976d2;
+  color: #fff;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.qty button:active {
+  transform: scale(0.92);
+  background: #1565c0;
+}
+
+
+  .qty span {
+    min-width: 24px;
+    text-align: center;
+    font-size: 15px;
+    font-weight: 600;
+  }
+
+  /* CHECKBOX */
+  input[type="checkbox"] {
+    transform: scale(1.3);
+    margin-right: 6px;
+  }
+  /* ====== LAYOUT FIX ====== */
+
+  body {
+    margin: 0;
+    padding: 0;
+  }
+
+  .wrapper {
+    width: 96%;
+    max-width: 900px;
+    margin: 0 auto;
+  }
+
+  /* Reduce section spacing */
+  .section {
+    margin-bottom: 16px;
+  }
+
+  /* Reduce card padding */
+  .card {
+    padding: 16px !important;
+  }
+  html, body {
+    height: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+  }
+  body {
+    touch-action: manipulation;
+  }
+  .day-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+
+  .day-text {
+    flex: 1;
+    text-align: center;
+  }
+
+  .day-name {
+    font-size: 20px;
+    font-weight: 700;
+    cursor: pointer;
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .day-arrow {
+    font-size: 12px;
+    color: #777;
+  }
+  .day-dropdown {
+    display: none;
+    position: absolute;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+    margin-top: 6px;
+    z-index: 10;
+    min-width: 160px;
+    padding: 6px 0;
+  }
+
+  .day-dropdown div {
+    padding: 10px 16px;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  
+  .day-dropdown div:hover {
+    background: #f2f2f2;
+  }
+  .day-date {
+    font-size: 14px;
+    color: #666;
+    margin-top: 4px;
+  }
+
+  .cancel-wrap {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 14px;
+    white-space: nowrap;
+  }
+
+  .nav-row {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.nav-row .btn {
+  flex: 1;
+}
+.protein-chicken { color: #d32f2f; font-weight: 600; }
+.protein-veg { color: #2e7d32; font-weight: 600; }
+.protein-egg { color: #f9a825; font-weight: 600; }
+.protein-seafood { color: #1565c0; font-weight: 600; }
+
+/* ===== SUMMARY MODAL ===== */
+.modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  backdrop-filter: blur(3px);
+  justify-content: center;
+  align-items: center;
+  padding: 16px;
+  z-index: 9999;
+}
+
+.modal-content {
+  background: #fff;
+  border-radius: 16px;
+  padding: 20px;
+  width: 100%;
+  max-width: 500px;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.modal-content h3 {
+  text-align: center;
+  margin-bottom: 16px;
+}
+
+.summary-day {
+  margin-bottom: 18px;
+}
+
+.summary-day h4 {
+  margin-bottom: 6px;
+}
+
+.summary-slot {
+  font-size: 14px;
+  color: #555;
+  margin-bottom: 4px;
+}
+
+.loader {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(255,255,255,0.6);
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #ddd;
+  border-top: 4px solid #1976d2;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+.btn.loading {
+  opacity: 0.7;
+  pointer-events: none;
+  position: relative;
+}
+
+.btn.loading::after {
+  content: "";
+  width: 16px;
+  height: 16px;
+  border: 2px solid #fff;
+  border-top: 2px solid transparent;
+  border-radius: 50%;
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  animation: spinBtn 0.6s linear infinite;
+}
+
+@keyframes spinBtn {
+  to { transform: translateY(-50%) rotate(360deg); }
+}
+
+      
+  </style>
+</head>
+
+<body>
+  <div class="wrapper">
+<div class="app">
+<div class="topbar">
+  <img src="logo.png" class="logo" alt="Friska Logo">
+</div>
+
+<h2>Weekly Meal Selection</h2>
+
+<div class="box">
+  <label>Phone</label>
+  <input id="phone" inputmode="numeric"
+         onkeydown="if(event.key==='Enter'){fetchClient()}">
+  <button class="btn" onclick="fetchClient(event)">Login</button>
+
+  <label style="margin-top:24px;">Client Name</label>
+  <input type="text" id="clientName" readonly>
+
+  <label>Type</label>
+  <input type="text" id="clientType" readonly>
+
+  <label>Remarks</label>
+  <input type="text" id="clientRemarks">
+</div>
+<div class="box" id="presetBox">
+
+  <details>
+    <summary style="font-weight:600; cursor:pointer;">Presets</summary>
+
+    <div class="preset-grid">
+
+      
+      <label><input type="checkbox" onchange="togglePreset('meals','chicken',this)"> Both Chicken Meals Everyday</label>
+      <label><input type="checkbox" onchange="togglePreset('meals','veg',this)"> Both Veg Meals Everyday</label>
+      <label><input type="checkbox" onchange="togglePreset('breakfast','veg',this)"> Veg Breakfast Everyday</label>
+      <label><input type="checkbox" onchange="togglePreset('breakfast','breakfast',this)"> Breakfast Everyday (Egg)</label>
+      <label><input type="checkbox" onchange="togglePreset('meals','seafood',this)"> Both Seafood Meals Everyday</label>
+      <label><input type="checkbox" onchange="togglePreset('meals','egg',this)"> One Egg Meal Everyday</label>
+      <label><input type="checkbox" onchange="togglePreset('meals','fish',this)"> One Fish Meal Everyday</label>
+      <label><input type="checkbox" onchange="togglePreset('meals','prawns',this)"> One Prawns Meal Everyday</label>
+      
+
+      
+      <label><input type="checkbox" onchange="togglePreset('snack','all',this)"> Snack Everyday</label>
+      <label><input type="checkbox" onchange="togglePreset('snack','veg',this)"> Veg Snack Everyday</label>
+
+     
+      <label><input type="checkbox" onchange="togglePreset('juice','both',this)"> Both Juices Everyday</label>
+
+    </div>
+
+  </details>
+
+</div>
+
+<div id="dayContainer"></div>
+</div>
+
+<div id="dayContainer"></div>
+
+<div class="nav-row">
+  <button id="backBtn" class="btn secondary" onclick="prevDay()">Back</button>
+  <button id="nextBtn" class="btn secondary" onclick="nextDay(event)">Next Day</button>
+</div>
+  
+<button class="btn" onclick="handleSubmit(event)">Submit & Exit</button>
+</div>
+
+<script>
+const API_URL = "https://orange-resonance-2dad.friskawellnessfoods.workers.dev/";  
+let CLIENT_LOCATION_1 = '';
+let CLIENT_LOCATION_2 = '';
+let CLIENT_DELIVERY = {};
+/* ========= CONFIG ========= */
+const CUTOFF_HOUR = 00;
+
+let MENU = {};
+let DATES = [];
+let VISIBLE_DATES = [];
+let STATE = {};
+let currentIndex = 0;
+
+/* ========= FETCH ========= */
+async function fetchClient() {
+
+  const btn = event.target;
+  btn.classList.add("loading");
+
+  const phone = document.getElementById('phone').value.trim();
+  if (!phone) {
+    btn.classList.remove("loading");
+    return alert('Enter phone');
+  }
+
+  const params = new URLSearchParams();
+  params.append("action", "getClient");
+  params.append("phone", phone);
+
+  const res = await fetch(API_URL, {
+    method: "POST",
+    body: params
+  });
+
+  const data = await res.json();
+
+  btn.classList.remove("loading");
+
+  if (!data || !data.client || !data.client.found)
+    return alert('Client not found');
+
+  const client = data.client;
+
+  clientName.value = client.clientName || '';
+  const originalType = client.mealType || '';
+
+  const cleanedType = originalType
+    .replace(/\d+/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  
+  clientType.value = cleanedType;
+  
+  clientRemarks.value = client.remarks || '';
+   
+  // store original for backend
+  clientType.dataset.original = originalType,
+
+
+  CLIENT_LOCATION_1 = client.location1 || '';
+  CLIENT_LOCATION_2 = client.location2 || '';
+  CLIENT_DELIVERY = client.delivery || {};
+
+  MENU = data.menu || {};
+  DATES = Object.keys(MENU).sort();
+  applyCutoff();
+  initState();
+  renderCurrentDay();
+}
+
+
+/* ========= CUTOFF ========= */
+function applyCutoff() {
+
+  const now = new Date();
+  const today = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate()
+  );
+
+  const todayStr =
+    today.getFullYear() + '-' +
+    String(today.getMonth() + 1).padStart(2, '0') + '-' +
+    String(today.getDate()).padStart(2, '0');
+
+  const todayExists = DATES.includes(todayStr);
+
+  if (!todayExists) {
+    // Show only valid dates that exist in MENU
+    VISIBLE_DATES = DATES.filter(d => MENU[d]);
+    currentIndex = 0;
+    return;
+  }
+
+  let targetDate = new Date(today);
+  targetDate.setDate(today.getDate() + 1);
+
+  if (CUTOFF_HOUR > 0 && now.getHours() >= CUTOFF_HOUR) {
+    targetDate.setDate(targetDate.getDate() + 1);
+  }
+
+  const targetStr =
+    targetDate.getFullYear() + '-' +
+    String(targetDate.getMonth() + 1).padStart(2, '0') + '-' +
+    String(targetDate.getDate()).padStart(2, '0');
+
+  VISIBLE_DATES = DATES.filter(d => d >= targetStr && MENU[d]);
+
+  currentIndex = 0;
+}
+
+/* ========= STATE ========= */
+function initState(){
+  VISIBLE_DATES.forEach(date => {
+
+    STATE[date] = {
+      sections: {
+        breakfast: { items: {}, slot: 'Morning', location: '' },
+        option1:   { items: {}, slot: 'Afternoon', location: '' },
+        option2:   { items: {}, slot: 'Evening', location: '' },
+        snack:     { items: {}, slot: 'Afternoon', location: '' },
+        juice1:    { items: {}, slot: 'Afternoon', location: '' },
+        juice2:    { items: {}, slot: 'Evening', location: '' }
+      },
+      cancel: false
+    };
+
+    // 🔵 FIX: Apply single-slot slot + location correction immediately
+    if (!hasAfternoonEveningSlots()) {
+
+      const singleSlot =
+        CLIENT_DELIVERY?.morning ? 'Morning' :
+        CLIENT_DELIVERY?.afternoon ? 'Afternoon' :
+        CLIENT_DELIVERY?.evening ? 'Evening' :
+        'Afternoon';
+
+      const defaultLocation =
+        CLIENT_LOCATION_1 || CLIENT_LOCATION_2 || '';
+
+      STATE[date].sections.option1.slot = singleSlot;
+      STATE[date].sections.option2.slot = singleSlot;
+
+      STATE[date].sections.option1.location = defaultLocation;
+      STATE[date].sections.option2.location = defaultLocation;
+    }
+
+    // Populate items
+    ['option1','option2','breakfast'].forEach(sec => {
+      if (!MENU[date][sec]) return;
+      
+      MENU[date][sec].forEach(item => {
+        STATE[date].sections[sec].items[item.label] = {
+          qty: 0,
+          protein: item.protein
+        };
+      });
+    });
+
+    if (MENU[date].snack) {
+      MENU[date].snack.forEach(item => {
+        STATE[date].sections.snack.items[item.label] = {
+          qty: 0,
+          type: item.type,
+          label: item.label
+        };
+      });
+    }
+
+    if (MENU[date].juice1) {
+      MENU[date].juice1.forEach(j => {
+        STATE[date].sections.juice1.items[j] = { qty: 0 };
+      });
+    }
+
+    if (MENU[date].juice2) {
+      MENU[date].juice2.forEach(j => {
+        STATE[date].sections.juice2.items[j] = { qty: 0 };
+      });
+    }
+    
+  });
+}
+
+function hasAfternoonEveningSlots() {
+  return CLIENT_DELIVERY?.afternoon && CLIENT_DELIVERY?.evening;
+}
+
+
+
+
+/* ========= RENDER ========= */
+function renderCurrentDay(){
+  const date = VISIBLE_DATES[currentIndex];
+  const container = document.getElementById('dayContainer');
+
+  if (!date) {
+    container.innerHTML = '<div class="box">Ordering closed.</div>';
+    return;
+  }
+
+  const parsedDate = new Date(date);
+  
+
+
+  const dayName = parsedDate.toLocaleDateString('en-US', {
+    weekday: 'long'
+  });
+
+  const formattedDate =
+    String(parsedDate.getDate()).padStart(2, '0') + '-' +
+    parsedDate.toLocaleDateString('en-US', { month: 'short' }) + '-' +
+    parsedDate.getFullYear();
+
+
+  container.innerHTML = `
+    <div class="box">
+     
+    <div class="day-header">
+      <div class="day-text" style="position:relative;">
+        <div class="day-name" onclick="toggleDayDropdown(event)">
+          <span class="day-arrow">▼</span> ${dayName}
+        </div>
+
+        <div id="dayDropdown" class="day-dropdown">
+          ${VISIBLE_DATES.map((d,i)=>{
+            const dn = new Date(d).toLocaleDateString('en-US',{weekday:'long'});
+            return `<div onclick="jumpToDay(${i})">${dn}</div>`;
+          }).join('')}
+        </div>
+
+        <div class="day-date">${formattedDate}</div>
+      </div>
+    
+      <label class="cancel-wrap">
+        <input type="checkbox"
+          onchange="STATE['${date}'].cancel=this.checked">
+        Cancel This Day
+      </label>
+    </div>
+
+      ${renderBlock(date,'breakfast','Breakfast')}
+      ${renderBlock(date,'option1','Option 1')}
+      ${renderBlock(date,'option2','Option 2')}
+      ${renderBlock(date,'snack','Snack')}
+      ${renderBlock(date,'juice1','Juice 1')}
+      ${renderBlock(date,'juice2','Juice 2')}
+      
+     ${!hasAfternoonEveningSlots() ? `
+        <label>Location</label>
+        <select id="loc_${date}"
+          onchange="STATE['${date}'].sections.option1.location=this.value">
+      
+          ${CLIENT_LOCATION_1 ? `
+            <option value="${CLIENT_LOCATION_1}"
+              ${!CLIENT_LOCATION_2 ? 'selected' : ''}>
+              ${CLIENT_LOCATION_1}
+            </option>
+          ` : ''}
+      
+          ${CLIENT_LOCATION_2 ? `
+            <option value="${CLIENT_LOCATION_2}">
+              ${CLIENT_LOCATION_2}
+            </option>
+          ` : ''}
+      
+        </select>
+      ` : ``}
+
+    </div>
+  `;
+
+  backBtn.style.display = currentIndex > 0 ? 'block' : 'none';
+  nextBtn.style.display = currentIndex < VISIBLE_DATES.length - 1 ? 'block' : 'none';
+}
+
+
+function renderBlock(date, slot, title) {
+
+  const section = STATE[date].sections[slot];
+  const items = section?.items;
+  if (!items || !Object.keys(items).length) return '';
+
+  const showSlotControls =
+    hasAfternoonEveningSlots() && (slot !== 'breakfast');
+
+  const showLocationControl =
+    hasAfternoonEveningSlots() &&
+    (slot === 'option1' || slot === 'option2');
+
+  // ✅ Set default location safely BEFORE rendering
+  if (hasAfternoonEveningSlots() && !section.location) {
+    if (slot === 'option1' && CLIENT_LOCATION_1) {
+      section.location = CLIENT_LOCATION_1;
+    }
+    if (slot === 'option2' && CLIENT_LOCATION_2) {
+      section.location = CLIENT_LOCATION_2;
+    }
+  }
+
+  let headerHTML = '';
+
+  if (showSlotControls) {
+
+    let locOptions = '';
+
+    if (CLIENT_LOCATION_1) {
+      locOptions += `<option value="${CLIENT_LOCATION_1.replace(/"/g,'&quot;')}"
+        ${section.location === CLIENT_LOCATION_1 ? 'selected' : ''}>
+        ${CLIENT_LOCATION_1}
+      </option>`;
+    }
+
+    if (CLIENT_LOCATION_2) {
+      locOptions += `<option value="${CLIENT_LOCATION_2.replace(/"/g,'&quot;')}"
+        ${section.location === CLIENT_LOCATION_2 ? 'selected' : ''}>
+        ${CLIENT_LOCATION_2}
+      </option>`;
+    }
+
+    headerHTML = `
+      <div class="section-header">
+        <h4 class="section-title">${title}</h4>
+        <div class="section-controls">
+
+          <select id="slot_${date}_${slot}"
+            onchange="updateSectionSlot('${date}','${slot}',this.value)">
+            <option value="Afternoon" ${section.slot === 'Afternoon' ? 'selected' : ''}>Afternoon</option>
+            <option value="Evening" ${section.slot === 'Evening' ? 'selected' : ''}>Evening</option>
+          </select>
+
+          ${showLocationControl ? `
+            <select id="loc_${date}_${slot}"
+              onchange="updateSectionLocation('${date}','${slot}',this.value)">
+            
+              ${CLIENT_LOCATION_1 ? `
+                <option value="${CLIENT_LOCATION_1}"
+                  ${
+                    section.location === CLIENT_LOCATION_1 ||
+                    (!section.location && slot === 'option1')
+                      ? 'selected'
+                      : ''
+                  }>
+                  ${CLIENT_LOCATION_1}
+                </option>
+              ` : ''}
+            
+              ${CLIENT_LOCATION_2 ? `
+                <option value="${CLIENT_LOCATION_2}"
+                  ${
+                    section.location === CLIENT_LOCATION_2 ||
+                    (!section.location && slot === 'option2')
+                      ? 'selected'
+                      : ''
+                  }>
+                  ${CLIENT_LOCATION_2}
+                </option>
+              ` : ''}
+            
+            </select>
+
+          ` : ``}
+
+        </div>
+      </div>
+    `;
+
+  } else {
+
+    headerHTML = `<h4>${title}</h4>`;
+
+  }
+
+  return headerHTML +
+    Object.keys(items).map(label => `
+      <div class="dish">
+        <div class="dish-name ${getProteinClass(slot, section.items[label])}">
+          ${label}
+        </div>
+        <div class="qty">
+          <button onclick="changeQty('${date}','${slot}','${label}',-1)">−</button>
+          <span id="${btoa(date+slot+label)}">${section.items[label].qty}</span>
+          <button onclick="changeQty('${date}','${slot}','${label}',1)">+</button>
+        </div>
+      </div>
+    `).join('');
+}
+
+
+
+
+function changeQty(d,s,l,delta){
+  const obj = STATE[d].sections[s].items[l];
+  obj.qty = Math.max(0, obj.qty + delta);
+  document.getElementById(btoa(d+s+l)).innerText = obj.qty;
+}
+function updateSectionSlot(date, section, value) {
+
+  const sec = STATE[date].sections;
+
+  sec[section].slot = value;
+
+  if (section === 'option1') {
+    const otherSlot = value === 'Afternoon' ? 'Evening' : 'Afternoon';
+    sec.option2.slot = otherSlot;
+
+    const otherSelect = document.getElementById(`slot_${date}_option2`);
+    if (otherSelect) otherSelect.value = otherSlot;
+  }
+
+  if (section === 'option2') {
+    const otherSlot = value === 'Afternoon' ? 'Evening' : 'Afternoon';
+    sec.option1.slot = otherSlot;
+
+    const otherSelect = document.getElementById(`slot_${date}_option1`);
+    if (otherSelect) otherSelect.value = otherSlot;
+  }
+}
+
+function updateSectionLocation(date, section, value) {
+  STATE[date].sections[section].location = value;
+}
+function nextDay(event){
+
+  if (currentIndex < VISIBLE_DATES.length - 1) {
+    currentIndex++;
+    renderCurrentDay();
+
+    const daySection = document.getElementById("dayContainer");
+    if (daySection) {
+      daySection.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }
+}
+
+
+
+function prevDay(){
+
+  if (currentIndex > 0) {
+    currentIndex--;
+    renderCurrentDay();
+
+    const daySection = document.getElementById("dayContainer");
+    if (daySection) {
+      daySection.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }
+}
+
+function hasSelectionForDate(date) {
+
+  const day = STATE[date];
+  if (!day) return false;
+
+  if (day.cancel) return true;
+
+  const sections = day.sections;
+
+  for (let sec in sections) {
+    const items = sections[sec].items || {};
+    for (let key in items) {
+      if (items[key].qty > 0) return true;
+    }
+  }
+
+  return false;
+}
+
+/* ========= SUBMIT ========= */
+async function saveCurrentDay(btn) {
+
+  if (btn) btn.classList.add("loading");
+
+  const phone = document.getElementById('phone').value.trim();
+  if (!phone) {
+    if (btn) btn.classList.remove("loading");
+    alert('Phone missing');
+    return { success: false };
+  }
+
+  const date = VISIBLE_DATES[currentIndex];
+
+  // 🔴 IMPORTANT FIX — Skip backend if nothing selected
+  if (!hasSelectionForDate(date)) {
+    if (btn) btn.classList.remove("loading");
+    return { success: true };
+  }
+
+  const payload = {
+    phone,
+    remarks: clientRemarks.dataset.original || clientRemarks.value || '',
+    days: [{
+      date,
+      sections: STATE[date].sections,
+      cancel: STATE[date].cancel
+    }]
+  };
+
+  const params = new URLSearchParams();
+  params.append("action", "submitOrder");
+  params.append("payload", JSON.stringify(payload));
+
+  try {
+
+    const res = await fetch(API_URL, {
+      method: "POST",
+      body: params
+    });
+
+    const result = await res.json();
+
+    if (btn) btn.classList.remove("loading");
+    return result;
+
+  } catch (error) {
+
+    if (btn) btn.classList.remove("loading");
+    alert("Network error");
+    return { success: false };
+  }
+}
+
+async function handleSubmit(event) {
+
+  const btn = event.target;
+  btn.classList.add("loading");
+
+  const phone = document.getElementById('phone').value.trim();
+  if (!phone) {
+    btn.classList.remove("loading");
+    return alert("Phone missing");
+  }
+
+  const allDays = [];
+
+  VISIBLE_DATES.forEach(date => {
+
+    if (!hasSelectionForDate(date)) return;
+
+    allDays.push({
+      date,
+      sections: STATE[date].sections,
+      cancel: STATE[date].cancel
+    });
+
+  });
+
+  if (!allDays.length) {
+    btn.classList.remove("loading");
+    return alert("No selections made.");
+  }
+
+  const payload = {
+    phone,
+    remarks: clientRemarks.value || '',
+    days: allDays
+  };
+
+  const params = new URLSearchParams();
+  params.append("action", "submitOrder");
+  params.append("payload", JSON.stringify(payload));
+
+  try {
+    await fetch(API_URL, {
+      method: "POST",
+      body: params
+    });
+
+    btn.classList.remove("loading");
+    generateSummary();
+
+  } catch (err) {
+    btn.classList.remove("loading");
+    alert("Network error. Please try again.");
+  }
+}
+
+
+
+function getProteinClass(slot, item) {
+
+  // Only apply to Option 1 & Option 2
+  if (slot !== 'option1' && slot !== 'option2') {
+    return '';
+  }
+
+  if (!item || !item.protein) return '';
+
+  const p = item.protein.toLowerCase();
+
+  if (p.includes('chicken')) return 'protein-chicken';
+  if (p.includes('veg')) return 'protein-veg';
+  if (p.includes('egg')) return 'protein-egg';
+  if (p.includes('seafood')) return 'protein-seafood';
+
+  return '';
+}
+function generateSummary() {
+  let html = "";
+
+  VISIBLE_DATES.forEach(date => {
+
+    const dayState = STATE[date];
+    if (!dayState) return;
+
+    const hasSelection =
+      dayState.cancel ||
+      Object.values(dayState.sections).some(sec =>
+        Object.values(sec.items || {}).some(i => i.qty > 0)
+      );
+
+    if (!hasSelection) return;
+
+    const dayName = new Date(date)
+      .toLocaleDateString('en-US',{ weekday:'long' });
+
+    html += `<div class="summary-day">`;
+    html += `<h4>${dayName} – ${date}</h4>`;
+
+    if (dayState.cancel) {
+      html += `<div>❌ Cancelled</div></div>`;
+      return;
+    }
+
+    // 🔹 GROUP BY SLOT + LOCATION
+    const grouped = {};
+
+    Object.values(dayState.sections).forEach(sec => {
+
+      const selectedItems = Object.entries(sec.items || {})
+        .filter(([_, item]) => item.qty > 0);
+
+      if (!selectedItems.length) return;
+
+      const key = (sec.slot || '') + "||" + (sec.location || '');
+
+      if (!grouped[key]) {
+        grouped[key] = {
+          slot: sec.slot || '',
+          location: sec.location || '',
+          items: []
+        };
+      }
+
+      selectedItems.forEach(([label, item]) => {
+        grouped[key].items.push({
+          label,
+          qty: item.qty
+        });
+      });
+
+    });
+
+    // 🔹 RENDER GROUPED OUTPUT
+    Object.values(grouped).forEach(group => {
+
+      const showSlot = hasAfternoonEveningSlots();
+      const showLocation = !hasAfternoonEveningSlots();
+
+      if (showSlot || showLocation) {
+
+        html += `<div class="summary-slot">`;
+
+        if (showSlot && group.slot) {
+          html += `🕒 ${group.slot}`;
+        }
+
+        if (showLocation && group.location) {
+          html += showSlot
+            ? ` – ${group.location}`
+            : `${group.location}`;
+        }
+
+        html += `</div>`;
+      }
+
+      group.items.forEach(item => {
+        html += `<div>• ${item.qty > 1 ? item.qty + 'x ' : ''}${item.label}</div>`;
+      });
+
+    });
+
+    html += `</div>`;
+  });
+
+  document.getElementById("summaryContent").innerHTML = html;
+  document.getElementById("summaryModal").style.display = "flex";
+}
+
+
+function closeSummary() {
+  document.getElementById("summaryModal").style.display = "none";
+}
+function showLoader() {
+  document.getElementById("loader").style.display = "flex";
+}
+
+function hideLoader() {
+  document.getElementById("loader").style.display = "none";
+}
+function togglePreset(type, protein, checkbox) {
+
+  const isChecked = checkbox.checked;
+
+  Object.keys(STATE).forEach(date => {
+
+    const sections = STATE[date].sections;
+
+    /* =======================
+       MEALS (Option1 + Option2)
+    ======================== */
+    if (type === 'meals') {
+
+  ['option1', 'option2'].forEach(slot => {
+
+    Object.entries(sections[slot].items).forEach(([label, item]) => {
+
+      const proteinType = (item.protein || '').toLowerCase();
+      const labelLower = label.toLowerCase();
+
+      // Regular protein presets (chicken / veg / seafood / egg)
+      if (
+        ['chicken','veg','seafood','egg'].includes(protein) &&
+        proteinType === protein.toLowerCase()
+      ) {
+        item.qty = Math.max(0, item.qty + (isChecked ? 1 : -1));
+      }
+
+      // Fish preset
+      if (
+        protein === 'fish' &&
+        proteinType === 'seafood' &&
+        labelLower.includes('fish')
+      ) {
+        item.qty = Math.max(0, item.qty + (isChecked ? 1 : -1));
+      }
+
+      // Prawns preset
+      if (
+        protein === 'prawns' &&
+        proteinType === 'seafood' &&
+        labelLower.includes('prawn')
+      ) {
+        item.qty = Math.max(0, item.qty + (isChecked ? 1 : -1));
+      }
+
+    });
+
+  });
+
+}
+
+
+    /* =======================
+       BREAKFAST
+    ======================== */
+    if (type === 'breakfast') {
+
+      Object.values(sections.breakfast.items).forEach(item => {
+    
+        const proteinType = item.protein.toLowerCase().trim();
+    
+        // Veg Breakfast preset
+        if (protein === 'veg' && proteinType === 'veg breakfast') {
+          item.qty = Math.max(0, item.qty + (isChecked ? 1 : -1));
+        }
+    
+        // Breakfast (Egg) preset
+        if (protein === 'breakfast' && proteinType === 'breakfast') {
+          item.qty = Math.max(0, item.qty + (isChecked ? 1 : -1));
+        }
+    
+      });
+    
+    }
+
+
+    /* =======================
+       SNACK
+    ======================== */
+    if (type === 'snack') {
+
+      Object.values(sections.snack.items).forEach(item => {
+
+        const snackType = (item.type || '').toLowerCase();
+
+        // Normal snack only
+        if (protein === 'all' && snackType === 'snack') {
+          item.qty = Math.max(0, item.qty + (isChecked ? 1 : -1));
+        }
+
+        // Veg snack only
+        if (protein === 'veg' && snackType === 'veg snack') {
+          item.qty = Math.max(0, item.qty + (isChecked ? 1 : -1));
+        }
+
+      });
+
+    }
+
+    /* =======================
+       JUICES
+    ======================== */
+    if (type === 'juice') {
+
+      if (protein === 'both') {
+
+        ['juice1','juice2'].forEach(j => {
+          Object.values(sections[j].items).forEach(item => {
+            item.qty = Math.max(0, item.qty + (isChecked ? 1 : -1));
+          });
+        });
+
+      }
+
+    }
+
+  });
+
+  renderCurrentDay();
+}
+function toggleDayDropdown(e) {
+  e.stopPropagation();
+  const dd = document.getElementById("dayDropdown");
+  dd.style.display = dd.style.display === "block" ? "none" : "block";
+}
+
+function jumpToDay(index) {
+  currentIndex = index;
+  renderCurrentDay();
+}
+
+document.addEventListener("click", function(){
+  const dd = document.getElementById("dayDropdown");
+  if (dd) dd.style.display = "none";
+});
+
+</script>
+  </div>
+  <div id="summaryModal" class="modal">
+  <div class="modal-content">
+    <h3>Order Summary</h3>
+    <div id="summaryContent"></div>
+    <button class="btn" onclick="closeSummary()">Close</button>
+  </div>
+</div>
+</body>
+</html>
