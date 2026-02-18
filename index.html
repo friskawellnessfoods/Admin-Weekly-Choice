@@ -496,12 +496,12 @@
 </div>
 
 <script>
-const API_URL = "https://script.google.com/macros/s/AKfycbxmaeJL-M6_mY9w53tG-ePluZjUtbtQRaU7sujpvJdPFacxoVYeviqFQOS0cH5rEhys/exec";  
+const API_URL = "https://script.google.com/macros/s/AKfycbzQ33LZwdZmX5RoRa-LHlcQZ2O1DCvRg-z_BV6teQkncRPY1WBWzITJG75K0JXAtII5/exec";  
 let CLIENT_LOCATION_1 = '';
 let CLIENT_LOCATION_2 = '';
 let CLIENT_DELIVERY = {};
 /* ========= CONFIG ========= */
-
+const CUTOFF_HOUR = 00;
 
 let MENU = {};
 let DATES = [];
@@ -561,17 +561,52 @@ async function fetchClient() {
 
   MENU = data.menu || {};
   DATES = Object.keys(MENU).sort();
-  
-  /* ✅ ADMIN MODE — NO CUTOFF */
-  VISIBLE_DATES = DATES.filter(d => MENU[d]);
-  currentIndex = 0;
-  
+  applyCutoff();
   initState();
   renderCurrentDay();
-
 }
 
 
+/* ========= CUTOFF ========= */
+function applyCutoff() {
+
+  const now = new Date();
+  const today = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate()
+  );
+
+  const todayStr =
+    today.getFullYear() + '-' +
+    String(today.getMonth() + 1).padStart(2, '0') + '-' +
+    String(today.getDate()).padStart(2, '0');
+
+  const todayExists = DATES.includes(todayStr);
+
+  if (!todayExists) {
+    // Show only valid dates that exist in MENU
+    VISIBLE_DATES = DATES.filter(d => MENU[d]);
+    currentIndex = 0;
+    return;
+  }
+
+  let targetDate = new Date(today);
+  targetDate.setDate(today.getDate() + 1);
+
+  if (CUTOFF_HOUR > 0 && now.getHours() >= CUTOFF_HOUR) {
+    targetDate.setDate(targetDate.getDate() + 1);
+  }
+
+  const targetStr =
+    targetDate.getFullYear() + '-' +
+    String(targetDate.getMonth() + 1).padStart(2, '0') + '-' +
+    String(targetDate.getDate()).padStart(2, '0');
+
+  VISIBLE_DATES = DATES.filter(d => d >= targetStr && MENU[d]);
+
+  currentIndex = 0;
+}
 
 /* ========= STATE ========= */
 function initState(){
@@ -648,8 +683,13 @@ function initState(){
 function hasAfternoonEveningSlots() {
   return CLIENT_DELIVERY?.afternoon && CLIENT_DELIVERY?.evening;
 }
-
-
+function hasAfternoonEveningOnly() {
+  return (
+    !CLIENT_DELIVERY?.morning &&
+    CLIENT_DELIVERY?.afternoon &&
+    CLIENT_DELIVERY?.evening
+  );
+}
 
 
 /* ========= RENDER ========= */
@@ -712,7 +752,10 @@ function renderCurrentDay(){
      ${!hasAfternoonEveningSlots() ? `
         <label>Location</label>
         <select id="loc_${date}"
-          onchange="STATE['${date}'].sections.option1.location=this.value">
+          onchange="
+            STATE['${date}'].sections.option1.location=this.value;
+            STATE['${date}'].sections.option2.location=this.value;
+          ">
       
           ${CLIENT_LOCATION_1 ? `
             <option value="${CLIENT_LOCATION_1}"
@@ -745,7 +788,10 @@ function renderBlock(date, slot, title) {
   if (!items || !Object.keys(items).length) return '';
 
   const showSlotControls =
-    hasAfternoonEveningSlots() && (slot !== 'breakfast');
+  slot === 'breakfast'
+    ? hasAfternoonEveningOnly()
+    : hasAfternoonEveningSlots();
+
 
   const showLocationControl =
     hasAfternoonEveningSlots() &&
@@ -883,7 +929,7 @@ function updateSectionSlot(date, section, value) {
 function updateSectionLocation(date, section, value) {
   STATE[date].sections[section].location = value;
 }
-function nextDay(event){
+function nextDay(){
 
   if (currentIndex < VISIBLE_DATES.length - 1) {
     currentIndex++;
@@ -895,6 +941,7 @@ function nextDay(event){
     }
   }
 }
+
 
 
 
@@ -984,13 +1031,21 @@ async function saveCurrentDay(btn) {
   }
 }
 
-async function handleSubmit(event) {
+  async function handleSubmit(event) {
 
   const btn = event.target;
+
+  // 🔒 Prevent double click
+  if (btn.dataset.locked === "true") return;
+
+  btn.dataset.locked = "true";
+  btn.disabled = true;
   btn.classList.add("loading");
 
   const phone = document.getElementById('phone').value.trim();
   if (!phone) {
+    btn.disabled = false;
+    btn.dataset.locked = "false";
     btn.classList.remove("loading");
     return alert("Phone missing");
   }
@@ -998,7 +1053,6 @@ async function handleSubmit(event) {
   const allDays = [];
 
   VISIBLE_DATES.forEach(date => {
-
     if (!hasSelectionForDate(date)) return;
 
     allDays.push({
@@ -1006,10 +1060,11 @@ async function handleSubmit(event) {
       sections: STATE[date].sections,
       cancel: STATE[date].cancel
     });
-
   });
 
   if (!allDays.length) {
+    btn.disabled = false;
+    btn.dataset.locked = "false";
     btn.classList.remove("loading");
     return alert("No selections made.");
   }
@@ -1030,13 +1085,19 @@ async function handleSubmit(event) {
       body: params
     });
 
-    btn.classList.remove("loading");
     generateSummary();
 
   } catch (err) {
-    btn.classList.remove("loading");
     alert("Network error. Please try again.");
   }
+
+  btn.classList.remove("loading");
+
+  // ⏳ Keep disabled for 60 seconds
+  setTimeout(() => {
+    btn.disabled = false;
+    btn.dataset.locked = "false";
+  }, 60000);
 }
 
 
@@ -1298,14 +1359,73 @@ document.addEventListener("click", function(){
   const dd = document.getElementById("dayDropdown");
   if (dd) dd.style.display = "none";
 });
+function resetAllSelections() {
 
+  Object.keys(STATE).forEach(date => {
+
+    const day = STATE[date];
+    if (!day) return;
+
+    day.cancel = false;
+
+    Object.values(day.sections).forEach(sec => {
+
+      Object.values(sec.items || {}).forEach(item => {
+        item.qty = 0;
+      });
+
+    });
+
+  });
+
+  renderCurrentDay();
+}
+async function shareSummary() {
+
+  const summaryDiv = document.getElementById("summaryContent");
+
+  let text = summaryDiv.innerText;
+
+  const clientName = document.getElementById("clientName").value;
+  const phone = document.getElementById("phone").value;
+
+  const header =
+`Friska Wellness - Weekly Meal Confirmation
+Client: ${clientName}
+Phone: ${phone}
+
+`;
+
+  const finalText = header + text;
+
+  // ✅ Use native share if supported
+  if (navigator.share) {
+    try {
+      await navigator.share({
+        title: "Friska Weekly Meal Summary",
+        text: finalText
+      });
+    } catch (err) {
+      console.log("Share cancelled");
+    }
+  } else {
+    // Fallback for desktop
+    navigator.clipboard.writeText(finalText);
+    alert("Summary copied to clipboard. Paste anywhere to share.");
+  }
+}
 </script>
   </div>
   <div id="summaryModal" class="modal">
   <div class="modal-content">
-    <h3>Order Summary</h3>
+    <h3 style="color:#2e7d32;">Submitted Successfully ✅</h3>
+    <h4 style="text-align:center;margin-top:-10px;">Order Summary</h4>
     <div id="summaryContent"></div>
-    <button class="btn" onclick="closeSummary()">Close</button>
+    <div style="display:flex; gap:10px;">
+      <button class="btn secondary" onclick="shareSummary()">Share</button>
+      <button class="btn" onclick="closeSummary()">Close</button>
+    </div>
+
   </div>
 </div>
 </body>
