@@ -6,7 +6,7 @@
       content="width=device-width, initial-scale=1, maximum-scale=5, user-scalable=yes">
 
     <style>
-  * { box-sizing: border-box; }
+  * { box-sizing: border-box; }     
   body {
     margin: 0;
     padding: 0;
@@ -24,25 +24,26 @@
     content: "";
     position: fixed;
     inset: 0;
-    background-image: url("bg.png"); /* image in main folder */
+    background-image: url("bg.webp"); /* image in main folder */
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;
     z-index: -2;
     transform: scale(1.03); /* subtle premium zoom */
   }
+  
+  /* Soft elegant overlay */
+  body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background: linear-gradient(
+      rgba(255,255,255,0.78),
+      rgba(255,255,255,0.88)
+    );
+    z-index: -1;
+  }
 
-/* Soft elegant overlay */
-body::after {
-  content: "";
-  position: fixed;
-  inset: 0;
-  background: linear-gradient(
-    rgba(255,255,255,0.78),
-    rgba(255,255,255,0.88)
-  );
-  z-index: -1;
-}
   .app {
     width: 100%;
     max-width: 100%;
@@ -82,7 +83,7 @@ body::after {
     border-radius: 16px;
     padding: 16px;
     margin-bottom: 16px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+    box-shadow: 0 4px 14px rgba(0,0,0,0.08);
   }
 
   /* FORM */
@@ -264,6 +265,7 @@ body::after {
   }
   /* ====== LAYOUT FIX ====== */
 
+
   .wrapper {
     width: 96%;
     max-width: 900px;
@@ -284,7 +286,7 @@ body::after {
     overflow-x: hidden;
     -webkit-overflow-scrolling: touch;
   }
- 
+  
   .day-header {
     display: flex;
     justify-content: space-between;
@@ -517,7 +519,7 @@ body::after {
 </div>
 
 <script>
-const API_URL = "https://script.google.com/macros/s/AKfycbzQ33LZwdZmX5RoRa-LHlcQZ2O1DCvRg-z_BV6teQkncRPY1WBWzITJG75K0JXAtII5/exec";  
+const API_URL = "https://script.google.com/macros/s/AKfycbzf4k9gongw9Brg2ue0fSRS1SFsrhtjFR6qwyyCfkDqUdxt6FJy8QMdwJg-cJptioPv/exec";  
 let CLIENT_LOCATION_1 = '';
 let CLIENT_LOCATION_2 = '';
 let CLIENT_DELIVERY = {};
@@ -662,6 +664,18 @@ function initState(){
 
       STATE[date].sections.option1.location = defaultLocation;
       STATE[date].sections.option2.location = defaultLocation;
+    }
+    // 🔵 FIX: Pre-assign location for dual-slot clients
+    if (hasAfternoonEveningSlots()) {
+    
+      if (CLIENT_LOCATION_1) {
+        STATE[date].sections.option1.location = CLIENT_LOCATION_1;
+      }
+    
+      if (CLIENT_LOCATION_2) {
+        STATE[date].sections.option2.location = CLIENT_LOCATION_2;
+      }
+    
     }
 
     // Populate items
