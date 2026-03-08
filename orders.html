@@ -111,7 +111,7 @@ const data=await res.json();
 
 let html="";
 
-Object.keys(data.orders).forEach(date=>{
+Object.keys(data.orders).sort().forEach(date=>{
 
 html+=`<div class="card"><h3>${date}</h3>`;
 
