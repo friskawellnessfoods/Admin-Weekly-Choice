@@ -176,6 +176,7 @@ async function loadOrders(){
 
 const btn=document.getElementById("loadBtn");
 btn.classList.add("loading");
+btn.disabled=true;
 
 const start=document.getElementById("start").value;
 const end=document.getElementById("end").value;
@@ -217,6 +218,7 @@ html+="</div>";
 
 document.getElementById("results").innerHTML=html;
 btn.classList.remove("loading");
+btn.disabled=false;
   
 }
 window.addEventListener("load",()=>{
