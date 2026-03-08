@@ -134,7 +134,11 @@
     background: #e0e0e0;
     color: #000;
   }
-
+      
+<button class="menu-btn" onclick="openMenu()">
+View Weekly Menu
+</button>
+      
   /* SECTION HEADER */
   .section-header {
   display: flex;
@@ -596,7 +600,11 @@ async function fetchClient() {
   document.getElementById("viewPastBtn").style.display = "block";
 }
 
+function openMenu(){
 
+window.open("menu.html","_blank");
+
+}
 /* ========= CUTOFF ========= */
 function applyCutoff() {
 
