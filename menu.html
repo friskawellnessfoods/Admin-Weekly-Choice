@@ -364,12 +364,16 @@ const spinner = document.getElementById("downloadSpinner");
 
 text.innerText = "Preparing PDF";
 spinner.style.display = "inline-block";
-
 btn.disabled = true;
 
 const { jsPDF } = window.jspdf;
-
 const pdf = new jsPDF("p","mm","a4");
+
+/* FORCE DESKTOP LAYOUT */
+
+const grid = document.querySelector(".menu-grid");
+grid.style.gridTemplateColumns = "repeat(3,1fr)";
+grid.style.width = "1200px";
 
 const categories = [
 {key:"veg",label:"VEGETARIAN"},
@@ -387,9 +391,7 @@ renderMenu();
 
 await new Promise(r=>setTimeout(r,400));
 
-const element = document.querySelector(".menu-grid");
-
-const canvas = await html2canvas(element,{
+const canvas = await html2canvas(grid,{
 scale:2,
 useCORS:true
 });
@@ -408,16 +410,18 @@ pdf.addImage(imgData,"PNG",5,20,200,pdfHeight);
 
 }
 
+/* RESTORE MOBILE LAYOUT */
+
+grid.style.gridTemplateColumns = "";
+grid.style.width = "";
+
 activeProtein="all";
 renderMenu();
 
 pdf.save("Weekly_Menu.pdf");
 
-/* restore button */
-
 text.innerText = "DOWNLOAD MENU";
 spinner.style.display = "none";
-
 btn.disabled = false;
 
 }
