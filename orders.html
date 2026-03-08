@@ -178,6 +178,8 @@ const btn=document.getElementById("loadBtn");
 btn.classList.add("loading");
 btn.disabled=true;
 
+try{
+
 const start=document.getElementById("start").value;
 const end=document.getElementById("end").value;
 
@@ -196,12 +198,23 @@ const data=await res.json();
 
 let html="";
 
-Object.keys(data.orders).sort().forEach(date=>{
+if(!data.orders || Object.keys(data.orders).length===0){
+
+document.getElementById("results").innerHTML=
+`<div class="card empty">No orders found for selected dates.</div>`;
+
+return;
+
+}
+
+const dates=Object.keys(data.orders).sort();
+
+for(const date of dates){
 
 html+=`<div class="card">
 <div class="order-date">${date}</div>`;
 
-data.orders[date].forEach(r=>{
+for(const r of data.orders[date]){
 
 html+=`<div class="slot"><b>${r.slot}</b> - ${r.location}</div>`;
 
@@ -210,16 +223,25 @@ html+=`<div class="slot"><b>${r.slot}</b> - ${r.location}</div>`;
 if(r[k]) html+=`<div class="dish">• ${r[k]}</div>`;
 });
 
-});
+}
 
 html+="</div>";
 
-});
+}
 
 document.getElementById("results").innerHTML=html;
+
+}
+catch(e){
+
+document.getElementById("results").innerHTML=
+`<div class="card empty">Error loading orders.</div>`;
+
+}
+
 btn.classList.remove("loading");
 btn.disabled=false;
-  
+
 }
 window.addEventListener("load",()=>{
 
