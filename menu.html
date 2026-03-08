@@ -2,7 +2,6 @@
 <html>
 
 <head>
-
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Weekly Menu</title>
 
@@ -29,16 +28,19 @@ letter-spacing:4px;
 margin-bottom:20px;
 }
 
+/* Tabs */
+
 .tabs{
 display:flex;
 justify-content:center;
+flex-wrap:wrap;
 gap:10px;
-margin-bottom:30px;
+margin-bottom:35px;
 }
 
 .tab{
-padding:10px 20px;
-border:1px solid #ccc;
+padding:8px 18px;
+border:1px solid #bbb;
 background:white;
 cursor:pointer;
 font-weight:bold;
@@ -49,6 +51,8 @@ background:black;
 color:white;
 }
 
+/* Grid */
+
 .menu-grid{
 display:grid;
 grid-template-columns:repeat(3,1fr);
@@ -57,30 +61,35 @@ gap:30px;
 
 .day-card{
 background:white;
-padding:20px;
+padding:25px;
 border:1px solid #ddd;
 }
 
 .day-card h2{
 text-align:center;
-letter-spacing:2px;
-margin-bottom:16px;
+letter-spacing:3px;
+margin-bottom:25px;
 }
 
+/* Sections */
+
 .section{
-margin-bottom:14px;
+margin-bottom:22px;
 }
 
 .label{
+text-align:center;
 font-weight:bold;
 text-decoration:underline;
-font-size:13px;
+font-size:14px;
+margin-bottom:10px;
 }
 
 .dish{
-font-size:14px;
-margin-top:4px;
-line-height:1.4;
+text-align:left;
+font-size:15px;
+line-height:1.6;
+margin-bottom:4px;
 }
 
 .loading{
@@ -90,20 +99,12 @@ font-size:18px;
 }
 
 @media(max-width:900px){
-
 .menu-grid{
 grid-template-columns:1fr;
 }
-
-.tabs{
-flex-direction:column;
-align-items:center;
-}
-
 }
 
 </style>
-
 </head>
 
 <body>
@@ -114,9 +115,11 @@ align-items:center;
 
 <div class="tabs">
 
-<div class="tab active" onclick="switchProtein('veg',this)">VEGETARIAN</div>
+<div class="tab active" onclick="switchProtein('all',this)">ALL</div>
+<div class="tab" onclick="switchProtein('veg',this)">VEGETARIAN</div>
 <div class="tab" onclick="switchProtein('chicken',this)">CHICKEN</div>
-<div class="tab" onclick="switchProtein('egg',this)">EGG & SEAFOOD</div>
+<div class="tab" onclick="switchProtein('egg',this)">EGG</div>
+<div class="tab" onclick="switchProtein('seafood',this)">SEAFOOD</div>
 
 </div>
 
@@ -129,7 +132,7 @@ align-items:center;
 <script>
 
 let weeklyMenu = {};
-let activeProtein = "veg";
+let activeProtein = "all";
 
 async function loadMenu(){
 
@@ -174,20 +177,25 @@ if(!arr) return "";
 return arr
 .filter(x=>{
 
-const p = (x.protein||"").toLowerCase();
+if(activeProtein==="all") return true;
 
-if(activeProtein==="veg") return p==="veg";
+const p=(x.protein||"").toLowerCase();
 
-if(activeProtein==="chicken") return p==="chicken";
-
-if(activeProtein==="egg")
-return p==="egg" || p==="seafood";
-
-return true;
+return p===activeProtein;
 
 })
-.map(x=>x.label)
-.join("<br>");
+.map(x=>`<div class="dish">${x.label}</div>`)
+.join("");
+
+}
+
+function simpleList(arr){
+
+if(!arr) return "";
+
+return arr
+.map(x=>`<div class="dish">${x.label||x}</div>`)
+.join("");
 
 }
 
@@ -198,28 +206,28 @@ const card = `
 
 <div class="section">
 <div class="label">BREAKFAST</div>
-<div class="dish">${filterProtein(d.breakfast)}</div>
+${filterProtein(d.breakfast)}
 </div>
 
 <div class="section">
 <div class="label">OPTION 1</div>
-<div class="dish">${filterProtein(d.option1)}</div>
+${filterProtein(d.option1)}
 </div>
 
 <div class="section">
 <div class="label">OPTION 2</div>
-<div class="dish">${filterProtein(d.option2)}</div>
+${filterProtein(d.option2)}
 </div>
 
 <div class="section">
 <div class="label">SNACK</div>
-<div class="dish">${(d.snack||[]).map(x=>x.label).join("<br>")}</div>
+${simpleList(d.snack)}
 </div>
 
 <div class="section">
 <div class="label">JUICES</div>
-<div class="dish">${(d.juice1||[]).join("<br>")}</div>
-<div class="dish">${(d.juice2||[]).join("<br>")}</div>
+${simpleList(d.juice1)}
+${simpleList(d.juice2)}
 </div>
 
 </div>
