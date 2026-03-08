@@ -129,15 +129,26 @@
   .btn:active {
     transform: scale(0.98);
   }
+.menu-btn{
 
+background:#0a1a6e;
+color:white;
+
+border:none;
+padding:10px 18px;
+
+font-weight:bold;
+letter-spacing:1px;
+
+cursor:pointer;
+margin-top:10px;
+
+}
   .btn.secondary {
     background: #e0e0e0;
     color: #000;
   }
       
-<button class="menu-btn" onclick="openMenu()">
-View Weekly Menu
-</button>
       
   /* SECTION HEADER */
   .section-header {
@@ -468,6 +479,10 @@ View Weekly Menu
   <input id="phone" inputmode="numeric"
          onkeydown="if(event.key==='Enter'){fetchClient()}">
   <button class="btn" onclick="fetchClient(event)">Login</button>
+
+  <button class="btn secondary" onclick="openMenu()">
+  View Weekly Menu
+  </button>
   
   <button class="btn" id="viewPastBtn" style="display:none;" onclick="openOrdersPage()">
     View Past Selections
