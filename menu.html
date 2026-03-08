@@ -27,7 +27,31 @@ background:linear-gradient(
 #e6b93f 100%
 );
 }
+.spinner{
 
+width:16px;
+height:16px;
+
+border:2px solid rgba(255,255,255,0.4);
+border-top:2px solid white;
+
+border-radius:50%;
+
+display:inline-block;
+
+margin-left:8px;
+
+animation:spin 0.8s linear infinite;
+
+}
+
+@keyframes spin{
+
+0%{ transform:rotate(0deg); }
+
+100%{ transform:rotate(360deg); }
+
+}
 .menu-wrapper{
 max-width:1200px;
 margin:auto;
@@ -194,7 +218,11 @@ font-size:34px;
 <div class="tab" onclick="switchProtein('seafood',this)">SEAFOOD</div>
 
 <button id="downloadBtn" class="download-btn" onclick="downloadMenuPDF()">
-DOWNLOAD MENU
+
+<span id="downloadText">DOWNLOAD MENU</span>
+
+<span id="downloadSpinner" class="spinner" style="display:none;"></span>
+
 </button>
 
 </div>
@@ -331,8 +359,12 @@ grid.innerHTML += card;
 async function downloadMenuPDF(){
 
 const btn = document.getElementById("downloadBtn");
+const text = document.getElementById("downloadText");
+const spinner = document.getElementById("downloadSpinner");
 
-btn.innerText = "Preparing PDF...";
+text.innerText = "Preparing PDF";
+spinner.style.display = "inline-block";
+
 btn.disabled = true;
 
 const { jsPDF } = window.jspdf;
@@ -376,14 +408,16 @@ pdf.addImage(imgData,"PNG",5,20,200,pdfHeight);
 
 }
 
-activeProtein = "all";
+activeProtein="all";
 renderMenu();
 
 pdf.save("Weekly_Menu.pdf");
 
 /* restore button */
 
-btn.innerText = "DOWNLOAD MENU";
+text.innerText = "DOWNLOAD MENU";
+spinner.style.display = "none";
+
 btn.disabled = false;
 
 }
