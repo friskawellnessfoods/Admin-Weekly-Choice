@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Weekly Menu</title>
+
+<script src="config.js"></script>
+
+<style>
+
+body{
+font-family: Georgia, serif;
+background:#f4f4f4;
+margin:0;
+padding:20px;
+color:#333;
+}
+
+.menu-wrapper{
+max-width:1200px;
+margin:auto;
+}
+
+.menu-title{
+text-align:center;
+font-size:44px;
+letter-spacing:4px;
+margin-bottom:40px;
+}
+
+.menu-grid{
+display:grid;
+grid-template-columns:repeat(3,1fr);
+gap:30px;
+}
+
+.day-card{
+background:#ffffff;
+padding:20px;
+border:1px solid #ddd;
+min-height:280px;
+}
+
+.day-card h2{
+text-align:center;
+letter-spacing:2px;
+margin-bottom:16px;
+font-size:20px;
+}
+
+.section{
+margin-bottom:14px;
+}
+
+.label{
+font-weight:bold;
+letter-spacing:1px;
+text-decoration:underline;
+font-size:13px;
+}
+
+.dish{
+font-size:14px;
+margin-top:4px;
+line-height:1.4;
+}
+
+.loading{
+text-align:center;
+font-size:18px;
+padding:60px;
+}
+
+@media(max-width:900px){
+
+.menu-grid{
+grid-template-columns:1fr;
+}
+
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="menu-wrapper">
+
+<h1 class="menu-title">WEEKLY MENU</h1>
+
+<div id="menuGrid" class="menu-grid">
+<div class="loading">Loading menu...</div>
+</div>
+
+</div>
+
+<script>
+
+async function loadMenu(){
+
+try{
+
+const res = await fetch(API_URL + "?action=getMenuForWeek");
+
+const menu = await res.json();
+
+renderMenu(menu);
+
+}catch(e){
+
+document.getElementById("menuGrid").innerHTML =
+"<div class='loading'>Menu could not be loaded</div>";
+
+}
+
+}
+
+function renderMenu(menu){
+
+const days = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+
+const grid = document.getElementById("menuGrid");
+
+grid.innerHTML="";
+
+days.forEach(day=>{
+
+const d = menu[day];
+
+if(!d) return;
+
+const card = `
+<div class="day-card">
+
+<h2>${day.toUpperCase()}</h2>
+
+<div class="section">
+<div class="label">BREAKFAST</div>
+<div class="dish">${d.breakfast || ""}</div>
+</div>
+
+<div class="section">
+<div class="label">OPTION 1</div>
+<div class="dish">${d.opt1 || ""}</div>
+</div>
+
+<div class="section">
+<div class="label">OPTION 2</div>
+<div class="dish">${d.opt2 || ""}</div>
+</div>
+
+<div class="section">
+<div class="label">SNACK</div>
+<div class="dish">${d.snack || ""}</div>
+</div>
+
+<div class="section">
+<div class="label">JUICES</div>
+<div class="dish">${d.juice1 || ""}</div>
+<div class="dish">${d.juice2 || ""}</div>
+</div>
+
+</div>
+`;
+
+grid.innerHTML += card;
+
+});
+
+}
+
+loadMenu();
+
+</script>
+
+</body>
+</html>
