@@ -107,8 +107,10 @@ background-size:cover;
 background-position:center;
 
 padding:28px;
-border:1px solid #d4c38a;
-border-radius:4px; 
+
+border:2px solid #000;   /* BLACK BORDER */
+
+border-radius:4px;
 
 box-shadow:0 6px 18px rgba(0,0,0,0.08);
 
@@ -191,7 +193,9 @@ font-size:34px;
 <div class="tab" onclick="switchProtein('egg',this)">EGG</div>
 <div class="tab" onclick="switchProtein('seafood',this)">SEAFOOD</div>
 
-<button class="download-btn" onclick="downloadMenuPDF()">DOWNLOAD MENU</button>
+<button id="downloadBtn" class="download-btn" onclick="downloadMenuPDF()">
+DOWNLOAD MENU
+</button>
 
 </div>
 
@@ -326,6 +330,11 @@ grid.innerHTML += card;
 
 async function downloadMenuPDF(){
 
+const btn = document.getElementById("downloadBtn");
+
+btn.innerText = "Preparing PDF...";
+btn.disabled = true;
+
 const { jsPDF } = window.jspdf;
 
 const pdf = new jsPDF("p","mm","a4");
@@ -371,6 +380,11 @@ activeProtein = "all";
 renderMenu();
 
 pdf.save("Weekly_Menu.pdf");
+
+/* restore button */
+
+btn.innerText = "DOWNLOAD MENU";
+btn.disabled = false;
 
 }
 
