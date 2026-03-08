@@ -474,6 +474,13 @@
   <label>Remarks</label>
   <input type="text" id="clientRemarks">
 </div>
+<div class="box" id="historyTools" style="display:none;">
+
+  <button class="btn secondary" onclick="openOrdersPage()">
+    View Weekly Selections
+  </button>
+
+</div>  
 <div class="box" id="presetBox">
 
   <details>
@@ -587,6 +594,8 @@ async function fetchClient() {
   applyCutoff();
   initState();
   renderCurrentDay();
+
+  document.getElementById("historyTools").style.display = "block";
 }
 
 
@@ -1448,6 +1457,22 @@ Phone: ${phone}
     navigator.clipboard.writeText(finalText);
     alert("Summary copied to clipboard. Paste anywhere to share.");
   }
+}
+
+function openOrdersPage(){
+
+  const phone = document.getElementById("phone").value.trim();
+
+  if(!phone){
+    alert("Login first");
+    return;
+  }
+
+  const url =
+    "orders.html?phone=" + encodeURIComponent(phone);
+
+  window.open(url, "_blank");
+
 }
 </script>
   </div>
