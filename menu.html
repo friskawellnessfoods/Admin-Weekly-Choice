@@ -2,7 +2,8 @@
 <html>
 
 <head>
-
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Weekly Menu</title>
 
@@ -327,76 +328,47 @@ async function downloadMenuPDF(){
 
 const { jsPDF } = window.jspdf;
 
-const pdf = new jsPDF();
+const pdf = new jsPDF("p","mm","a4");
 
-const categories = ["veg","chicken","egg","seafood"];
+const categories = [
+{key:"veg",label:"VEGETARIAN"},
+{key:"chicken",label:"CHICKEN"},
+{key:"egg",label:"EGG"},
+{key:"seafood",label:"SEAFOOD"}
+];
 
-categories.forEach((cat,index)=>{
+for(let i=0;i<categories.length;i++){
 
-if(index>0) pdf.addPage();
+const cat = categories[i];
 
-let y = 20;
+activeProtein = cat.key;
+renderMenu();
 
-pdf.setFontSize(20);
-pdf.text(cat.toUpperCase()+" MENU",105,y,{align:"center"});
+await new Promise(r=>setTimeout(r,400));
 
-y += 10;
+const element = document.querySelector(".menu-grid");
 
-const dates = Object.keys(weeklyMenu).sort();
+const canvas = await html2canvas(element,{
+scale:2,
+useCORS:true
+});
 
-dates.forEach(date=>{
+const imgData = canvas.toDataURL("image/png");
 
-const d = weeklyMenu[date];
+const pdfWidth = 210;
+const pdfHeight = canvas.height * pdfWidth / canvas.width;
 
-const dayName = new Date(date)
-.toLocaleDateString('en-US',{weekday:'long'});
+if(i>0) pdf.addPage();
 
-y += 10;
+pdf.setFontSize(22);
+pdf.text(cat.label + " MENU",105,15,{align:"center"});
 
-pdf.setFontSize(14);
-pdf.text(dayName.toUpperCase(),10,y);
-
-function filter(arr){
-
-if(!arr) return [];
-
-return arr.filter(x=>{
-const p=(x.protein||"").toLowerCase();
-return p===cat;
-}).map(x=>x.label);
+pdf.addImage(imgData,"PNG",5,20,200,pdfHeight);
 
 }
 
-const sections = [
-
-["Breakfast",filter(d.breakfast)],
-["Option 1",filter(d.option1)],
-["Option 2",filter(d.option2)]
-
-];
-
-sections.forEach(sec=>{
-
-if(sec[1].length===0) return;
-
-y += 6;
-pdf.setFontSize(11);
-pdf.text(sec[0],10,y);
-
-sec[1].forEach(item=>{
-
-y += 5;
-
-pdf.setFontSize(10);
-pdf.text("- "+item,12,y);
-
-});
-
-});
-
-});
-
-});
+activeProtein = "all";
+renderMenu();
 
 pdf.save("Weekly_Menu.pdf");
 
