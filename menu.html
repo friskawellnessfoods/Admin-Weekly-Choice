@@ -15,7 +15,6 @@ font-family: Georgia, serif;
 background:#f4f4f4;
 margin:0;
 padding:20px;
-color:#333;
 }
 
 .menu-wrapper{
@@ -25,7 +24,7 @@ margin:auto;
 
 .menu-title{
 text-align:center;
-font-size:44px;
+font-size:42px;
 letter-spacing:4px;
 margin-bottom:40px;
 }
@@ -37,17 +36,15 @@ gap:30px;
 }
 
 .day-card{
-background:#ffffff;
+background:white;
 padding:20px;
 border:1px solid #ddd;
-min-height:280px;
 }
 
 .day-card h2{
 text-align:center;
 letter-spacing:2px;
 margin-bottom:16px;
-font-size:20px;
 }
 
 .section{
@@ -56,7 +53,6 @@ margin-bottom:14px;
 
 .label{
 font-weight:bold;
-letter-spacing:1px;
 text-decoration:underline;
 font-size:13px;
 }
@@ -64,21 +60,18 @@ font-size:13px;
 .dish{
 font-size:14px;
 margin-top:4px;
-line-height:1.4;
 }
 
 .loading{
 text-align:center;
 font-size:18px;
-padding:60px;
+padding:40px;
 }
 
 @media(max-width:900px){
-
 .menu-grid{
 grid-template-columns:1fr;
 }
-
 }
 
 </style>
@@ -101,66 +94,61 @@ grid-template-columns:1fr;
 
 async function loadMenu(){
 
-try{
-
-const res = await fetch(API_URL + "?action=getMenuForWeek");
-
+const res = await fetch(API_URL + "?action=getMenu");
 const menu = await res.json();
 
 renderMenu(menu);
-
-}catch(e){
-
-document.getElementById("menuGrid").innerHTML =
-"<div class='loading'>Menu could not be loaded</div>";
-
-}
 
 }
 
 function renderMenu(menu){
 
-const days = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
-
 const grid = document.getElementById("menuGrid");
-
 grid.innerHTML="";
 
-days.forEach(day=>{
+const dates = Object.keys(menu).sort();
 
-const d = menu[day];
+dates.forEach(date=>{
 
-if(!d) return;
+const d = menu[date];
+
+const dayName = new Date(date)
+  .toLocaleDateString('en-US',{weekday:'long'});
+
+function joinLabels(arr){
+if(!arr) return "";
+return arr.map(x=>x.label || x).join("<br>");
+}
 
 const card = `
 <div class="day-card">
 
-<h2>${day.toUpperCase()}</h2>
+<h2>${dayName.toUpperCase()}</h2>
 
 <div class="section">
 <div class="label">BREAKFAST</div>
-<div class="dish">${d.breakfast || ""}</div>
+<div class="dish">${joinLabels(d.breakfast)}</div>
 </div>
 
 <div class="section">
 <div class="label">OPTION 1</div>
-<div class="dish">${d.opt1 || ""}</div>
+<div class="dish">${joinLabels(d.option1)}</div>
 </div>
 
 <div class="section">
 <div class="label">OPTION 2</div>
-<div class="dish">${d.opt2 || ""}</div>
+<div class="dish">${joinLabels(d.option2)}</div>
 </div>
 
 <div class="section">
 <div class="label">SNACK</div>
-<div class="dish">${d.snack || ""}</div>
+<div class="dish">${joinLabels(d.snack)}</div>
 </div>
 
 <div class="section">
 <div class="label">JUICES</div>
-<div class="dish">${d.juice1 || ""}</div>
-<div class="dish">${d.juice2 || ""}</div>
+<div class="dish">${(d.juice1||[]).join("<br>")}</div>
+<div class="dish">${(d.juice2||[]).join("<br>")}</div>
 </div>
 
 </div>
