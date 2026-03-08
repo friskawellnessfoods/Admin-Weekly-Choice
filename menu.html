@@ -23,25 +23,22 @@ max-width:1200px;
 margin:auto;
 }
 
-/* LOGO */
+.menu-header{
+display:flex;
+align-items:center;
+justify-content:center;
+gap:15px;
+margin-bottom:25px;
+}
 
 .logo{
-display:flex;
-justify-content:center;
-margin-bottom:10px;
+height:55px;
 }
-
-.logo img{
-height:60px;
-}
-
-/* TITLE */
 
 .menu-title{
-text-align:center;
 font-size:44px;
 letter-spacing:6px;
-margin-bottom:20px;
+margin:0;
 }
 
 /* TABS */
@@ -143,8 +140,12 @@ font-size:34px;
 
 <div class="menu-wrapper">
 
-<div class="logo">
-<img src="logo.png">
+<div class="menu-header">
+
+<img src="logo.png" class="logo">
+
+<h1 class="menu-title">WEEKLY MENU</h1>
+
 </div>
 
 <h1 class="menu-title">WEEKLY MENU</h1>
