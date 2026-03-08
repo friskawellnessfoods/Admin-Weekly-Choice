@@ -11,11 +11,17 @@
 <style>
 
 body{
-font-family: "Georgia", serif;
-background:#f5f5f5;
+font-family:"Georgia",serif;
 margin:0;
 padding:20px;
 color:#222;
+
+background:linear-gradient(
+180deg,
+#f7e27a 0%,
+#f2d35a 40%,
+#e6b93f 100%
+);
 }
 
 .menu-wrapper{
@@ -76,9 +82,17 @@ gap:30px;
 /* DAY CARD */
 
 .day-card{
-background:white;
+
+background-image:url("bg.webp");
+background-size:cover;
+background-position:center;
+
 padding:28px;
-border:1px solid #ddd;
+border:1px solid #d4c38a;
+border-radius:4px; 
+
+box-shadow:0 6px 18px rgba(0,0,0,0.08);
+
 }
 
 .day-card h2{
@@ -115,7 +129,7 @@ margin-bottom:6px;
 
 .divider{
 height:1px;
-background:#ddd;
+background:#d6b85c;
 margin:18px 0;
 }
 
