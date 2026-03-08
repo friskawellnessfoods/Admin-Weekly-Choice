@@ -8,13 +8,16 @@
 
 <script src="config.js"></script>
 
+<!-- PDF LIBRARY -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
 <style>
 
 body{
 font-family:"Georgia",serif;
 margin:0;
 padding:20px;
-color:#222;
+color:#111;
 
 background:linear-gradient(
 180deg,
@@ -71,6 +74,18 @@ background:black;
 color:white;
 }
 
+/* DOWNLOAD BUTTON */
+
+.download-btn{
+background:#0a1a6e;
+color:white;
+border:none;
+padding:8px 18px;
+font-weight:bold;
+letter-spacing:1px;
+cursor:pointer;
+}
+
 /* GRID */
 
 .menu-grid{
@@ -83,7 +98,10 @@ gap:30px;
 
 .day-card{
 
-background-image:url("bg.webp");
+background:
+linear-gradient(rgba(255,255,255,0.85),rgba(255,255,255,0.85)),
+url("bg.webp");
+
 background-size:cover;
 background-position:center;
 
@@ -123,6 +141,7 @@ margin-bottom:10px;
 font-size:15px;
 line-height:1.7;
 margin-bottom:6px;
+color:#000;
 }
 
 /* DIVIDER */
@@ -170,6 +189,8 @@ font-size:34px;
 <div class="tab" onclick="switchProtein('chicken',this)">CHICKEN</div>
 <div class="tab" onclick="switchProtein('egg',this)">EGG</div>
 <div class="tab" onclick="switchProtein('seafood',this)">SEAFOOD</div>
+
+<button class="download-btn" onclick="downloadMenuPDF()">DOWNLOAD MENU</button>
 
 </div>
 
@@ -297,6 +318,87 @@ ${simpleList(d.juice2)}
 grid.innerHTML += card;
 
 });
+
+}
+
+/* PDF DOWNLOAD */
+
+async function downloadMenuPDF(){
+
+const { jsPDF } = window.jspdf;
+
+const pdf = new jsPDF();
+
+const categories = ["veg","chicken","egg","seafood"];
+
+categories.forEach((cat,index)=>{
+
+if(index>0) pdf.addPage();
+
+let y = 20;
+
+pdf.setFontSize(20);
+pdf.text(cat.toUpperCase()+" MENU",105,y,{align:"center"});
+
+y += 10;
+
+const dates = Object.keys(weeklyMenu).sort();
+
+dates.forEach(date=>{
+
+const d = weeklyMenu[date];
+
+const dayName = new Date(date)
+.toLocaleDateString('en-US',{weekday:'long'});
+
+y += 10;
+
+pdf.setFontSize(14);
+pdf.text(dayName.toUpperCase(),10,y);
+
+function filter(arr){
+
+if(!arr) return [];
+
+return arr.filter(x=>{
+const p=(x.protein||"").toLowerCase();
+return p===cat;
+}).map(x=>x.label);
+
+}
+
+const sections = [
+
+["Breakfast",filter(d.breakfast)],
+["Option 1",filter(d.option1)],
+["Option 2",filter(d.option2)]
+
+];
+
+sections.forEach(sec=>{
+
+if(sec[1].length===0) return;
+
+y += 6;
+pdf.setFontSize(11);
+pdf.text(sec[0],10,y);
+
+sec[1].forEach(item=>{
+
+y += 5;
+
+pdf.setFontSize(10);
+pdf.text("- "+item,12,y);
+
+});
+
+});
+
+});
+
+});
+
+pdf.save("Weekly_Menu.pdf");
 
 }
 
