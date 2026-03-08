@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+
+body{
+font-family:system-ui;
+padding:20px;
+background:#f5f5f5;
+}
+
+.card{
+background:white;
+padding:20px;
+border-radius:12px;
+margin-bottom:15px;
+}
+
+button{
+padding:12px 16px;
+border:none;
+border-radius:8px;
+background:#1976d2;
+color:white;
+}
+
+</style>
+</head>
+
+<body>
+
+<h2>My Orders</h2>
+
+<div class="card">
+
+<label>Start Date</label>
+<input type="date" id="start">
+
+<label>End Date</label>
+<input type="date" id="end">
+
+<button onclick="loadOrders()">Load Orders</button>
+
+</div>
+
+<div id="results"></div>
+
+<script>
+
+const API_URL="YOUR_SCRIPT_URL";
+
+const params=new URLSearchParams(location.search);
+const phone=params.get("phone");
+
+async function loadOrders(){
+
+const start=document.getElementById("start").value;
+const end=document.getElementById("end").value;
+
+const form=new URLSearchParams();
+form.append("action","getClientOrdersByDate");
+form.append("phone",phone);
+form.append("start",start);
+form.append("end",end);
+
+const res=await fetch(API_URL,{
+method:"POST",
+body:form
+});
+
+const data=await res.json();
+
+let html="";
+
+Object.keys(data.orders).forEach(date=>{
+
+html+=`<div class="card"><h3>${date}</h3>`;
+
+data.orders[date].forEach(r=>{
+
+html+=`<div><b>${r.slot}</b> - ${r.location}</div>`;
+
+["option1","option2","breakfast","snack","juice1","juice2"]
+.forEach(k=>{
+if(r[k]) html+=`<div>• ${r[k]}</div>`;
+});
+
+});
+
+html+="</div>";
+
+});
+
+document.getElementById("results").innerHTML=html;
+
+}
+
+</script>
+
+</body>
+</html>
