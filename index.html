@@ -464,7 +464,11 @@
   <input id="phone" inputmode="numeric"
          onkeydown="if(event.key==='Enter'){fetchClient()}">
   <button class="btn" onclick="fetchClient(event)">Login</button>
-
+  
+  <button class="btn" id="viewPastBtn" style="display:none;" onclick="openOrdersPage()">
+    View Past Selections
+  </button>
+  
   <label style="margin-top:24px;">Client Name</label>
   <input type="text" id="clientName" readonly>
 
@@ -474,13 +478,7 @@
   <label>Remarks</label>
   <input type="text" id="clientRemarks">
 </div>
-<div class="box" id="historyTools" style="display:none;">
 
-  <button class="btn secondary" onclick="openOrdersPage()">
-    View Past Selections
-  </button>
-
-</div>  
 <div class="box" id="presetBox">
 
   <details>
@@ -595,7 +593,7 @@ async function fetchClient() {
   initState();
   renderCurrentDay();
 
-  document.getElementById("historyTools").style.display = "block";
+  document.getElementById("viewPastBtn").style.display = "block";
 }
 
 
