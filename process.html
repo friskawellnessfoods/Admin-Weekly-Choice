@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="config.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+      background: #f4f4f4;
+    }
+    .card {
+      background: #fff;
+      border-radius: 16px;
+      padding: 32px;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.08);
+      width: 100%;
+      max-width: 400px;
+    }
+    h2 { text-align: center; margin: 0 0 24px; font-size: 20px; }
+    label { font-size: 14px; font-weight: 500; display: block; margin-bottom: 6px; }
+    input[type="date"] {
+      width: 100%;
+      padding: 14px;
+      font-size: 16px;
+      border-radius: 12px;
+      border: 1px solid #ccc;
+      margin-bottom: 16px;
+    }
+    .btn {
+      width: 100%;
+      padding: 14px;
+      font-size: 16px;
+      border-radius: 12px;
+      border: none;
+      background: #1976d2;
+      color: #fff;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+    #status {
+      margin-top: 16px;
+      text-align: center;
+      font-size: 14px;
+      min-height: 20px;
+    }
+    .success { color: #2e7d32; }
+    .error   { color: #c62828; }
+  </style>
+</head>
+<body>
+<div class="card">
+  <h2>Process Orders by Date</h2>
+
+  <label>Select Date</label>
+  <input type="date" id="dateInput">
+
+  <button class="btn" id="processBtn" onclick="runProcess()">
+    Process to Orders_Output
+  </button>
+
+  <div id="status"></div>
+</div>
+
+<script>
+async function runProcess() {
+
+  const dateVal = document.getElementById('dateInput').value;
+  if (!dateVal) return setStatus('Select a date first.', 'error');
+
+  const btn = document.getElementById('processBtn');
+  btn.disabled = true;
+  btn.textContent = 'Processing...';
+  setStatus('');
+
+  const params = new URLSearchParams();
+  params.append('action', 'processLogByDate');
+  params.append('date', dateVal);
+
+  try {
+    const res = await fetch(API_URL, { method: 'POST', body: params });
+    const data = await res.json();
+
+    if (data.success) {
+      setStatus('✅ ' + data.message, 'success');
+    } else {
+      setStatus('⚠️ ' + data.message, 'error');
+    }
+  } catch (err) {
+    setStatus('❌ Network error. Try again.', 'error');
+  }
+
+  btn.disabled = false;
+  btn.textContent = 'Process to Orders_Output';
+}
+
+function setStatus(msg, type) {
+  const el = document.getElementById('status');
+  el.textContent = msg;
+  el.className = type || '';
+}
+</script>
+</body>
+</html>
