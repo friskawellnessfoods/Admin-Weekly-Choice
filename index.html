@@ -1170,11 +1170,18 @@ async function saveCurrentDay(btn) {
   btn.classList.remove("loading");
 
   // ⏳ Keep disabled for 60 seconds
-  setTimeout(() => {
-    btn.disabled = false;
-    btn.dataset.locked = "false";
-  }, 60000);
-}
+  let countdown = 30;
+    btn.textContent = `Wait ${countdown}s`;
+  
+    const timer = setInterval(() => {
+      countdown--;
+      btn.textContent = countdown > 0 ? `Wait ${countdown}s` : 'Submit & Exit';
+      if (countdown <= 0) {
+        clearInterval(timer);
+        btn.disabled = false;
+        btn.dataset.locked = "false";
+      }
+    }, 1000);
 
 
 
