@@ -1134,11 +1134,22 @@ async function saveCurrentDay(btn) {
     return alert("No selections made.");
   }
 
-  const payload = {
-    phone,
-    remarks: clientRemarks.value || '',
-    days: allDays
-  };
+  const now = new Date();
+    const pad = n => String(n).padStart(2,'0');
+    const submissionTimestamp =
+      pad(now.getDate()) + '-' +
+      pad(now.getMonth()+1) + '-' +
+      now.getFullYear() + ' ' +
+      pad(now.getHours()) + ':' +
+      pad(now.getMinutes()) + ':' +
+      pad(now.getSeconds());
+  
+    const payload = {
+      phone,
+      remarks: clientRemarks.value || '',
+      submissionTimestamp,
+      days: allDays
+    };
 
   const params = new URLSearchParams();
   params.append("action", "submitOrder");
