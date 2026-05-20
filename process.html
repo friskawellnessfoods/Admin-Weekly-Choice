@@ -46,6 +46,7 @@
       margin-top: 8px;
     }
     .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
     .progress-wrap {
       display: none;
       margin-top: 20px;
@@ -56,6 +57,7 @@
       margin-bottom: 6px;
       display: flex;
       justify-content: space-between;
+      align-items: center;
     }
     .progress-track {
       width: 100%;
@@ -64,13 +66,29 @@
       border-radius: 10px;
       overflow: hidden;
     }
-    .progress-fill {
+    .progress-bar {
       height: 100%;
-      width: 0%;
-      background: #1976d2;
+      width: 100%;
       border-radius: 10px;
-      transition: width 0.3s ease;
+      background: linear-gradient(
+        90deg,
+        #1976d2 0%,
+        #64b5f6 40%,
+        #1976d2 80%
+      );
+      background-size: 200% 100%;
+      animation: shimmer 1.5s infinite linear;
     }
+    .progress-bar.done {
+      animation: none;
+      background: #2e7d32;
+      width: 100%;
+    }
+    @keyframes shimmer {
+      0%   { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+
     #status {
       margin-top: 16px;
       text-align: center;
@@ -106,10 +124,10 @@
   <div class="progress-wrap" id="progressWrap">
     <div class="progress-label">
       <span id="progressText">Processing...</span>
-      <span id="progressPct">0%</span>
+      <span id="elapsedTime">0s</span>
     </div>
     <div class="progress-track">
-      <div class="progress-fill" id="progressFill"></div>
+      <div class="progress-bar" id="progressBar"></div>
     </div>
   </div>
 
@@ -118,10 +136,29 @@
 </div>
 
 <script>
+let elapsedTimer = null;
+
+function startTimer() {
+  let seconds = 0;
+  document.getElementById('elapsedTime').textContent = '0s';
+  elapsedTimer = setInterval(() => {
+    seconds++;
+    document.getElementById('elapsedTime').textContent = seconds + 's';
+  }, 1000);
+}
+
+function stopTimer() {
+  if (elapsedTimer) {
+    clearInterval(elapsedTimer);
+    elapsedTimer = null;
+  }
+}
+
 async function runProcess() {
   const btn = document.getElementById('processBtn');
   const resultList = document.getElementById('resultList');
   const progressWrap = document.getElementById('progressWrap');
+  const progressBar = document.getElementById('progressBar');
 
   resultList.innerHTML = '';
   setStatus('');
@@ -132,32 +169,21 @@ async function runProcess() {
   btn.disabled = true;
   btn.textContent = 'Processing...';
   progressWrap.style.display = 'block';
-
-  document.getElementById('progressFill').style.width = '0%';
-  document.getElementById('progressPct').textContent = '0%';
+  progressBar.classList.remove('done');
   document.getElementById('progressText').textContent = 'Processing...';
+
+  startTimer();
 
   try {
     const params = new URLSearchParams();
     params.append('action', 'processLogByDate');
     params.append('date', single);
 
-    // Animate progress while waiting
-    let fakeProgress = 0;
-    const fakeTimer = setInterval(() => {
-      if (fakeProgress < 85) {
-        fakeProgress += 5;
-        document.getElementById('progressFill').style.width = fakeProgress + '%';
-        document.getElementById('progressPct').textContent = fakeProgress + '%';
-      }
-    }, 800);
-
     const res = await fetch(API_URL, { method: 'POST', body: params });
     const data = await res.json();
 
-    clearInterval(fakeTimer);
-    document.getElementById('progressFill').style.width = '100%';
-    document.getElementById('progressPct').textContent = '100%';
+    stopTimer();
+    progressBar.classList.add('done');
     document.getElementById('progressText').textContent = 'Done';
 
     const div = document.createElement('div');
@@ -171,7 +197,9 @@ async function runProcess() {
     resultList.appendChild(div);
 
   } catch (err) {
-    document.getElementById('progressFill').style.width = '0%';
+    stopTimer();
+    progressBar.classList.remove('done');
+    progressWrap.style.display = 'none';
     setStatus('❌ Network error. Try again.', 'error');
   }
 
