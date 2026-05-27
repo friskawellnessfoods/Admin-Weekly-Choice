@@ -859,22 +859,23 @@ function renderCurrentDay(){
 
 
 function renderBlock(date, slot, title) {
-
   const section = STATE[date].sections[slot];
   const items = section?.items;
   if (!items || !Object.keys(items).length) return '';
 
-  const showSlotControls =
-  slot === 'breakfast'
-    ? hasAfternoonEveningOnly()
-    : slot === 'juice1' || slot === 'juice2'
-      ? (CLIENT_DELIVERY?.morning || CLIENT_DELIVERY?.afternoon || CLIENT_DELIVERY?.evening) && (
-          (CLIENT_DELIVERY?.morning ? 1 : 0) +
-          (CLIENT_DELIVERY?.afternoon ? 1 : 0) +
-          (CLIENT_DELIVERY?.evening ? 1 : 0)
-        ) > 1
-      : hasAfternoonEveningSlots();
+  const totalDeliverySlots =
+    (CLIENT_DELIVERY?.morning ? 1 : 0) +
+    (CLIENT_DELIVERY?.afternoon ? 1 : 0) +
+    (CLIENT_DELIVERY?.evening ? 1 : 0);
 
+  const singleSlotLabel =
+    CLIENT_DELIVERY?.morning && totalDeliverySlots === 1 ? 'Morning' :
+    CLIENT_DELIVERY?.afternoon && totalDeliverySlots === 1 ? 'Afternoon' :
+    CLIENT_DELIVERY?.evening && totalDeliverySlots === 1 ? 'Evening' : '';
+
+  const nonMorningSlot =
+    CLIENT_DELIVERY?.afternoon ? 'Afternoon' :
+    CLIENT_DELIVERY?.evening ? 'Evening' : '';
 
   const showLocationControl =
     hasAfternoonEveningSlots() &&
@@ -890,78 +891,92 @@ function renderBlock(date, slot, title) {
     }
   }
 
+  const staticBox = (label) =>
+    `<div style="
+      width:110px;
+      padding:10px;
+      font-size:14px;
+      border-radius:12px;
+      border:1px solid #ccc;
+      background:#f9f9f9;
+      color:#333;
+      text-align:center;
+      pointer-events:none;
+      user-select:none;
+    ">${label}</div>`;
+
+  let slotControlHTML = '';
+
+  if (slot === 'breakfast') {
+    if (CLIENT_DELIVERY?.morning) {
+      slotControlHTML = staticBox('Morning');
+    } else if (hasAfternoonEveningOnly()) {
+      slotControlHTML = `
+        <select id="slot_${date}_${slot}"
+          onchange="updateSectionSlot('${date}','${slot}',this.value)">
+          ${CLIENT_DELIVERY?.afternoon ? `<option value="Afternoon" ${section.slot === 'Afternoon' ? 'selected' : ''}>Afternoon</option>` : ''}
+          ${CLIENT_DELIVERY?.evening ? `<option value="Evening" ${section.slot === 'Evening' ? 'selected' : ''}>Evening</option>` : ''}
+        </select>`;
+    }
+  }
+
+  else if (slot === 'option1' || slot === 'option2' || slot === 'snack') {
+    if (totalDeliverySlots === 1) {
+      slotControlHTML = staticBox(singleSlotLabel);
+    } else if (CLIENT_DELIVERY?.morning && totalDeliverySlots === 2) {
+      slotControlHTML = staticBox(nonMorningSlot);
+    } else {
+      slotControlHTML = `
+        <select id="slot_${date}_${slot}"
+          onchange="updateSectionSlot('${date}','${slot}',this.value)">
+          ${CLIENT_DELIVERY?.afternoon ? `<option value="Afternoon" ${section.slot === 'Afternoon' ? 'selected' : ''}>Afternoon</option>` : ''}
+          ${CLIENT_DELIVERY?.evening ? `<option value="Evening" ${section.slot === 'Evening' ? 'selected' : ''}>Evening</option>` : ''}
+        </select>`;
+    }
+  }
+
+  else if (slot === 'juice1' || slot === 'juice2') {
+    if (totalDeliverySlots === 1) {
+      slotControlHTML = staticBox(singleSlotLabel);
+    } else {
+      slotControlHTML = `
+        <select id="slot_${date}_${slot}"
+          onchange="updateSectionSlot('${date}','${slot}',this.value)">
+          ${CLIENT_DELIVERY?.morning ? `<option value="Morning" ${section.slot === 'Morning' ? 'selected' : ''}>Morning</option>` : ''}
+          ${CLIENT_DELIVERY?.afternoon ? `<option value="Afternoon" ${section.slot === 'Afternoon' ? 'selected' : ''}>Afternoon</option>` : ''}
+          ${CLIENT_DELIVERY?.evening ? `<option value="Evening" ${section.slot === 'Evening' ? 'selected' : ''}>Evening</option>` : ''}
+        </select>`;
+    }
+  }
+
   let headerHTML = '';
 
-  if (showSlotControls) {
-
-    let locOptions = '';
-
-    if (CLIENT_LOCATION_1) {
-      locOptions += `<option value="${CLIENT_LOCATION_1.replace(/"/g,'&quot;')}"
-        ${section.location === CLIENT_LOCATION_1 ? 'selected' : ''}>
-        ${CLIENT_LOCATION_1}
-      </option>`;
-    }
-
-    if (CLIENT_LOCATION_2) {
-      locOptions += `<option value="${CLIENT_LOCATION_2.replace(/"/g,'&quot;')}"
-        ${section.location === CLIENT_LOCATION_2 ? 'selected' : ''}>
-        ${CLIENT_LOCATION_2}
-      </option>`;
-    }
-
+  if (slotControlHTML) {
     headerHTML = `
       <div class="section-header">
         <h4 class="section-title">${title}</h4>
         <div class="section-controls">
-
-          <select id="slot_${date}_${slot}"
-            onchange="updateSectionSlot('${date}','${slot}',this.value)">
-            ${CLIENT_DELIVERY?.morning ? `<option value="Morning" ${section.slot === 'Morning' ? 'selected' : ''}>Morning</option>` : ''}
-            ${CLIENT_DELIVERY?.afternoon ? `<option value="Afternoon" ${section.slot === 'Afternoon' ? 'selected' : ''}>Afternoon</option>` : ''}
-            ${CLIENT_DELIVERY?.evening ? `<option value="Evening" ${section.slot === 'Evening' ? 'selected' : ''}>Evening</option>` : ''}
-          </select>
-
+          ${slotControlHTML}
           ${showLocationControl ? `
             <select id="loc_${date}_${slot}"
               onchange="updateSectionLocation('${date}','${slot}',this.value)">
-            
               ${CLIENT_LOCATION_1 ? `
                 <option value="${CLIENT_LOCATION_1}"
-                  ${
-                    section.location === CLIENT_LOCATION_1 ||
-                    (!section.location && slot === 'option1')
-                      ? 'selected'
-                      : ''
-                  }>
+                  ${section.location === CLIENT_LOCATION_1 ||
+                    (!section.location && slot === 'option1') ? 'selected' : ''}>
                   ${CLIENT_LOCATION_1}
-                </option>
-              ` : ''}
-            
+                </option>` : ''}
               ${CLIENT_LOCATION_2 ? `
                 <option value="${CLIENT_LOCATION_2}"
-                  ${
-                    section.location === CLIENT_LOCATION_2 ||
-                    (!section.location && slot === 'option2')
-                      ? 'selected'
-                      : ''
-                  }>
+                  ${section.location === CLIENT_LOCATION_2 ||
+                    (!section.location && slot === 'option2') ? 'selected' : ''}>
                   ${CLIENT_LOCATION_2}
-                </option>
-              ` : ''}
-            
-            </select>
-
-          ` : ``}
-
+                </option>` : ''}
+            </select>` : ''}
         </div>
-      </div>
-    `;
-
+      </div>`;
   } else {
-
     headerHTML = `<h4>${title}</h4>`;
-
   }
 
   return headerHTML +
