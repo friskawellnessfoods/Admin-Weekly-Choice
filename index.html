@@ -908,7 +908,9 @@ function renderBlock(date, slot, title) {
   let slotControlHTML = '';
 
   if (slot === 'breakfast') {
-    if (CLIENT_DELIVERY?.morning) {
+    if (totalDeliverySlots === 1) {
+      slotControlHTML = staticBox(singleSlotLabel);
+    } else if (CLIENT_DELIVERY?.morning) {
       slotControlHTML = staticBox('Morning');
     } else if (hasAfternoonEveningOnly()) {
       slotControlHTML = `
