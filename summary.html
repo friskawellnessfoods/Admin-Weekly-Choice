@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="config.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: #f0f2f8;
+  padding: 20px;
+  color: #0f172a;
+}
+h1 {
+  font-size: 22px;
+  color: #0a1a6e;
+  margin-bottom: 20px;
+  text-align: center;
+}
+.top-bar {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+  background: #fff;
+  padding: 16px;
+  border-radius: 14px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.07);
+}
+.top-bar label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #555;
+  display: block;
+  margin-bottom: 4px;
+}
+.top-bar input {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1.5px solid #dde;
+  font-size: 14px;
+  outline: none;
+}
+.top-bar input:focus { border-color: #1976d2; }
+.btn {
+  padding: 10px 22px;
+  background: #1976d2;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* GRAND TOTAL CARDS */
+.totals-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.total-card {
+  background: #fff;
+  border-radius: 14px;
+  padding: 16px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.07);
+  border-left: 4px solid #1976d2;
+}
+.total-card.green { border-left-color: #16a34a; }
+.total-card.orange { border-left-color: #ea580c; }
+.total-card.purple { border-left-color: #7c3aed; }
+.total-card.teal { border-left-color: #0891b2; }
+.total-card.pink { border-left-color: #db2777; }
+.total-card h3 {
+  font-size: 12px;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 8px;
+}
+.total-card .big {
+  font-size: 32px;
+  font-weight: 700;
+  color: #0a1a6e;
+  line-height: 1;
+  margin-bottom: 8px;
+}
+.total-card .breakdown {
+  font-size: 12px;
+  color: #666;
+  line-height: 1.7;
+}
+
+/* TABLE */
+.table-wrap {
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.07);
+  overflow-x: auto;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+thead th {
+  background: #0a1a6e;
+  color: #fff;
+  padding: 12px 14px;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+}
+thead th:hover { background: #1230a0; }
+thead th .sort-arrow {
+  font-size: 10px;
+  margin-left: 4px;
+  opacity: 0.6;
+}
+tbody tr:nth-child(even) { background: #f8f9ff; }
+tbody tr:hover { background: #eef2ff; }
+tbody td {
+  padding: 11px 14px;
+  border-bottom: 1px solid #eee;
+  white-space: nowrap;
+}
+td.date-col { font-weight: 600; color: #0a1a6e; }
+td .sub {
+  font-size: 11px;
+  color: #888;
+  margin-top: 2px;
+}
+.pill {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  margin: 1px;
+}
+.pill.chicken { background: #fee2e2; color: #b91c1c; }
+.pill.veg     { background: #dcfce7; color: #15803d; }
+.pill.egg     { background: #fef9c3; color: #a16207; }
+.pill.seafood { background: #dbeafe; color: #1d4ed8; }
+.pill.other   { background: #f3f4f6; color: #374151; }
+.pill.bfast   { background: #fce7f3; color: #9d174d; }
+.pill.vbfast  { background: #d1fae5; color: #065f46; }
+.pill.snack   { background: #ffedd5; color: #9a3412; }
+.pill.vsnack  { background: #ecfdf5; color: #065f46; }
+
+#status {
+  text-align: center;
+  padding: 20px;
+  color: #888;
+  font-size: 14px;
+}
+</style>
+</head>
+<body>
+
+<h1>📊 Meal Summary</h1>
+
+<div class="top-bar">
+  <div>
+    <label>Start Date</label>
+    <input type="date" id="startDate">
+  </div>
+  <div>
+    <label>End Date</label>
+    <input type="date" id="endDate">
+  </div>
+  <button class="btn" id="fetchBtn" onclick="fetchSummary()">Generate Report</button>
+</div>
+
+<div id="totalsSection" style="display:none;">
+  <div class="totals-grid" id="totalsGrid"></div>
+  <div class="table-wrap">
+    <table id="summaryTable">
+      <thead>
+        <tr>
+          <th onclick="sortTable('date')">Date <span class="sort-arrow">↕</span></th>
+          <th onclick="sortTable('meals')">Total Meals <span class="sort-arrow">↕</span></th>
+          <th onclick="sortTable('option1')">Option 1 <span class="sort-arrow">↕</span></th>
+          <th onclick="sortTable('option2')">Option 2 <span class="sort-arrow">↕</span></th>
+          <th onclick="sortTable('breakfast')">Breakfast <span class="sort-arrow">↕</span></th>
+          <th onclick="sortTable('snack')">Snack <span class="sort-arrow">↕</span></th>
+          <th onclick="sortTable('juice1')">Juice 1 <span class="sort-arrow">↕</span></th>
+          <th onclick="sortTable('juice2')">Juice 2 <span class="sort-arrow">↕</span></th>
+        </tr>
+      </thead>
+      <tbody id="summaryBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<div id="status">Select a date range and click Generate Report.</div>
+
+<script>
+let tableData = [];
+let sortKey = 'date';
+let sortAsc = true;
+
+async function fetchSummary() {
+  const start = document.getElementById('startDate').value;
+  const end   = document.getElementById('endDate').value;
+  if (!start || !end) return setStatus('Select both dates.', true);
+  if (start > end) return setStatus('Start must be before end.', true);
+
+  const btn = document.getElementById('fetchBtn');
+  btn.disabled = true;
+  btn.textContent = 'Loading...';
+  setStatus('Fetching data...');
+
+  try {
+    const url = `${API_URL}?action=getSummaryByDateRange&start=${start}&end=${end}`;
+    const res = await fetch(url);
+    const data = await res.json();
+
+    if (!data.success) {
+      setStatus('No data found for this range.', true);
+      btn.disabled = false;
+      btn.textContent = 'Generate Report';
+      return;
+    }
+
+    tableData = Object.entries(data.summary).map(([date, d]) => ({
+      date,
+      meals: d.option1.total + d.option2.total,
+      option1: d.option1,
+      option2: d.option2,
+      breakfast: d.breakfast,
+      snack: d.snack,
+      juice1: d.juice1,
+      juice2: d.juice2
+    }));
+
+    renderTotals(data.summary);
+    renderTable();
+    document.getElementById('totalsSection').style.display = 'block';
+    document.getElementById('status').style.display = 'none';
+
+  } catch (err) {
+    setStatus('Network error. Try again.', true);
+  }
+
+  btn.disabled = false;
+  btn.textContent = 'Generate Report';
+}
+
+function renderTotals(summary) {
+  const t = {
+    meals: 0,
+    o1: { total:0, Chicken:0, Veg:0, Egg:0, Seafood:0, Other:0 },
+    o2: { total:0, Chicken:0, Veg:0, Egg:0, Seafood:0, Other:0 },
+    bf: { total:0, Breakfast:0, 'Veg Breakfast':0, Other:0 },
+    sn: { total:0, Snack:0, 'Veg Snack':0 },
+    j1: 0, j2: 0
+  };
+
+  Object.values(summary).forEach(d => {
+    t.meals += d.option1.total + d.option2.total;
+    ['total','Chicken','Veg','Egg','Seafood','Other'].forEach(k => {
+      t.o1[k] += d.option1[k] || 0;
+      t.o2[k] += d.option2[k] || 0;
+    });
+    t.bf.total += d.breakfast.total;
+    t.bf.Breakfast += d.breakfast.Breakfast || 0;
+    t.bf['Veg Breakfast'] += d.breakfast['Veg Breakfast'] || 0;
+    t.bf.Other += d.breakfast.Other || 0;
+    t.sn.total += d.snack.total;
+    t.sn.Snack += d.snack.Snack || 0;
+    t.sn['Veg Snack'] += d.snack['Veg Snack'] || 0;
+    t.j1 += d.juice1;
+    t.j2 += d.juice2;
+  });
+
+  document.getElementById('totalsGrid').innerHTML = `
+    <div class="total-card">
+      <h3>Total Meals</h3>
+      <div class="big">${t.meals}</div>
+      <div class="breakdown">Option 1: ${t.o1.total} &nbsp;|&nbsp; Option 2: ${t.o2.total}</div>
+    </div>
+    <div class="total-card green">
+      <h3>Option 1</h3>
+      <div class="big">${t.o1.total}</div>
+      <div class="breakdown">
+        🍗 Chicken: ${t.o1.Chicken}<br>
+        🥦 Veg: ${t.o1.Veg}<br>
+        🥚 Egg: ${t.o1.Egg}<br>
+        🐟 Seafood: ${t.o1.Seafood}
+        ${t.o1.Other ? `<br>Other: ${t.o1.Other}` : ''}
+      </div>
+    </div>
+    <div class="total-card orange">
+      <h3>Option 2</h3>
+      <div class="big">${t.o2.total}</div>
+      <div class="breakdown">
+        🍗 Chicken: ${t.o2.Chicken}<br>
+        🥦 Veg: ${t.o2.Veg}<br>
+        🥚 Egg: ${t.o2.Egg}<br>
+        🐟 Seafood: ${t.o2.Seafood}
+        ${t.o2.Other ? `<br>Other: ${t.o2.Other}` : ''}
+      </div>
+    </div>
+    <div class="total-card purple">
+      <h3>Breakfast</h3>
+      <div class="big">${t.bf.total}</div>
+      <div class="breakdown">
+        Egg: ${t.bf.Breakfast}<br>
+        Veg: ${t.bf['Veg Breakfast']}
+        ${t.bf.Other ? `<br>Other: ${t.bf.Other}` : ''}
+      </div>
+    </div>
+    <div class="total-card teal">
+      <h3>Snack</h3>
+      <div class="big">${t.sn.total}</div>
+      <div class="breakdown">
+        Regular: ${t.sn.Snack}<br>
+        Veg: ${t.sn['Veg Snack']}
+      </div>
+    </div>
+    <div class="total-card pink">
+      <h3>Juices</h3>
+      <div class="big">${t.j1 + t.j2}</div>
+      <div class="breakdown">
+        Juice 1: ${t.j1}<br>
+        Juice 2: ${t.j2}
+      </div>
+    </div>
+  `;
+}
+
+function renderTable() {
+  const sorted = [...tableData].sort((a, b) => {
+    let av, bv;
+    if (sortKey === 'date') { av = a.date; bv = b.date; }
+    else if (sortKey === 'meals') { av = a.meals; bv = b.meals; }
+    else if (sortKey === 'option1') { av = a.option1.total; bv = b.option1.total; }
+    else if (sortKey === 'option2') { av = a.option2.total; bv = b.option2.total; }
+    else if (sortKey === 'breakfast') { av = a.breakfast.total; bv = b.breakfast.total; }
+    else if (sortKey === 'snack') { av = a.snack.total; bv = b.snack.total; }
+    else if (sortKey === 'juice1') { av = a.juice1; bv = b.juice1; }
+    else if (sortKey === 'juice2') { av = a.juice2; bv = b.juice2; }
+    if (av < bv) return sortAsc ? -1 : 1;
+    if (av > bv) return sortAsc ? 1 : -1;
+    return 0;
+  });
+
+  document.getElementById('summaryBody').innerHTML = sorted.map(row => {
+    const d = new Date(row.date);
+    const dayName = d.toLocaleDateString('en-US', { weekday: 'short' });
+    const dateFormatted = String(d.getDate()).padStart(2,'0') + '-' +
+      d.toLocaleDateString('en-US',{month:'short'}) + '-' + d.getFullYear();
+
+    return `<tr>
+      <td class="date-col">${dayName}, ${dateFormatted}</td>
+      <td><strong>${row.meals}</strong></td>
+      <td>
+        <strong>${row.option1.total}</strong>
+        <div class="sub">
+          ${row.option1.Chicken ? `<span class="pill chicken">🍗 ${row.option1.Chicken}</span>` : ''}
+          ${row.option1.Veg ? `<span class="pill veg">🥦 ${row.option1.Veg}</span>` : ''}
+          ${row.option1.Egg ? `<span class="pill egg">🥚 ${row.option1.Egg}</span>` : ''}
+          ${row.option1.Seafood ? `<span class="pill seafood">🐟 ${row.option1.Seafood}</span>` : ''}
+          ${row.option1.Other ? `<span class="pill other">${row.option1.Other}</span>` : ''}
+        </div>
+      </td>
+      <td>
+        <strong>${row.option2.total}</strong>
+        <div class="sub">
+          ${row.option2.Chicken ? `<span class="pill chicken">🍗 ${row.option2.Chicken}</span>` : ''}
+          ${row.option2.Veg ? `<span class="pill veg">🥦 ${row.option2.Veg}</span>` : ''}
+          ${row.option2.Egg ? `<span class="pill egg">🥚 ${row.option2.Egg}</span>` : ''}
+          ${row.option2.Seafood ? `<span class="pill seafood">🐟 ${row.option2.Seafood}</span>` : ''}
+          ${row.option2.Other ? `<span class="pill other">${row.option2.Other}</span>` : ''}
+        </div>
+      </td>
+      <td>
+        <strong>${row.breakfast.total}</strong>
+        <div class="sub">
+          ${row.breakfast.Breakfast ? `<span class="pill bfast">Egg ${row.breakfast.Breakfast}</span>` : ''}
+          ${row.breakfast['Veg Breakfast'] ? `<span class="pill vbfast">Veg ${row.breakfast['Veg Breakfast']}</span>` : ''}
+        </div>
+      </td>
+      <td>
+        <strong>${row.snack.total}</strong>
+        <div class="sub">
+          ${row.snack.Snack ? `<span class="pill snack">${row.snack.Snack}</span>` : ''}
+          ${row.snack['Veg Snack'] ? `<span class="pill vsnack">Veg ${row.snack['Veg Snack']}</span>` : ''}
+        </div>
+      </td>
+      <td>${row.juice1}</td>
+      <td>${row.juice2}</td>
+    </tr>`;
+  }).join('');
+}
+
+function sortTable(key) {
+  if (sortKey === key) sortAsc = !sortAsc;
+  else { sortKey = key; sortAsc = false; }
+  renderTable();
+}
+
+function setStatus(msg, isError) {
+  const el = document.getElementById('status');
+  el.style.display = 'block';
+  el.style.color = isError ? '#c62828' : '#888';
+  el.textContent = msg;
+}
+</script>
+</body>
+</html>
