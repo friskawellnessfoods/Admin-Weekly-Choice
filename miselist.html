@@ -314,12 +314,10 @@ function buildTable(t, tIdx) {
       if (cell.formula) {
         input.classList.add('has-formula');
         input.dataset.formula = cell.formula;
-        input.readOnly = true;
-      } else if (isSummary && (c === 1 || c === 3)) {
-        // Editable number cells in summary rows
-        input.classList.add('editable-num');
-        input.addEventListener('input', () => onCellEdit(tIdx));
       }
+
+      // All cells editable, trigger recalc on edit
+      input.addEventListener('input', () => onCellEdit(tIdx));
 
       td.appendChild(input);
       tr.appendChild(td);
