@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="config.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --navy: #0a1a6e;
+  --navy-light: #1230a0;
+  --gold: #c9a84c;
+  --gold-light: #f0d98a;
+  --cream: #fafaf7;
+  --white: #ffffff;
+  --border: #e8e8e0;
+  --text: #1a1a2e;
+  --muted: #7a7a8a;
+  --chicken: #e53e3e;
+  --veg: #38a169;
+  --egg: #d69e2e;
+  --seafood: #3182ce;
+  --shadow: 0 4px 24px rgba(10,26,110,0.10);
+  --shadow-sm: 0 2px 8px rgba(10,26,110,0.07);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--cream);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+/* TOP BAR */
+.header {
+  background: var(--navy);
+  padding: 18px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.header-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 20px;
+  color: var(--gold-light);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+/* FILTER BAR */
+.filter-bar {
+  background: var(--white);
+  border-bottom: 1px solid var(--border);
+  padding: 14px 24px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.filter-group label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.filter-group select,
+.filter-group input[type="date"],
+.filter-group input[type="month"] {
+  padding: 8px 12px;
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+  font-family: 'DM Sans', sans-serif;
+  color: var(--text);
+  background: var(--white);
+  outline: none;
+  transition: border-color 0.2s;
+  min-width: 130px;
+}
+
+.filter-group select:focus,
+.filter-group input:focus {
+  border-color: var(--navy);
+}
+
+.btn {
+  padding: 9px 20px;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: 'DM Sans', sans-serif;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-primary {
+  background: var(--navy);
+  color: var(--white);
+}
+
+.btn-primary:hover { background: var(--navy-light); }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.btn-toggle {
+  background: var(--cream);
+  color: var(--navy);
+  border: 1.5px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-toggle.active {
+  background: var(--navy);
+  color: var(--white);
+  border-color: var(--navy);
+}
+
+.toggle-row {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+  align-items: center;
+}
+
+/* MAIN CONTENT */
+.content {
+  padding: 20px 24px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+/* SUMMARY CARDS */
+.cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+.card {
+  background: var(--white);
+  border-radius: 14px;
+  padding: 18px 16px;
+  box-shadow: var(--shadow-sm);
+  border-top: 3px solid var(--navy);
+  position: relative;
+  overflow: hidden;
+}
+
+.card::after {
+  content: '';
+  position: absolute;
+  bottom: -20px;
+  right: -20px;
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: var(--navy);
+  opacity: 0.04;
+}
+
+.card.gold { border-top-color: var(--gold); }
+.card.green { border-top-color: var(--veg); }
+.card.red { border-top-color: var(--chicken); }
+.card.blue { border-top-color: var(--seafood); }
+.card.teal { border-top-color: #0891b2; }
+
+.card-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  margin-bottom: 8px;
+}
+
+.card-number {
+  font-family: 'Playfair Display', serif;
+  font-size: 36px;
+  font-weight: 700;
+  color: var(--navy);
+  line-height: 1;
+  margin-bottom: 8px;
+}
+
+.card-breakdown {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.8;
+}
+
+.card-breakdown span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-right: 8px;
+}
+
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+/* VIEW PANELS */
+.view-panel { display: none; }
+.view-panel.active { display: block; }
+
+/* CHARTS */
+.charts-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+@media (max-width: 768px) {
+  .charts-grid { grid-template-columns: 1fr; }
+}
+
+.chart-card {
+  background: var(--white);
+  border-radius: 14px;
+  padding: 20px;
+  box-shadow: var(--shadow-sm);
+}
+
+.chart-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 15px;
+  color: var(--navy);
+  margin-bottom: 16px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.chart-container {
+  position: relative;
+  height: 280px;
+}
+
+/* TABLE */
+.table-card {
+  background: var(--white);
+  border-radius: 14px;
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+thead th {
+  background: var(--navy);
+  color: var(--white);
+  padding: 12px 14px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+
+thead th:hover { background: var(--navy-light); }
+
+.sort-arrow { opacity: 0.5; margin-left: 4px; font-size: 10px; }
+
+tbody tr:nth-child(even) { background: #f8f8f5; }
+tbody tr:hover { background: #f0f2ff; }
+
+tbody td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+td.date-col {
+  font-weight: 600;
+  color: var(--navy);
+}
+
+td .sub {
+  margin-top: 3px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 7px;
+  border-radius: 20px;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.pill.chicken { background: #fff5f5; color: var(--chicken); }
+.pill.veg     { background: #f0fff4; color: var(--veg); }
+.pill.egg     { background: #fffff0; color: var(--egg); }
+.pill.seafood { background: #ebf8ff; color: var(--seafood); }
+.pill.other   { background: #f7f7f7; color: #555; }
+.pill.bfast   { background: #fff0f6; color: #9d174d; }
+.pill.vbfast  { background: #f0fff4; color: #065f46; }
+.pill.snack   { background: #fff7ed; color: #9a3412; }
+.pill.vsnack  { background: #ecfdf5; color: #065f46; }
+
+#status {
+  text-align: center;
+  padding: 40px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.dynamic-fields {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-title">📊 Meal Summary</div>
+</div>
+
+<div class="filter-bar">
+  <div class="filter-group">
+    <label>Filter By</label>
+    <select id="filterType" onchange="updateFilterFields()">
+      <option value="range">Date Range</option>
+      <option value="month">Month</option>
+      <option value="monthRange">Month Range</option>
+      <option value="last6">Last 6 Months</option>
+      <option value="year">Last 1 Year</option>
+    </select>
+  </div>
+
+  <div class="dynamic-fields" id="dynamicFields">
+    <div class="filter-group" id="f_startDate">
+      <label>Start Date</label>
+      <input type="date" id="startDate">
+    </div>
+    <div class="filter-group" id="f_endDate">
+      <label>End Date</label>
+      <input type="date" id="endDate">
+    </div>
+    <div class="filter-group" id="f_month" style="display:none;">
+      <label>Month</label>
+      <input type="month" id="monthPicker">
+    </div>
+    <div class="filter-group" id="f_startMonth" style="display:none;">
+      <label>Start Month</label>
+      <input type="month" id="startMonth">
+    </div>
+    <div class="filter-group" id="f_endMonth" style="display:none;">
+      <label>End Month</label>
+      <input type="month" id="endMonth">
+    </div>
+  </div>
+
+  <button class="btn btn-primary" id="fetchBtn" onclick="fetchSummary()">Generate</button>
+
+  <div class="toggle-row" id="toggleRow" style="display:none;">
+    <button class="btn btn-toggle active" id="btnNumbers" onclick="switchView('numbers')">🔢 Numbers</button>
+    <button class="btn btn-toggle" id="btnCharts" onclick="switchView('charts')">📊 Charts</button>
+  </div>
+</div>
+
+<div class="content">
+  <div id="status">Select a filter and click Generate.</div>
+
+  <div id="mainContent" style="display:none;">
+    <div class="cards-grid" id="totalsGrid"></div>
+
+    <div class="view-panel active" id="panelNumbers">
+      <div class="table-card">
+        <table id="summaryTable">
+          <thead>
+            <tr>
+              <th onclick="sortTable('date')">Date <span class="sort-arrow">↕</span></th>
+              <th onclick="sortTable('meals')">Total Meals <span class="sort-arrow">↕</span></th>
+              <th onclick="sortTable('option1')">Option 1 <span class="sort-arrow">↕</span></th>
+              <th onclick="sortTable('option2')">Option 2 <span class="sort-arrow">↕</span></th>
+              <th onclick="sortTable('breakfast')">Breakfast <span class="sort-arrow">↕</span></th>
+              <th onclick="sortTable('snack')">Snack <span class="sort-arrow">↕</span></th>
+              <th onclick="sortTable('juice1')">Juice 1 <span class="sort-arrow">↕</span></th>
+              <th onclick="sortTable('juice2')">Juice 2 <span class="sort-arrow">↕</span></th>
+            </tr>
+          </thead>
+          <tbody id="summaryBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="view-panel" id="panelCharts">
+      <div class="charts-grid">
+        <div class="chart-card">
+          <div class="chart-title">Protein Breakdown per Day</div>
+          <div class="chart-container">
+            <canvas id="barChart"></canvas>
+          </div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">Total Meals Trend</div>
+          <div class="chart-container">
+            <canvas id="lineChart"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let tableData = [];
+let sortKey = 'date';
+let sortAsc = true;
+let barChartInst = null;
+let lineChartInst = null;
+
+function updateFilterFields() {
+  const type = document.getElementById('filterType').value;
+  const fields = {
+    f_startDate: false, f_endDate: false,
+    f_month: false, f_startMonth: false, f_endMonth: false
+  };
+  if (type === 'range')      { fields.f_startDate = true; fields.f_endDate = true; }
+  if (type === 'month')      { fields.f_month = true; }
+  if (type === 'monthRange') { fields.f_startMonth = true; fields.f_endMonth = true; }
+  Object.entries(fields).forEach(([id, show]) => {
+    document.getElementById(id).style.display = show ? 'flex' : 'none';
+  });
+}
+
+function getDateRange() {
+  const type = document.getElementById('filterType').value;
+  const now = new Date();
+  let start, end;
+
+  if (type === 'range') {
+    start = document.getElementById('startDate').value;
+    end   = document.getElementById('endDate').value;
+    if (!start || !end) return null;
+  } else if (type === 'month') {
+    const m = document.getElementById('monthPicker').value;
+    if (!m) return null;
+    start = m + '-01';
+    const d = new Date(m + '-01');
+    d.setMonth(d.getMonth() + 1);
+    d.setDate(d.getDate() - 1);
+    end = d.toISOString().slice(0, 10);
+  } else if (type === 'monthRange') {
+    const sm = document.getElementById('startMonth').value;
+    const em = document.getElementById('endMonth').value;
+    if (!sm || !em) return null;
+    start = sm + '-01';
+    const d = new Date(em + '-01');
+    d.setMonth(d.getMonth() + 1);
+    d.setDate(d.getDate() - 1);
+    end = d.toISOString().slice(0, 10);
+  } else if (type === 'last6') {
+    end = now.toISOString().slice(0, 10);
+    const s = new Date(now);
+    s.setMonth(s.getMonth() - 6);
+    start = s.toISOString().slice(0, 10);
+  } else if (type === 'year') {
+    end = now.toISOString().slice(0, 10);
+    const s = new Date(now);
+    s.setFullYear(s.getFullYear() - 1);
+    start = s.toISOString().slice(0, 10);
+  }
+  return { start, end };
+}
+
+async function fetchSummary() {
+  const range = getDateRange();
+  if (!range) return setStatus('Please fill in the required fields.', true);
+
+  const btn = document.getElementById('fetchBtn');
+  btn.disabled = true;
+  btn.textContent = 'Loading...';
+  setStatus('Fetching data...');
+  document.getElementById('mainContent').style.display = 'none';
+  document.getElementById('toggleRow').style.display = 'none';
+
+  try {
+    const url = `${API_URL}?action=getSummaryByDateRange&start=${range.start}&end=${range.end}`;
+    const res = await fetch(url);
+    const data = await res.json();
+
+    if (!data.success || !Object.keys(data.summary).length) {
+      setStatus('No data found for this period.', true);
+      btn.disabled = false;
+      btn.textContent = 'Generate';
+      return;
+    }
+
+    tableData = Object.entries(data.summary).map(([date, d]) => ({
+      date,
+      meals: d.option1.total + d.option2.total,
+      option1: d.option1,
+      option2: d.option2,
+      breakfast: d.breakfast,
+      snack: d.snack,
+      juice1: d.juice1,
+      juice2: d.juice2
+    }));
+
+    renderTotals(data.summary);
+    renderTable();
+    renderCharts();
+
+    document.getElementById('mainContent').style.display = 'block';
+    document.getElementById('toggleRow').style.display = 'flex';
+    setStatus('');
+
+  } catch(err) {
+    setStatus('Network error. Try again.', true);
+  }
+
+  btn.disabled = false;
+  btn.textContent = 'Generate';
+}
+
+function switchView(view) {
+  document.getElementById('panelNumbers').classList.toggle('active', view === 'numbers');
+  document.getElementById('panelCharts').classList.toggle('active', view === 'charts');
+  document.getElementById('btnNumbers').classList.toggle('active', view === 'numbers');
+  document.getElementById('btnCharts').classList.toggle('active', view === 'charts');
+}
+
+function renderTotals(summary) {
+  const t = {
+    meals: 0,
+    o1: { total:0, Chicken:0, Veg:0, Egg:0, Seafood:0, Other:0 },
+    o2: { total:0, Chicken:0, Veg:0, Egg:0, Seafood:0, Other:0 },
+    bf: { total:0, Breakfast:0, 'Veg Breakfast':0, Other:0 },
+    sn: { total:0, Snack:0, 'Veg Snack':0 },
+    j1: 0, j2: 0
+  };
+
+  Object.values(summary).forEach(d => {
+    t.meals += d.option1.total + d.option2.total;
+    ['total','Chicken','Veg','Egg','Seafood','Other'].forEach(k => {
+      t.o1[k] += d.option1[k] || 0;
+      t.o2[k] += d.option2[k] || 0;
+    });
+    t.bf.total += d.breakfast.total;
+    t.bf.Breakfast += d.breakfast.Breakfast || 0;
+    t.bf['Veg Breakfast'] += d.breakfast['Veg Breakfast'] || 0;
+    t.sn.total += d.snack.total;
+    t.sn.Snack += d.snack.Snack || 0;
+    t.sn['Veg Snack'] += d.snack['Veg Snack'] || 0;
+    t.j1 += d.juice1;
+    t.j2 += d.juice2;
+  });
+
+  document.getElementById('totalsGrid').innerHTML = `
+    <div class="card">
+      <div class="card-label">Total Meals</div>
+      <div class="card-number">${t.meals}</div>
+      <div class="card-breakdown">
+        <span>Option 1: <strong>${t.o1.total}</strong></span>
+        <span>Option 2: <strong>${t.o2.total}</strong></span>
+      </div>
+    </div>
+    <div class="card red">
+      <div class="card-label">Option 1</div>
+      <div class="card-number">${t.o1.total}</div>
+      <div class="card-breakdown">
+        <span><span class="dot" style="background:var(--chicken)"></span>Chicken: ${t.o1.Chicken}</span>
+        <span><span class="dot" style="background:var(--veg)"></span>Veg: ${t.o1.Veg}</span>
+        <span><span class="dot" style="background:var(--egg)"></span>Egg: ${t.o1.Egg}</span>
+        <span><span class="dot" style="background:var(--seafood)"></span>Seafood: ${t.o1.Seafood}</span>
+      </div>
+    </div>
+    <div class="card gold">
+      <div class="card-label">Option 2</div>
+      <div class="card-number">${t.o2.total}</div>
+      <div class="card-breakdown">
+        <span><span class="dot" style="background:var(--chicken)"></span>Chicken: ${t.o2.Chicken}</span>
+        <span><span class="dot" style="background:var(--veg)"></span>Veg: ${t.o2.Veg}</span>
+        <span><span class="dot" style="background:var(--egg)"></span>Egg: ${t.o2.Egg}</span>
+        <span><span class="dot" style="background:var(--seafood)"></span>Seafood: ${t.o2.Seafood}</span>
+      </div>
+    </div>
+    <div class="card green">
+      <div class="card-label">Breakfast</div>
+      <div class="card-number">${t.bf.total}</div>
+      <div class="card-breakdown">
+        <span>Egg: ${t.bf.Breakfast}</span>
+        <span>Veg: ${t.bf['Veg Breakfast']}</span>
+      </div>
+    </div>
+    <div class="card teal">
+      <div class="card-label">Snack</div>
+      <div class="card-number">${t.sn.total}</div>
+      <div class="card-breakdown">
+        <span>Regular: ${t.sn.Snack}</span>
+        <span>Veg: ${t.sn['Veg Snack']}</span>
+      </div>
+    </div>
+    <div class="card blue">
+      <div class="card-label">Juices</div>
+      <div class="card-number">${t.j1 + t.j2}</div>
+      <div class="card-breakdown">
+        <span>Juice 1: ${t.j1}</span>
+        <span>Juice 2: ${t.j2}</span>
+      </div>
+    </div>
+  `;
+}
+
+function renderTable() {
+  const sorted = [...tableData].sort((a, b) => {
+    let av, bv;
+    if (sortKey === 'date')      { av = a.date; bv = b.date; }
+    else if (sortKey === 'meals')     { av = a.meals; bv = b.meals; }
+    else if (sortKey === 'option1')   { av = a.option1.total; bv = b.option1.total; }
+    else if (sortKey === 'option2')   { av = a.option2.total; bv = b.option2.total; }
+    else if (sortKey === 'breakfast') { av = a.breakfast.total; bv = b.breakfast.total; }
+    else if (sortKey === 'snack')     { av = a.snack.total; bv = b.snack.total; }
+    else if (sortKey === 'juice1')    { av = a.juice1; bv = b.juice1; }
+    else if (sortKey === 'juice2')    { av = a.juice2; bv = b.juice2; }
+    if (av < bv) return sortAsc ? -1 : 1;
+    if (av > bv) return sortAsc ? 1 : -1;
+    return 0;
+  });
+
+  document.getElementById('summaryBody').innerHTML = sorted.map(row => {
+    const d = new Date(row.date);
+    const dayName = d.toLocaleDateString('en-US', { weekday: 'short' });
+    const fmt = String(d.getDate()).padStart(2,'0') + '-' +
+      d.toLocaleDateString('en-US',{month:'short'}) + '-' + d.getFullYear();
+
+    return `<tr>
+      <td class="date-col">${dayName}, ${fmt}</td>
+      <td><strong>${row.meals}</strong></td>
+      <td>
+        <strong>${row.option1.total}</strong>
+        <div class="sub">
+          ${row.option1.Chicken ? `<span class="pill chicken">🍗 ${row.option1.Chicken}</span>` : ''}
+          ${row.option1.Veg     ? `<span class="pill veg">🥦 ${row.option1.Veg}</span>` : ''}
+          ${row.option1.Egg     ? `<span class="pill egg">🥚 ${row.option1.Egg}</span>` : ''}
+          ${row.option1.Seafood ? `<span class="pill seafood">🐟 ${row.option1.Seafood}</span>` : ''}
+        </div>
+      </td>
+      <td>
+        <strong>${row.option2.total}</strong>
+        <div class="sub">
+          ${row.option2.Chicken ? `<span class="pill chicken">🍗 ${row.option2.Chicken}</span>` : ''}
+          ${row.option2.Veg     ? `<span class="pill veg">🥦 ${row.option2.Veg}</span>` : ''}
+          ${row.option2.Egg     ? `<span class="pill egg">🥚 ${row.option2.Egg}</span>` : ''}
+          ${row.option2.Seafood ? `<span class="pill seafood">🐟 ${row.option2.Seafood}</span>` : ''}
+        </div>
+      </td>
+      <td>
+        <strong>${row.breakfast.total}</strong>
+        <div class="sub">
+          ${row.breakfast.Breakfast       ? `<span class="pill bfast">Egg ${row.breakfast.Breakfast}</span>` : ''}
+          ${row.breakfast['Veg Breakfast'] ? `<span class="pill vbfast">Veg ${row.breakfast['Veg Breakfast']}</span>` : ''}
+        </div>
+      </td>
+      <td>
+        <strong>${row.snack.total}</strong>
+        <div class="sub">
+          ${row.snack.Snack       ? `<span class="pill snack">${row.snack.Snack}</span>` : ''}
+          ${row.snack['Veg Snack'] ? `<span class="pill vsnack">Veg ${row.snack['Veg Snack']}</span>` : ''}
+        </div>
+      </td>
+      <td>${row.juice1}</td>
+      <td>${row.juice2}</td>
+    </tr>`;
+  }).join('');
+}
+
+function sortTable(key) {
+  if (sortKey === key) sortAsc = !sortAsc;
+  else { sortKey = key; sortAsc = false; }
+  renderTable();
+}
+
+function renderCharts() {
+  const sorted = [...tableData].sort((a,b) => a.date.localeCompare(b.date));
+  const labels = sorted.map(r => {
+    const d = new Date(r.date);
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  });
+
+  // Destroy existing
+  if (barChartInst) { barChartInst.destroy(); barChartInst = null; }
+  if (lineChartInst) { lineChartInst.destroy(); lineChartInst = null; }
+
+  // BAR CHART — protein breakdown
+  barChartInst = new Chart(document.getElementById('barChart'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Chicken',
+          data: sorted.map(r => r.option1.Chicken + r.option2.Chicken),
+          backgroundColor: 'rgba(229,62,62,0.75)',
+          borderRadius: 4
+        },
+        {
+          label: 'Veg',
+          data: sorted.map(r => r.option1.Veg + r.option2.Veg),
+          backgroundColor: 'rgba(56,161,105,0.75)',
+          borderRadius: 4
+        },
+        {
+          label: 'Egg',
+          data: sorted.map(r => r.option1.Egg + r.option2.Egg),
+          backgroundColor: 'rgba(214,158,46,0.75)',
+          borderRadius: 4
+        },
+        {
+          label: 'Seafood',
+          data: sorted.map(r => r.option1.Seafood + r.option2.Seafood),
+          backgroundColor: 'rgba(49,130,206,0.75)',
+          borderRadius: 4
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'bottom', labels: { font: { family: 'DM Sans', size: 11 }, boxWidth: 12 } }
+      },
+      scales: {
+        x: { stacked: true, ticks: { font: { family: 'DM Sans', size: 10 } } },
+        y: { stacked: true, ticks: { font: { family: 'DM Sans', size: 10 } } }
+      }
+    }
+  });
+
+  // LINE CHART — total meals trend
+  lineChartInst = new Chart(document.getElementById('lineChart'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Total Meals',
+          data: sorted.map(r => r.meals),
+          borderColor: '#0a1a6e',
+          backgroundColor: 'rgba(10,26,110,0.08)',
+          borderWidth: 2,
+          pointBackgroundColor: '#0a1a6e',
+          pointRadius: 4,
+          tension: 0.3,
+          fill: true
+        },
+        {
+          label: 'Breakfast',
+          data: sorted.map(r => r.breakfast.total),
+          borderColor: '#9d174d',
+          backgroundColor: 'transparent',
+          borderWidth: 1.5,
+          pointRadius: 3,
+          tension: 0.3,
+          borderDash: [4,3]
+        },
+        {
+          label: 'Snack',
+          data: sorted.map(r => r.snack.total),
+          borderColor: '#9a3412',
+          backgroundColor: 'transparent',
+          borderWidth: 1.5,
+          pointRadius: 3,
+          tension: 0.3,
+          borderDash: [4,3]
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'bottom', labels: { font: { family: 'DM Sans', size: 11 }, boxWidth: 12 } }
+      },
+      scales: {
+        x: { ticks: { font: { family: 'DM Sans', size: 10 } } },
+        y: { ticks: { font: { family: 'DM Sans', size: 10 } } }
+      }
+    }
+  });
+}
+
+function setStatus(msg, isError) {
+  const el = document.getElementById('status');
+  el.style.display = msg ? 'block' : 'none';
+  el.style.color = isError ? '#c62828' : 'var(--muted)';
+  el.textContent = msg;
+}
+
+// Init
+updateFilterFields();
+</script>
+</body>
+</html>
