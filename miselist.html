@@ -321,14 +321,18 @@ function buildTable(t, tIdx) {
       input.dataset.row = r;
       input.dataset.col = c;
 
-      if (cell.formula) {
+      if (isSummary) {
+        input.classList.add('editable-num');
+        if (cell.formula) {
+          input.classList.add('has-formula');
+          input.dataset.formula = cell.formula;
+        }
+        input.addEventListener('input', () => onCellEdit(tIdx));
+      } else if (cell.formula) {
         input.classList.add('has-formula');
         input.dataset.formula = cell.formula;
         input.readOnly = true;
         input.style.pointerEvents = 'none';
-      } else if (isSummary) {
-        input.classList.add('editable-num');
-        input.addEventListener('input', () => onCellEdit(tIdx));
       } else {
         input.readOnly = true;
         input.style.pointerEvents = 'none';
