@@ -182,7 +182,7 @@ h1 {
 /* ===== PRINT ===== */
 @media print {
   @page {
-    size: A4 landscape;
+    size: A4 portrait;
     margin: 8mm;
   }
 
@@ -193,57 +193,53 @@ h1 {
     print-color-adjust: exact;
   }
 
-  h1 { font-size: 12px; margin-bottom: 6px; }
+  h1 { display: none; }
   .top-bar { display: none; }
 
+  /* Hide the row wrapper, show tables one by one */
   .tables-row {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 4px;
-    margin-bottom: 4px;
-    page-break-inside: avoid;
-    break-inside: avoid;
+    display: block;
   }
 
-  /* Each row of 3 tables on its own page */
-  .tables-row + .tables-row {
-    page-break-before: always;
-    break-before: always;
-  }
-
+  /* Each table on its own page */
   .mise-wrap {
+    display: block;
+    width: 100%;
     box-shadow: none;
     border: 0.5px solid #ccc;
     border-radius: 0;
+    page-break-after: always;
+    break-after: always;
   }
 
   .mise-wrap table {
-    font-size: 7px;
+    font-size: 9px;
+    width: 100%;
   }
 
   .mise-wrap thead th {
-    font-size: 7px;
-    padding: 2px;
+    font-size: 10px;
+    padding: 4px;
     background: #0a1a6e !important;
     color: #fff !important;
   }
 
   .mise-wrap tbody td {
-    height: 11px;
-    line-height: 11px;
-    padding: 0 1px;
+    height: 13px;
+    line-height: 13px;
+    padding: 0 2px;
     border-bottom: 0.3px solid #eee;
   }
 
   .mise-wrap tbody td:nth-child(1),
   .mise-wrap tbody td:nth-child(3) {
     height: auto;
-    min-height: 11px;
+    min-height: 13px;
   }
 
   .cell-input {
-    font-size: 7px;
-    line-height: 11px;
+    font-size: 9px;
+    line-height: 13px;
     color: #000 !important;
     font-weight: normal !important;
   }
