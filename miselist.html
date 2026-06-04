@@ -324,12 +324,14 @@ function buildTable(t, tIdx) {
       if (cell.formula) {
         input.classList.add('has-formula');
         input.dataset.formula = cell.formula;
-        input.classList.add('readonly');
-      } else if (isSummary && (c === 1 || c === 3)) {
+        input.readOnly = true;
+        input.style.pointerEvents = 'none';
+      } else if (isSummary) {
         input.classList.add('editable-num');
         input.addEventListener('input', () => onCellEdit(tIdx));
       } else {
-        input.classList.add('readonly');
+        input.readOnly = true;
+        input.style.pointerEvents = 'none';
       }
 
       td.appendChild(input);
