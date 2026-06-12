@@ -316,6 +316,7 @@ async function loadOrders() {
 
     ordersRes.clients.forEach((c, i) => {
       const master = results[i].client;
+      console.log('Client:', c.name, '| location:', JSON.stringify(c.location), '| master:', master);
       if (!master || !master.found) return;
 
       let route = '';
