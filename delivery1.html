@@ -348,12 +348,8 @@ async function loadOrders() {
 
 const SLOT_ORDER = ['Morning', 'Afternoon', 'Evening'];
 
-function renderSummary() {
-  currentSlot = null;
-  currentView = null;
-  stopAssignments = {};
-
-  const slots = Object.keys(slotGroups).sort((a, b) => {
+function sortedSlots() {
+  return Object.keys(slotGroups).sort((a, b) => {
     const ai = SLOT_ORDER.indexOf(a);
     const bi = SLOT_ORDER.indexOf(b);
     if (ai === -1 && bi === -1) return a.localeCompare(b);
@@ -361,38 +357,62 @@ function renderSummary() {
     if (bi === -1) return -1;
     return ai - bi;
   });
+}
 
-  let html = '';
+function renderSummary() {
+  currentSlot = null;
+  currentView = null;
+  stopAssignments = {};
+
+  const slots = sortedSlots();
+
+  let html = '<div class="section-title">Select Slot</div>';
+  html += '<div class="tiles">';
 
   slots.forEach(slot => {
-    const routes = Object.keys(slotGroups[slot]).sort((a, b) => {
-      if (a === 'No Route') return 1;
-      if (b === 'No Route') return -1;
-      return a.localeCompare(b, undefined, { numeric: true });
-    });
-
     const totalCount = Object.values(slotGroups[slot])
       .reduce((sum, arr) => sum + arr.length, 0);
 
-    html += `<div class="section-title">${escapeHtml(slot)} <span style="color:var(--muted); font-weight:400;">(${totalCount})</span></div>`;
-    html += '<div class="tiles">';
-
-    routes.forEach(route => {
-      html += `
-        <div class="tile" onclick="openRoute('${escapeAttr(slot)}','${escapeAttr(route)}')">
-          <div class="route-name">${escapeHtml(route)}</div>
-          <div class="route-count">${slotGroups[slot][route].length} client(s)</div>
-        </div>`;
-    });
-
     html += `
-      <div class="tile new-route" onclick="openNewRoute('${escapeAttr(slot)}')">
-        ➕ New Route
+      <div class="tile" onclick="openSlot('${escapeAttr(slot)}')">
+        <div class="route-name">${escapeHtml(slot)}</div>
+        <div class="route-count">${totalCount} client(s)</div>
       </div>`;
-
-    html += '</div>';
   });
 
+  html += '</div>';
+  content.innerHTML = html;
+}
+
+function openSlot(slot) {
+  currentSlot = slot;
+  currentView = null;
+  stopAssignments = {};
+
+  const routes = Object.keys(slotGroups[slot]).sort((a, b) => {
+    if (a === 'No Route') return 1;
+    if (b === 'No Route') return -1;
+    return a.localeCompare(b, undefined, { numeric: true });
+  });
+
+  let html = `<span class="back-link" onclick="renderSummary()">← Back to slots</span>`;
+  html += `<div class="section-title">${escapeHtml(slot)}</div>`;
+  html += '<div class="tiles">';
+
+  routes.forEach(route => {
+    html += `
+      <div class="tile" onclick="openRoute('${escapeAttr(slot)}','${escapeAttr(route)}')">
+        <div class="route-name">${escapeHtml(route)}</div>
+        <div class="route-count">${slotGroups[slot][route].length} client(s)</div>
+      </div>`;
+  });
+
+  html += `
+    <div class="tile new-route" onclick="openNewRoute('${escapeAttr(slot)}')">
+      ➕ New Route
+    </div>`;
+
+  html += '</div>';
   content.innerHTML = html;
 }
 
@@ -414,7 +434,7 @@ function openNewRoute(slot) {
 }
 
 function renderClientView(clients, title) {
-  let html = `<span class="back-link" onclick="renderSummary()">← Back to routes</span>`;
+  let html = `<span class="back-link" onclick="openSlot('${escapeAttr(currentSlot)}')">← Back to ${escapeHtml(currentSlot)}</span>`;
   html += `<div class="section-title">${escapeHtml(title)}</div>`;
   html += renderClientList(clients, true);
 
