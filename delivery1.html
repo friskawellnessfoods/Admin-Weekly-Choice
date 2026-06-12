@@ -280,7 +280,11 @@ function showToast(msg) {
 
 async function apiPost(action, params = {}) {
   const body = new URLSearchParams({ action, ...params });
-  const res = await fetch(API_URL, { method: 'POST', body });
+  const res = await fetch(API_URL, {
+    method: 'POST',
+    body,
+    redirect: 'follow'
+  });
   return res.json();
 }
 
@@ -292,6 +296,7 @@ async function loadOrders() {
 
   try {
     const ordersRes = await apiPost('getOrdersForDate', { date });
+    console.log('ordersRes:', ordersRes);
 
     if (!ordersRes.success || !ordersRes.clients.length) {
       content.innerHTML = '<div class="empty-state">No active clients found for this date.</div>';
@@ -304,6 +309,7 @@ async function loadOrders() {
     const results = await Promise.all(
       ordersRes.clients.map(c => apiPost('getClient', { phone: c.phone }))
     );
+    console.log('master results:', results);
 
     allClients = [];
     routeGroups = {};
