@@ -261,9 +261,10 @@
 <script src="config.js"></script>
 <script>
 
-let allClients = [];     // full client list with route info
-let routeGroups = {};    // route -> [clients]
-let currentView = null;  // null | route name | "NEW"
+let allClients = [];      // full client list
+let slotGroups = {};      // slot -> { route -> [clients] }
+let currentSlot = null;
+let currentView = null;   // null | route name | "NEW"
 let stopAssignments = {}; // phone -> stop number (per current view)
 
 const content = document.getElementById('content');
@@ -301,36 +302,40 @@ async function loadOrders() {
     if (!ordersRes.success || !ordersRes.clients.length) {
       content.innerHTML = '<div class="empty-state">No active clients found for this date.</div>';
       allClients = [];
-      routeGroups = {};
+      slotGroups = {};
       return;
     }
 
     allClients = [];
-    routeGroups = {};
+    slotGroups = {};
 
     ordersRes.clients.forEach(c => {
-      const route = String(c.route || '').trim();
-      if (!route) return; // skip clients with no matched route
+      const slot = String(c.slot || 'Unspecified').trim() || 'Unspecified';
+      const route = String(c.route || '').trim() || 'No Route';
 
       const clientObj = {
         phone: c.phone,
         name: c.name,
         location: c.location,
-        slot: c.slot,
-        route: route
+        slot,
+        route
       };
 
       allClients.push(clientObj);
 
-      if (!routeGroups[route]) routeGroups[route] = [];
-      routeGroups[route].push(clientObj);
+      if (!slotGroups[slot]) slotGroups[slot] = {};
+      if (!slotGroups[slot][route]) slotGroups[slot][route] = [];
+      slotGroups[slot][route].push(clientObj);
     });
 
     // Sort clients within each route by name
-    Object.values(routeGroups).forEach(arr =>
-      arr.sort((a, b) => a.name.localeCompare(b.name))
-    );
+    Object.values(slotGroups).forEach(routes => {
+      Object.values(routes).forEach(arr =>
+        arr.sort((a, b) => a.name.localeCompare(b.name))
+      );
+    });
 
+    currentSlot = null;
     currentView = null;
     stopAssignments = {};
     renderSummary();
@@ -341,49 +346,71 @@ async function loadOrders() {
   }
 }
 
+const SLOT_ORDER = ['Morning', 'Afternoon', 'Evening'];
+
 function renderSummary() {
+  currentSlot = null;
   currentView = null;
   stopAssignments = {};
 
-  const routeNames = Object.keys(routeGroups).sort((a, b) =>
-    a.localeCompare(b, undefined, { numeric: true })
-  );
-
-  let html = '<div class="section-title">Routes Found</div>';
-  html += '<div class="tiles">';
-
-  routeNames.forEach(route => {
-    html += `
-      <div class="tile" onclick="openRoute('${escapeAttr(route)}')">
-        <div class="route-name">${escapeHtml(route)}</div>
-        <div class="route-count">${routeGroups[route].length} client(s)</div>
-      </div>`;
+  const slots = Object.keys(slotGroups).sort((a, b) => {
+    const ai = SLOT_ORDER.indexOf(a);
+    const bi = SLOT_ORDER.indexOf(b);
+    if (ai === -1 && bi === -1) return a.localeCompare(b);
+    if (ai === -1) return 1;
+    if (bi === -1) return -1;
+    return ai - bi;
   });
 
-  html += `
-    <div class="tile new-route" onclick="openNewRoute()">
-      ➕ New Route
-    </div>`;
+  let html = '';
 
-  html += '</div>';
+  slots.forEach(slot => {
+    const routes = Object.keys(slotGroups[slot]).sort((a, b) => {
+      if (a === 'No Route') return 1;
+      if (b === 'No Route') return -1;
+      return a.localeCompare(b, undefined, { numeric: true });
+    });
 
-  // Show all clients below if needed
-  html += '<div class="section-title">All Active Clients</div>';
-  html += renderClientList(allClients, false);
+    const totalCount = Object.values(slotGroups[slot])
+      .reduce((sum, arr) => sum + arr.length, 0);
+
+    html += `<div class="section-title">${escapeHtml(slot)} <span style="color:var(--muted); font-weight:400;">(${totalCount})</span></div>`;
+    html += '<div class="tiles">';
+
+    routes.forEach(route => {
+      html += `
+        <div class="tile" onclick="openRoute('${escapeAttr(slot)}','${escapeAttr(route)}')">
+          <div class="route-name">${escapeHtml(route)}</div>
+          <div class="route-count">${slotGroups[slot][route].length} client(s)</div>
+        </div>`;
+    });
+
+    html += `
+      <div class="tile new-route" onclick="openNewRoute('${escapeAttr(slot)}')">
+        ➕ New Route
+      </div>`;
+
+    html += '</div>';
+  });
 
   content.innerHTML = html;
 }
 
-function openRoute(route) {
+function openRoute(slot, route) {
+  currentSlot = slot;
   currentView = route;
   stopAssignments = {};
-  renderClientView(routeGroups[route], route);
+  renderClientView(slotGroups[slot][route], `${slot} — ${route}`);
 }
 
-function openNewRoute() {
+function openNewRoute(slot) {
+  currentSlot = slot;
   currentView = 'NEW';
   stopAssignments = {};
-  renderClientView(allClients, 'New Route');
+
+  // All clients within this slot, across all routes
+  const clients = Object.values(slotGroups[slot]).flat();
+  renderClientView(clients, `${slot} — New Route`);
 }
 
 function renderClientView(clients, title) {
@@ -414,7 +441,6 @@ function renderClientList(clients, withStopSelect) {
     html += `<div class="client-info">
       <div class="name">${escapeHtml(c.name)}</div>
       <div class="meta">${escapeHtml(c.phone)} · ${escapeHtml(c.location)}</div>
-      <div class="meta">${escapeHtml(c.slot)} · Route: ${escapeHtml(c.route)}</div>
     </div>`;
 
     if (withStopSelect) {
@@ -473,7 +499,9 @@ function refreshStopOptions() {
 }
 
 function generateMessage() {
-  const clients = currentView === 'NEW' ? allClients : routeGroups[currentView];
+  const clients = currentView === 'NEW'
+    ? Object.values(slotGroups[currentSlot]).flat()
+    : slotGroups[currentSlot][currentView];
 
   // Build ordered list based on stopAssignments
   const ordered = [];
