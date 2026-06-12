@@ -523,23 +523,46 @@ function generateMessage() {
     ? Object.values(slotGroups[currentSlot]).flat()
     : slotGroups[currentSlot][currentView];
 
-  // Build ordered list based on stopAssignments
-  const ordered = [];
-  Object.entries(stopAssignments).forEach(([phone, stopNum]) => {
-    const client = clients.find(c => c.phone === phone);
-    if (client) ordered.push({ ...client, stop: parseInt(stopNum) });
-  });
+  let ordered = [];
 
-  ordered.sort((a, b) => a.stop - b.stop);
+  if (currentView === 'NEW') {
+    // Only include clients with an assigned stop number
+    Object.entries(stopAssignments).forEach(([phone, stopNum]) => {
+      const client = clients.find(c => c.phone === phone);
+      if (client) ordered.push({ ...client, stop: parseInt(stopNum) });
+    });
 
-  if (!ordered.length) {
-    showToast('Assign stop numbers first');
-    return;
+    ordered.sort((a, b) => a.stop - b.stop);
+
+    if (!ordered.length) {
+      showToast('Assign stop numbers first');
+      return;
+    }
+
+  } else {
+    // Include ALL clients: numbered first (sorted), then unnumbered
+    const numbered = [];
+    const unnumbered = [];
+
+    clients.forEach(c => {
+      if (stopAssignments[c.phone]) {
+        numbered.push({ ...c, stop: parseInt(stopAssignments[c.phone]) });
+      } else {
+        unnumbered.push({ ...c, stop: null });
+      }
+    });
+
+    numbered.sort((a, b) => a.stop - b.stop);
+    ordered = numbered.concat(unnumbered);
   }
 
   let message = '';
   ordered.forEach(c => {
-    message += `${c.stop}. ${c.name}\n${c.phone}\n${c.location}\n\n`;
+    if (c.stop !== null) {
+      message += `${c.stop}. ${c.name}\n${c.phone}\n${c.location}\n\n`;
+    } else {
+      message += `${c.name}\n${c.phone}\n${c.location}\n\n`;
+    }
   });
 
   message = message.trim();
