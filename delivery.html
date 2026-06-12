@@ -171,6 +171,49 @@
     background: #fff;
   }
 
+  .stop-dropdown {
+    position: relative;
+    width: 60px;
+  }
+
+  .stop-dropdown-btn {
+    width: 100%;
+    padding: 8px 4px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    font-size: 15px;
+    text-align: center;
+    background: #fff;
+    cursor: pointer;
+    color: var(--text);
+  }
+
+  .stop-dropdown-menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    max-height: 180px;
+    overflow-y: auto;
+    z-index: 50;
+    min-width: 60px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  }
+
+  .stop-dropdown-menu div {
+    padding: 8px 12px;
+    text-align: center;
+    font-size: 15px;
+    cursor: pointer;
+  }
+
+  .stop-dropdown-menu div:active,
+  .stop-dropdown-menu div:hover {
+    background: var(--bg);
+  }
+
   .section-title {
     font-size: 16px;
     font-weight: 700;
@@ -436,7 +479,14 @@ function openNewRoute(slot) {
 function renderClientView(clients, title) {
   let html = `<span class="back-link" onclick="openSlot('${escapeAttr(currentSlot)}')">← Back to ${escapeHtml(currentSlot)}</span>`;
   html += `<div class="section-title">${escapeHtml(title)}</div>`;
-  html += renderClientList(clients, true);
+
+  html += `<input type="text" id="searchInput" placeholder="Search client name..."
+    style="width:100%; padding:10px; border-radius:var(--radius); border:1px solid var(--border); font-size:15px; margin-bottom:10px; background:var(--card);"
+    oninput="filterClients()">`;
+
+  html += `<div id="clientListContainer">`;
+  html += renderClientList(clients, true, clients.length);
+  html += `</div>`;
 
   html += `
     <button class="full" style="margin-top:14px;" onclick="generateMessage()">
@@ -448,12 +498,27 @@ function renderClientView(clients, title) {
   content.innerHTML = html;
 }
 
-function renderClientList(clients, withStopSelect) {
+function filterClients() {
+  const query = document.getElementById('searchInput').value.toLowerCase().trim();
+
+  const clients = currentView === 'NEW'
+    ? Object.values(slotGroups[currentSlot]).flat()
+    : slotGroups[currentSlot][currentView];
+
+  const filtered = query
+    ? clients.filter(c => c.name.toLowerCase().includes(query))
+    : clients;
+
+  document.getElementById('clientListContainer').innerHTML = renderClientList(filtered, true, clients.length);
+  refreshStopOptions();
+}
+
+function renderClientList(clients, withStopSelect, totalOverride) {
   if (!clients.length) {
     return '<div class="empty-state">No clients here.</div>';
   }
 
-  const total = clients.length;
+  const total = totalOverride || clients.length;
 
   let html = '';
   clients.forEach(c => {
@@ -464,12 +529,10 @@ function renderClientList(clients, withStopSelect) {
     </div>`;
 
     if (withStopSelect) {
-      html += `<select class="stop-select" data-phone="${escapeAttr(c.phone)}" onchange="onStopChange(this)">
-        <option value="">-</option>`;
-      for (let i = 1; i <= total; i++) {
-        html += `<option value="${i}">${i}</option>`;
-      }
-      html += `</select>`;
+      const currentVal = stopAssignments[c.phone] || '-';
+      html += `<div class="stop-dropdown" data-phone="${escapeAttr(c.phone)}">
+        <div class="stop-dropdown-btn" onclick="toggleStopMenu(this, event)">${currentVal}</div>
+      </div>`;
     }
 
     html += `</div>`;
@@ -478,14 +541,66 @@ function renderClientList(clients, withStopSelect) {
   return html;
 }
 
-function onStopChange(selectEl) {
-  const phone = selectEl.dataset.phone;
-  const val = selectEl.value;
+function toggleStopMenu(btnEl, event) {
+  if (event) event.stopPropagation();
 
+  // Close any existing open menu
+  closeStopMenus();
+
+  const wrapper = btnEl.parentElement;
+  const phone = wrapper.dataset.phone;
+
+  const clients = currentView === 'NEW'
+    ? Object.values(slotGroups[currentSlot]).flat()
+    : slotGroups[currentSlot][currentView];
+
+  const total = clients.length;
+  const currentVal = stopAssignments[phone] || '';
+
+  const menu = document.createElement('div');
+  menu.className = 'stop-dropdown-menu';
+
+  const noneOpt = document.createElement('div');
+  noneOpt.textContent = '-';
+  noneOpt.onclick = () => selectStop(phone, '');
+  menu.appendChild(noneOpt);
+
+  for (let i = 1; i <= total; i++) {
+    const taken = Object.entries(stopAssignments).some(
+      ([p, v]) => v === String(i) && p !== phone
+    );
+    if (taken) continue;
+
+    const opt = document.createElement('div');
+    opt.textContent = i;
+    if (String(i) === currentVal) opt.style.fontWeight = '700';
+    opt.onclick = () => selectStop(phone, String(i));
+    menu.appendChild(opt);
+  }
+
+  menu.onclick = (e) => e.stopPropagation();
+
+  wrapper.appendChild(menu);
+
+  // Close on outside click
+  setTimeout(() => {
+    document.addEventListener('click', closeStopMenusOnce);
+  }, 0);
+}
+
+function closeStopMenusOnce(e) {
+  closeStopMenus();
+  document.removeEventListener('click', closeStopMenusOnce);
+}
+
+function closeStopMenus() {
+  document.querySelectorAll('.stop-dropdown-menu').forEach(m => m.remove());
+}
+
+function selectStop(phone, val) {
   if (val === '') {
     delete stopAssignments[phone];
   } else {
-    // Remove this number from any other client first
     for (const p in stopAssignments) {
       if (stopAssignments[p] === val && p !== phone) {
         delete stopAssignments[p];
@@ -494,27 +609,15 @@ function onStopChange(selectEl) {
     stopAssignments[phone] = val;
   }
 
-  // Refresh all dropdowns to reflect taken numbers
+  closeStopMenus();
   refreshStopOptions();
 }
 
 function refreshStopOptions() {
-  const selects = document.querySelectorAll('.stop-select');
-  const total = selects.length;
-
-  selects.forEach(sel => {
-    const phone = sel.dataset.phone;
-    const currentVal = stopAssignments[phone] || '';
-
-    let html = '<option value="">-</option>';
-    for (let i = 1; i <= total; i++) {
-      const taken = Object.entries(stopAssignments).some(
-        ([p, v]) => v === String(i) && p !== phone
-      );
-      if (taken) continue;
-      html += `<option value="${i}" ${String(i) === currentVal ? 'selected' : ''}>${i}</option>`;
-    }
-    sel.innerHTML = html;
+  document.querySelectorAll('.stop-dropdown').forEach(wrapper => {
+    const phone = wrapper.dataset.phone;
+    const btn = wrapper.querySelector('.stop-dropdown-btn');
+    if (btn) btn.textContent = stopAssignments[phone] || '-';
   });
 }
 
