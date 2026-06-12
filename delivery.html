@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Delivery Routes</title>
+<style>
+  :root {
+    --bg: #f5f6f8;
+    --card: #ffffff;
+    --primary: #2563eb;
+    --primary-dark: #1d4ed8;
+    --text: #1f2330;
+    --muted: #6b7280;
+    --border: #e5e7eb;
+    --accent: #16a34a;
+    --radius: 12px;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    font-family: -apple-system, Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding-bottom: 40px;
+  }
+
+  header {
+    background: var(--primary);
+    color: #fff;
+    padding: 12px 16px;
+    text-align: center;
+    font-size: 18px;
+    font-weight: 600;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+  }
+
+  header .logo {
+    height: 32px;
+    width: 32px;
+    object-fit: contain;
+    border-radius: 6px;
+  }
+
+  .container {
+    padding: 12px;
+    max-width: 600px;
+    margin: 0 auto;
+  }
+
+  .date-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  input[type="date"] {
+    flex: 1;
+    padding: 10px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    font-size: 16px;
+    background: var(--card);
+  }
+
+  button {
+    background: var(--primary);
+    color: #fff;
+    border: none;
+    padding: 10px 16px;
+    border-radius: var(--radius);
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  button:active { background: var(--primary-dark); }
+
+  button.secondary {
+    background: var(--card);
+    color: var(--primary);
+    border: 1px solid var(--primary);
+  }
+
+  button.full { width: 100%; }
+
+  /* Tiles */
+  .tiles {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+
+  .tile {
+    background: var(--card);
+    border: 2px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color .15s, transform .1s;
+  }
+
+  .tile:active { transform: scale(0.97); }
+
+  .tile.active {
+    border-color: var(--primary);
+    background: #eff4ff;
+  }
+
+  .tile .route-name {
+    font-weight: 700;
+    font-size: 15px;
+    margin-bottom: 4px;
+  }
+
+  .tile .route-count {
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  .tile.new-route {
+    border-style: dashed;
+    color: var(--primary);
+    font-weight: 700;
+  }
+
+  /* Client cards */
+  .client-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .client-info {
+    flex: 1;
+  }
+
+  .client-info .name {
+    font-weight: 600;
+    font-size: 15px;
+  }
+
+  .client-info .meta {
+    font-size: 13px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+
+  select.stop-select {
+    width: 60px;
+    padding: 8px 4px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    font-size: 15px;
+    text-align: center;
+    background: #fff;
+  }
+
+  .section-title {
+    font-size: 16px;
+    font-weight: 700;
+    margin: 16px 0 8px;
+  }
+
+  .empty-state {
+    text-align: center;
+    color: var(--muted);
+    padding: 30px 12px;
+    font-size: 14px;
+  }
+
+  .loading {
+    text-align: center;
+    padding: 30px;
+    color: var(--muted);
+  }
+
+  /* Message output */
+  .message-box {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px;
+    margin-top: 12px;
+    white-space: pre-wrap;
+    font-size: 14px;
+    line-height: 1.5;
+    font-family: monospace;
+  }
+
+  .action-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+  }
+
+  .toast {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--accent);
+    color: #fff;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 14px;
+    opacity: 0;
+    transition: opacity .3s;
+    pointer-events: none;
+  }
+
+  .toast.show { opacity: 1; }
+
+  .back-link {
+    display: inline-block;
+    margin-bottom: 10px;
+    color: var(--primary);
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 14px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <img src="logo.png" alt="Logo" class="logo">
+  Delivery Route Planner
+</header>
+
+<div class="container">
+
+  <div class="date-row">
+    <input type="date" id="dateInput">
+    <button onclick="loadOrders()">Go</button>
+  </div>
+
+  <div id="content">
+    <div class="empty-state">Select a date and tap Go to load active clients.</div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="config.js"></script>
+<script>
+
+let allClients = [];     // full client list with route info
+let routeGroups = {};    // route -> [clients]
+let currentView = null;  // null | route name | "NEW"
+let stopAssignments = {}; // phone -> stop number (per current view)
+
+const content = document.getElementById('content');
+
+// Set default date to today
+document.getElementById('dateInput').valueAsDate = new Date();
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 1800);
+}
+
+async function apiPost(action, params = {}) {
+  const body = new URLSearchParams({ action, ...params });
+  const res = await fetch(API_URL, { method: 'POST', body });
+  return res.json();
+}
+
+async function loadOrders() {
+  const date = document.getElementById('dateInput').value;
+  if (!date) { showToast('Pick a date first'); return; }
+
+  content.innerHTML = '<div class="loading">Loading active clients…</div>';
+
+  try {
+    const ordersRes = await apiPost('getOrdersForDate', { date });
+
+    if (!ordersRes.success || !ordersRes.clients.length) {
+      content.innerHTML = '<div class="empty-state">No active clients found for this date.</div>';
+      allClients = [];
+      routeGroups = {};
+      return;
+    }
+
+    // Fetch master info for each client to determine route
+    const results = await Promise.all(
+      ordersRes.clients.map(c => apiPost('getClient', { phone: c.phone }))
+    );
+
+    allClients = [];
+    routeGroups = {};
+
+    ordersRes.clients.forEach((c, i) => {
+      const master = results[i];
+      if (!master.found) return;
+
+      let route = '';
+      if (c.location === master.location1) route = master.route1;
+      else if (c.location === master.location2) route = master.route2;
+
+      if (!route) return;
+
+      const clientObj = {
+        phone: c.phone,
+        name: c.name,
+        location: c.location,
+        route: String(route).trim()
+      };
+
+      allClients.push(clientObj);
+
+      if (!routeGroups[clientObj.route]) routeGroups[clientObj.route] = [];
+      routeGroups[clientObj.route].push(clientObj);
+    });
+
+    // Sort clients within each route by name
+    Object.values(routeGroups).forEach(arr =>
+      arr.sort((a, b) => a.name.localeCompare(b.name))
+    );
+
+    currentView = null;
+    stopAssignments = {};
+    renderSummary();
+
+  } catch (err) {
+    content.innerHTML = '<div class="empty-state">Error loading data. Please try again.</div>';
+    console.error(err);
+  }
+}
+
+function renderSummary() {
+  currentView = null;
+  stopAssignments = {};
+
+  const routeNames = Object.keys(routeGroups).sort((a, b) =>
+    a.localeCompare(b, undefined, { numeric: true })
+  );
+
+  let html = '<div class="section-title">Routes Found</div>';
+  html += '<div class="tiles">';
+
+  routeNames.forEach(route => {
+    html += `
+      <div class="tile" onclick="openRoute('${escapeAttr(route)}')">
+        <div class="route-name">${escapeHtml(route)}</div>
+        <div class="route-count">${routeGroups[route].length} client(s)</div>
+      </div>`;
+  });
+
+  html += `
+    <div class="tile new-route" onclick="openNewRoute()">
+      ➕ New Route
+    </div>`;
+
+  html += '</div>';
+
+  // Show all clients below if needed
+  html += '<div class="section-title">All Active Clients</div>';
+  html += renderClientList(allClients, false);
+
+  content.innerHTML = html;
+}
+
+function openRoute(route) {
+  currentView = route;
+  stopAssignments = {};
+  renderClientView(routeGroups[route], route);
+}
+
+function openNewRoute() {
+  currentView = 'NEW';
+  stopAssignments = {};
+  renderClientView(allClients, 'New Route');
+}
+
+function renderClientView(clients, title) {
+  let html = `<span class="back-link" onclick="renderSummary()">← Back to routes</span>`;
+  html += `<div class="section-title">${escapeHtml(title)}</div>`;
+  html += renderClientList(clients, true);
+
+  html += `
+    <button class="full" style="margin-top:14px;" onclick="generateMessage()">
+      Generate WhatsApp Message
+    </button>
+    <div id="messageOutput"></div>
+  `;
+
+  content.innerHTML = html;
+}
+
+function renderClientList(clients, withStopSelect) {
+  if (!clients.length) {
+    return '<div class="empty-state">No clients here.</div>';
+  }
+
+  const total = clients.length;
+
+  let html = '';
+  clients.forEach(c => {
+    html += `<div class="client-card">`;
+    html += `<div class="client-info">
+      <div class="name">${escapeHtml(c.name)}</div>
+      <div class="meta">${escapeHtml(c.phone)} · ${escapeHtml(c.location)} · ${escapeHtml(c.route)}</div>
+    </div>`;
+
+    if (withStopSelect) {
+      html += `<select class="stop-select" data-phone="${escapeAttr(c.phone)}" onchange="onStopChange(this)">
+        <option value="">-</option>`;
+      for (let i = 1; i <= total; i++) {
+        html += `<option value="${i}">${i}</option>`;
+      }
+      html += `</select>`;
+    }
+
+    html += `</div>`;
+  });
+
+  return html;
+}
+
+function onStopChange(selectEl) {
+  const phone = selectEl.dataset.phone;
+  const val = selectEl.value;
+
+  if (val === '') {
+    delete stopAssignments[phone];
+  } else {
+    // Remove this number from any other client first
+    for (const p in stopAssignments) {
+      if (stopAssignments[p] === val && p !== phone) {
+        delete stopAssignments[p];
+      }
+    }
+    stopAssignments[phone] = val;
+  }
+
+  // Refresh all dropdowns to reflect taken numbers
+  refreshStopOptions();
+}
+
+function refreshStopOptions() {
+  const selects = document.querySelectorAll('.stop-select');
+  const total = selects.length;
+
+  selects.forEach(sel => {
+    const phone = sel.dataset.phone;
+    const currentVal = stopAssignments[phone] || '';
+
+    let html = '<option value="">-</option>';
+    for (let i = 1; i <= total; i++) {
+      const taken = Object.entries(stopAssignments).some(
+        ([p, v]) => v === String(i) && p !== phone
+      );
+      if (taken) continue;
+      html += `<option value="${i}" ${String(i) === currentVal ? 'selected' : ''}>${i}</option>`;
+    }
+    sel.innerHTML = html;
+  });
+}
+
+function generateMessage() {
+  const clients = currentView === 'NEW' ? allClients : routeGroups[currentView];
+
+  // Build ordered list based on stopAssignments
+  const ordered = [];
+  Object.entries(stopAssignments).forEach(([phone, stopNum]) => {
+    const client = clients.find(c => c.phone === phone);
+    if (client) ordered.push({ ...client, stop: parseInt(stopNum) });
+  });
+
+  ordered.sort((a, b) => a.stop - b.stop);
+
+  if (!ordered.length) {
+    showToast('Assign stop numbers first');
+    return;
+  }
+
+  let message = '';
+  ordered.forEach(c => {
+    message += `${c.stop}. ${c.name}\n${c.phone}\n${c.location}\n\n`;
+  });
+
+  message = message.trim();
+
+  const out = document.getElementById('messageOutput');
+  out.innerHTML = `
+    <div class="message-box" id="msgText">${escapeHtml(message)}</div>
+    <div class="action-row">
+      <button class="full" onclick="copyMessage()">📋 Copy Message</button>
+    </div>
+  `;
+
+  // store raw text for copying
+  out.dataset.raw = message;
+}
+
+function copyMessage() {
+  const out = document.getElementById('messageOutput');
+  const text = out.dataset.raw || '';
+
+  navigator.clipboard.writeText(text).then(() => {
+    showToast('Copied to clipboard!');
+  }).catch(() => {
+    // fallback
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    showToast('Copied to clipboard!');
+  });
+}
+
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function escapeAttr(str) {
+  return String(str).replace(/'/g, "\\'");
+}
+
+</script>
+</body>
+</html>
