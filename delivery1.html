@@ -305,37 +305,25 @@ async function loadOrders() {
       return;
     }
 
-    // Fetch master info for each client to determine route
-    const results = await Promise.all(
-      ordersRes.clients.map(c => apiPost('getClient', { phone: c.phone }))
-    );
-    console.log('master results:', results);
-
     allClients = [];
     routeGroups = {};
 
-    ordersRes.clients.forEach((c, i) => {
-      const master = results[i].client;
-      console.log('Client:', c.name, '| location:', JSON.stringify(c.location), '| master:', master);
-      if (!master || !master.found) return;
-
-      let route = '';
-      if (c.location === master.location1) route = master.route1;
-      else if (c.location === master.location2) route = master.route2;
-
-      if (!route) return;
+    ordersRes.clients.forEach(c => {
+      const route = String(c.route || '').trim();
+      if (!route) return; // skip clients with no matched route
 
       const clientObj = {
         phone: c.phone,
         name: c.name,
         location: c.location,
-        route: String(route).trim()
+        slot: c.slot,
+        route: route
       };
 
       allClients.push(clientObj);
 
-      if (!routeGroups[clientObj.route]) routeGroups[clientObj.route] = [];
-      routeGroups[clientObj.route].push(clientObj);
+      if (!routeGroups[route]) routeGroups[route] = [];
+      routeGroups[route].push(clientObj);
     });
 
     // Sort clients within each route by name
@@ -425,7 +413,8 @@ function renderClientList(clients, withStopSelect) {
     html += `<div class="client-card">`;
     html += `<div class="client-info">
       <div class="name">${escapeHtml(c.name)}</div>
-      <div class="meta">${escapeHtml(c.phone)} · ${escapeHtml(c.location)} · ${escapeHtml(c.route)}</div>
+      <div class="meta">${escapeHtml(c.phone)} · ${escapeHtml(c.location)}</div>
+      <div class="meta">${escapeHtml(c.slot)} · Route: ${escapeHtml(c.route)}</div>
     </div>`;
 
     if (withStopSelect) {
