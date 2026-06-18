@@ -61,7 +61,7 @@
   .cb-name{ font-weight:700; font-size:1.3em; }
   .cb-slot{ font-weight:600; font-size:.95em; margin-top:.15em; text-transform:uppercase; letter-spacing:.5px; }
   .cb-type{ font-size:1em; margin-top:.22em; }
-  .cb-codes{ font-size:1.05em; margin-top:.35em; }
+  .cb-code{ font-weight:700; font-size:1.3em; }
   .cb-remark{ font-size:.95em; font-style:italic; margin-top:.35em; }
 
   @media print{
@@ -260,24 +260,24 @@
     return arr;
   }
 
-  // ---------- CARRY BAG TAG ----------
+ // ---------- CARRY BAG TAG ----------
   function buildCarryTag(g){
     const el = document.createElement('div'); el.className = 'tag carry';
     const inner = document.createElement('div'); inner.className = 'inner';
 
+    // name (big)
     const name = document.createElement('div'); name.className = 'cb-name';
     name.textContent = g.clientName || '';
     inner.appendChild(name);
 
-    // slot shown only for Morning / Evening
-    const slot = String(g.slot || '').trim();
-    if(slot === 'Morning' || slot === 'Evening'){
-      const s = document.createElement('div'); s.className = 'cb-slot';
-      s.textContent = slot;
-      inner.appendChild(s);
-    }
+    // each choice on its own line (big)
+    g.codeList.forEach(code => {
+      const c = document.createElement('div'); c.className = 'cb-code';
+      c.textContent = code;
+      inner.appendChild(c);
+    });
 
-    // meal type, strip leading numbers (same as meal tags)
+    // meal type, strip leading numbers
     if(g.type){
       const cleanType = g.type
         .split(',')
@@ -291,16 +291,19 @@
       }
     }
 
-    // choices in this slot (codes)
-    const codes = document.createElement('div'); codes.className = 'cb-codes';
-    codes.textContent = g.codeList.join(', ');
-    inner.appendChild(codes);
-
     // remark if any
     if(g.remarks){
       const rem = document.createElement('div'); rem.className = 'cb-remark';
       rem.textContent = g.remarks;
       inner.appendChild(rem);
+    }
+
+    // slot at the bottom, only for Morning / Evening
+    const slot = String(g.slot || '').trim();
+    if(slot === 'Morning' || slot === 'Evening'){
+      const s = document.createElement('div'); s.className = 'cb-slot';
+      s.textContent = slot;
+      inner.appendChild(s);
     }
 
     el.appendChild(inner);
