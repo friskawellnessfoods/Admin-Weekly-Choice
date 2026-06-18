@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Friska — Dish Tags</title>
+<script src="config.js"></script>
+<style>
+  /* ===== TWEAKABLE ===== */
+  :root{
+    --tag-border: 1mm;          /* tag border thickness */
+    --tag-border-color: #222;   /* tag border color */
+    --pad-x: 9mm;               /* horizontal safe-zone padding (keeps text off the food border) */
+    --pad-y: 8mm;               /* vertical safe-zone padding */
+  }
+  /* ===================== */
+
+  * { box-sizing: border-box; }
+  body{ font-family: Arial, Helvetica, sans-serif; margin:0; background:#eceff1; color:#263238; }
+
+  .bar{ position:sticky; top:0; z-index:10; background:#fff; border-bottom:1px solid #cfd8dc;
+        padding:12px 16px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .bar input[type=date]{ padding:8px; border:1px solid #b0bec5; border-radius:6px; font-size:14px; }
+  .bar input[type=url]{ padding:8px; border:1px solid #b0bec5; border-radius:6px; font-size:13px; min-width:260px; }
+  .bar button{ padding:9px 16px; border:0; border-radius:6px; font-size:14px; cursor:pointer; color:#fff; background:#2e7d32; }
+  .bar button.alt{ background:#455a64; }
+  .bar button:disabled{ opacity:.5; cursor:default; }
+  .status{ font-size:13px; color:#546e7a; margin-left:auto; }
+
+  #pages{ padding:18px; display:flex; flex-direction:column; align-items:center; gap:18px; }
+
+  .page{
+    width:210mm; height:297mm; background:#fff;
+    box-shadow:0 2px 10px rgba(0,0,0,.18);
+    display:grid; grid-template-columns:1fr 1fr; grid-template-rows:repeat(5,1fr);
+  }
+
+  .tag{
+    position:relative; overflow:hidden;
+    border:var(--tag-border) solid var(--tag-border-color);
+    background-image:url('tag_template.png');     /* change path here if needed */
+    background-size:100% 100%; background-repeat:no-repeat; background-position:center;
+  }
+
+  .inner{
+    position:absolute; top:var(--pad-y); bottom:var(--pad-y); left:var(--pad-x); right:var(--pad-x);
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    text-align:center; overflow:hidden; line-height:1.18;
+  }
+  .dish{ font-weight:800; font-size:1.45em; }
+  .type{ font-weight:600; font-size:1em; margin-top:.28em; }
+  .remark{ font-size:.95em; font-style:italic; margin-top:.45em; }
+  .cname{ font-size:.85em; font-weight:600; margin-top:.15em; }
+
+  @media print{
+    .bar{ display:none; }
+    body{ background:#fff; }
+    #pages{ padding:0; gap:0; }
+    .page{ box-shadow:none; page-break-after:always; }
+    .tag{ -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  }
+  @page{ size:A4; margin:0; }
+</style>
+</head>
+<body>
+
+  <div class="bar">
+    <input type="date" id="date">
+    <button id="go">Generate Tags</button>
+    <button id="refresh" class="alt">Refresh Menu Cache</button>
+    <button id="print" class="alt" disabled>Print</button>
+    <input type="url" id="api" placeholder="API URL (auto from config.js)">
+    <span class="status" id="status">Pick a date and generate.</span>
+  </div>
+
+  <div id="pages"></div>
+
+<script>
+  const API_FALLBACK = (typeof API_URL !== 'undefined') ? API_URL : '';
+  const apiInput = document.getElementById('api');
+  apiInput.value = API_FALLBACK;
+
+  const dateEl   = document.getElementById('date');
+  const statusEl = document.getElementById('status');
+  const pagesEl  = document.getElementById('pages');
+  const goBtn    = document.getElementById('go');
+  const printBtn = document.getElementById('print');
+  const refreshBtn = document.getElementById('refresh');
+
+  dateEl.value = new Date().toISOString().slice(0,10);
+
+  function api(){ return (apiInput.value || '').trim(); }
+
+  goBtn.addEventListener('click', generate);
+  printBtn.addEventListener('click', () => window.print());
+  refreshBtn.addEventListener('click', refreshMenu);
+
+  async function refreshMenu(){
+    if(!api()){ statusEl.textContent = 'No API URL set.'; return; }
+    refreshBtn.disabled = true; statusEl.textContent = 'Refreshing menu cache…';
+    try{
+      await fetch(api(), { method:'POST', body:new URLSearchParams({ action:'refreshMenu' }) });
+      statusEl.textContent = 'Menu cache refreshed. Generate again.';
+    }catch(e){ statusEl.textContent = 'Refresh failed: ' + e.message; }
+    refreshBtn.disabled = false;
+  }
+
+  async function generate(){
+    if(!api()){ statusEl.textContent = 'No API URL set.'; return; }
+    const date = dateEl.value;
+    if(!date){ statusEl.textContent = 'Pick a date first.'; return; }
+
+    goBtn.disabled = true; printBtn.disabled = true;
+    pagesEl.innerHTML = '';
+    statusEl.textContent = 'Loading orders for ' + date + '…';
+
+    try{
+      const res = await fetch(api() + '?action=getTagsForDate&date=' + encodeURIComponent(date));
+      const data = await res.json();
+
+      if(!data.success || !data.tags){ throw new Error('No data returned'); }
+
+      let tags = data.tags;
+      if(tags.length === 0){
+        statusEl.textContent = 'No tags for ' + date + ' (no orders, or all cancelled).';
+        goBtn.disabled = false; return;
+      }
+
+      // group identical dishes together; non-remark before remark
+      tags.sort((a,b) =>
+        (a.dish||'').localeCompare(b.dish||'') ||
+        ((a.remarks?1:0) - (b.remarks?1:0)) ||
+        (a.clientName||'').localeCompare(b.clientName||'')
+      );
+
+      render(tags);
+      statusEl.textContent = tags.length + ' tags  ·  ' + Math.ceil(tags.length/10) + ' page(s)';
+      printBtn.disabled = false;
+    }catch(e){
+      statusEl.textContent = 'Error: ' + e.message;
+    }
+    goBtn.disabled = false;
+  }
+
+  function render(tags){
+    for(let p=0; p<tags.length; p+=10){
+      const page = document.createElement('div');
+      page.className = 'page';
+      tags.slice(p, p+10).forEach(t => page.appendChild(buildTag(t)));
+      // pad last page so the grid keeps tag sizing consistent
+      const blanks = 10 - Math.min(10, tags.length - p);
+      for(let b=0; b<blanks; b++){
+        const empty = document.createElement('div');
+        empty.className = 'tag';
+        empty.style.background = '#fff';
+        empty.style.border = 'none';
+        page.appendChild(empty);
+      }
+      pagesEl.appendChild(page);
+    }
+    // fit fonts after layout
+    requestAnimationFrame(() => {
+      document.querySelectorAll('.inner').forEach(fitTag);
+    });
+  }
+
+  function buildTag(t){
+    const el = document.createElement('div'); el.className = 'tag';
+    const inner = document.createElement('div'); inner.className = 'inner';
+
+    const dish = document.createElement('div'); dish.className = 'dish';
+    dish.textContent = t.dish || '';
+    inner.appendChild(dish);
+
+    const isExtra = (t.kind === 'snack' || t.kind === 'juice');
+    if(!isExtra && t.type){
+      const type = document.createElement('div'); type.className = 'type';
+      type.textContent = t.type;
+      inner.appendChild(type);
+    }
+
+    if(t.remarks){
+      const rem = document.createElement('div'); rem.className = 'remark';
+      rem.textContent = t.remarks;
+      inner.appendChild(rem);
+      const nm = document.createElement('div'); nm.className = 'cname';
+      nm.textContent = t.clientName || '';
+      inner.appendChild(nm);
+    }
+
+    el.appendChild(inner);
+    return el;
+  }
+
+  // shrink base font-size until content fits the safe zone
+  function fitTag(inner){
+    let size = 24;
+    inner.style.fontSize = size + 'px';
+    while(size > 7 &&
+         (inner.scrollHeight > inner.clientHeight || inner.scrollWidth > inner.clientWidth)){
+      size -= 0.5;
+      inner.style.fontSize = size + 'px';
+    }
+  }
+</script>
+</body>
+</html>
