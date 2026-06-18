@@ -34,7 +34,6 @@ body {
   min-height: 100vh;
 }
 
-/* TOP BAR */
 .header {
   background: var(--navy);
   padding: 18px 24px;
@@ -50,10 +49,8 @@ body {
   font-size: 20px;
   color: var(--gold-light);
   letter-spacing: 0.02em;
-  white-space: nowrap;
 }
 
-/* FILTER BAR */
 .filter-bar {
   background: var(--white);
   border-bottom: 1px solid var(--border);
@@ -90,13 +87,26 @@ body {
   background: var(--white);
   outline: none;
   transition: border-color 0.2s;
-  min-width: 130px;
+  min-width: 140px;
+  cursor: pointer;
+}
+
+.filter-group input[type="date"]::-webkit-calendar-picker-indicator,
+.filter-group input[type="month"]::-webkit-calendar-picker-indicator {
+  position: absolute;
+  left: 0; top: 0; right: 0; bottom: 0;
+  width: 100%; height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.filter-group input[type="date"],
+.filter-group input[type="month"] {
+  position: relative;
 }
 
 .filter-group select:focus,
-.filter-group input:focus {
-  border-color: var(--navy);
-}
+.filter-group input:focus { border-color: var(--navy); }
 
 .btn {
   padding: 9px 20px;
@@ -109,11 +119,7 @@ body {
   transition: all 0.2s;
 }
 
-.btn-primary {
-  background: var(--navy);
-  color: var(--white);
-}
-
+.btn-primary { background: var(--navy); color: var(--white); }
 .btn-primary:hover { background: var(--navy-light); }
 .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
 
@@ -139,14 +145,13 @@ body {
   align-items: center;
 }
 
-/* MAIN CONTENT */
 .content {
   padding: 20px 24px;
   max-width: 1400px;
   margin: 0 auto;
 }
 
-/* SUMMARY CARDS */
+/* CARDS — numbers view */
 .cards-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -164,23 +169,11 @@ body {
   overflow: hidden;
 }
 
-.card::after {
-  content: '';
-  position: absolute;
-  bottom: -20px;
-  right: -20px;
-  width: 80px;
-  height: 80px;
-  border-radius: 50%;
-  background: var(--navy);
-  opacity: 0.04;
-}
-
-.card.gold { border-top-color: var(--gold); }
+.card.gold  { border-top-color: var(--gold); }
 .card.green { border-top-color: var(--veg); }
-.card.red { border-top-color: var(--chicken); }
-.card.blue { border-top-color: var(--seafood); }
-.card.teal { border-top-color: #0891b2; }
+.card.red   { border-top-color: var(--chicken); }
+.card.blue  { border-top-color: var(--seafood); }
+.card.teal  { border-top-color: #0891b2; }
 
 .card-label {
   font-size: 11px;
@@ -214,17 +207,65 @@ body {
 }
 
 .dot {
-  width: 7px;
-  height: 7px;
+  width: 7px; height: 7px;
   border-radius: 50%;
   display: inline-block;
+  flex-shrink: 0;
+}
+
+/* PIE CARDS — charts view */
+.pie-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+.pie-card {
+  background: var(--white);
+  border-radius: 14px;
+  padding: 16px;
+  box-shadow: var(--shadow-sm);
+  border-top: 3px solid var(--navy);
+  text-align: center;
+}
+
+.pie-card.gold  { border-top-color: var(--gold); }
+.pie-card.green { border-top-color: var(--veg); }
+.pie-card.red   { border-top-color: var(--chicken); }
+.pie-card.blue  { border-top-color: var(--seafood); }
+.pie-card.teal  { border-top-color: #0891b2; }
+
+.pie-card-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  margin-bottom: 4px;
+}
+
+.pie-card-number {
+  font-family: 'Playfair Display', serif;
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--navy);
+  line-height: 1;
+  margin-bottom: 10px;
+}
+
+.pie-container {
+  position: relative;
+  height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* VIEW PANELS */
 .view-panel { display: none; }
 .view-panel.active { display: block; }
 
-/* CHARTS */
 .charts-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -254,7 +295,7 @@ body {
 
 .chart-container {
   position: relative;
-  height: 280px;
+  height: 300px;
 }
 
 /* TABLE */
@@ -265,11 +306,7 @@ body {
   overflow: hidden;
 }
 
-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-}
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
 
 thead th {
   background: var(--navy);
@@ -285,7 +322,6 @@ thead th {
 }
 
 thead th:hover { background: var(--navy-light); }
-
 .sort-arrow { opacity: 0.5; margin-left: 4px; font-size: 10px; }
 
 tbody tr:nth-child(even) { background: #f8f8f5; }
@@ -297,50 +333,31 @@ tbody td {
   white-space: nowrap;
 }
 
-td.date-col {
-  font-weight: 600;
-  color: var(--navy);
-}
-
-td .sub {
-  margin-top: 3px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 3px;
-}
+td.date-col { font-weight: 600; color: var(--navy); }
+td .sub { margin-top: 3px; display: flex; flex-wrap: wrap; gap: 3px; }
 
 .pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  padding: 2px 7px;
-  border-radius: 20px;
-  font-size: 10px;
-  font-weight: 600;
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 2px 7px; border-radius: 20px;
+  font-size: 10px; font-weight: 600;
 }
 
 .pill.chicken { background: #fff5f5; color: var(--chicken); }
 .pill.veg     { background: #f0fff4; color: var(--veg); }
 .pill.egg     { background: #fffff0; color: var(--egg); }
 .pill.seafood { background: #ebf8ff; color: var(--seafood); }
-.pill.other   { background: #f7f7f7; color: #555; }
 .pill.bfast   { background: #fff0f6; color: #9d174d; }
 .pill.vbfast  { background: #f0fff4; color: #065f46; }
 .pill.snack   { background: #fff7ed; color: #9a3412; }
 .pill.vsnack  { background: #ecfdf5; color: #065f46; }
 
 #status {
-  text-align: center;
-  padding: 40px;
-  color: var(--muted);
-  font-size: 14px;
+  text-align: center; padding: 40px;
+  color: var(--muted); font-size: 14px;
 }
 
 .dynamic-fields {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-  align-items: flex-end;
+  display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end;
 }
 </style>
 </head>
@@ -365,23 +382,23 @@ td .sub {
   <div class="dynamic-fields" id="dynamicFields">
     <div class="filter-group" id="f_startDate">
       <label>Start Date</label>
-      <input type="date" id="startDate">
+      <input type="date" id="startDate" onclick="this.showPicker && this.showPicker()">
     </div>
     <div class="filter-group" id="f_endDate">
-      <label>End Date</label>
-      <input type="date" id="endDate">
+      <label>End Date (optional)</label>
+      <input type="date" id="endDate" onclick="this.showPicker && this.showPicker()">
     </div>
     <div class="filter-group" id="f_month" style="display:none;">
       <label>Month</label>
-      <input type="month" id="monthPicker">
+      <input type="month" id="monthPicker" onclick="this.showPicker && this.showPicker()">
     </div>
     <div class="filter-group" id="f_startMonth" style="display:none;">
       <label>Start Month</label>
-      <input type="month" id="startMonth">
+      <input type="month" id="startMonth" onclick="this.showPicker && this.showPicker()">
     </div>
     <div class="filter-group" id="f_endMonth" style="display:none;">
       <label>End Month</label>
-      <input type="month" id="endMonth">
+      <input type="month" id="endMonth" onclick="this.showPicker && this.showPicker()">
     </div>
   </div>
 
@@ -397,8 +414,18 @@ td .sub {
   <div id="status">Select a filter and click Generate.</div>
 
   <div id="mainContent" style="display:none;">
-    <div class="cards-grid" id="totalsGrid"></div>
 
+    <!-- Numbers view cards -->
+    <div id="numCards">
+      <div class="cards-grid" id="totalsGrid"></div>
+    </div>
+
+    <!-- Charts view pie cards -->
+    <div id="pieCards" style="display:none;">
+      <div class="pie-cards-grid" id="pieGrid"></div>
+    </div>
+
+    <!-- Numbers panel -->
     <div class="view-panel active" id="panelNumbers">
       <div class="table-card">
         <table id="summaryTable">
@@ -419,10 +446,11 @@ td .sub {
       </div>
     </div>
 
+    <!-- Charts panel -->
     <div class="view-panel" id="panelCharts">
       <div class="charts-grid">
         <div class="chart-card">
-          <div class="chart-title">Protein Breakdown per Day</div>
+          <div class="chart-title">Protein Breakdown</div>
           <div class="chart-container">
             <canvas id="barChart"></canvas>
           </div>
@@ -435,6 +463,7 @@ td .sub {
         </div>
       </div>
     </div>
+
   </div>
 </div>
 
@@ -444,30 +473,35 @@ let sortKey = 'date';
 let sortAsc = true;
 let barChartInst = null;
 let lineChartInst = null;
+let pieChartInsts = {};
+let currentFilterType = 'range';
+let summaryRaw = {};
 
 function updateFilterFields() {
-  const type = document.getElementById('filterType').value;
-  const fields = {
+  currentFilterType = document.getElementById('filterType').value;
+  const show = {
     f_startDate: false, f_endDate: false,
     f_month: false, f_startMonth: false, f_endMonth: false
   };
-  if (type === 'range')      { fields.f_startDate = true; fields.f_endDate = true; }
-  if (type === 'month')      { fields.f_month = true; }
-  if (type === 'monthRange') { fields.f_startMonth = true; fields.f_endMonth = true; }
-  Object.entries(fields).forEach(([id, show]) => {
-    document.getElementById(id).style.display = show ? 'flex' : 'none';
+  if (currentFilterType === 'range')      { show.f_startDate = true; show.f_endDate = true; }
+  if (currentFilterType === 'month')      { show.f_month = true; }
+  if (currentFilterType === 'monthRange') { show.f_startMonth = true; show.f_endMonth = true; }
+  Object.entries(show).forEach(([id, visible]) => {
+    document.getElementById(id).style.display = visible ? 'flex' : 'none';
   });
 }
 
 function getDateRange() {
-  const type = document.getElementById('filterType').value;
+  const type = currentFilterType;
   const now = new Date();
   let start, end;
 
   if (type === 'range') {
     start = document.getElementById('startDate').value;
-    end   = document.getElementById('endDate').value;
-    if (!start || !end) return null;
+    const endVal = document.getElementById('endDate').value;
+    // End date optional — if empty use start date
+    end = endVal || start;
+    if (!start) return null;
   } else if (type === 'month') {
     const m = document.getElementById('monthPicker').value;
     if (!m) return null;
@@ -499,6 +533,46 @@ function getDateRange() {
   return { start, end };
 }
 
+// Determine if we should aggregate monthly
+function isMonthlyAggregation() {
+  return ['monthRange','last6','year'].includes(currentFilterType);
+}
+
+// Aggregate daily data into monthly buckets
+function aggregateMonthly(data) {
+  const months = {};
+  data.forEach(row => {
+    const d = new Date(row.date);
+    const key = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+    if (!months[key]) {
+      months[key] = {
+        date: key,
+        meals: 0,
+        option1: { total:0, Chicken:0, Veg:0, Egg:0, Seafood:0, Other:0 },
+        option2: { total:0, Chicken:0, Veg:0, Egg:0, Seafood:0, Other:0 },
+        breakfast: { total:0, Breakfast:0, 'Veg Breakfast':0, Other:0 },
+        snack: { total:0, Snack:0, 'Veg Snack':0 },
+        juice1: 0, juice2: 0
+      };
+    }
+    const m = months[key];
+    m.meals += row.meals;
+    m.juice1 += row.juice1;
+    m.juice2 += row.juice2;
+    ['total','Chicken','Veg','Egg','Seafood','Other'].forEach(k => {
+      m.option1[k] += row.option1[k]||0;
+      m.option2[k] += row.option2[k]||0;
+    });
+    m.breakfast.total += row.breakfast.total||0;
+    m.breakfast.Breakfast += row.breakfast.Breakfast||0;
+    m.breakfast['Veg Breakfast'] += row.breakfast['Veg Breakfast']||0;
+    m.snack.total += row.snack.total||0;
+    m.snack.Snack += row.snack.Snack||0;
+    m.snack['Veg Snack'] += row.snack['Veg Snack']||0;
+  });
+  return Object.values(months).sort((a,b) => a.date.localeCompare(b.date));
+}
+
 async function fetchSummary() {
   const range = getDateRange();
   if (!range) return setStatus('Please fill in the required fields.', true);
@@ -522,6 +596,8 @@ async function fetchSummary() {
       return;
     }
 
+    summaryRaw = data.summary;
+
     tableData = Object.entries(data.summary).map(([date, d]) => ({
       date,
       meals: d.option1.total + d.option2.total,
@@ -536,10 +612,14 @@ async function fetchSummary() {
     renderTotals(data.summary);
     renderTable();
     renderCharts();
+    renderPieCards();
 
     document.getElementById('mainContent').style.display = 'block';
     document.getElementById('toggleRow').style.display = 'flex';
     setStatus('');
+
+    // Default to numbers view
+    switchView('numbers');
 
   } catch(err) {
     setStatus('Network error. Try again.', true);
@@ -554,34 +634,12 @@ function switchView(view) {
   document.getElementById('panelCharts').classList.toggle('active', view === 'charts');
   document.getElementById('btnNumbers').classList.toggle('active', view === 'numbers');
   document.getElementById('btnCharts').classList.toggle('active', view === 'charts');
+  document.getElementById('numCards').style.display = view === 'numbers' ? 'block' : 'none';
+  document.getElementById('pieCards').style.display = view === 'charts' ? 'block' : 'none';
 }
 
 function renderTotals(summary) {
-  const t = {
-    meals: 0,
-    o1: { total:0, Chicken:0, Veg:0, Egg:0, Seafood:0, Other:0 },
-    o2: { total:0, Chicken:0, Veg:0, Egg:0, Seafood:0, Other:0 },
-    bf: { total:0, Breakfast:0, 'Veg Breakfast':0, Other:0 },
-    sn: { total:0, Snack:0, 'Veg Snack':0 },
-    j1: 0, j2: 0
-  };
-
-  Object.values(summary).forEach(d => {
-    t.meals += d.option1.total + d.option2.total;
-    ['total','Chicken','Veg','Egg','Seafood','Other'].forEach(k => {
-      t.o1[k] += d.option1[k] || 0;
-      t.o2[k] += d.option2[k] || 0;
-    });
-    t.bf.total += d.breakfast.total;
-    t.bf.Breakfast += d.breakfast.Breakfast || 0;
-    t.bf['Veg Breakfast'] += d.breakfast['Veg Breakfast'] || 0;
-    t.sn.total += d.snack.total;
-    t.sn.Snack += d.snack.Snack || 0;
-    t.sn['Veg Snack'] += d.snack['Veg Snack'] || 0;
-    t.j1 += d.juice1;
-    t.j2 += d.juice2;
-  });
-
+  const t = calcTotals(summary);
   document.getElementById('totalsGrid').innerHTML = `
     <div class="card">
       <div class="card-label">Total Meals</div>
@@ -638,6 +696,127 @@ function renderTotals(summary) {
   `;
 }
 
+function calcTotals(summary) {
+  const t = {
+    meals: 0,
+    o1: { total:0, Chicken:0, Veg:0, Egg:0, Seafood:0, Other:0 },
+    o2: { total:0, Chicken:0, Veg:0, Egg:0, Seafood:0, Other:0 },
+    bf: { total:0, Breakfast:0, 'Veg Breakfast':0, Other:0 },
+    sn: { total:0, Snack:0, 'Veg Snack':0 },
+    j1: 0, j2: 0
+  };
+  Object.values(summary).forEach(d => {
+    t.meals += d.option1.total + d.option2.total;
+    ['total','Chicken','Veg','Egg','Seafood','Other'].forEach(k => {
+      t.o1[k] += d.option1[k]||0;
+      t.o2[k] += d.option2[k]||0;
+    });
+    t.bf.total += d.breakfast.total||0;
+    t.bf.Breakfast += d.breakfast.Breakfast||0;
+    t.bf['Veg Breakfast'] += d.breakfast['Veg Breakfast']||0;
+    t.sn.total += d.snack.total||0;
+    t.sn.Snack += d.snack.Snack||0;
+    t.sn['Veg Snack'] += d.snack['Veg Snack']||0;
+    t.j1 += d.juice1||0;
+    t.j2 += d.juice2||0;
+  });
+  return t;
+}
+
+function renderPieCards() {
+  // Destroy existing pie charts
+  Object.values(pieChartInsts).forEach(c => c.destroy());
+  pieChartInsts = {};
+
+  const t = calcTotals(summaryRaw);
+  const configs = [
+    {
+      id: 'pie_meals', label: 'Total Meals', cls: '', total: t.meals,
+      data: [t.o1.total, t.o2.total],
+      labels: ['Option 1', 'Option 2'],
+      colors: ['#0a1a6e', '#c9a84c']
+    },
+    {
+      id: 'pie_o1', label: 'Option 1', cls: 'red', total: t.o1.total,
+      data: [t.o1.Chicken, t.o1.Veg, t.o1.Egg, t.o1.Seafood],
+      labels: ['Chicken','Veg','Egg','Seafood'],
+      colors: ['#e53e3e','#38a169','#d69e2e','#3182ce']
+    },
+    {
+      id: 'pie_o2', label: 'Option 2', cls: 'gold', total: t.o2.total,
+      data: [t.o2.Chicken, t.o2.Veg, t.o2.Egg, t.o2.Seafood],
+      labels: ['Chicken','Veg','Egg','Seafood'],
+      colors: ['#e53e3e','#38a169','#d69e2e','#3182ce']
+    },
+    {
+      id: 'pie_bf', label: 'Breakfast', cls: 'green', total: t.bf.total,
+      data: [t.bf.Breakfast, t.bf['Veg Breakfast']],
+      labels: ['Egg Breakfast','Veg Breakfast'],
+      colors: ['#9d174d','#065f46']
+    },
+    {
+      id: 'pie_sn', label: 'Snack', cls: 'teal', total: t.sn.total,
+      data: [t.sn.Snack, t.sn['Veg Snack']],
+      labels: ['Regular','Veg'],
+      colors: ['#9a3412','#065f46']
+    },
+    {
+      id: 'pie_j', label: 'Juices', cls: 'blue', total: t.j1 + t.j2,
+      data: [t.j1, t.j2],
+      labels: ['Juice 1','Juice 2'],
+      colors: ['#3182ce','#0891b2']
+    }
+  ];
+
+  const grid = document.getElementById('pieGrid');
+  grid.innerHTML = configs.map(c => `
+    <div class="pie-card ${c.cls}">
+      <div class="pie-card-label">${c.label}</div>
+      <div class="pie-card-number">${c.total}</div>
+      <div class="pie-container">
+        <canvas id="${c.id}"></canvas>
+      </div>
+    </div>
+  `).join('');
+
+  configs.forEach(c => {
+    const ctx = document.getElementById(c.id);
+    if (!ctx) return;
+    pieChartInsts[c.id] = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: c.labels,
+        datasets: [{
+          data: c.data,
+          backgroundColor: c.colors,
+          borderWidth: 1,
+          borderColor: '#fff'
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: '55%',
+        plugins: {
+          legend: {
+            position: 'bottom',
+            labels: { font: { family: 'DM Sans', size: 9 }, boxWidth: 8, padding: 6 }
+          },
+          tooltip: {
+            callbacks: {
+              label: ctx => {
+                const total = ctx.dataset.data.reduce((a,b) => a+b, 0);
+                const pct = total ? Math.round(ctx.parsed / total * 100) : 0;
+                return ` ${ctx.label}: ${ctx.parsed} (${pct}%)`;
+              }
+            }
+          }
+        }
+      }
+    });
+  });
+}
+
 function renderTable() {
   const sorted = [...tableData].sort((a, b) => {
     let av, bv;
@@ -659,7 +838,6 @@ function renderTable() {
     const dayName = d.toLocaleDateString('en-US', { weekday: 'short' });
     const fmt = String(d.getDate()).padStart(2,'0') + '-' +
       d.toLocaleDateString('en-US',{month:'short'}) + '-' + d.getFullYear();
-
     return `<tr>
       <td class="date-col">${dayName}, ${fmt}</td>
       <td><strong>${row.meals}</strong></td>
@@ -684,14 +862,14 @@ function renderTable() {
       <td>
         <strong>${row.breakfast.total}</strong>
         <div class="sub">
-          ${row.breakfast.Breakfast       ? `<span class="pill bfast">Egg ${row.breakfast.Breakfast}</span>` : ''}
+          ${row.breakfast.Breakfast        ? `<span class="pill bfast">Egg ${row.breakfast.Breakfast}</span>` : ''}
           ${row.breakfast['Veg Breakfast'] ? `<span class="pill vbfast">Veg ${row.breakfast['Veg Breakfast']}</span>` : ''}
         </div>
       </td>
       <td>
         <strong>${row.snack.total}</strong>
         <div class="sub">
-          ${row.snack.Snack       ? `<span class="pill snack">${row.snack.Snack}</span>` : ''}
+          ${row.snack.Snack        ? `<span class="pill snack">${row.snack.Snack}</span>` : ''}
           ${row.snack['Veg Snack'] ? `<span class="pill vsnack">Veg ${row.snack['Veg Snack']}</span>` : ''}
         </div>
       </td>
@@ -708,45 +886,74 @@ function sortTable(key) {
 }
 
 function renderCharts() {
-  const sorted = [...tableData].sort((a,b) => a.date.localeCompare(b.date));
-  const labels = sorted.map(r => {
+  if (barChartInst)  { barChartInst.destroy();  barChartInst = null; }
+  if (lineChartInst) { lineChartInst.destroy(); lineChartInst = null; }
+
+  const monthly = isMonthlyAggregation();
+  const chartData = monthly
+    ? aggregateMonthly(tableData)
+    : [...tableData].sort((a,b) => a.date.localeCompare(b.date));
+
+  const labels = chartData.map(r => {
+    if (monthly) {
+      const [y, m] = r.date.split('-');
+      return new Date(y, m-1).toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+    }
     const d = new Date(r.date);
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   });
 
-  // Destroy existing
-  if (barChartInst) { barChartInst.destroy(); barChartInst = null; }
-  if (lineChartInst) { lineChartInst.destroy(); lineChartInst = null; }
+  // BAR CHART with percentage labels plugin
+  const percentLabelPlugin = {
+    id: 'percentLabels',
+    afterDatasetsDraw(chart) {
+      const { ctx } = chart;
+      chart.data.datasets.forEach((dataset, i) => {
+        const meta = chart.getDatasetMeta(i);
+        meta.data.forEach((bar, index) => {
+          const total = chart.data.datasets.reduce((sum, ds) => sum + (ds.data[index]||0), 0);
+          const val = dataset.data[index] || 0;
+          if (!val || !total) return;
+          const pct = Math.round(val / total * 100);
+          if (pct < 8) return; // skip tiny segments
+          ctx.save();
+          ctx.fillStyle = '#fff';
+          ctx.font = 'bold 9px DM Sans';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          const { x, y, height } = bar;
+          if (height > 14) ctx.fillText(pct + '%', x, y + height/2);
+          ctx.restore();
+        });
+      });
+    }
+  };
 
-  // BAR CHART — protein breakdown
   barChartInst = new Chart(document.getElementById('barChart'), {
     type: 'bar',
+    plugins: [percentLabelPlugin],
     data: {
       labels,
       datasets: [
         {
           label: 'Chicken',
-          data: sorted.map(r => r.option1.Chicken + r.option2.Chicken),
-          backgroundColor: 'rgba(229,62,62,0.75)',
-          borderRadius: 4
+          data: chartData.map(r => r.option1.Chicken + r.option2.Chicken),
+          backgroundColor: 'rgba(229,62,62,0.82)', borderRadius: 3
         },
         {
           label: 'Veg',
-          data: sorted.map(r => r.option1.Veg + r.option2.Veg),
-          backgroundColor: 'rgba(56,161,105,0.75)',
-          borderRadius: 4
+          data: chartData.map(r => r.option1.Veg + r.option2.Veg),
+          backgroundColor: 'rgba(56,161,105,0.82)', borderRadius: 3
         },
         {
           label: 'Egg',
-          data: sorted.map(r => r.option1.Egg + r.option2.Egg),
-          backgroundColor: 'rgba(214,158,46,0.75)',
-          borderRadius: 4
+          data: chartData.map(r => r.option1.Egg + r.option2.Egg),
+          backgroundColor: 'rgba(214,158,46,0.82)', borderRadius: 3
         },
         {
           label: 'Seafood',
-          data: sorted.map(r => r.option1.Seafood + r.option2.Seafood),
-          backgroundColor: 'rgba(49,130,206,0.75)',
-          borderRadius: 4
+          data: chartData.map(r => r.option1.Seafood + r.option2.Seafood),
+          backgroundColor: 'rgba(49,130,206,0.82)', borderRadius: 3
         }
       ]
     },
@@ -763,7 +970,7 @@ function renderCharts() {
     }
   });
 
-  // LINE CHART — total meals trend
+  // LINE CHART
   lineChartInst = new Chart(document.getElementById('lineChart'), {
     type: 'line',
     data: {
@@ -771,7 +978,7 @@ function renderCharts() {
       datasets: [
         {
           label: 'Total Meals',
-          data: sorted.map(r => r.meals),
+          data: chartData.map(r => r.meals),
           borderColor: '#0a1a6e',
           backgroundColor: 'rgba(10,26,110,0.08)',
           borderWidth: 2,
@@ -782,7 +989,7 @@ function renderCharts() {
         },
         {
           label: 'Breakfast',
-          data: sorted.map(r => r.breakfast.total),
+          data: chartData.map(r => r.breakfast.total),
           borderColor: '#9d174d',
           backgroundColor: 'transparent',
           borderWidth: 1.5,
@@ -792,7 +999,7 @@ function renderCharts() {
         },
         {
           label: 'Snack',
-          data: sorted.map(r => r.snack.total),
+          data: chartData.map(r => r.snack.total),
           borderColor: '#9a3412',
           backgroundColor: 'transparent',
           borderWidth: 1.5,
@@ -823,7 +1030,6 @@ function setStatus(msg, isError) {
   el.textContent = msg;
 }
 
-// Init
 updateFilterFields();
 </script>
 </body>
