@@ -126,8 +126,10 @@
         goBtn.disabled = false; return;
       }
 
-      // group identical dishes together; non-remark before remark
+     // sort by category order, then group identical dishes, non-remark before remark
+      const ORDER = { breakfast:1, option1:2, option2:3, snack:4, juice1:5, juice2:6 };
       tags.sort((a,b) =>
+        ((ORDER[a.cat]||99) - (ORDER[b.cat]||99)) ||
         (a.dish||'').localeCompare(b.dish||'') ||
         ((a.remarks?1:0) - (b.remarks?1:0)) ||
         (a.clientName||'').localeCompare(b.clientName||'')
