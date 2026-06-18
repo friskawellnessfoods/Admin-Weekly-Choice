@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Friska — Dish Tags</title>
+<title>Friska — Dish & Carry Bag Tags</title>
 <script src="config.js"></script>
 <style>
   /* ===== TWEAKABLE ===== */
@@ -20,8 +20,10 @@
 
   .bar{ position:sticky; top:0; z-index:10; background:#fff; border-bottom:1px solid #cfd8dc;
         padding:12px 16px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .bar .brand{ display:flex; align-items:center; gap:10px; }
+  .bar .brand img{ height:34px; width:auto; }
+  .bar .brand span{ font-size:15px; font-weight:700; color:#2e7d32; }
   .bar input[type=date]{ padding:8px; border:1px solid #b0bec5; border-radius:6px; font-size:14px; }
-  .bar input[type=url]{ padding:8px; border:1px solid #b0bec5; border-radius:6px; font-size:13px; min-width:260px; }
   .bar button{ padding:9px 16px; border:0; border-radius:6px; font-size:14px; cursor:pointer; color:#fff; background:#2e7d32; }
   .bar button.alt{ background:#455a64; }
   .bar button:disabled{ opacity:.5; cursor:default; }
@@ -38,19 +40,29 @@
   .tag{
     position:relative; overflow:hidden;
     border:var(--tag-border) solid var(--tag-border-color);
-    background-image:url('tag_template.png');     /* change path here if needed */
+    background-image:url('tag_template.png');     /* meal tag template */
     background-size:100% 100%; background-repeat:no-repeat; background-position:center;
   }
+  .tag.carry{ background-image:url('carrybag_tags.png'); }  /* carry bag template */
 
   .inner{
     position:absolute; top:var(--pad-y); bottom:var(--pad-y); left:var(--pad-x); right:var(--pad-x);
     display:flex; flex-direction:column; align-items:center; justify-content:center;
     text-align:center; overflow:hidden; line-height:1.18;
   }
+
+  /* meal tag text */
   .dish{ font-weight:400; font-size:1.45em; }
   .type{ font-weight:600; font-size:1em; margin-top:.28em; }
   .remark{ font-size:.95em; font-style:italic; margin-top:.45em; }
   .cname{ font-size:.85em; font-weight:600; margin-top:.15em; }
+
+  /* carry bag tag text */
+  .cb-name{ font-weight:700; font-size:1.3em; }
+  .cb-slot{ font-weight:600; font-size:.95em; margin-top:.15em; text-transform:uppercase; letter-spacing:.5px; }
+  .cb-type{ font-size:1em; margin-top:.22em; }
+  .cb-codes{ font-size:1.05em; margin-top:.35em; }
+  .cb-remark{ font-size:.95em; font-style:italic; margin-top:.35em; }
 
   @media print{
     .bar{ display:none; }
@@ -65,48 +77,34 @@
 <body>
 
   <div class="bar">
+    <div class="brand">
+      <img src="logo.png" alt="Friska Wellness Foods">
+      <span>Tags</span>
+    </div>
     <input type="date" id="date">
     <button id="go">Generate Tags</button>
-    <button id="refresh" class="alt">Refresh Menu Cache</button>
     <button id="print" class="alt" disabled>Print</button>
-    <input type="url" id="api" placeholder="API URL (auto from config.js)">
     <span class="status" id="status">Pick a date and generate.</span>
   </div>
 
   <div id="pages"></div>
 
 <script>
-  const API_FALLBACK = (typeof API_URL !== 'undefined') ? API_URL : '';
-  const apiInput = document.getElementById('api');
-  apiInput.value = API_FALLBACK;
+  const API = (typeof API_URL !== 'undefined') ? API_URL : '';
 
   const dateEl   = document.getElementById('date');
   const statusEl = document.getElementById('status');
   const pagesEl  = document.getElementById('pages');
   const goBtn    = document.getElementById('go');
   const printBtn = document.getElementById('print');
-  const refreshBtn = document.getElementById('refresh');
 
   dateEl.value = new Date().toISOString().slice(0,10);
 
-  function api(){ return (apiInput.value || '').trim(); }
-
   goBtn.addEventListener('click', generate);
   printBtn.addEventListener('click', () => window.print());
-  refreshBtn.addEventListener('click', refreshMenu);
-
-  async function refreshMenu(){
-    if(!api()){ statusEl.textContent = 'No API URL set.'; return; }
-    refreshBtn.disabled = true; statusEl.textContent = 'Refreshing menu cache…';
-    try{
-      await fetch(api(), { method:'POST', body:new URLSearchParams({ action:'refreshMenu' }) });
-      statusEl.textContent = 'Menu cache refreshed. Generate again.';
-    }catch(e){ statusEl.textContent = 'Refresh failed: ' + e.message; }
-    refreshBtn.disabled = false;
-  }
 
   async function generate(){
-    if(!api()){ statusEl.textContent = 'No API URL set.'; return; }
+    if(!API){ statusEl.textContent = 'No API URL found in config.js.'; return; }
     const date = dateEl.value;
     if(!date){ statusEl.textContent = 'Pick a date first.'; return; }
 
@@ -115,28 +113,34 @@
     statusEl.textContent = 'Loading orders for ' + date + '…';
 
     try{
-      const res = await fetch(api() + '?action=getTagsForDate&date=' + encodeURIComponent(date));
+      const res = await fetch(API + '?action=getTagsForDate&date=' + encodeURIComponent(date));
       const data = await res.json();
 
       if(!data.success || !data.tags){ throw new Error('No data returned'); }
 
-      let tags = data.tags;
+      const tags = data.tags;
       if(tags.length === 0){
         statusEl.textContent = 'No tags for ' + date + ' (no orders, or all cancelled).';
         goBtn.disabled = false; return;
       }
 
-     // sort by category order, then group identical dishes, non-remark before remark
+      // ---- MEAL TAGS: category order, group identical dishes, non-remark first ----
       const ORDER = { breakfast:1, option1:2, option2:3, snack:4, juice1:5, juice2:6 };
-      tags.sort((a,b) =>
+      const mealTags = tags.slice().sort((a,b) =>
         ((ORDER[a.cat]||99) - (ORDER[b.cat]||99)) ||
         (a.dish||'').localeCompare(b.dish||'') ||
         ((a.remarks?1:0) - (b.remarks?1:0)) ||
         (a.clientName||'').localeCompare(b.clientName||'')
       );
 
-      render(tags);
-      statusEl.textContent = tags.length + ' tags  ·  ' + Math.ceil(tags.length/10) + ' page(s)';
+      // ---- CARRY BAG TAGS: one per client per slot ----
+      const carryTags = buildCarryGroups(tags);
+
+      render(mealTags, carryTags);
+
+      const total = mealTags.length + carryTags.length;
+      statusEl.textContent = mealTags.length + ' meal + ' + carryTags.length +
+        ' carry bag = ' + total + ' tags · ' + Math.ceil(total/10) + ' page(s)';
       printBtn.disabled = false;
     }catch(e){
       statusEl.textContent = 'Error: ' + e.message;
@@ -144,28 +148,38 @@
     goBtn.disabled = false;
   }
 
-  function render(tags){
-    for(let p=0; p<tags.length; p+=10){
+  function render(mealTags, carryTags){
+    pagesEl.innerHTML = '';
+
+    // continuous flow: meal tags first, carry bags pick up in the same grid
+    const elements = [];
+    mealTags.forEach(t => elements.push(buildTag(t)));
+    carryTags.forEach(g => elements.push(buildCarryTag(g)));
+
+    for(let p=0; p<elements.length; p+=10){
       const page = document.createElement('div');
       page.className = 'page';
-      tags.slice(p, p+10).forEach(t => page.appendChild(buildTag(t)));
-      // pad last page so the grid keeps tag sizing consistent
-      const blanks = 10 - Math.min(10, tags.length - p);
-      for(let b=0; b<blanks; b++){
-        const empty = document.createElement('div');
-        empty.className = 'tag';
-        empty.style.background = '#fff';
-        empty.style.border = 'none';
-        page.appendChild(empty);
-      }
+      elements.slice(p, p+10).forEach(el => page.appendChild(el));
       pagesEl.appendChild(page);
     }
-    // fit fonts after layout
+
+    // pad ONLY the final page with empty meal tags
+    const lastPage = pagesEl.lastElementChild;
+    if(lastPage){
+      const used = lastPage.childElementCount;
+      for(let b=used; b<10; b++){
+        const empty = document.createElement('div');
+        empty.className = 'tag';   // empty meal tag (meal template + border, no content)
+        lastPage.appendChild(empty);
+      }
+    }
+
     requestAnimationFrame(() => {
       document.querySelectorAll('.inner').forEach(fitTag);
     });
   }
 
+  // ---------- MEAL TAG ----------
   function buildTag(t){
     const el = document.createElement('div'); el.className = 'tag';
     const inner = document.createElement('div'); inner.className = 'inner';
@@ -201,6 +215,99 @@
     return el;
   }
 
+  // ---------- CARRY BAG GROUPING ----------
+  function buildCarryGroups(tags){
+    const catOrder = { breakfast:1, option1:2, option2:3, snack:4, juice1:5, juice2:6 };
+    const groups = {};
+
+    tags.forEach(t => {
+      const key = (t.phone || t.clientName) + '|' + t.slot;
+      if(!groups[key]){
+        groups[key] = {
+          clientName: t.clientName,
+          slot: t.slot,
+          type: t.type,
+          remarks: t.remarks,
+          codes: []
+        };
+      }
+      groups[key].codes.push({ code: t.code, cat: t.cat });
+    });
+
+    const arr = Object.values(groups);
+    arr.forEach(g => {
+      g.codes.sort((a,b) => (catOrder[a.cat]||99) - (catOrder[b.cat]||99));
+
+      // collapse duplicates within the slot: "Chicken 1, Chicken 1" -> "2x Chicken 1"
+      const counts = {};
+      const seq = [];
+      g.codes.forEach(c => {
+        if(counts[c.code] === undefined){ counts[c.code] = 0; seq.push(c.code); }
+        counts[c.code]++;
+      });
+      g.codeList = seq.map(code =>
+        counts[code] > 1 ? counts[code] + 'x ' + code : code
+      );
+    });
+
+    // order carry bags by slot then client name
+    const slotOrder = { Morning:1, Afternoon:2, Evening:3 };
+    arr.sort((a,b) =>
+      ((slotOrder[a.slot]||99) - (slotOrder[b.slot]||99)) ||
+      (a.clientName||'').localeCompare(b.clientName||'')
+    );
+
+    return arr;
+  }
+
+  // ---------- CARRY BAG TAG ----------
+  function buildCarryTag(g){
+    const el = document.createElement('div'); el.className = 'tag carry';
+    const inner = document.createElement('div'); inner.className = 'inner';
+
+    const name = document.createElement('div'); name.className = 'cb-name';
+    name.textContent = g.clientName || '';
+    inner.appendChild(name);
+
+    // slot shown only for Morning / Evening
+    const slot = String(g.slot || '').trim();
+    if(slot === 'Morning' || slot === 'Evening'){
+      const s = document.createElement('div'); s.className = 'cb-slot';
+      s.textContent = slot;
+      inner.appendChild(s);
+    }
+
+    // meal type, strip leading numbers (same as meal tags)
+    if(g.type){
+      const cleanType = g.type
+        .split(',')
+        .map(s => s.trim().replace(/^\d+\s*/, ''))
+        .filter(Boolean)
+        .join(', ');
+      if(cleanType){
+        const ty = document.createElement('div'); ty.className = 'cb-type';
+        ty.textContent = cleanType;
+        inner.appendChild(ty);
+      }
+    }
+
+    // choices in this slot (codes)
+    const codes = document.createElement('div'); codes.className = 'cb-codes';
+    codes.textContent = g.codeList.join(', ');
+    inner.appendChild(codes);
+
+    // remark if any
+    if(g.remarks){
+      const rem = document.createElement('div'); rem.className = 'cb-remark';
+      rem.textContent = g.remarks;
+      inner.appendChild(rem);
+    }
+
+    el.appendChild(inner);
+    return el;
+  }
+
+  // ---------- FONT FIT ----------
   // shrink base font-size until content fits the safe zone
   function fitTag(inner){
     let size = 24;
