@@ -47,7 +47,7 @@
     display:flex; flex-direction:column; align-items:center; justify-content:center;
     text-align:center; overflow:hidden; line-height:1.18;
   }
-  .dish{ font-weight:800; font-size:1.45em; }
+  .dish{ font-weight:400; font-size:1.45em; }
   .type{ font-weight:600; font-size:1em; margin-top:.28em; }
   .remark{ font-size:.95em; font-style:italic; margin-top:.45em; }
   .cname{ font-size:.85em; font-weight:600; margin-top:.15em; }
@@ -174,12 +174,19 @@
 
     const isExtra = (t.kind === 'snack' || t.kind === 'juice');
     if(!isExtra && t.type){
-      const type = document.createElement('div'); type.className = 'type';
-      type.textContent = t.type;
-      inner.appendChild(type);
+      const cleanType = t.type
+        .split(',')
+        .map(s => s.trim().replace(/^\d+\s*/, ''))
+        .filter(Boolean)
+        .join(', ');
+      if(cleanType){
+        const type = document.createElement('div'); type.className = 'type';
+        type.textContent = cleanType;
+        inner.appendChild(type);
+      }
     }
 
-    if(t.remarks){
+    if(t.remarks && !isExtra){
       const rem = document.createElement('div'); rem.className = 'remark';
       rem.textContent = t.remarks;
       inner.appendChild(rem);
