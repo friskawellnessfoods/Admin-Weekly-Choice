@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Friska — Kitchen List</title>
 <script src="config.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <style>
   /* ===== TWEAKABLE ===== */
   :root{
@@ -81,7 +83,7 @@
     .view:not(.active){ display:none; }
     body{ background:#fff; }
     .pages{ padding:0; gap:0; }
-    .page{ box-shadow:none; margin:0; page-break-after:always; page:tagPage; }
+    .page{ box-shadow:none; margin:0; width:100%; height:100vh; page-break-after:always; page:tagPage; }
     .page:last-of-type{ page-break-after:auto; }
     .tag{ -webkit-print-color-adjust:exact; print-color-adjust:exact; }
     .listwrap{ padding:0; }
@@ -107,13 +109,13 @@
     <input type="date" id="date">
     <button id="go">Generate</button>
     <button id="print" class="alt" disabled>Print</button>
+    <button id="pdf" class="alt" disabled>Download Kitchen List PDF</button>
     <span class="status" id="status">Pick a date to begin.</span>
   </div>
 
   <div class="tabs">
     <button data-tab="tags" class="active">Tags</button>
     <button data-tab="client">Client List</button>
-    <button data-tab="kitchen">Kitchen List</button>
   </div>
 
   <div id="view-tags" class="view active">
@@ -124,10 +126,6 @@
     <div id="clientWrap" class="listwrap"></div>
   </div>
 
-  <div id="view-kitchen" class="view">
-    <div id="combined"></div>
-  </div>
-
 <script>
   const API = (typeof API_URL !== 'undefined') ? API_URL : '';
 
@@ -135,18 +133,19 @@
   const statusEl   = document.getElementById('status');
   const pagesEl    = document.getElementById('pages');
   const clientWrap = document.getElementById('clientWrap');
-  const combinedEl = document.getElementById('combined');
   const goBtn      = document.getElementById('go');
   const printBtn   = document.getElementById('print');
+  const pdfBtn     = document.getElementById('pdf');
 
   let activeTab = 'tags';
-  const loadedView = { tags:false, client:false, kitchen:false };
+  const loadedView = { tags:false, client:false };
   let cache = { date:null, tags:null, client:null };  // raw data per date
 
   // ---- date input: click opens calendar, picking a date runs ----
   dateEl.addEventListener('click', () => { try{ dateEl.showPicker(); }catch(e){} });
   dateEl.addEventListener('change', () => {
     invalidate();
+    pdfBtn.disabled = !dateEl.value;
     if(dateEl.value) load(activeTab);
   });
 
@@ -158,7 +157,7 @@
     activeTab = tab;
     document.querySelectorAll('.tabs button').forEach(b =>
       b.classList.toggle('active', b.dataset.tab === tab));
-    ['tags','client','kitchen'].forEach(t =>
+    ['tags','client'].forEach(t =>
       document.getElementById('view-' + t).classList.toggle('active', t === tab));
     printBtn.disabled = !loadedView[tab];
     if(dateEl.value && !loadedView[tab]) load(tab);
@@ -169,18 +168,18 @@
     loadedView[activeTab] = false; load(activeTab);
   });
   printBtn.addEventListener('click', () => window.print());
+  pdfBtn.addEventListener('click', downloadKitchenPdf);
 
   function invalidate(){
     cache = { date:null, tags:null, client:null };
-    loadedView.tags = loadedView.client = loadedView.kitchen = false;
-    pagesEl.innerHTML = ''; clientWrap.innerHTML = ''; combinedEl.innerHTML = '';
+    loadedView.tags = loadedView.client = false;
+    pagesEl.innerHTML = ''; clientWrap.innerHTML = '';
     printBtn.disabled = true;
   }
 
   function load(tab){
     if(tab === 'tags')    return loadTags();
     if(tab === 'client')  return loadClient();
-    if(tab === 'kitchen') return loadKitchen();
   }
 
   // ---- data fetch + cache ----
@@ -469,37 +468,126 @@
   }
 
   // ============================================================
-  //  KITCHEN LIST (combined: tags, then all lists)
+  //  KITCHEN LIST PDF  (tags portrait + lists landscape, one file)
   // ============================================================
-  async function loadKitchen(){
+  // preload tag backgrounds so html2canvas captures them
+  ['tag_template.png','carrybag_tags.png','logo.png'].forEach(src => { const im = new Image(); im.src = src; });
+
+  function fitInnerSync(inner){
+    let size = 24; inner.style.fontSize = size + 'px';
+    while(size > 7 && (inner.scrollHeight > inner.clientHeight || inner.scrollWidth > inner.clientWidth)){
+      size -= 0.5; inner.style.fontSize = size + 'px';
+    }
+  }
+
+  // wait for all <img> and CSS background images inside a node to load
+  function waitForImages(node){
+    const urls = [];
+    node.querySelectorAll('*').forEach(el => {
+      const bg = getComputedStyle(el).backgroundImage;
+      const m = bg && bg.match(/url\(["']?([^"')]+)["']?\)/);
+      if(m) urls.push(m[1]);
+    });
+    node.querySelectorAll('img').forEach(img => urls.push(img.src));
+    return Promise.all(urls.map(u => new Promise(res => {
+      const im = new Image(); im.onload = im.onerror = res; im.src = u;
+    })));
+  }
+
+  async function downloadKitchenPdf(){
     if(!guard()) return;
+    if(!window.jspdf || !window.html2canvas){
+      statusEl.textContent = 'PDF libraries not loaded — check your connection.';
+      return;
+    }
     const date = dateEl.value;
-    busy('Building full kitchen list for ' + date + '…');
+    pdfBtn.disabled = true; busy('Building Kitchen List PDF for ' + date + '…');
+
+    // offscreen staging (rendered, but off-screen so html2canvas can read layout)
+    const stage = document.createElement('div');
+    stage.style.cssText = 'position:absolute; left:-99999px; top:0; background:#fff;';
+    document.body.appendChild(stage);
+
     try{
       const [tags, rows] = await Promise.all([ ensureTags(date), ensureClient(date) ]);
-      combinedEl.innerHTML = '';
 
-      // Section 1: tags
-      const tagSection = document.createElement('div'); tagSection.className = 'pages';
-      combinedEl.appendChild(tagSection);
+      // ---- render tag pages, snapshot each ----
+      const tagCanvases = [];
       if(tags.length){
+        const pagesC = document.createElement('div');
+        pagesC.className = 'pages';
+        pagesC.style.cssText = 'padding:0; gap:0;';
+        stage.appendChild(pagesC);
         const built = buildTagElements(tags);
-        paginateInto(tagSection, built);
-        fitInners(tagSection);
+        paginateInto(pagesC, built);
+        pagesC.querySelectorAll('.inner').forEach(fitInnerSync);
+        await waitForImages(pagesC);
+        for(const page of pagesC.querySelectorAll('.page')){
+          const c = await html2canvas(page, { scale:2, useCORS:true, backgroundColor:'#ffffff' });
+          tagCanvases.push(c);
+        }
       }
 
-      // Section 2: client list
-      const listSection = document.createElement('div'); listSection.className = 'listwrap';
+      // ---- render client list, snapshot ----
       const sheet = buildClientSheet(rows, date);
-      listSection.appendChild(sheet);
-      combinedEl.appendChild(listSection);
+      const sw = document.createElement('div'); sw.className = 'listwrap'; sw.style.padding = '0';
+      sw.appendChild(sheet);
+      stage.appendChild(sw);
       fitClientSheet(sheet, rows.length);
+      await waitForImages(sw);
+      const clientCanvas = await html2canvas(sheet, { scale:2, useCORS:true, backgroundColor:'#ffffff' });
 
-      // (meal / mise / delivery / pause lists will append here next)
+      // ---- assemble PDF ----
+      const { jsPDF } = window.jspdf;
+      const firstOrient = tagCanvases.length ? 'portrait' : 'landscape';
+      const pdf = new jsPDF({ orientation:firstOrient, unit:'mm', format:'a4' });
+      let started = false;
+      const place = (orient) => { if(!started){ started = true; } else { pdf.addPage('a4', orient); } };
 
-      loadedView.kitchen = true;
-      done('Full kitchen list ready for ' + date, 'kitchen');
-    }catch(e){ fail(e); }
+      // tags: full-bleed portrait A4
+      for(const c of tagCanvases){
+        place('portrait');
+        pdf.addImage(c.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, 210, 297);
+      }
+
+      // client list: landscape, sliced across pages if taller than one page
+      addLandscapeSliced(pdf, clientCanvas, place);
+
+      // (meal / mise / delivery / pause lists will be appended here next)
+
+      pdf.save('Kitchen_List_' + date + '.pdf');
+      statusEl.textContent = 'Kitchen List PDF downloaded for ' + date + '.';
+    }catch(e){
+      statusEl.textContent = 'PDF error: ' + e.message;
+    }finally{
+      stage.remove();
+      goBtn.disabled = false; pdfBtn.disabled = false;
+    }
+  }
+
+  // place a canvas onto landscape A4 page(s), 6mm margins, slicing if needed
+  function addLandscapeSliced(pdf, canvas, place){
+    const margin = 6;
+    const Pw = 297 - 2*margin;   // 285mm printable width
+    const Ph = 210 - 2*margin;   // 198mm printable height
+    const Cw = canvas.width, Ch = canvas.height;
+    if(!Cw || !Ch) return;
+
+    const fullH = Ch * (Pw / Cw);          // mm if placed at full width
+    if(fullH <= Ph){
+      place('landscape');
+      pdf.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', margin, margin, Pw, fullH);
+      return;
+    }
+    const sliceHpx = Math.floor(Cw * (Ph / Pw));   // px tall per page
+    for(let y = 0; y < Ch; y += sliceHpx){
+      const h = Math.min(sliceHpx, Ch - y);
+      const sc = document.createElement('canvas');
+      sc.width = Cw; sc.height = h;
+      sc.getContext('2d').drawImage(canvas, 0, y, Cw, h, 0, 0, Cw, h);
+      place('landscape');
+      pdf.addImage(sc.toDataURL('image/jpeg', 0.92), 'JPEG', margin, margin, Pw, h * (Pw / Cw));
+    }
   }
 
   // ---- small helpers ----
