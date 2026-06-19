@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Friska — Kitchen List</title>
+<script src="config.js"></script>
+<style>
+  /* ===== TWEAKABLE ===== */
+  :root{
+    --tag-border: 1mm;          /* tag border thickness */
+    --tag-border-color: #222;   /* tag border color */
+    --pad-x: 9mm;               /* horizontal safe-zone padding */
+    --pad-y: 8mm;               /* vertical safe-zone padding */
+  }
+  /* ===================== */
+
+  * { box-sizing: border-box; }
+  body{ font-family: Arial, Helvetica, sans-serif; margin:0; background:#eceff1; color:#263238; }
+
+  .bar{ position:sticky; top:0; z-index:10; background:#fff; border-bottom:1px solid #cfd8dc;
+        padding:12px 16px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .bar .brand{ display:flex; align-items:center; gap:10px; }
+  .bar .brand img{ height:34px; width:auto; }
+  .bar .brand span{ font-size:15px; font-weight:700; color:#2e7d32; }
+  .bar input[type=date]{ padding:8px; border:1px solid #b0bec5; border-radius:6px; font-size:14px; }
+  .bar button{ padding:9px 16px; border:0; border-radius:6px; font-size:14px; cursor:pointer; color:#fff; background:#2e7d32; }
+  .bar button.alt{ background:#455a64; }
+  .bar button:disabled{ opacity:.5; cursor:default; }
+  .status{ font-size:13px; color:#546e7a; margin-left:auto; }
+
+  /* tab bar */
+  .tabs{ position:sticky; top:59px; z-index:9; background:#fff; border-bottom:1px solid #cfd8dc;
+         padding:0 16px; display:flex; gap:4px; }
+  .tabs button{ border:0; background:none; padding:11px 18px; font-size:14px; cursor:pointer;
+                color:#546e7a; border-bottom:3px solid transparent; }
+  .tabs button.active{ color:#2e7d32; border-bottom-color:#2e7d32; font-weight:700; }
+
+  .view{ display:none; }
+  .view.active{ display:block; }
+
+  /* ---------- TAGS VIEW ---------- */
+  #pages{ padding:18px; display:flex; flex-direction:column; align-items:center; gap:18px; }
+
+  .page{
+    width:210mm; height:297mm; background:#fff;
+    box-shadow:0 2px 10px rgba(0,0,0,.18);
+    display:grid; grid-template-columns:1fr 1fr; grid-template-rows:repeat(5,1fr);
+  }
+  .tag{
+    position:relative; overflow:hidden;
+    border:var(--tag-border) solid var(--tag-border-color);
+    background-image:url('tag_template.png');
+    background-size:100% 100%; background-repeat:no-repeat; background-position:center;
+  }
+  .tag.carry{ background-image:url('carrybag_tags.png'); }
+  .inner{
+    position:absolute; top:var(--pad-y); bottom:var(--pad-y); left:var(--pad-x); right:var(--pad-x);
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    text-align:center; overflow:hidden; line-height:1.18;
+  }
+  .dish{ font-weight:400; font-size:1.45em; }
+  .type{ font-weight:600; font-size:1em; margin-top:.28em; }
+  .remark{ font-size:.95em; font-style:italic; margin-top:.45em; }
+  .cname{ font-size:.85em; font-weight:600; margin-top:.15em; }
+  .cb-name{ font-weight:700; font-size:1.3em; }
+  .cb-code{ font-weight:700; font-size:1.3em; }
+  .cb-type{ font-size:1em; margin-top:.22em; }
+  .cb-remark{ font-size:.95em; font-style:italic; margin-top:.35em; }
+  .cb-slot{ font-weight:600; font-size:.95em; margin-top:.15em; text-transform:uppercase; letter-spacing:.5px; }
+
+  /* ---------- CLIENT LIST VIEW ---------- */
+  #clientWrap{ padding:18px; }
+  .sheet{ background:#fff; box-shadow:0 2px 10px rgba(0,0,0,.18); margin:0 auto; max-width:1100px;
+          padding:14px; }
+  .sheet h2{ text-align:center; font-size:16px; margin:4px 0 12px; }
+  table.client{ border-collapse:collapse; width:100%; font-size:12px; }
+  table.client th, table.client td{ border:1px solid #999; padding:3px 6px; text-align:left; white-space:nowrap; }
+  table.client th{ background:#f0f0f0; font-weight:700; text-align:center; }
+  table.client td.num{ text-align:center; width:28px; color:#666; }
+  table.client td.rmk{ white-space:normal; min-width:160px; }
+
+  @media print{
+    .bar, .tabs{ display:none; }
+    body{ background:#fff; }
+    #pages{ padding:0; gap:0; }
+    .page{ box-shadow:none; page-break-after:always; }
+    .tag{ -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    .sheet{ box-shadow:none; max-width:none; padding:0; }
+    table.client{ -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    table.client tr{ page-break-inside:avoid; }
+  }
+  @page{ size:A4; margin:8mm; }
+</style>
+</head>
+<body>
+
+  <div class="bar">
+    <div class="brand">
+      <img src="logo.png" alt="Friska Wellness Foods">
+      <span>Kitchen List</span>
+    </div>
+    <input type="date" id="date">
+    <button id="go">Generate</button>
+    <button id="print" class="alt" disabled>Print</button>
+    <span class="status" id="status">Pick a date and generate.</span>
+  </div>
+
+  <div class="tabs">
+    <button data-tab="tags" class="active">Tags</button>
+    <button data-tab="client">Client List</button>
+  </div>
+
+  <div id="view-tags" class="view active">
+    <div id="pages"></div>
+  </div>
+
+  <div id="view-client" class="view">
+    <div id="clientWrap"></div>
+  </div>
+
+<script>
+  const API = (typeof API_URL !== 'undefined') ? API_URL : '';
+
+  const dateEl   = document.getElementById('date');
+  const statusEl = document.getElementById('status');
+  const pagesEl  = document.getElementById('pages');
+  const clientWrap = document.getElementById('clientWrap');
+  const goBtn    = document.getElementById('go');
+  const printBtn = document.getElementById('print');
+
+  dateEl.value = new Date().toISOString().slice(0,10);
+
+  let activeTab = 'tags';
+  const loaded = { tags:false, client:false };   // per-tab load state for current date
+
+  // ---------- TABS ----------
+  document.querySelectorAll('.tabs button').forEach(btn => {
+    btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+  });
+
+  function switchTab(tab){
+    activeTab = tab;
+    document.querySelectorAll('.tabs button').forEach(b =>
+      b.classList.toggle('active', b.dataset.tab === tab));
+    document.getElementById('view-tags').classList.toggle('active', tab === 'tags');
+    document.getElementById('view-client').classList.toggle('active', tab === 'client');
+    printBtn.disabled = !loaded[tab];
+    if(!loaded[tab]) load(tab);
+  }
+
+  dateEl.addEventListener('change', () => {
+    loaded.tags = false; loaded.client = false;
+    pagesEl.innerHTML = ''; clientWrap.innerHTML = '';
+    printBtn.disabled = true;
+    statusEl.textContent = 'Date changed — generating…';
+    load(activeTab);
+  });
+
+  goBtn.addEventListener('click', () => { loaded[activeTab] = false; load(activeTab); });
+  printBtn.addEventListener('click', () => window.print());
+
+  function load(tab){
+    if(tab === 'tags')   return loadTags();
+    if(tab === 'client') return loadClient();
+  }
+
+  // ============================================================
+  //  COLOR ENGINE (shared) — mirrors the sheet's text-based CF
+  //  Edit colors / rules here. Order = stripe order, first on left.
+  // ============================================================
+  const CF_RULES = [
+    { test: t => t.includes('high protein'),  color: '#cc4125' }, // red
+    { test: t => t.includes('no carb'),       color: '#3d85c6' }, // blue
+    { test: t => t.includes('allergies'),     color: '#595959' }, // dark gray
+    { test: t => t.includes('evening'),       color: '#ffff00' }, // yellow
+    { test: t => t.includes('high carb'),     color: '#cfe2f3' }, // light blue
+    { test: t => t.includes('low carb'),      color: '#6d9eeb' }, // med blue
+    { test: t => t.includes('multi'),         color: '#434343' }, // near-black
+    { test: t => t.trim() === 'chicken high', color: '#ff0000' }, // bright red
+    { test: t => t.startsWith('veg '),        color: '#93c47d' }, // green
+  ];
+
+  function isDark(hex){
+    const h = hex.replace('#','');
+    if(h.length !== 6) return false;
+    const r = parseInt(h.slice(0,2),16),
+          g = parseInt(h.slice(2,4),16),
+          b = parseInt(h.slice(4,6),16);
+    return (0.299*r + 0.587*g + 0.114*b) < 140;
+  }
+
+  function cellStyle(text){
+    const t = String(text || '').toLowerCase();
+    const hits = CF_RULES.filter(r => r.test(t)).map(r => r.color);
+    if(hits.length === 0) return { background:'', dark:false };
+    if(hits.length === 1) return { background:hits[0], dark:isDark(hits[0]) };
+    const n = hits.length;
+    const stops = hits.map((c,i) => {
+      const s = (i*100/n).toFixed(2), e = ((i+1)*100/n).toFixed(2);
+      return `${c} ${s}%, ${c} ${e}%`;
+    }).join(', ');
+    return { background:`linear-gradient(90deg, ${stops})`, dark:isDark(hits[0]) };
+  }
+
+  function applyCell(td, text){
+    const st = cellStyle(text);
+    if(st.background){
+      td.style.background = st.background;
+      if(st.dark) td.style.color = '#fff';
+    }
+  }
+
+  // ============================================================
+  //  CLIENT LIST
+  // ============================================================
+  async function loadClient(){
+    if(!API){ statusEl.textContent = 'No API URL found in config.js.'; return; }
+    const date = dateEl.value;
+    if(!date){ statusEl.textContent = 'Pick a date first.'; return; }
+
+    goBtn.disabled = true; printBtn.disabled = true;
+    clientWrap.innerHTML = '';
+    statusEl.textContent = 'Loading client list for ' + date + '…';
+
+    try{
+      const res = await fetch(API + '?action=getClientListForDate&date=' + encodeURIComponent(date));
+      const data = await res.json();
+      if(!data.success || !data.rows){ throw new Error('No data returned'); }
+
+      renderClient(data.rows, date);
+      loaded.client = true;
+      statusEl.textContent = data.rows.length + ' client rows for ' + date;
+      if(activeTab === 'client') printBtn.disabled = false;
+    }catch(e){
+      statusEl.textContent = 'Error: ' + e.message;
+    }
+    goBtn.disabled = false;
+  }
+
+  function renderClient(rows, date){
+    const wrap = document.createElement('div'); wrap.className = 'sheet';
+
+    const h = document.createElement('h2');
+    h.textContent = new Date(date + 'T00:00:00')
+      .toLocaleDateString(undefined, { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+    wrap.appendChild(h);
+
+    const table = document.createElement('table'); table.className = 'client';
+
+    const cols = [
+      { key:'_num',      label:'#'         },
+      { key:'name',      label:'Name'      },
+      { key:'breakfast', label:'Breakfast' },
+      { key:'option1',   label:'Option 1'  },
+      { key:'option2',   label:'Option 2'  },
+      { key:'snack',     label:'Snack'     },
+      { key:'juice1',    label:'Juice 1'   },
+      { key:'juice2',    label:'Juice 2'   },
+      { key:'remarks',   label:'Remarks'   },
+      { key:'type',      label:'Type'      },
+      { key:'slot',      label:'Slot'      },
+    ];
+
+    const thead = document.createElement('thead');
+    const htr = document.createElement('tr');
+    cols.forEach(c => { const th = document.createElement('th'); th.textContent = c.label; htr.appendChild(th); });
+    thead.appendChild(htr); table.appendChild(thead);
+
+    const tbody = document.createElement('tbody');
+    rows.forEach((r, i) => {
+      const tr = document.createElement('tr');
+      cols.forEach(c => {
+        const td = document.createElement('td');
+        if(c.key === '_num'){ td.className = 'num'; td.textContent = i + 1; }
+        else {
+          const val = r[c.key] || '';
+          td.textContent = val;
+          if(c.key === 'remarks') td.className = 'rmk';
+          applyCell(td, val);   // color exactly like the sheet, per cell text
+        }
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    wrap.appendChild(table);
+    clientWrap.innerHTML = '';
+    clientWrap.appendChild(wrap);
+  }
+
+  // ============================================================
+  //  TAGS  (unchanged logic)
+  // ============================================================
+  async function loadTags(){
+    if(!API){ statusEl.textContent = 'No API URL found in config.js.'; return; }
+    const date = dateEl.value;
+    if(!date){ statusEl.textContent = 'Pick a date first.'; return; }
+
+    goBtn.disabled = true; printBtn.disabled = true;
+    pagesEl.innerHTML = '';
+    statusEl.textContent = 'Loading orders for ' + date + '…';
+
+    try{
+      const res = await fetch(API + '?action=getTagsForDate&date=' + encodeURIComponent(date));
+      const data = await res.json();
+      if(!data.success || !data.tags){ throw new Error('No data returned'); }
+
+      const tags = data.tags;
+      if(tags.length === 0){
+        statusEl.textContent = 'No tags for ' + date + ' (no orders, or all cancelled).';
+        loaded.tags = true; goBtn.disabled = false; return;
+      }
+
+      const ORDER = { breakfast:1, option1:2, option2:3, snack:4, juice1:5, juice2:6 };
+      const mealTags = tags.slice().sort((a,b) =>
+        ((ORDER[a.cat]||99) - (ORDER[b.cat]||99)) ||
+        (a.dish||'').localeCompare(b.dish||'') ||
+        ((a.remarks?1:0) - (b.remarks?1:0)) ||
+        (a.clientName||'').localeCompare(b.clientName||'')
+      );
+      const carryTags = buildCarryGroups(tags);
+
+      renderTags(mealTags, carryTags);
+
+      const total = mealTags.length + carryTags.length;
+      statusEl.textContent = mealTags.length + ' meal + ' + carryTags.length +
+        ' carry bag = ' + total + ' tags · ' + Math.ceil(total/10) + ' page(s)';
+      loaded.tags = true;
+      if(activeTab === 'tags') printBtn.disabled = false;
+    }catch(e){
+      statusEl.textContent = 'Error: ' + e.message;
+    }
+    goBtn.disabled = false;
+  }
+
+  function renderTags(mealTags, carryTags){
+    pagesEl.innerHTML = '';
+    const elements = [];
+    mealTags.forEach(t => elements.push(buildTag(t)));
+    carryTags.forEach(g => elements.push(buildCarryTag(g)));
+
+    for(let p=0; p<elements.length; p+=10){
+      const page = document.createElement('div');
+      page.className = 'page';
+      elements.slice(p, p+10).forEach(el => page.appendChild(el));
+      pagesEl.appendChild(page);
+    }
+    const lastPage = pagesEl.lastElementChild;
+    if(lastPage){
+      const used = lastPage.childElementCount;
+      for(let b=used; b<10; b++){
+        const empty = document.createElement('div');
+        empty.className = 'tag';
+        lastPage.appendChild(empty);
+      }
+    }
+    requestAnimationFrame(() => {
+      document.querySelectorAll('#pages .inner').forEach(fitTag);
+    });
+  }
+
+  function buildTag(t){
+    const el = document.createElement('div'); el.className = 'tag';
+    const inner = document.createElement('div'); inner.className = 'inner';
+
+    const dish = document.createElement('div'); dish.className = 'dish';
+    dish.textContent = t.dish || '';
+    inner.appendChild(dish);
+
+    const isExtra = (t.kind === 'snack' || t.kind === 'juice');
+    if(!isExtra && t.type){
+      const cleanType = t.type.split(',').map(s => s.trim().replace(/^\d+\s*/, '')).filter(Boolean).join(', ');
+      if(cleanType){
+        const type = document.createElement('div'); type.className = 'type';
+        type.textContent = cleanType;
+        inner.appendChild(type);
+      }
+    }
+    if(t.remarks && !isExtra){
+      const rem = document.createElement('div'); rem.className = 'remark';
+      rem.textContent = t.remarks;
+      inner.appendChild(rem);
+      const nm = document.createElement('div'); nm.className = 'cname';
+      nm.textContent = t.clientName || '';
+      inner.appendChild(nm);
+    }
+    el.appendChild(inner);
+    return el;
+  }
+
+  function buildCarryGroups(tags){
+    const catOrder = { breakfast:1, option1:2, option2:3, snack:4, juice1:5, juice2:6 };
+    const groups = {};
+    tags.forEach(t => {
+      const key = (t.phone || t.clientName) + '|' + t.slot;
+      if(!groups[key]){
+        groups[key] = { clientName:t.clientName, slot:t.slot, type:t.type, remarks:t.remarks, codes:[] };
+      }
+      groups[key].codes.push({ code:t.code, cat:t.cat });
+    });
+    const arr = Object.values(groups);
+    arr.forEach(g => {
+      g.codes.sort((a,b) => (catOrder[a.cat]||99) - (catOrder[b.cat]||99));
+      const counts = {}; const seq = [];
+      g.codes.forEach(c => {
+        if(counts[c.code] === undefined){ counts[c.code] = 0; seq.push(c.code); }
+        counts[c.code]++;
+      });
+      g.codeList = seq.map(code => counts[code] > 1 ? counts[code] + 'x ' + code : code);
+    });
+    const slotOrder = { Morning:1, Afternoon:2, Evening:3 };
+    arr.sort((a,b) =>
+      ((slotOrder[a.slot]||99) - (slotOrder[b.slot]||99)) ||
+      (a.clientName||'').localeCompare(b.clientName||'')
+    );
+    return arr;
+  }
+
+  function buildCarryTag(g){
+    const el = document.createElement('div'); el.className = 'tag carry';
+    const inner = document.createElement('div'); inner.className = 'inner';
+
+    const name = document.createElement('div'); name.className = 'cb-name';
+    name.textContent = g.clientName || '';
+    inner.appendChild(name);
+
+    g.codeList.forEach(code => {
+      const c = document.createElement('div'); c.className = 'cb-code';
+      c.textContent = code;
+      inner.appendChild(c);
+    });
+
+    if(g.type){
+      const cleanType = g.type.split(',').map(s => s.trim().replace(/^\d+\s*/, '')).filter(Boolean).join(', ');
+      if(cleanType){
+        const ty = document.createElement('div'); ty.className = 'cb-type';
+        ty.textContent = cleanType;
+        inner.appendChild(ty);
+      }
+    }
+    if(g.remarks){
+      const rem = document.createElement('div'); rem.className = 'cb-remark';
+      rem.textContent = g.remarks;
+      inner.appendChild(rem);
+    }
+    const slot = String(g.slot || '').trim();
+    if(slot === 'Morning' || slot === 'Evening'){
+      const s = document.createElement('div'); s.className = 'cb-slot';
+      s.textContent = slot;
+      inner.appendChild(s);
+    }
+    el.appendChild(inner);
+    return el;
+  }
+
+  function fitTag(inner){
+    let size = 24;
+    inner.style.fontSize = size + 'px';
+    while(size > 7 &&
+         (inner.scrollHeight > inner.clientHeight || inner.scrollWidth > inner.clientWidth)){
+      size -= 0.5;
+      inner.style.fontSize = size + 'px';
+    }
+  }
+
+  // initial load
+  load('tags');
+</script>
+</body>
+</html>
