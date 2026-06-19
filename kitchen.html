@@ -70,27 +70,31 @@
   /* ---------- LISTS (client etc.) ---------- */
   .listwrap{ padding:18px; }
   .sheet{ background:#fff; box-shadow:0 2px 10px rgba(0,0,0,.18); margin:0 auto; padding:14px; overflow-x:auto; }
-  .sheet h2{ text-align:center; font-size:16px; margin:4px 0 12px; }
-  table.client{ border-collapse:collapse; width:100%; font-size:12px; color:#000; }
-  table.client th, table.client td{ border:1px solid #999; padding:3px 6px; text-align:left; white-space:nowrap; }
+  .sheet h2{ text-align:center; font-size:15px; margin:2px 0 8px; }
+  table.client{ border-collapse:collapse; width:100%; font-size:11px; color:#000; line-height:1.1; }
+  table.client th, table.client td{ border:1px solid #999; padding:1px 5px; text-align:left; white-space:nowrap; }
   table.client th{ background:#f0f0f0; font-weight:700; text-align:center; }
-  table.client td.num{ text-align:center; width:28px; color:#666; }
+  table.client td.num{ text-align:center; width:24px; color:#666; }
 
   @media print{
     .bar, .tabs{ display:none; }
     .view:not(.active){ display:none; }
     body{ background:#fff; }
     .pages{ padding:0; gap:0; }
-    .page{ box-shadow:none; page-break-after:always; }
+    .page{ box-shadow:none; margin:0; page-break-after:always; page:tagPage; }
+    .page:last-of-type{ page-break-after:auto; }
     .tag{ -webkit-print-color-adjust:exact; print-color-adjust:exact; }
     .listwrap{ padding:0; }
-    .sheet{ box-shadow:none; padding:0; overflow:visible; page:landscapeList; }
+    .sheet{ box-shadow:none; padding:0; margin:0; overflow:visible; page:landscapeList; }
+    .sheet h2{ margin:0 0 6px; }
     table.client{ -webkit-print-color-adjust:exact; print-color-adjust:exact; }
     table.client tr{ page-break-inside:avoid; }
+    table.client thead{ display:table-header-group; }   /* repeat header on page 2+ */
   }
-  /* portrait by default (tags); lists use the named landscape page */
+  /* portrait by default; named pages pin exact size + margins */
   @page{ size:A4 portrait; margin:0; }
-  @page landscapeList{ size:A4 landscape; margin:8mm; }
+  @page tagPage{ size:A4 portrait; margin:0; }
+  @page landscapeList{ size:A4 landscape; margin:6mm; }
 </style>
 </head>
 <body>
@@ -241,7 +245,9 @@
     try{
       const rows = await ensureClient(date);
       clientWrap.innerHTML = '';
-      clientWrap.appendChild(buildClientSheet(rows, date));
+      const sheet = buildClientSheet(rows, date);
+      clientWrap.appendChild(sheet);
+      fitClientSheet(sheet, rows.length);
       loadedView.client = true;
       done(rows.length + ' client rows for ' + date, 'client');
     }catch(e){ fail(e); }
@@ -250,6 +256,35 @@
   function typeNum(t){
     const m = String(t || '').match(/\d+/);
     return m ? parseInt(m[0], 10) : 999;
+  }
+
+  // Scale the table font so up to ~60 rows fit one landscape A4 page.
+  // Landscape A4 printable height at 6mm margins ~= 285mm. We target that.
+  function fitClientSheet(sheet, rowCount){
+    const table = sheet.querySelector('table.client');
+    if(!table) return;
+    // only bother scaling when it's a single-page-worth of rows
+    const ROWS_PER_PAGE = 60;
+    if(rowCount > ROWS_PER_PAGE){
+      table.style.fontSize = '10px';   // dense; will flow to extra pages
+      return;
+    }
+    // landscape printable height in px at 96dpi: 210mm - 12mm margins ~= 748px
+    const TARGET = 740;
+    let size = 12;
+    table.style.fontSize = size + 'px';
+    // shrink if the rendered table is taller than one page
+    let guard = 0;
+    while(size > 7 && table.scrollHeight > TARGET && guard < 40){
+      size -= 0.5; table.style.fontSize = size + 'px'; guard++;
+    }
+    // grow a little if there's slack and few rows
+    guard = 0;
+    while(size < 13 && table.scrollHeight < TARGET - 40 && guard < 10){
+      size += 0.5; table.style.fontSize = size + 'px';
+      if(table.scrollHeight > TARGET){ size -= 0.5; table.style.fontSize = size + 'px'; break; }
+      guard++;
+    }
   }
 
   function buildClientSheet(rows, date){
@@ -455,8 +490,10 @@
 
       // Section 2: client list
       const listSection = document.createElement('div'); listSection.className = 'listwrap';
-      listSection.appendChild(buildClientSheet(rows, date));
+      const sheet = buildClientSheet(rows, date);
+      listSection.appendChild(sheet);
       combinedEl.appendChild(listSection);
+      fitClientSheet(sheet, rows.length);
 
       // (meal / mise / delivery / pause lists will append here next)
 
