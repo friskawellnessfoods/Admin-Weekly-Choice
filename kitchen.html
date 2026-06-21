@@ -97,11 +97,11 @@
   .mbox .mh.dual span{ flex:1; padding:4px 2px; }
   .mbox .mh.dual span:first-child{ border-right:1px solid #555; }
   .mbox .mb{ flex:1; }
-  .mbox table{ width:100%; border-collapse:collapse; font-size:calc(10px * var(--mscale)); color:#000; table-layout:auto; }
+  .mbox table{ width:100%; border-collapse:collapse; font-size:calc(10px * var(--mscale)); color:#000; table-layout:fixed; }
   .mbox td{ border:1px solid #ccc; padding:2px 6px; }
-  .mbox td:first-child{ white-space:nowrap; }
-  .mbox td:last-child{ white-space:normal; overflow-wrap:normal; word-break:normal; }
-  .mbox table.single td{ white-space:nowrap; }
+  .mbox td:first-child{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .mbox td:last-child{ width:46%; white-space:normal; overflow-wrap:normal; word-break:normal; }
+  .mbox table.single td{ width:auto; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .mbox table.dualt td{ width:50%; }
   .mbox .mf{ display:flex; justify-content:space-between; align-items:center; background:#9fc5e8; color:#000;
              font-weight:700; padding:5px 8px; font-size:calc(15px * var(--mscale)); }
