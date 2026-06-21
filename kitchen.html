@@ -83,12 +83,12 @@
               width:794px; max-width:100%; box-sizing:border-box; display:flex; flex-direction:column; }
   .mealsheet h2{ text-align:center; font-size:17px; margin:2px 0 14px; }
   .mealgrid{ flex:1; display:grid; grid-template-columns:repeat(4,1fr); gap:8px; min-height:980px;
-    grid-template-rows:1.7fr 1fr 1.1fr 0.7fr;
+    grid-template-rows:1.8fr 1.2fr 1fr 0.5fr;
     grid-template-areas:
       "c1 v1 v2 c2"
-      "s1 mid mid s2"
-      "e1 bf sn e2"
-      "j1 j1 j2 j2"; }
+      "s1 e1 e2 s2"
+      "bf sn j1 j2"
+      "mid mid mid mid"; }
   .mbox{ border:1px solid #555; background:#fff; display:flex; flex-direction:column; overflow:hidden; }
   .mbox .mh{ text-align:center; font-weight:700; padding:4px 2px; background:#b7b7b7; color:#000;
              font-size:calc(13px * var(--mscale)); }
@@ -107,12 +107,12 @@
   .mbox .mf.dual span:first-child{ border-right:1px solid #555; }
   .mbox.mid{ border:none; background:none; }
   .midwrap{ display:flex; align-items:stretch; justify-content:center; height:100%; gap:0; }
-  .midcol{ border:1px solid #555; flex:1; display:flex; flex-direction:column;
-           align-items:center; justify-content:center; padding:8px; gap:6px; }
-  .midlbl{ font-weight:700; text-align:center; font-size:calc(22px * var(--mscale)); line-height:1.1; }
-  .midnum{ font-weight:800; font-size:calc(64px * var(--mscale)); line-height:1; }
-  .midgrand{ border-top:1px solid #555; border-bottom:1px solid #555; padding:2px 6px;
-             font-weight:700; font-size:calc(20px * var(--mscale)); display:flex; align-items:center; }
+  .midcol{ border:1px solid #555; flex:1; display:flex; flex-direction:row;
+           align-items:center; justify-content:center; padding:8px; gap:16px; }
+  .midlbl{ font-weight:700; text-align:center; font-size:calc(24px * var(--mscale)); line-height:1.1; }
+  .midnum{ font-weight:800; font-size:calc(60px * var(--mscale)); line-height:1; }
+  .midgrand{ border-left:1px solid #555; border-right:1px solid #555; padding:2px 14px;
+             font-weight:700; font-size:calc(22px * var(--mscale)); display:flex; align-items:center; }
 
   @media print{
     .bar, .tabs{ display:none; }
@@ -533,9 +533,9 @@
     const box = document.createElement('div'); box.className = 'mbox mid';
     const wrap = document.createElement('div'); wrap.className = 'midwrap';
     wrap.innerHTML =
-      '<div class="midcol"><div class="midlbl">Total<br>Option 1</div><div class="midnum">' + o1 + '</div></div>' +
+      '<div class="midcol"><div class="midlbl">Total Option 1</div><div class="midnum">' + o1 + '</div></div>' +
       '<div class="midgrand">' + grand + '</div>' +
-      '<div class="midcol"><div class="midlbl">Total<br>Option 2</div><div class="midnum">' + o2 + '</div></div>';
+      '<div class="midcol"><div class="midlbl">Total Option 2</div><div class="midnum">' + o2 + '</div></div>';
     box.appendChild(wrap);
     return box;
   }
