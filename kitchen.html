@@ -97,11 +97,8 @@
   .mbox .mh.dual span{ flex:1; padding:4px 2px; }
   .mbox .mh.dual span:first-child{ border-right:1px solid #555; }
   .mbox .mb{ flex:1; }
-  .mbox table{ width:100%; border-collapse:collapse; font-size:calc(13px * var(--mscale)); color:#000; table-layout:fixed; }
-  .mbox td{ border:1px solid #ccc; padding:3px 6px; overflow:hidden; word-break:break-word; }
-  .mbox td:first-child{ width:58%; }
-  .mbox td:last-child{ width:42%; white-space:normal; }
-  .mbox table.single td{ width:auto; }
+  .mbox table{ border-collapse:collapse; font-size:calc(13px * var(--mscale)); color:#000; table-layout:auto; }
+  .mbox td{ border:1px solid #ccc; padding:3px 8px; white-space:nowrap; }
   .mbox table.dualt td{ width:50%; }
   .mbox .mf{ display:flex; justify-content:space-between; align-items:center; background:#9fc5e8; color:#000;
              font-weight:700; padding:5px 8px; font-size:calc(15px * var(--mscale)); }
