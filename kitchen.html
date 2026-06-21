@@ -123,6 +123,16 @@
                  overflow:hidden; text-overflow:ellipsis; height:calc(20px * var(--msc)); line-height:calc(14px * var(--msc)); box-sizing:border-box; }
   table.mise td.banner{ font-weight:700; border:none; padding:3px; height:auto; line-height:1.2; }
 
+  /* ---------- DELIVERY LIST ---------- */
+  .delsheet{ background:#fff; box-shadow:0 2px 10px rgba(0,0,0,.18); margin:0 auto; padding:14px; }
+  .delsheet h2{ text-align:center; font-size:14px; margin:0 0 6px; }
+  table.delivery{ border-collapse:collapse; width:100%; font-size:13px; color:#000; }
+  table.delivery th, table.delivery td{ border:1px solid #999; padding:3px 8px; text-align:left; white-space:nowrap; }
+  table.delivery th{ background:#f0f0f0; font-weight:700; text-align:center; }
+  table.delivery td.num{ text-align:center; width:28px; color:#666; }
+  table.delivery td.loc{ white-space:normal; }
+  table.delivery tr.slotsep td{ border-top:2px solid #555; }
+
   @media print{
     .bar, .tabs{ display:none; }
     .view:not(.active){ display:none; }
@@ -136,9 +146,12 @@
     .sheet h2{ margin:0 0 6px; }
     .mealsheet{ box-shadow:none; padding:0; margin:0; width:auto; page:portraitList; }
     .misesheet{ box-shadow:none; padding:0; margin:0; width:auto; page:portraitList; }
+    .delsheet{ box-shadow:none; padding:0; margin:0; page:portraitList; }
     table.client{ -webkit-print-color-adjust:exact; print-color-adjust:exact; }
     table.client tr{ page-break-inside:avoid; }
     table.client thead{ display:table-header-group; }   /* repeat header on page 2+ */
+    table.delivery tr{ page-break-inside:avoid; }
+    table.delivery thead{ display:table-header-group; }
     .mealgrid, .mbox{ -webkit-print-color-adjust:exact; print-color-adjust:exact; }
   }
   /* portrait by default; named pages pin exact size + margins */
@@ -167,6 +180,7 @@
     <button data-tab="client">Client List</button>
     <button data-tab="meal">Meal List</button>
     <button data-tab="mise">Mise List</button>
+    <button data-tab="delivery">Delivery List</button>
   </div>
 
   <div id="view-tags" class="view active">
@@ -185,6 +199,10 @@
     <div id="miseWrap" class="listwrap"></div>
   </div>
 
+  <div id="view-delivery" class="view">
+    <div id="deliveryWrap" class="listwrap"></div>
+  </div>
+
 <script>
   const API = (typeof API_URL !== 'undefined') ? API_URL : '';
 
@@ -194,13 +212,14 @@
   const clientWrap = document.getElementById('clientWrap');
   const mealWrap   = document.getElementById('mealWrap');
   const miseWrap   = document.getElementById('miseWrap');
+  const deliveryWrap = document.getElementById('deliveryWrap');
   const goBtn      = document.getElementById('go');
   const printBtn   = document.getElementById('print');
   const pdfBtn     = document.getElementById('pdf');
 
   let activeTab = 'tags';
-  const loadedView = { tags:false, client:false, meal:false, mise:false };
-  let cache = { date:null, tags:null, client:null, mise:null };  // raw data per date
+  const loadedView = { tags:false, client:false, meal:false, mise:false, delivery:false };
+  let cache = { date:null, tags:null, client:null, mise:null, delivery:null };  // raw data per date
 
   // ---- date input: click opens calendar, picking a date runs ----
   dateEl.addEventListener('click', () => { try{ dateEl.showPicker(); }catch(e){} });
@@ -218,7 +237,7 @@
     activeTab = tab;
     document.querySelectorAll('.tabs button').forEach(b =>
       b.classList.toggle('active', b.dataset.tab === tab));
-    ['tags','client','meal','mise'].forEach(t =>
+    ['tags','client','meal','mise','delivery'].forEach(t =>
       document.getElementById('view-' + t).classList.toggle('active', t === tab));
     printBtn.disabled = !loadedView[tab];
     if(dateEl.value && !loadedView[tab]) load(tab);
@@ -232,17 +251,19 @@
   pdfBtn.addEventListener('click', downloadKitchenPdf);
 
   function invalidate(){
-    cache = { date:null, tags:null, client:null, mise:null };
-    loadedView.tags = loadedView.client = loadedView.meal = loadedView.mise = false;
-    pagesEl.innerHTML = ''; clientWrap.innerHTML = ''; mealWrap.innerHTML = ''; miseWrap.innerHTML = '';
+    cache = { date:null, tags:null, client:null, mise:null, delivery:null };
+    loadedView.tags = loadedView.client = loadedView.meal = loadedView.mise = loadedView.delivery = false;
+    pagesEl.innerHTML = ''; clientWrap.innerHTML = ''; mealWrap.innerHTML = '';
+    miseWrap.innerHTML = ''; deliveryWrap.innerHTML = '';
     printBtn.disabled = true;
   }
 
   function load(tab){
-    if(tab === 'tags')    return loadTags();
-    if(tab === 'client')  return loadClient();
-    if(tab === 'meal')    return loadMeal();
-    if(tab === 'mise')    return loadMise();
+    if(tab === 'tags')     return loadTags();
+    if(tab === 'client')   return loadClient();
+    if(tab === 'meal')     return loadMeal();
+    if(tab === 'mise')     return loadMise();
+    if(tab === 'delivery') return loadDelivery();
   }
 
   // ---- mise fetch + cache (read-only values from the MiseList sheet) ----
@@ -253,6 +274,16 @@
     if(!data.success) throw new Error(data.message || 'No mise data returned');
     cache.date = date; cache.mise = data;
     return cache.mise;
+  }
+
+  // ---- delivery fetch + cache (getOrdersForDate: name/location/slot/route, deduped phone+slot) ----
+  async function ensureDelivery(date){
+    if(cache.delivery && cache.date === date) return cache.delivery;
+    const res = await fetch(API + '?action=getOrdersForDate&date=' + encodeURIComponent(date));
+    const data = await res.json();
+    if(!data.success) throw new Error(data.message || 'No delivery data returned');
+    cache.date = date; cache.delivery = data;
+    return cache.delivery;
   }
 
   // ---- data fetch + cache ----
@@ -682,6 +713,79 @@
   }
 
   // ============================================================
+  //  DELIVERY LIST  (getOrdersForDate: name/location/slot/route)
+  // ============================================================
+  async function loadDelivery(){
+    if(!guard()) return;
+    const date = dateEl.value;
+    busy('Loading delivery list for ' + date + '…');
+    try{
+      const data = await ensureDelivery(date);
+      deliveryWrap.innerHTML = '';
+      const sheet = buildDeliverySheet(data.clients || [], date);
+      deliveryWrap.appendChild(sheet);
+      loadedView.delivery = true;
+      done((data.clients || []).length + ' deliveries for ' + date, 'delivery');
+    }catch(e){ fail(e); }
+  }
+
+  function buildDeliverySheet(clients, date){
+    // sort by slot (Morning→Afternoon→Evening), then route ascending
+    const slotOrder = { Morning:1, Afternoon:2, Evening:3 };
+    const routeKey = r => {
+      const n = parseInt(String(r || '').match(/\d+/) || [9999], 10);
+      return { n: isNaN(n) ? 9999 : n, s: String(r || '') };
+    };
+    const sorted = clients.slice().sort((a, b) => {
+      const so = (slotOrder[a.slot] || 99) - (slotOrder[b.slot] || 99);
+      if(so) return so;
+      const ra = routeKey(a.route), rb = routeKey(b.route);
+      return (ra.n - rb.n) || ra.s.localeCompare(rb.s);
+    });
+
+    const wrap = document.createElement('div'); wrap.className = 'delsheet';
+    const h = document.createElement('h2');
+    h.textContent = new Date(date + 'T00:00:00')
+      .toLocaleDateString(undefined, { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+    wrap.appendChild(h);
+
+    const table = document.createElement('table'); table.className = 'delivery';
+    const cols = [
+      { key:'_num',     label:'#'        },
+      { key:'name',     label:'Name'     },
+      { key:'location', label:'Location' },
+      { key:'slot',     label:'Slot'     },
+      { key:'route',    label:'Route'    },
+    ];
+
+    const thead = document.createElement('thead');
+    const htr = document.createElement('tr');
+    cols.forEach(c => { const th = document.createElement('th'); th.textContent = c.label; htr.appendChild(th); });
+    thead.appendChild(htr); table.appendChild(thead);
+
+    const tbody = document.createElement('tbody');
+    let prevSlot = null;
+    sorted.forEach((r, i) => {
+      const tr = document.createElement('tr');
+      if(prevSlot !== null && r.slot !== prevSlot) tr.className = 'slotsep';  // line between slot groups
+      prevSlot = r.slot;
+      cols.forEach(c => {
+        const td = document.createElement('td');
+        if(c.key === '_num'){ td.className = 'num'; td.textContent = i + 1; }
+        else {
+          td.textContent = r[c.key] || '';
+          if(c.key === 'location') td.className = 'loc';
+        }
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    wrap.appendChild(table);
+    return wrap;
+  }
+
+  // ============================================================
   //  TAGS
   // ============================================================
   async function loadTags(){
@@ -851,6 +955,8 @@
       const [tags, rows] = await Promise.all([ ensureTags(date), ensureClient(date) ]);
       let miseData = null;
       try{ miseData = await ensureMise(date); }catch(e){ miseData = null; }  // mise optional
+      let deliveryData = null;
+      try{ deliveryData = await ensureDelivery(date); }catch(e){ deliveryData = null; }  // delivery optional
 
       // ---- render tag pages, snapshot each ----
       const tagCanvases = [];
@@ -895,6 +1001,15 @@
         miseCanvas = await html2canvas(miseSheet, { scale:2, useCORS:true, backgroundColor:'#ffffff' });
       }
 
+      // ---- render delivery list, snapshot (optional) ----
+      let deliveryCanvas = null;
+      if(deliveryData && deliveryData.clients && deliveryData.clients.length){
+        const delSheet = buildDeliverySheet(deliveryData.clients, date);
+        delSheet.style.padding = '0'; delSheet.style.boxShadow = 'none'; delSheet.style.width = '760px';
+        stage.appendChild(delSheet);
+        deliveryCanvas = await html2canvas(delSheet, { scale:2, useCORS:true, backgroundColor:'#ffffff' });
+      }
+
       // ---- assemble PDF ----
       const { jsPDF } = window.jspdf;
       const firstOrient = tagCanvases.length ? 'portrait' : 'landscape';
@@ -917,7 +1032,10 @@
       // mise list: portrait (if present)
       if(miseCanvas) addImagePaged(pdf, miseCanvas, place, 'portrait');
 
-      // (delivery / pause lists will be appended here next)
+      // delivery list: portrait (if present)
+      if(deliveryCanvas) addImagePaged(pdf, deliveryCanvas, place, 'portrait');
+
+      // (pause list will be appended here next)
 
       pdf.save('Kitchen_List_' + date + '.pdf');
       statusEl.textContent = 'Kitchen List PDF downloaded for ' + date + '.';
