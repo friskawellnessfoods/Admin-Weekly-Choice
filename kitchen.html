@@ -768,13 +768,16 @@
 
     const tbody = document.createElement('tbody');
     let prevSlot = null;
-    sorted.forEach((r, i) => {
+    let slotNum = 0;
+    sorted.forEach((r) => {
       const tr = document.createElement('tr');
       if(prevSlot !== null && r.slot !== prevSlot) tr.className = 'slotsep';  // line between slot groups
+      if(r.slot !== prevSlot) slotNum = 0;   // restart numbering each slot
       prevSlot = r.slot;
+      slotNum++;
       cols.forEach(c => {
         const td = document.createElement('td');
-        if(c.key === '_num'){ td.className = 'num'; td.textContent = i + 1; }
+        if(c.key === '_num'){ td.className = 'num'; td.textContent = slotNum; }
         else {
           td.textContent = r[c.key] || '';
           if(c.key === 'location') td.className = 'loc';
