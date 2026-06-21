@@ -100,7 +100,7 @@
   .mbox table{ width:100%; border-collapse:collapse; font-size:calc(10px * var(--mscale)); color:#000; table-layout:auto; }
   .mbox td{ border:1px solid #ccc; padding:2px 6px; }
   .mbox td:first-child{ white-space:nowrap; }
-  .mbox td:last-child{ white-space:normal; word-break:break-word; }
+  .mbox td:last-child{ white-space:normal; overflow-wrap:normal; word-break:normal; }
   .mbox table.single td{ white-space:nowrap; }
   .mbox table.dualt td{ width:50%; }
   .mbox .mf{ display:flex; justify-content:space-between; align-items:center; background:#9fc5e8; color:#000;
@@ -316,6 +316,21 @@
       .join(', ');
   }
 
+  // render the type cell: each value kept on its own line (nowrap span),
+  // the comma is the only place a break can happen
+  function fillTypeCell(td, raw){
+    const parts = String(raw || '')
+      .split(',')
+      .map(s => s.trim().replace(/^\d+\s*/, ''))
+      .filter(Boolean);
+    parts.forEach((p, i) => {
+      const span = document.createElement('span');
+      span.style.whiteSpace = 'nowrap';
+      span.textContent = (i > 0 ? ', ' : '') + p;
+      td.appendChild(span);
+    });
+  }
+
   // Scale the table font so up to ~60 rows fit one landscape A4 page.
   // Landscape A4 printable height at 6mm margins ~= 285mm. We target that.
   function fitClientSheet(sheet, rowCount){
@@ -526,7 +541,7 @@
       sorted.forEach(it => {
         const tr = document.createElement('tr');
         const tdN = document.createElement('td'); tdN.textContent = it.name || ''; tr.appendChild(tdN);
-        const tdV = document.createElement('td'); tdV.textContent = stripTypeNumbers(it.val); applyCell(tdV, it.val); tr.appendChild(tdV);
+        const tdV = document.createElement('td'); fillTypeCell(tdV, it.val); applyCell(tdV, it.val); tr.appendChild(tdV);
         table.appendChild(tr);
       });
     }
