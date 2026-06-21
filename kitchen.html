@@ -276,10 +276,13 @@
     return cache.mise;
   }
 
-  // ---- delivery fetch + cache (getOrdersForDate: name/location/slot/route, deduped phone+slot) ----
+  // ---- delivery fetch + cache (getOrdersForDate via POST: name/location/slot/route, deduped phone+slot) ----
   async function ensureDelivery(date){
     if(cache.delivery && cache.date === date) return cache.delivery;
-    const res = await fetch(API + '?action=getOrdersForDate&date=' + encodeURIComponent(date));
+    const res = await fetch(API, {
+      method: 'POST',
+      body: new URLSearchParams({ action: 'getOrdersForDate', date: date })
+    });
     const data = await res.json();
     if(!data.success) throw new Error(data.message || 'No delivery data returned');
     cache.date = date; cache.delivery = data;
