@@ -133,6 +133,17 @@
   table.delivery td.loc{ white-space:normal; }
   table.delivery tr.slotsep td{ border-top:2px solid #555; }
 
+  /* ---------- PAUSE LIST ---------- */
+  .pausesheet{ background:#fff; box-shadow:0 2px 10px rgba(0,0,0,.18); margin:0 auto; padding:18px;
+               width:520px; max-width:100%; box-sizing:border-box; }
+  .pausesheet h2{ text-align:center; font-size:16px; margin:0 0 6px; }
+  .pause-toggle{ display:flex; align-items:center; justify-content:center; gap:8px; margin:0 0 12px; font-size:13px; color:#455a64; }
+  .pause-toggle input{ width:16px; height:16px; cursor:pointer; }
+  table.pause{ border-collapse:collapse; width:100%; font-size:14px; color:#000; }
+  table.pause td{ border:1px solid #999; padding:4px 10px; }
+  table.pause td.num{ text-align:center; width:36px; color:#666; }
+  table.pause tr.subhead td{ background:#eceff1; font-weight:700; text-align:center; }
+
   @media print{
     .bar, .tabs{ display:none; }
     .view:not(.active){ display:none; }
@@ -147,6 +158,8 @@
     .mealsheet{ box-shadow:none; padding:0; margin:0; width:auto; page:portraitList; }
     .misesheet{ box-shadow:none; padding:0; margin:0; width:auto; page:portraitList; }
     .delsheet{ box-shadow:none; padding:0; margin:0; page:portraitList; }
+    .pausesheet{ box-shadow:none; padding:0; margin:0; width:auto; page:portraitList; }
+    .pause-toggle{ display:none; }
     table.client{ -webkit-print-color-adjust:exact; print-color-adjust:exact; }
     table.client tr{ page-break-inside:avoid; }
     table.client thead{ display:table-header-group; }   /* repeat header on page 2+ */
@@ -181,6 +194,7 @@
     <button data-tab="meal">Meal List</button>
     <button data-tab="mise">Mise List</button>
     <button data-tab="delivery">Delivery List</button>
+    <button data-tab="pause">Pause List</button>
   </div>
 
   <div id="view-tags" class="view active">
@@ -203,6 +217,10 @@
     <div id="deliveryWrap" class="listwrap"></div>
   </div>
 
+  <div id="view-pause" class="view">
+    <div id="pauseWrap" class="listwrap"></div>
+  </div>
+
 <script>
   const API = (typeof API_URL !== 'undefined') ? API_URL : '';
 
@@ -213,13 +231,15 @@
   const mealWrap   = document.getElementById('mealWrap');
   const miseWrap   = document.getElementById('miseWrap');
   const deliveryWrap = document.getElementById('deliveryWrap');
+  const pauseWrap  = document.getElementById('pauseWrap');
   const goBtn      = document.getElementById('go');
   const printBtn   = document.getElementById('print');
   const pdfBtn     = document.getElementById('pdf');
 
   let activeTab = 'tags';
-  const loadedView = { tags:false, client:false, meal:false, mise:false, delivery:false };
-  let cache = { date:null, tags:null, client:null, mise:null, delivery:null };  // raw data per date
+  const loadedView = { tags:false, client:false, meal:false, mise:false, delivery:false, pause:false };
+  let cache = { date:null, tags:null, client:null, mise:null, delivery:null, pause:null };  // raw data per date
+  let showInactive = false;   // pause-list toggle
 
   // ---- date input: click opens calendar, picking a date runs ----
   dateEl.addEventListener('click', () => { try{ dateEl.showPicker(); }catch(e){} });
@@ -237,7 +257,7 @@
     activeTab = tab;
     document.querySelectorAll('.tabs button').forEach(b =>
       b.classList.toggle('active', b.dataset.tab === tab));
-    ['tags','client','meal','mise','delivery'].forEach(t =>
+    ['tags','client','meal','mise','delivery','pause'].forEach(t =>
       document.getElementById('view-' + t).classList.toggle('active', t === tab));
     printBtn.disabled = !loadedView[tab];
     if(dateEl.value && !loadedView[tab]) load(tab);
@@ -251,10 +271,10 @@
   pdfBtn.addEventListener('click', downloadKitchenPdf);
 
   function invalidate(){
-    cache = { date:null, tags:null, client:null, mise:null, delivery:null };
-    loadedView.tags = loadedView.client = loadedView.meal = loadedView.mise = loadedView.delivery = false;
+    cache = { date:null, tags:null, client:null, mise:null, delivery:null, pause:null };
+    loadedView.tags = loadedView.client = loadedView.meal = loadedView.mise = loadedView.delivery = loadedView.pause = false;
     pagesEl.innerHTML = ''; clientWrap.innerHTML = ''; mealWrap.innerHTML = '';
-    miseWrap.innerHTML = ''; deliveryWrap.innerHTML = '';
+    miseWrap.innerHTML = ''; deliveryWrap.innerHTML = ''; pauseWrap.innerHTML = '';
     printBtn.disabled = true;
   }
 
@@ -264,6 +284,17 @@
     if(tab === 'meal')     return loadMeal();
     if(tab === 'mise')     return loadMise();
     if(tab === 'delivery') return loadDelivery();
+    if(tab === 'pause')    return loadPause();
+  }
+
+  // ---- pause fetch + cache (master clients with no order for the date) ----
+  async function ensurePause(date){
+    if(cache.pause && cache.date === date) return cache.pause;
+    const res = await fetch(API + '?action=getPausedForDate&date=' + encodeURIComponent(date));
+    const data = await res.json();
+    if(!data.success) throw new Error(data.message || 'No pause data returned');
+    cache.date = date; cache.pause = data;
+    return cache.pause;
   }
 
   // ---- mise fetch + cache (read-only values from the MiseList sheet) ----
@@ -792,6 +823,70 @@
   }
 
   // ============================================================
+  //  PAUSE LIST  (master clients with no order for the date)
+  // ============================================================
+  async function loadPause(){
+    if(!guard()) return;
+    const date = dateEl.value;
+    busy('Loading pause list for ' + date + '…');
+    try{
+      const data = await ensurePause(date);
+      renderPause(data, date);
+      loadedView.pause = true;
+      done((data.paused || []).length + ' paused clients for ' + date, 'pause');
+    }catch(e){ fail(e); }
+  }
+
+  function renderPause(data, date){
+    pauseWrap.innerHTML = '';
+    pauseWrap.appendChild(buildPauseSheet(data, date));
+  }
+
+  function buildPauseSheet(data, date){
+    const paused = (data.paused || []).slice().sort((a,b) => a.localeCompare(b));
+    const inactive = (data.pausedInactive || []).slice().sort((a,b) => a.localeCompare(b));
+
+    const wrap = document.createElement('div'); wrap.className = 'pausesheet';
+    const h = document.createElement('h2');
+    h.textContent = 'Paused Clients — ' + new Date(date + 'T00:00:00')
+      .toLocaleDateString(undefined, { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+    wrap.appendChild(h);
+
+    // toggle (hidden in print)
+    const tg = document.createElement('label'); tg.className = 'pause-toggle';
+    const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = showInactive;
+    cb.addEventListener('change', () => { showInactive = cb.checked; renderPause(data, date); });
+    tg.appendChild(cb);
+    tg.appendChild(document.createTextNode('Show inactive clients'));
+    wrap.appendChild(tg);
+
+    const table = document.createElement('table'); table.className = 'pause';
+    let n = 0;
+    paused.forEach(name => {
+      const tr = document.createElement('tr');
+      const num = document.createElement('td'); num.className = 'num'; num.textContent = ++n;
+      const nm = document.createElement('td'); nm.textContent = name;
+      tr.appendChild(num); tr.appendChild(nm); table.appendChild(tr);
+    });
+
+    if(showInactive && inactive.length){
+      const sub = document.createElement('tr'); sub.className = 'subhead';
+      const td = document.createElement('td'); td.colSpan = 2; td.textContent = 'Inactive Clients';
+      sub.appendChild(td); table.appendChild(sub);
+      let m = 0;
+      inactive.forEach(name => {
+        const tr = document.createElement('tr');
+        const num = document.createElement('td'); num.className = 'num'; num.textContent = ++m;
+        const nm = document.createElement('td'); nm.textContent = name;
+        tr.appendChild(num); tr.appendChild(nm); table.appendChild(tr);
+      });
+    }
+
+    wrap.appendChild(table);
+    return wrap;
+  }
+
+  // ============================================================
   //  TAGS
   // ============================================================
   async function loadTags(){
@@ -963,6 +1058,8 @@
       try{ miseData = await ensureMise(date); }catch(e){ miseData = null; }  // mise optional
       let deliveryData = null;
       try{ deliveryData = await ensureDelivery(date); }catch(e){ deliveryData = null; }  // delivery optional
+      let pauseData = null;
+      try{ pauseData = await ensurePause(date); }catch(e){ pauseData = null; }  // pause optional
 
       // ---- render tag pages, snapshot each ----
       const tagCanvases = [];
@@ -1016,6 +1113,15 @@
         deliveryCanvas = await html2canvas(delSheet, { scale:2, useCORS:true, backgroundColor:'#ffffff' });
       }
 
+      // ---- render pause list, snapshot (optional; respects the inactive toggle) ----
+      let pauseCanvas = null;
+      if(pauseData && ((pauseData.paused && pauseData.paused.length) || (showInactive && pauseData.pausedInactive && pauseData.pausedInactive.length))){
+        const pauseSheet = buildPauseSheet(pauseData, date);
+        pauseSheet.style.padding = '0'; pauseSheet.style.boxShadow = 'none';
+        stage.appendChild(pauseSheet);
+        pauseCanvas = await html2canvas(pauseSheet, { scale:2, useCORS:true, backgroundColor:'#ffffff' });
+      }
+
       // ---- assemble PDF ----
       const { jsPDF } = window.jspdf;
       const firstOrient = tagCanvases.length ? 'portrait' : 'landscape';
@@ -1041,7 +1147,8 @@
       // delivery list: portrait (if present)
       if(deliveryCanvas) addImagePaged(pdf, deliveryCanvas, place, 'portrait');
 
-      // (pause list will be appended here next)
+      // pause list: portrait (if present)
+      if(pauseCanvas) addImagePaged(pdf, pauseCanvas, place, 'portrait');
 
       pdf.save('Kitchen_List_' + date + '.pdf');
       statusEl.textContent = 'Kitchen List PDF downloaded for ' + date + '.';
