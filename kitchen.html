@@ -669,10 +669,13 @@
   }
 
   function fitMiseSheet(sheet){
-    const TARGET = 1050;
+    // Portrait A4 printable ~198mm wide x 285mm tall. The sheet is placed across
+    // the full printable width, so its height budget in its own px = width * (285/198).
+    const w = sheet.offsetWidth || 560;
+    const TARGET = w * (285/198);
     let s = 1; sheet.style.setProperty('--msc', s);
     let guard = 0;
-    while(s > 0.6 && sheet.scrollHeight > TARGET && guard < 30){
+    while(s > 0.5 && sheet.scrollHeight > TARGET && guard < 40){
       s -= 0.03; sheet.style.setProperty('--msc', s.toFixed(3)); guard++;
     }
   }
