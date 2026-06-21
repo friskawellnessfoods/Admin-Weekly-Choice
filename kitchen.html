@@ -78,6 +78,39 @@
   table.client th{ background:#f0f0f0; font-weight:700; text-align:center; }
   table.client td.num{ text-align:center; width:24px; color:#666; }
 
+  /* ---------- MEAL LIST ---------- */
+  .mealsheet{ --mscale:1; background:#fff; box-shadow:0 2px 10px rgba(0,0,0,.18); margin:0 auto; padding:14px; width:780px; max-width:100%; }
+  .mealsheet h2{ text-align:center; font-size:15px; margin:2px 0 10px; }
+  .mealgrid{ display:grid; grid-template-columns:repeat(4,1fr); gap:6px;
+    grid-template-areas:
+      "c1 v1 v2 c2"
+      "s1 mid mid s2"
+      "e1 bs jj e2"; }
+  .mbox{ border:1px solid #555; background:#fff; display:flex; flex-direction:column; min-height:60px; }
+  .mbox .mh{ text-align:center; font-weight:700; padding:3px 2px; background:#b7b7b7; color:#000;
+             font-size:calc(12px * var(--mscale)); }
+  .mbox.veg .mh{ background:#93c47d; }
+  .mbox .mh.dual{ display:flex; padding:0; }
+  .mbox .mh.dual span{ flex:1; padding:3px 2px; }
+  .mbox .mh.dual span:first-child{ border-right:1px solid #555; }
+  .mbox .mb{ flex:1; }
+  .mbox table{ width:100%; border-collapse:collapse; font-size:calc(10px * var(--mscale)); color:#000; }
+  .mbox td{ border:1px solid #ccc; padding:1px 4px; white-space:nowrap; overflow:hidden; }
+  .mbox table.dualt td{ width:50%; }
+  .mbox .mf{ display:flex; justify-content:space-between; background:#9fc5e8; color:#000;
+             font-weight:700; padding:3px 6px; font-size:calc(11px * var(--mscale)); }
+  .mbox .mf.dual span{ flex:1; text-align:center; }
+  .mbox .mf.dual span:first-child{ border-right:1px solid #555; }
+  .mbox.mid{ border:none; background:none; }
+  .midwrap{ display:flex; align-items:center; justify-content:center; height:100%; gap:0; }
+  .midcol{ border:1px solid #555; flex:1; height:100%; display:flex; flex-direction:column;
+           align-items:center; justify-content:center; padding:6px; }
+  .midlbl{ font-weight:700; text-align:center; font-size:calc(16px * var(--mscale)); line-height:1.1; }
+  .midnum{ font-weight:800; font-size:calc(46px * var(--mscale)); }
+  .midgrand{ border:1px solid #555; border-left:none; border-right:none; padding:2px 4px;
+             font-weight:700; font-size:calc(16px * var(--mscale)); align-self:stretch;
+             display:flex; align-items:center; }
+
   @media print{
     .bar, .tabs{ display:none; }
     .view:not(.active){ display:none; }
@@ -89,14 +122,17 @@
     .listwrap{ padding:0; }
     .sheet{ box-shadow:none; padding:0; margin:0; overflow:visible; page:landscapeList; }
     .sheet h2{ margin:0 0 6px; }
+    .mealsheet{ box-shadow:none; padding:0; margin:0; width:auto; page:portraitList; }
     table.client{ -webkit-print-color-adjust:exact; print-color-adjust:exact; }
     table.client tr{ page-break-inside:avoid; }
     table.client thead{ display:table-header-group; }   /* repeat header on page 2+ */
+    .mealgrid, .mbox{ -webkit-print-color-adjust:exact; print-color-adjust:exact; }
   }
   /* portrait by default; named pages pin exact size + margins */
   @page{ size:A4 portrait; margin:0; }
   @page tagPage{ size:A4 portrait; margin:0; }
   @page landscapeList{ size:A4 landscape; margin:6mm; }
+  @page portraitList{ size:A4 portrait; margin:8mm; }
 </style>
 </head>
 <body>
@@ -116,6 +152,7 @@
   <div class="tabs">
     <button data-tab="tags" class="active">Tags</button>
     <button data-tab="client">Client List</button>
+    <button data-tab="meal">Meal List</button>
   </div>
 
   <div id="view-tags" class="view active">
@@ -126,6 +163,10 @@
     <div id="clientWrap" class="listwrap"></div>
   </div>
 
+  <div id="view-meal" class="view">
+    <div id="mealWrap" class="listwrap"></div>
+  </div>
+
 <script>
   const API = (typeof API_URL !== 'undefined') ? API_URL : '';
 
@@ -133,12 +174,13 @@
   const statusEl   = document.getElementById('status');
   const pagesEl    = document.getElementById('pages');
   const clientWrap = document.getElementById('clientWrap');
+  const mealWrap   = document.getElementById('mealWrap');
   const goBtn      = document.getElementById('go');
   const printBtn   = document.getElementById('print');
   const pdfBtn     = document.getElementById('pdf');
 
   let activeTab = 'tags';
-  const loadedView = { tags:false, client:false };
+  const loadedView = { tags:false, client:false, meal:false };
   let cache = { date:null, tags:null, client:null };  // raw data per date
 
   // ---- date input: click opens calendar, picking a date runs ----
@@ -157,7 +199,7 @@
     activeTab = tab;
     document.querySelectorAll('.tabs button').forEach(b =>
       b.classList.toggle('active', b.dataset.tab === tab));
-    ['tags','client'].forEach(t =>
+    ['tags','client','meal'].forEach(t =>
       document.getElementById('view-' + t).classList.toggle('active', t === tab));
     printBtn.disabled = !loadedView[tab];
     if(dateEl.value && !loadedView[tab]) load(tab);
@@ -172,15 +214,19 @@
 
   function invalidate(){
     cache = { date:null, tags:null, client:null };
-    loadedView.tags = loadedView.client = false;
-    pagesEl.innerHTML = ''; clientWrap.innerHTML = '';
+    loadedView.tags = loadedView.client = loadedView.meal = false;
+    pagesEl.innerHTML = ''; clientWrap.innerHTML = ''; mealWrap.innerHTML = '';
     printBtn.disabled = true;
   }
 
   function load(tab){
     if(tab === 'tags')    return loadTags();
     if(tab === 'client')  return loadClient();
+    if(tab === 'meal')    return loadMeal();
   }
+
+  // ---- data fetch + cache ----
+  // (meal list is derived from the same client rows — no separate fetch)
 
   // ---- data fetch + cache ----
   async function ensureTags(date){
@@ -340,6 +386,153 @@
     table.appendChild(tbody);
     wrap.appendChild(table);
     return wrap;
+  }
+
+  // ============================================================
+  //  MEAL LIST
+  // ============================================================
+  async function loadMeal(){
+    if(!guard()) return;
+    const date = dateEl.value;
+    busy('Building meal list for ' + date + '…');
+    try{
+      const rows = await ensureClient(date);     // reuse the client-list rows
+      const meal = groupMeal(rows);
+      mealWrap.innerHTML = '';
+      const sheet = buildMealSheet(meal, date);
+      mealWrap.appendChild(sheet);
+      fitMealSheet(sheet);
+      loadedView.meal = true;
+      done('Meal list ready for ' + date, 'meal');
+    }catch(e){ fail(e); }
+  }
+
+  // regroup client rows into protein buckets (same shape the meal list needs)
+  function groupMeal(rows){
+    const opt1 = { Chicken:[], Veg:[], Seafood:[], Egg:[] };
+    const opt2 = { Chicken:[], Veg:[], Seafood:[], Egg:[] };
+    const breakfast = [], snack = [], juice1 = [], juice2 = [];
+    const proteinOf = code => String(code || '').replace(/\s*\d+\s*$/, '').trim();
+
+    rows.forEach(r => {
+      const o1 = String(r.option1 || '').trim();
+      const o2 = String(r.option2 || '').trim();
+      if(o1 && o1 !== 'N/A'){ const p = proteinOf(o1); (opt1[p] = opt1[p] || []).push({ name:r.name, type:r.type }); }
+      if(o2 && o2 !== 'N/A'){ const p = proteinOf(o2); (opt2[p] = opt2[p] || []).push({ name:r.name, type:r.type }); }
+      if(String(r.breakfast || '').trim() && r.breakfast !== 'N/A') breakfast.push(r.name);
+      if(String(r.snack     || '').trim() && r.snack     !== 'N/A') snack.push(r.name);
+      if(String(r.juice1    || '').trim() && r.juice1    !== 'N/A') juice1.push(r.name);
+      if(String(r.juice2    || '').trim() && r.juice2    !== 'N/A') juice2.push(r.name);
+    });
+
+    return { opt1, opt2, breakfast, snack, juice1, juice2 };
+  }
+
+  function buildMealSheet(data, date){
+    const o1 = data.opt1 || {}, o2 = data.opt2 || {};
+    const len = x => (x ? x.length : 0);
+    const opt1Total = len(o1.Chicken) + len(o1.Veg) + len(o1.Seafood) + len(o1.Egg);
+    const opt2Total = len(o2.Chicken) + len(o2.Veg) + len(o2.Seafood) + len(o2.Egg);
+
+    const sheet = document.createElement('div'); sheet.className = 'mealsheet';
+    const h = document.createElement('h2');
+    h.textContent = new Date(date + 'T00:00:00')
+      .toLocaleDateString(undefined, { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+    sheet.appendChild(h);
+
+    const grid = document.createElement('div'); grid.className = 'mealgrid';
+    const place = (el, area) => { el.style.gridArea = area; grid.appendChild(el); };
+
+    place(buildBucket('Chicken 1', o1.Chicken, false), 'c1');
+    place(buildBucket('Veg 1',     o1.Veg,     true ), 'v1');
+    place(buildBucket('Veg 2',     o2.Veg,     true ), 'v2');
+    place(buildBucket('Chicken 2', o2.Chicken, false), 'c2');
+    place(buildBucket('Seafood 1', o1.Seafood, false), 's1');
+    place(buildMiddle(opt1Total, opt2Total, opt1Total + opt2Total), 'mid');
+    place(buildBucket('Seafood 2', o2.Seafood, false), 's2');
+    place(buildBucket('Egg 1',     o1.Egg,     false), 'e1');
+    place(buildDual('Breakfast', data.breakfast || [], 'Snack',   data.snack  || []), 'bs');
+    place(buildDual('Juice 1',   data.juice1   || [], 'Juice 2', data.juice2 || []), 'jj');
+    place(buildBucket('Egg 2',     o2.Egg,     false), 'e2');
+
+    sheet.appendChild(grid);
+    return sheet;
+  }
+
+  function buildBucket(title, items, isVeg){
+    items = items || [];
+    const box = document.createElement('div'); box.className = 'mbox' + (isVeg ? ' veg' : '');
+    const head = document.createElement('div'); head.className = 'mh'; head.textContent = title; box.appendChild(head);
+
+    const body = document.createElement('div'); body.className = 'mb';
+    const table = document.createElement('table');
+    const sorted = items.map((it,i) => ({ ...it, _i:i }))
+      .sort((a,b) => (typeNum(a.type) - typeNum(b.type)) || (a._i - b._i));
+    if(sorted.length === 0){
+      const tr = document.createElement('tr');
+      const td = document.createElement('td'); td.colSpan = 2; td.textContent = '#N/A'; td.style.color = '#999';
+      tr.appendChild(td); table.appendChild(tr);
+    } else {
+      sorted.forEach(it => {
+        const tr = document.createElement('tr');
+        const tdN = document.createElement('td'); tdN.textContent = it.name || ''; tr.appendChild(tdN);
+        const tdT = document.createElement('td'); tdT.textContent = it.type || ''; applyCell(tdT, it.type); tr.appendChild(tdT);
+        table.appendChild(tr);
+      });
+    }
+    body.appendChild(table); box.appendChild(body);
+
+    const f = document.createElement('div'); f.className = 'mf';
+    const lbl = document.createElement('span'); lbl.textContent = 'Total';
+    const val = document.createElement('span'); val.textContent = items.length;
+    f.appendChild(lbl); f.appendChild(val); box.appendChild(f);
+    return box;
+  }
+
+  function buildDual(t1, list1, t2, list2){
+    const box = document.createElement('div'); box.className = 'mbox';
+    const head = document.createElement('div'); head.className = 'mh dual';
+    const h1 = document.createElement('span'); h1.textContent = t1;
+    const h2 = document.createElement('span'); h2.textContent = t2;
+    head.appendChild(h1); head.appendChild(h2); box.appendChild(head);
+
+    const body = document.createElement('div'); body.className = 'mb';
+    const table = document.createElement('table'); table.className = 'dualt';
+    const n = Math.max(list1.length, list2.length);
+    for(let i=0; i<n; i++){
+      const tr = document.createElement('tr');
+      const td1 = document.createElement('td'); td1.textContent = list1[i] || ''; tr.appendChild(td1);
+      const td2 = document.createElement('td'); td2.textContent = list2[i] || ''; tr.appendChild(td2);
+      table.appendChild(tr);
+    }
+    body.appendChild(table); box.appendChild(body);
+
+    const f = document.createElement('div'); f.className = 'mf dual';
+    const v1 = document.createElement('span'); v1.textContent = list1.length;
+    const v2 = document.createElement('span'); v2.textContent = list2.length;
+    f.appendChild(v1); f.appendChild(v2); box.appendChild(f);
+    return box;
+  }
+
+  function buildMiddle(o1, o2, grand){
+    const box = document.createElement('div'); box.className = 'mbox mid';
+    const wrap = document.createElement('div'); wrap.className = 'midwrap';
+    wrap.innerHTML =
+      '<div class="midcol"><div class="midlbl">Total<br>Option 1</div><div class="midnum">' + o1 + '</div></div>' +
+      '<div class="midgrand">' + grand + '</div>' +
+      '<div class="midcol"><div class="midlbl">Total<br>Option 2</div><div class="midnum">' + o2 + '</div></div>';
+    box.appendChild(wrap);
+    return box;
+  }
+
+  // shrink meal grid to fit one portrait page
+  function fitMealSheet(sheet){
+    const TARGET = 1040;   // portrait A4 printable height ~ px at 96dpi
+    let s = 1; sheet.style.setProperty('--mscale', s);
+    let guard = 0;
+    while(s > 0.5 && sheet.scrollHeight > TARGET && guard < 40){
+      s -= 0.03; sheet.style.setProperty('--mscale', s.toFixed(3)); guard++;
+    }
   }
 
   // ============================================================
@@ -537,6 +730,12 @@
       await waitForImages(sw);
       const clientCanvas = await html2canvas(sheet, { scale:2, useCORS:true, backgroundColor:'#ffffff' });
 
+      // ---- render meal list, snapshot ----
+      const mealSheet = buildMealSheet(groupMeal(rows), date);
+      stage.appendChild(mealSheet);
+      fitMealSheet(mealSheet);
+      const mealCanvas = await html2canvas(mealSheet, { scale:2, useCORS:true, backgroundColor:'#ffffff' });
+
       // ---- assemble PDF ----
       const { jsPDF } = window.jspdf;
       const firstOrient = tagCanvases.length ? 'portrait' : 'landscape';
@@ -551,9 +750,12 @@
       }
 
       // client list: landscape, sliced across pages if taller than one page
-      addLandscapeSliced(pdf, clientCanvas, place);
+      addImagePaged(pdf, clientCanvas, place, 'landscape');
 
-      // (meal / mise / delivery / pause lists will be appended here next)
+      // meal list: portrait
+      addImagePaged(pdf, mealCanvas, place, 'portrait');
+
+      // (mise / delivery / pause lists will be appended here next)
 
       pdf.save('Kitchen_List_' + date + '.pdf');
       statusEl.textContent = 'Kitchen List PDF downloaded for ' + date + '.';
@@ -565,27 +767,28 @@
     }
   }
 
-  // place a canvas onto landscape A4 page(s), 6mm margins, slicing if needed
-  function addLandscapeSliced(pdf, canvas, place){
+  // place a canvas onto A4 page(s) in the given orientation, 6mm margins, slicing if too tall
+  function addImagePaged(pdf, canvas, place, orient){
     const margin = 6;
-    const Pw = 297 - 2*margin;   // 285mm printable width
-    const Ph = 210 - 2*margin;   // 198mm printable height
+    const pageW = orient === 'landscape' ? 297 : 210;
+    const pageH = orient === 'landscape' ? 210 : 297;
+    const Pw = pageW - 2*margin, Ph = pageH - 2*margin;
     const Cw = canvas.width, Ch = canvas.height;
     if(!Cw || !Ch) return;
 
-    const fullH = Ch * (Pw / Cw);          // mm if placed at full width
+    const fullH = Ch * (Pw / Cw);
     if(fullH <= Ph){
-      place('landscape');
+      place(orient);
       pdf.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', margin, margin, Pw, fullH);
       return;
     }
-    const sliceHpx = Math.floor(Cw * (Ph / Pw));   // px tall per page
+    const sliceHpx = Math.floor(Cw * (Ph / Pw));
     for(let y = 0; y < Ch; y += sliceHpx){
       const h = Math.min(sliceHpx, Ch - y);
       const sc = document.createElement('canvas');
       sc.width = Cw; sc.height = h;
       sc.getContext('2d').drawImage(canvas, 0, y, Cw, h, 0, 0, Cw, h);
-      place('landscape');
+      place(orient);
       pdf.addImage(sc.toDataURL('image/jpeg', 0.92), 'JPEG', margin, margin, Pw, h * (Pw / Cw));
     }
   }
