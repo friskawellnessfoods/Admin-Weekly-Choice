@@ -117,8 +117,8 @@
 
   /* ---------- MISE LIST ---------- */
   .misesheet{ --msc:1; background:#fff; box-shadow:0 2px 10px rgba(0,0,0,.18); margin:0 auto; padding:18px;
-              width:560px; max-width:100%; box-sizing:border-box; }
-  table.mise{ border-collapse:collapse; width:100%; font-size:calc(13px * var(--msc)); color:#000; table-layout:fixed; }
+              width:760px; max-width:100%; box-sizing:border-box; }
+  table.mise{ border-collapse:collapse; width:100%; font-size:calc(15px * var(--msc)); color:#000; table-layout:fixed; }
   table.mise td{ border:1px solid #555; padding:3px 6px; text-align:center; white-space:nowrap;
                  overflow:hidden; text-overflow:ellipsis; height:calc(20px * var(--msc)); line-height:calc(14px * var(--msc)); box-sizing:border-box; }
   table.mise td.banner{ font-weight:700; border:none; padding:3px; height:auto; line-height:1.2; }
@@ -671,12 +671,13 @@
   function fitMiseSheet(sheet){
     // Portrait A4 printable ~198mm wide x 285mm tall. The sheet is placed across
     // the full printable width, so its height budget in its own px = width * (285/198).
-    const w = sheet.offsetWidth || 560;
+    const w = sheet.offsetWidth || 760;
     const TARGET = w * (285/198);
     let s = 1; sheet.style.setProperty('--msc', s);
     let guard = 0;
-    while(s > 0.5 && sheet.scrollHeight > TARGET && guard < 40){
-      s -= 0.03; sheet.style.setProperty('--msc', s.toFixed(3)); guard++;
+    // keep text readable — don't shrink below 0.82
+    while(s > 0.82 && sheet.scrollHeight > TARGET && guard < 40){
+      s -= 0.02; sheet.style.setProperty('--msc', s.toFixed(3)); guard++;
     }
   }
 
