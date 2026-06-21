@@ -307,6 +307,15 @@
     return m ? parseInt(m[0], 10) : 999;
   }
 
+  // "3 High Protein, 5 Low Carb" -> "High Protein, Low Carb"
+  function stripTypeNumbers(t){
+    return String(t || '')
+      .split(',')
+      .map(s => s.trim().replace(/^\d+\s*/, ''))
+      .filter(Boolean)
+      .join(', ');
+  }
+
   // Scale the table font so up to ~60 rows fit one landscape A4 page.
   // Landscape A4 printable height at 6mm margins ~= 285mm. We target that.
   function fitClientSheet(sheet, rowCount){
@@ -517,7 +526,7 @@
       sorted.forEach(it => {
         const tr = document.createElement('tr');
         const tdN = document.createElement('td'); tdN.textContent = it.name || ''; tr.appendChild(tdN);
-        const tdV = document.createElement('td'); tdV.textContent = it.val || ''; applyCell(tdV, it.val); tr.appendChild(tdV);
+        const tdV = document.createElement('td'); tdV.textContent = stripTypeNumbers(it.val); applyCell(tdV, it.val); tr.appendChild(tdV);
         table.appendChild(tr);
       });
     }
