@@ -115,6 +115,15 @@
   .midlbl{ font-weight:700; text-align:center; font-size:calc(16px * var(--mscale)); line-height:1.1; }
   .midnum{ font-weight:800; font-size:calc(40px * var(--mscale)); line-height:1; }
 
+  /* ---------- MISE LIST ---------- */
+  .misesheet{ --msc:1; background:#fff; box-shadow:0 2px 10px rgba(0,0,0,.18); margin:0 auto; padding:18px;
+              width:680px; max-width:100%; box-sizing:border-box; }
+  .misesheet h2{ text-align:center; font-size:17px; margin:2px 0 14px; }
+  table.mise{ border-collapse:collapse; width:100%; font-size:calc(13px * var(--msc)); color:#000; table-layout:fixed; }
+  table.mise td{ border:1px solid #999; padding:4px 8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  table.mise td.qty{ text-align:center; }
+  table.mise td.blank{ border-color:#ddd; }
+
   @media print{
     .bar, .tabs{ display:none; }
     .view:not(.active){ display:none; }
@@ -127,6 +136,7 @@
     .sheet{ box-shadow:none; padding:0; margin:0; overflow:visible; page:landscapeList; }
     .sheet h2{ margin:0 0 6px; }
     .mealsheet{ box-shadow:none; padding:0; margin:0; width:auto; page:portraitList; }
+    .misesheet{ box-shadow:none; padding:0; margin:0; width:auto; page:portraitList; }
     table.client{ -webkit-print-color-adjust:exact; print-color-adjust:exact; }
     table.client tr{ page-break-inside:avoid; }
     table.client thead{ display:table-header-group; }   /* repeat header on page 2+ */
@@ -157,6 +167,7 @@
     <button data-tab="tags" class="active">Tags</button>
     <button data-tab="client">Client List</button>
     <button data-tab="meal">Meal List</button>
+    <button data-tab="mise">Mise List</button>
   </div>
 
   <div id="view-tags" class="view active">
@@ -171,6 +182,10 @@
     <div id="mealWrap" class="listwrap"></div>
   </div>
 
+  <div id="view-mise" class="view">
+    <div id="miseWrap" class="listwrap"></div>
+  </div>
+
 <script>
   const API = (typeof API_URL !== 'undefined') ? API_URL : '';
 
@@ -179,13 +194,14 @@
   const pagesEl    = document.getElementById('pages');
   const clientWrap = document.getElementById('clientWrap');
   const mealWrap   = document.getElementById('mealWrap');
+  const miseWrap   = document.getElementById('miseWrap');
   const goBtn      = document.getElementById('go');
   const printBtn   = document.getElementById('print');
   const pdfBtn     = document.getElementById('pdf');
 
   let activeTab = 'tags';
-  const loadedView = { tags:false, client:false, meal:false };
-  let cache = { date:null, tags:null, client:null };  // raw data per date
+  const loadedView = { tags:false, client:false, meal:false, mise:false };
+  let cache = { date:null, tags:null, client:null, mise:null };  // raw data per date
 
   // ---- date input: click opens calendar, picking a date runs ----
   dateEl.addEventListener('click', () => { try{ dateEl.showPicker(); }catch(e){} });
@@ -203,7 +219,7 @@
     activeTab = tab;
     document.querySelectorAll('.tabs button').forEach(b =>
       b.classList.toggle('active', b.dataset.tab === tab));
-    ['tags','client','meal'].forEach(t =>
+    ['tags','client','meal','mise'].forEach(t =>
       document.getElementById('view-' + t).classList.toggle('active', t === tab));
     printBtn.disabled = !loadedView[tab];
     if(dateEl.value && !loadedView[tab]) load(tab);
@@ -217,9 +233,9 @@
   pdfBtn.addEventListener('click', downloadKitchenPdf);
 
   function invalidate(){
-    cache = { date:null, tags:null, client:null };
-    loadedView.tags = loadedView.client = loadedView.meal = false;
-    pagesEl.innerHTML = ''; clientWrap.innerHTML = ''; mealWrap.innerHTML = '';
+    cache = { date:null, tags:null, client:null, mise:null };
+    loadedView.tags = loadedView.client = loadedView.meal = loadedView.mise = false;
+    pagesEl.innerHTML = ''; clientWrap.innerHTML = ''; mealWrap.innerHTML = ''; miseWrap.innerHTML = '';
     printBtn.disabled = true;
   }
 
@@ -227,6 +243,17 @@
     if(tab === 'tags')    return loadTags();
     if(tab === 'client')  return loadClient();
     if(tab === 'meal')    return loadMeal();
+    if(tab === 'mise')    return loadMise();
+  }
+
+  // ---- mise fetch + cache (read-only values from the MiseList sheet) ----
+  async function ensureMise(date){
+    if(cache.mise && cache.date === date) return cache.mise;
+    const res = await fetch(API + '?action=getMiseListByDate&start=' + encodeURIComponent(date) + '&end=' + encodeURIComponent(date));
+    const data = await res.json();
+    if(!data.success) throw new Error(data.message || 'No mise data returned');
+    cache.date = date; cache.mise = data;
+    return cache.mise;
   }
 
   // ---- data fetch + cache ----
@@ -572,6 +599,73 @@
   }
 
   // ============================================================
+  //  MISE LIST  (read-only values from the MiseList sheet)
+  // ============================================================
+  async function loadMise(){
+    if(!guard()) return;
+    const date = dateEl.value;
+    busy('Loading mise list for ' + date + '…');
+    try{
+      const data = await ensureMise(date);
+      const tbl = (data.tables && data.tables[0]) ? data.tables[0] : null;
+      miseWrap.innerHTML = '';
+      if(!tbl){
+        miseWrap.innerHTML = '<div class="sheet"><p style="text-align:center;color:#777">No mise list found for ' + date + '.</p></div>';
+        loadedView.mise = true; done('No mise list for ' + date, 'mise'); return;
+      }
+      const sheet = buildMiseSheet(tbl, date);
+      miseWrap.appendChild(sheet);
+      fitMiseSheet(sheet);
+      loadedView.mise = true;
+      done('Mise list ready for ' + date, 'mise');
+    }catch(e){ fail(e); }
+  }
+
+  function buildMiseSheet(tbl, date){
+    const sheet = document.createElement('div'); sheet.className = 'misesheet';
+    const h = document.createElement('h2');
+    h.textContent = tbl.dateLabel || new Date(date + 'T00:00:00')
+      .toLocaleDateString(undefined, { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+    sheet.appendChild(h);
+
+    const table = document.createElement('table'); table.className = 'mise';
+
+    // trim trailing fully-empty rows so the grid hugs its content
+    const rows = tbl.table || [];
+    let lastUsed = -1;
+    rows.forEach((r, i) => {
+      if(r.some(c => String((c && c.val) || '').trim() !== '')) lastUsed = i;
+    });
+
+    for(let i = 0; i <= lastUsed; i++){
+      const r = rows[i] || [];
+      const tr = document.createElement('tr');
+      for(let c = 0; c < 4; c++){
+        const cell = r[c] || {};
+        const val = String(cell.val || '').trim();
+        const td = document.createElement('td');
+        td.textContent = val;
+        if(val === '') td.className = 'blank';
+        else if(/^[\d,.]+$/.test(val)) td.className = 'qty';   // numeric quantity → centered
+        tr.appendChild(td);
+      }
+      table.appendChild(tr);
+    }
+
+    sheet.appendChild(table);
+    return sheet;
+  }
+
+  function fitMiseSheet(sheet){
+    const TARGET = 1050;
+    let s = 1; sheet.style.setProperty('--msc', s);
+    let guard = 0;
+    while(s > 0.6 && sheet.scrollHeight > TARGET && guard < 30){
+      s -= 0.03; sheet.style.setProperty('--msc', s.toFixed(3)); guard++;
+    }
+  }
+
+  // ============================================================
   //  TAGS
   // ============================================================
   async function loadTags(){
@@ -739,6 +833,8 @@
 
     try{
       const [tags, rows] = await Promise.all([ ensureTags(date), ensureClient(date) ]);
+      let miseData = null;
+      try{ miseData = await ensureMise(date); }catch(e){ miseData = null; }  // mise optional
 
       // ---- render tag pages, snapshot each ----
       const tagCanvases = [];
@@ -773,6 +869,16 @@
       fitMealSheet(mealSheet);
       const mealCanvas = await html2canvas(mealSheet, { scale:2, useCORS:true, backgroundColor:'#ffffff' });
 
+      // ---- render mise list, snapshot (optional) ----
+      let miseCanvas = null;
+      const miseTbl = (miseData && miseData.tables && miseData.tables[0]) ? miseData.tables[0] : null;
+      if(miseTbl){
+        const miseSheet = buildMiseSheet(miseTbl, date);
+        stage.appendChild(miseSheet);
+        fitMiseSheet(miseSheet);
+        miseCanvas = await html2canvas(miseSheet, { scale:2, useCORS:true, backgroundColor:'#ffffff' });
+      }
+
       // ---- assemble PDF ----
       const { jsPDF } = window.jspdf;
       const firstOrient = tagCanvases.length ? 'portrait' : 'landscape';
@@ -792,7 +898,10 @@
       // meal list: portrait
       addImagePaged(pdf, mealCanvas, place, 'portrait');
 
-      // (mise / delivery / pause lists will be appended here next)
+      // mise list: portrait (if present)
+      if(miseCanvas) addImagePaged(pdf, miseCanvas, place, 'portrait');
+
+      // (delivery / pause lists will be appended here next)
 
       pdf.save('Kitchen_List_' + date + '.pdf');
       statusEl.textContent = 'Kitchen List PDF downloaded for ' + date + '.';
