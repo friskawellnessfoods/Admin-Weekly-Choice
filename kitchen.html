@@ -78,6 +78,7 @@
   table.client th, table.client td{ border:1px solid #999; padding:1px 5px; text-align:left; white-space:nowrap; }
   table.client th{ background:#f0f0f0; font-weight:700; text-align:center; }
   table.client td.num{ text-align:center; width:24px; color:#666; }
+  table.client tr.slotsep td{ border-top:2px solid #555; }
   table.client tr.totals td{ font-weight:700; border:none; border-top:2px solid #555; padding-top:3px; }
 
   /* ---------- MEAL LIST ---------- */
@@ -498,6 +499,7 @@
     let prevSlot = null, slotNum = 0;
     sorted.forEach((r) => {
       const tr = document.createElement('tr');
+      if(prevSlot !== null && r.slot !== prevSlot) tr.className = 'slotsep';  // line between slot groups
       if(r.slot !== prevSlot) slotNum = 0;   // restart numbering each slot
       prevSlot = r.slot;
       slotNum++;
