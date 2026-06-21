@@ -79,37 +79,40 @@
   table.client td.num{ text-align:center; width:24px; color:#666; }
 
   /* ---------- MEAL LIST ---------- */
-  .mealsheet{ --mscale:1; background:#fff; box-shadow:0 2px 10px rgba(0,0,0,.18); margin:0 auto; padding:14px; width:780px; max-width:100%; }
-  .mealsheet h2{ text-align:center; font-size:15px; margin:2px 0 10px; }
-  .mealgrid{ display:grid; grid-template-columns:repeat(4,1fr); gap:6px;
+  .mealsheet{ --mscale:1; background:#fff; box-shadow:0 2px 10px rgba(0,0,0,.18); margin:0 auto; padding:18px;
+              width:794px; max-width:100%; box-sizing:border-box; display:flex; flex-direction:column; }
+  .mealsheet h2{ text-align:center; font-size:17px; margin:2px 0 14px; }
+  .mealgrid{ flex:1; display:grid; grid-template-columns:repeat(4,1fr); gap:8px; min-height:980px;
+    grid-template-rows:1.7fr 1fr 1.1fr 0.7fr;
     grid-template-areas:
       "c1 v1 v2 c2"
       "s1 mid mid s2"
-      "e1 bs jj e2"; }
-  .mbox{ border:1px solid #555; background:#fff; display:flex; flex-direction:column; min-height:60px; }
-  .mbox .mh{ text-align:center; font-weight:700; padding:3px 2px; background:#b7b7b7; color:#000;
-             font-size:calc(12px * var(--mscale)); }
+      "e1 bf sn e2"
+      "j1 j1 j2 j2"; }
+  .mbox{ border:1px solid #555; background:#fff; display:flex; flex-direction:column; overflow:hidden; }
+  .mbox .mh{ text-align:center; font-weight:700; padding:4px 2px; background:#b7b7b7; color:#000;
+             font-size:calc(13px * var(--mscale)); }
   .mbox.veg .mh{ background:#93c47d; }
   .mbox .mh.dual{ display:flex; padding:0; }
-  .mbox .mh.dual span{ flex:1; padding:3px 2px; }
+  .mbox .mh.dual span{ flex:1; padding:4px 2px; }
   .mbox .mh.dual span:first-child{ border-right:1px solid #555; }
   .mbox .mb{ flex:1; }
-  .mbox table{ width:100%; border-collapse:collapse; font-size:calc(10px * var(--mscale)); color:#000; }
-  .mbox td{ border:1px solid #ccc; padding:1px 4px; white-space:nowrap; overflow:hidden; }
+  .mbox table{ width:100%; border-collapse:collapse; font-size:calc(11px * var(--mscale)); color:#000; }
+  .mbox td{ border:1px solid #ccc; padding:2px 5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:0; }
   .mbox table.dualt td{ width:50%; }
-  .mbox .mf{ display:flex; justify-content:space-between; background:#9fc5e8; color:#000;
-             font-weight:700; padding:3px 6px; font-size:calc(11px * var(--mscale)); }
-  .mbox .mf.dual span{ flex:1; text-align:center; }
+  .mbox .mf{ display:flex; justify-content:space-between; align-items:center; background:#9fc5e8; color:#000;
+             font-weight:700; padding:5px 8px; font-size:calc(15px * var(--mscale)); }
+  .mbox .mf .val{ font-size:calc(17px * var(--mscale)); }
+  .mbox .mf.dual span{ flex:1; text-align:center; font-size:calc(15px * var(--mscale)); }
   .mbox .mf.dual span:first-child{ border-right:1px solid #555; }
   .mbox.mid{ border:none; background:none; }
-  .midwrap{ display:flex; align-items:center; justify-content:center; height:100%; gap:0; }
-  .midcol{ border:1px solid #555; flex:1; height:100%; display:flex; flex-direction:column;
-           align-items:center; justify-content:center; padding:6px; }
-  .midlbl{ font-weight:700; text-align:center; font-size:calc(16px * var(--mscale)); line-height:1.1; }
-  .midnum{ font-weight:800; font-size:calc(46px * var(--mscale)); }
-  .midgrand{ border:1px solid #555; border-left:none; border-right:none; padding:2px 4px;
-             font-weight:700; font-size:calc(16px * var(--mscale)); align-self:stretch;
-             display:flex; align-items:center; }
+  .midwrap{ display:flex; align-items:stretch; justify-content:center; height:100%; gap:0; }
+  .midcol{ border:1px solid #555; flex:1; display:flex; flex-direction:column;
+           align-items:center; justify-content:center; padding:8px; gap:6px; }
+  .midlbl{ font-weight:700; text-align:center; font-size:calc(22px * var(--mscale)); line-height:1.1; }
+  .midnum{ font-weight:800; font-size:calc(64px * var(--mscale)); line-height:1; }
+  .midgrand{ border-top:1px solid #555; border-bottom:1px solid #555; padding:2px 6px;
+             font-weight:700; font-size:calc(20px * var(--mscale)); display:flex; align-items:center; }
 
   @media print{
     .bar, .tabs{ display:none; }
@@ -417,12 +420,14 @@
     rows.forEach(r => {
       const o1 = String(r.option1 || '').trim();
       const o2 = String(r.option2 || '').trim();
-      if(o1 && o1 !== 'N/A'){ const p = proteinOf(o1); (opt1[p] = opt1[p] || []).push({ name:r.name, type:r.type }); }
-      if(o2 && o2 !== 'N/A'){ const p = proteinOf(o2); (opt2[p] = opt2[p] || []).push({ name:r.name, type:r.type }); }
-      if(String(r.breakfast || '').trim() && r.breakfast !== 'N/A') breakfast.push(r.name);
-      if(String(r.snack     || '').trim() && r.snack     !== 'N/A') snack.push(r.name);
-      if(String(r.juice1    || '').trim() && r.juice1    !== 'N/A') juice1.push(r.name);
-      if(String(r.juice2    || '').trim() && r.juice2    !== 'N/A') juice2.push(r.name);
+      if(o1 && o1 !== 'N/A'){ const p = proteinOf(o1); (opt1[p] = opt1[p] || []).push({ name:r.name, val:r.type }); }
+      if(o2 && o2 !== 'N/A'){ const p = proteinOf(o2); (opt2[p] = opt2[p] || []).push({ name:r.name, val:r.type }); }
+      const bf = String(r.breakfast || '').trim();
+      const sn = String(r.snack     || '').trim();
+      if(bf && bf !== 'N/A') breakfast.push({ name:r.name, val:bf });   // Breakfast / Veg Breakfast
+      if(sn && sn !== 'N/A') snack.push({ name:r.name, val:sn });       // Snack / Veg Snack
+      if(String(r.juice1 || '').trim() && r.juice1 !== 'N/A') juice1.push(r.name);
+      if(String(r.juice2 || '').trim() && r.juice2 !== 'N/A') juice2.push(r.name);
     });
 
     return { opt1, opt2, breakfast, snack, juice1, juice2 };
@@ -443,31 +448,66 @@
     const grid = document.createElement('div'); grid.className = 'mealgrid';
     const place = (el, area) => { el.style.gridArea = area; grid.appendChild(el); };
 
-    place(buildBucket('Chicken 1', o1.Chicken, false), 'c1');
-    place(buildBucket('Veg 1',     o1.Veg,     true ), 'v1');
-    place(buildBucket('Veg 2',     o2.Veg,     true ), 'v2');
-    place(buildBucket('Chicken 2', o2.Chicken, false), 'c2');
-    place(buildBucket('Seafood 1', o1.Seafood, false), 's1');
+    place(buildBucket('Chicken 1', o1.Chicken, false, true), 'c1');
+    place(buildBucket('Veg 1',     o1.Veg,     true,  true), 'v1');
+    place(buildBucket('Veg 2',     o2.Veg,     true,  true), 'v2');
+    place(buildBucket('Chicken 2', o2.Chicken, false, true), 'c2');
+    place(buildBucket('Seafood 1', o1.Seafood, false, true), 's1');
     place(buildMiddle(opt1Total, opt2Total, opt1Total + opt2Total), 'mid');
-    place(buildBucket('Seafood 2', o2.Seafood, false), 's2');
-    place(buildBucket('Egg 1',     o1.Egg,     false), 'e1');
-    place(buildDual('Breakfast', data.breakfast || [], 'Snack',   data.snack  || []), 'bs');
-    place(buildDual('Juice 1',   data.juice1   || [], 'Juice 2', data.juice2 || []), 'jj');
-    place(buildBucket('Egg 2',     o2.Egg,     false), 'e2');
+    place(buildBucket('Seafood 2', o2.Seafood, false, true), 's2');
+    place(buildBucket('Egg 1',     o1.Egg,     false, true), 'e1');
+    place(buildBucket('Breakfast', data.breakfast || [], false, false), 'bf');
+    place(buildBucket('Snack',     data.snack     || [], false, false), 'sn');
+    place(buildBucket('Egg 2',     o2.Egg,     false, true), 'e2');
+    place(buildNameBox('Juice 1', data.juice1 || []), 'j1');
+    place(buildNameBox('Juice 2', data.juice2 || []), 'j2');
 
     sheet.appendChild(grid);
     return sheet;
   }
 
-  function buildBucket(title, items, isVeg){
+  // single-column Name box (used for juices)
+  function buildNameBox(title, names){
+    names = names || [];
+    const box = document.createElement('div'); box.className = 'mbox';
+    const head = document.createElement('div'); head.className = 'mh'; head.textContent = title; box.appendChild(head);
+
+    const body = document.createElement('div'); body.className = 'mb';
+    const table = document.createElement('table');
+    if(names.length === 0){
+      const tr = document.createElement('tr');
+      const td = document.createElement('td'); td.textContent = '#N/A'; td.style.color = '#999';
+      tr.appendChild(td); table.appendChild(tr);
+    } else {
+      names.forEach(nm => {
+        const tr = document.createElement('tr');
+        const td = document.createElement('td'); td.textContent = nm || '';
+        tr.appendChild(td); table.appendChild(tr);
+      });
+    }
+    body.appendChild(table); box.appendChild(body);
+
+    const f = document.createElement('div'); f.className = 'mf';
+    const lbl = document.createElement('span'); lbl.textContent = 'Total';
+    const val = document.createElement('span'); val.className = 'val'; val.textContent = names.length;
+    f.appendChild(lbl); f.appendChild(val); box.appendChild(f);
+    return box;
+  }
+
+  // Name | Value bucket box. sortNum=true sorts by leading number in the value
+  // (meal type); sortNum=false sorts by the value text (breakfast/snack option).
+  function buildBucket(title, items, isVeg, sortNum){
     items = items || [];
     const box = document.createElement('div'); box.className = 'mbox' + (isVeg ? ' veg' : '');
     const head = document.createElement('div'); head.className = 'mh'; head.textContent = title; box.appendChild(head);
 
     const body = document.createElement('div'); body.className = 'mb';
     const table = document.createElement('table');
-    const sorted = items.map((it,i) => ({ ...it, _i:i }))
-      .sort((a,b) => (typeNum(a.type) - typeNum(b.type)) || (a._i - b._i));
+    const sorted = items.map((it,i) => ({ ...it, _i:i })).sort((a,b) =>
+      sortNum
+        ? ((typeNum(a.val) - typeNum(b.val)) || (a._i - b._i))
+        : (String(a.val).localeCompare(String(b.val)) || (a._i - b._i))
+    );
     if(sorted.length === 0){
       const tr = document.createElement('tr');
       const td = document.createElement('td'); td.colSpan = 2; td.textContent = '#N/A'; td.style.color = '#999';
@@ -476,7 +516,7 @@
       sorted.forEach(it => {
         const tr = document.createElement('tr');
         const tdN = document.createElement('td'); tdN.textContent = it.name || ''; tr.appendChild(tdN);
-        const tdT = document.createElement('td'); tdT.textContent = it.type || ''; applyCell(tdT, it.type); tr.appendChild(tdT);
+        const tdV = document.createElement('td'); tdV.textContent = it.val || ''; applyCell(tdV, it.val); tr.appendChild(tdV);
         table.appendChild(tr);
       });
     }
@@ -484,33 +524,8 @@
 
     const f = document.createElement('div'); f.className = 'mf';
     const lbl = document.createElement('span'); lbl.textContent = 'Total';
-    const val = document.createElement('span'); val.textContent = items.length;
+    const val = document.createElement('span'); val.className = 'val'; val.textContent = items.length;
     f.appendChild(lbl); f.appendChild(val); box.appendChild(f);
-    return box;
-  }
-
-  function buildDual(t1, list1, t2, list2){
-    const box = document.createElement('div'); box.className = 'mbox';
-    const head = document.createElement('div'); head.className = 'mh dual';
-    const h1 = document.createElement('span'); h1.textContent = t1;
-    const h2 = document.createElement('span'); h2.textContent = t2;
-    head.appendChild(h1); head.appendChild(h2); box.appendChild(head);
-
-    const body = document.createElement('div'); body.className = 'mb';
-    const table = document.createElement('table'); table.className = 'dualt';
-    const n = Math.max(list1.length, list2.length);
-    for(let i=0; i<n; i++){
-      const tr = document.createElement('tr');
-      const td1 = document.createElement('td'); td1.textContent = list1[i] || ''; tr.appendChild(td1);
-      const td2 = document.createElement('td'); td2.textContent = list2[i] || ''; tr.appendChild(td2);
-      table.appendChild(tr);
-    }
-    body.appendChild(table); box.appendChild(body);
-
-    const f = document.createElement('div'); f.className = 'mf dual';
-    const v1 = document.createElement('span'); v1.textContent = list1.length;
-    const v2 = document.createElement('span'); v2.textContent = list2.length;
-    f.appendChild(v1); f.appendChild(v2); box.appendChild(f);
     return box;
   }
 
@@ -525,11 +540,12 @@
     return box;
   }
 
-  // shrink meal grid to fit one portrait page
+  // scale meal grid to fill — but not overflow — one portrait page
   function fitMealSheet(sheet){
-    const TARGET = 1040;   // portrait A4 printable height ~ px at 96dpi
+    const TARGET = 1050;   // portrait A4 printable height ~ px at 96dpi
     let s = 1; sheet.style.setProperty('--mscale', s);
     let guard = 0;
+    // shrink only if a dense day pushes past the page
     while(s > 0.5 && sheet.scrollHeight > TARGET && guard < 40){
       s -= 0.03; sheet.style.setProperty('--mscale', s.toFixed(3)); guard++;
     }
