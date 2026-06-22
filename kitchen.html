@@ -256,9 +256,9 @@
   table.pause tr.subhead td{ background:#eceff1; font-weight:700; text-align:center; }
 
   /* ---------- MEAL OVERVIEW ---------- */
-  .ovsheet{ background:#fff; box-shadow:0 2px 10px rgba(0,0,0,.18); margin:0 auto; padding:20px; max-width:920px; }
+  .ovsheet{ background:#fff; box-shadow:0 2px 10px rgba(0,0,0,.18); margin:0 auto; padding:20px; width:680px; max-width:100%; box-sizing:border-box; }
   .ovsheet h2{ text-align:center; font-size:17px; margin:0 0 16px; }
-  .ovgrid{ display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:16px; align-items:start; }
+  .ovgrid{ display:grid; grid-template-columns:1fr 1fr; gap:16px; align-items:start; }
   table.ov{ border-collapse:collapse; width:100%; font-size:14px; color:#000; }
   table.ov th, table.ov td{ border:1px solid #cfd8dc; padding:6px 10px; text-align:center; }
   table.ov th.cap{ background:linear-gradient(90deg,var(--grad-a),var(--grad-b)); color:#fff; font-size:14px; }
@@ -302,6 +302,7 @@
     .misesheet{ box-shadow:none; padding:0; margin:0; width:auto; page:portraitList; }
     .delsheet{ box-shadow:none; padding:0; margin:0; page:portraitList; }
     .pausesheet{ box-shadow:none; padding:0; margin:0; width:auto; page:portraitList; }
+    .ovsheet{ box-shadow:none; padding:0; margin:0; width:auto; page:portraitList; }
     .pause-toggle{ display:none; }
     table.client{ -webkit-print-color-adjust:exact; print-color-adjust:exact; }
     table.client tr{ page-break-inside:avoid; }
@@ -350,9 +351,9 @@
   <div class="tabs">
     <button data-tab="client" class="active"><input type="checkbox" class="tabchk" data-sec="client" checked onclick="event.stopPropagation()">Client List</button>
     <button data-tab="meal"><input type="checkbox" class="tabchk" data-sec="meal" checked onclick="event.stopPropagation()">Meal List</button>
-    <button data-tab="overview"><input type="checkbox" class="tabchk" data-sec="overview" checked onclick="event.stopPropagation()">Meal Overview</button>
     <button data-tab="mise"><input type="checkbox" class="tabchk" data-sec="mise" checked onclick="event.stopPropagation()">Mise List</button>
     <button data-tab="delivery"><input type="checkbox" class="tabchk" data-sec="delivery" checked onclick="event.stopPropagation()">Delivery List</button>
+    <button data-tab="overview"><input type="checkbox" class="tabchk" data-sec="overview" checked onclick="event.stopPropagation()">Meal Overview</button>
     <button data-tab="pause"><input type="checkbox" class="tabchk" data-sec="pause" checked onclick="event.stopPropagation()">Pause List</button>
     <button data-tab="tags"><input type="checkbox" class="tabchk" data-sec="tags" checked onclick="event.stopPropagation()">Tags</button>
   </div>
@@ -1504,11 +1505,12 @@
       const needTags   = sectionOn('tags');
       const needClient = sectionOn('client');
       const needMeal   = sectionOn('meal');
+      const needOverview = sectionOn('overview');
       const needMise   = sectionOn('mise');
       const needDel    = sectionOn('delivery');
       const needPause  = sectionOn('pause');
 
-      if(!(needTags || needClient || needMeal || needMise || needDel || needPause)){
+      if(!(needTags || needClient || needMeal || needOverview || needMise || needDel || needPause)){
         setStatus('Tick at least one list to include in the PDF.', false);
         stage.remove(); goBtn.disabled = false; pdfBtn.disabled = false; hideOverlay();
         return;
@@ -1516,7 +1518,7 @@
 
       setOverlay('Fetching data…');
       const tags = needTags ? await ensureTags(date) : [];
-      const rows = (needClient || needMeal) ? await ensureClient(date) : [];
+      const rows = (needClient || needMeal || needOverview) ? await ensureClient(date) : [];
 
       let miseData = null;
       if(needMise){ try{ miseData = await ensureMise(date); }catch(e){ miseData = null; } }
@@ -1589,6 +1591,16 @@
         deliveryCanvas = await html2canvas(delSheet, { scale:PDF_SCALE, useCORS:true, backgroundColor:'#ffffff' });
       }
 
+      // ---- render meal overview, snapshot (optional) ----
+      let overviewCanvas = null;
+      if(needOverview && rows.length){
+        setOverlay('Rendering meal overview…');
+        const ovSheet = buildOverviewSheet(computeMealCounts(rows), date);
+        ovSheet.style.padding = '0'; ovSheet.style.boxShadow = 'none'; ovSheet.style.width = '680px';
+        stage.appendChild(ovSheet);
+        overviewCanvas = await html2canvas(ovSheet, { scale:PDF_SCALE, useCORS:true, backgroundColor:'#ffffff' });
+      }
+
       // ---- render pause list, snapshot (optional; respects the inactive toggle) ----
       let pauseCanvas = null;
       if(needPause && pauseData && ((pauseData.paused && pauseData.paused.length) || (showInactive && pauseData.pausedInactive && pauseData.pausedInactive.length))){
@@ -1629,6 +1641,9 @@
 
       // delivery list: portrait (if present)
       if(deliveryCanvas) addImagePaged(pdf, deliveryCanvas, place, 'portrait');
+
+      // meal overview: portrait (if present)
+      if(overviewCanvas) addImagePaged(pdf, overviewCanvas, place, 'portrait');
 
       // pause list: portrait (if present)
       if(pauseCanvas) addImagePaged(pdf, pauseCanvas, place, 'portrait');
