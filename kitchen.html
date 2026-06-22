@@ -50,6 +50,7 @@
     border-bottom:0;
   }
   body.landing .tabs, body.landing .view{ display:none; }
+  body.landing #print, body.landing #pdf{ display:none; }   /* only show after Generate */
 
   body.working .bar{
     position:sticky; top:0; z-index:10; flex-direction:row; min-height:auto;
@@ -1353,7 +1354,7 @@
       // tags: full-bleed portrait A4
       for(const c of tagCanvases){
         place('portrait');
-        pdf.addImage(c.toDataURL('image/png'), 'PNG', 0, 0, 210, 297);
+        pdf.addImage(c.toDataURL('image/jpeg', 0.96), 'JPEG', 0, 0, 210, 297);
       }
 
       // client list: landscape, sliced across pages if taller than one page
@@ -1394,7 +1395,7 @@
     const fullH = Ch * (Pw / Cw);
     if(fullH <= Ph){
       place(orient);
-      pdf.addImage(canvas.toDataURL('image/png'), 'PNG', margin, margin, Pw, fullH);
+      pdf.addImage(canvas.toDataURL('image/jpeg', 0.96), 'JPEG', margin, margin, Pw, fullH);
       return;
     }
     const sliceHpx = Math.floor(Cw * (Ph / Pw));
@@ -1406,7 +1407,7 @@
       sctx.fillStyle = '#ffffff'; sctx.fillRect(0, 0, Cw, h);
       sctx.drawImage(canvas, 0, y, Cw, h, 0, 0, Cw, h);
       place(orient);
-      pdf.addImage(sc.toDataURL('image/png'), 'PNG', margin, margin, Pw, h * (Pw / Cw));
+      pdf.addImage(sc.toDataURL('image/jpeg', 0.96), 'JPEG', margin, margin, Pw, h * (Pw / Cw));
     }
   }
 
