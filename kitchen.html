@@ -236,7 +236,8 @@
   table.delivery col.c-loc{ width:44%; }
   table.delivery col.c-slot{ width:14%; }
   table.delivery col.c-route{ width:14%; }
-  table.delivery tr.slotsep td{ border-top:2px solid #555; }
+  table.delivery tr.slotsep td{ border-top:3px solid #222; }
+  table.delivery tr.routesep td{ border-top:2px solid #777; }
 
   /* ---------- PAUSE LIST ---------- */
   .pausesheet{ background:#fff; box-shadow:0 2px 10px rgba(0,0,0,.18); margin:0 auto; padding:18px;
@@ -329,19 +330,19 @@
   </div>
 
   <div class="tabs">
-    <button data-tab="tags" class="active"><input type="checkbox" class="tabchk" data-sec="tags" checked onclick="event.stopPropagation()">Tags</button>
-    <button data-tab="client"><input type="checkbox" class="tabchk" data-sec="client" checked onclick="event.stopPropagation()">Client List</button>
+    <button data-tab="client" class="active"><input type="checkbox" class="tabchk" data-sec="client" checked onclick="event.stopPropagation()">Client List</button>
     <button data-tab="meal"><input type="checkbox" class="tabchk" data-sec="meal" checked onclick="event.stopPropagation()">Meal List</button>
     <button data-tab="mise"><input type="checkbox" class="tabchk" data-sec="mise" checked onclick="event.stopPropagation()">Mise List</button>
     <button data-tab="delivery"><input type="checkbox" class="tabchk" data-sec="delivery" checked onclick="event.stopPropagation()">Delivery List</button>
     <button data-tab="pause"><input type="checkbox" class="tabchk" data-sec="pause" checked onclick="event.stopPropagation()">Pause List</button>
+    <button data-tab="tags"><input type="checkbox" class="tabchk" data-sec="tags" checked onclick="event.stopPropagation()">Tags</button>
   </div>
 
-  <div id="view-tags" class="view active">
+  <div id="view-tags" class="view">
     <div id="pages" class="pages"></div>
   </div>
 
-  <div id="view-client" class="view">
+  <div id="view-client" class="view active">
     <div id="clientWrap" class="listwrap"></div>
   </div>
 
@@ -384,7 +385,7 @@
   const overlayTimer = document.getElementById('overlayTimer');
   let overlayTick = null;
 
-  let activeTab = 'tags';
+  let activeTab = 'client';
   const loadedView = { tags:false, client:false, meal:false, mise:false, delivery:false, pause:false };
   let cache = { date:null, tags:null, client:null, mise:null, delivery:null, pause:null };  // raw data per date
   let showInactive = false;   // pause-list toggle
@@ -437,7 +438,7 @@
   }
 
   // ---- Generate: the single explicit trigger ----
-  goBtn.addEventListener('click', () => {
+  goBtn.addEventListener('click', async () => {
     if(!dateEl.value){ setStatus('Pick a date first.', false); return; }
     // shift from landing hero to working layout on first generate
     if(!hasGenerated){
@@ -446,9 +447,34 @@
       document.body.classList.add('working');
     }
     loadedView[activeTab] = false;
-    load(activeTab);
+    await load(activeTab);          // render the visible tab first
+    preloadData();                  // then warm the rest in the background
   });
   pdfBtn.addEventListener('click', downloadKitchenPdf);
+
+  // Prefetch every list's DATA in tab order so switching tabs and building the
+  // PDF are instant. Data only (no render) — rendering needs a visible layout,
+  // and the slow part is the network fetch, which this removes from the path.
+  let preloading = false;
+  async function preloadData(){
+    if(preloading) return;
+    preloading = true;
+    const date = dateEl.value;
+    const tasks = [
+      () => ensureClient(date),
+      () => ensureMise(date),
+      () => ensureDelivery(date),
+      () => ensurePause(date),
+      () => ensureTags(date),
+    ];
+    setStatus('Preparing all lists in background…', true);
+    for(const fn of tasks){
+      if(dateEl.value !== date) break;   // date changed mid-preload → stop
+      try{ await fn(); }catch(e){ /* optional lists may be absent */ }
+    }
+    preloading = false;
+    if(dateEl.value === date) setStatus('All lists ready for ' + date + '. Open any tab or download the PDF.', false);
+  }
 
   function invalidate(){
     cache = { date:null, tags:null, client:null, mise:null, delivery:null, pause:null };
@@ -1021,17 +1047,20 @@
     thead.appendChild(htr); table.appendChild(thead);
 
     const tbody = document.createElement('tbody');
-    let prevSlot = null;
-    let slotNum = 0;
+    let prevSlot = null, prevRoute = null, groupNum = 0;
     sorted.forEach((r) => {
       const tr = document.createElement('tr');
-      if(prevSlot !== null && r.slot !== prevSlot) tr.className = 'slotsep';  // line between slot groups
-      if(r.slot !== prevSlot) slotNum = 0;   // restart numbering each slot
-      prevSlot = r.slot;
-      slotNum++;
+      const slotChanged  = prevSlot  !== null && r.slot  !== prevSlot;
+      const routeChanged = prevRoute !== null && String(r.route) !== prevRoute;
+      // new group whenever slot OR route changes -> heavy line + restart numbering
+      if(slotChanged) tr.className = 'slotsep';
+      else if(routeChanged) tr.className = 'routesep';
+      if(slotChanged || routeChanged || prevSlot === null) groupNum = 0;
+      prevSlot = r.slot; prevRoute = String(r.route);
+      groupNum++;
       cols.forEach(c => {
         const td = document.createElement('td');
-        if(c.key === '_num'){ td.className = 'num'; td.textContent = slotNum; }
+        if(c.key === '_num'){ td.className = 'num'; td.textContent = groupNum; }
         else {
           td.textContent = r[c.key] || '';
           if(c.key === 'location') td.className = 'loc';
