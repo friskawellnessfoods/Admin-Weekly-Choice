@@ -14,29 +14,122 @@
     --tag-border-color: #222;
     --pad-x: 9mm;
     --pad-y: 8mm;
+
+    /* modern palette */
+    --c-bg:        #eef2f6;
+    --c-surface:   #ffffff;
+    --c-ink:       #1f2a37;
+    --c-muted:     #5b6b7b;
+    --c-line:      #d7e0ea;
+    --grad-a:      #0ea5a3;   /* teal */
+    --grad-b:      #2563eb;   /* blue */
+    --c-accent:    #f6b100;   /* bright yellow accent */
+    --c-accent-ink:#3a2e00;
+    --c-primary:   #0ea5a3;
+    --c-primary-d: #0b8482;
+    --radius:      12px;
+    --shadow:      0 6px 24px rgba(20,40,70,.10);
   }
   /* ===================== */
 
   * { box-sizing: border-box; }
-  body{ font-family: Arial, Helvetica, sans-serif; margin:0; background:#eceff1; color:#263238; }
+  body{ font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+        margin:0; background:var(--c-bg); color:var(--c-ink); -webkit-text-size-adjust:100%; }
 
-  .bar{ position:sticky; top:0; z-index:10; background:#fff; border-bottom:1px solid #cfd8dc;
-        padding:12px 16px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
-  .bar .brand{ display:flex; align-items:center; gap:10px; }
-  .bar .brand img{ height:34px; width:auto; }
-  .bar .brand span{ font-size:15px; font-weight:700; color:#2e7d32; }
-  .bar input[type=date]{ padding:8px; border:1px solid #b0bec5; border-radius:6px; font-size:14px; cursor:pointer; }
-  .bar button{ padding:9px 16px; border:0; border-radius:6px; font-size:14px; cursor:pointer; color:#fff; background:#2e7d32; }
-  .bar button.alt{ background:#455a64; }
-  .bar button:disabled{ opacity:.5; cursor:default; }
-  .status{ font-size:13px; color:#546e7a; margin-left:auto; }
+  /* ===== LANDING (hero) vs WORKING states ===== */
+  /* landing: controls centered on screen; working: compact sticky top bar */
+  .bar{ background:var(--c-surface); }
 
-  .tabs{ position:sticky; top:59px; z-index:9; background:#fff; border-bottom:1px solid #cfd8dc;
-         padding:0 16px; display:flex; gap:4px; }
-  .tabs button{ border:0; background:none; padding:11px 18px; font-size:14px; cursor:pointer;
-                color:#546e7a; border-bottom:3px solid transparent; }
-  .tabs button.active{ color:#2e7d32; border-bottom-color:#2e7d32; font-weight:700; }
-  .tabs .tabchk{ margin-right:7px; vertical-align:middle; width:15px; height:15px; cursor:pointer; }
+  body.landing .bar{
+    position:static; min-height:100vh; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:18px; padding:32px 20px;
+    background:
+      radial-gradient(1200px 500px at 50% -10%, rgba(37,99,235,.10), transparent 60%),
+      radial-gradient(900px 500px at 50% 110%, rgba(14,165,163,.12), transparent 60%),
+      var(--c-bg);
+    border-bottom:0;
+  }
+  body.landing .tabs, body.landing .view{ display:none; }
+
+  body.working .bar{
+    position:sticky; top:0; z-index:10; flex-direction:row; min-height:auto;
+    padding:10px 16px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;
+    justify-content:flex-start; background:var(--c-surface);
+    border-bottom:1px solid var(--c-line); box-shadow:0 1px 0 rgba(0,0,0,.02);
+  }
+
+  /* brand */
+  .bar .brand{ display:flex; align-items:center; gap:12px; }
+  .bar .brand img{ height:36px; width:auto; }
+  .bar .brand span{ font-size:16px; font-weight:800; letter-spacing:.2px;
+    background:linear-gradient(90deg,var(--grad-a),var(--grad-b));
+    -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
+  body.landing .brand img{ height:64px; }
+  body.landing .brand span{ font-size:26px; }
+  body.landing .brand{ flex-direction:column; gap:10px; margin-bottom:4px; }
+
+  /* hero subtitle only on landing */
+  .hero-sub{ display:none; }
+  body.landing .hero-sub{ display:block; color:var(--c-muted); font-size:14px; margin-top:-6px; text-align:center; }
+
+  /* controls cluster */
+  .controls{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; justify-content:center; }
+  body.landing .controls{ flex-direction:column; width:100%; max-width:340px; }
+  body.landing .controls > *{ width:100%; }
+  body.landing .controls .field{ width:100%; }
+
+  .field{ position:relative; display:flex; align-items:center; }
+  .field input[type=date]{
+    padding:12px 14px; border:1.5px solid var(--c-line); border-radius:var(--radius);
+    font-size:15px; cursor:pointer; background:var(--c-surface); color:var(--c-ink);
+    width:100%; transition:border-color .15s, box-shadow .15s; }
+  .field input[type=date]:focus{ outline:none; border-color:var(--c-primary);
+    box-shadow:0 0 0 3px rgba(14,165,163,.16); }
+
+  .btn{ padding:12px 18px; border:0; border-radius:var(--radius); font-size:15px; font-weight:700;
+        cursor:pointer; color:#fff; transition:transform .08s, filter .15s, box-shadow .15s;
+        background:linear-gradient(90deg,var(--grad-a),var(--grad-b)); box-shadow:0 4px 14px rgba(37,99,235,.25); }
+  .btn:hover:not(:disabled){ filter:brightness(1.05); }
+  .btn:active:not(:disabled){ transform:translateY(1px); }
+  .btn.alt{ background:var(--c-surface); color:var(--c-primary-d); border:1.5px solid var(--c-line);
+            box-shadow:none; }
+  .btn.alt:hover:not(:disabled){ border-color:var(--c-primary); }
+  .btn:disabled{ opacity:.45; cursor:default; box-shadow:none; }
+  body.landing .btn{ padding:14px 18px; font-size:16px; }
+
+  /* status + spinner */
+  .status{ font-size:13px; color:var(--c-muted); display:inline-flex; align-items:center; gap:8px; }
+  body.working .status{ margin-left:auto; }
+  body.landing .status{ margin-top:4px; }
+  .spinner{ width:15px; height:15px; border:2.5px solid var(--c-line); border-top-color:var(--c-primary);
+            border-radius:50%; animation:spin .7s linear infinite; display:none; flex:0 0 auto; }
+  .status.busy .spinner{ display:inline-block; }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+
+  /* loading overlay for PDF build */
+  .overlay{ position:fixed; inset:0; z-index:9999; display:none; align-items:center; justify-content:center;
+            background:rgba(20,30,45,.42); backdrop-filter:blur(2px); }
+  .overlay.show{ display:flex; }
+  .overlay .card{ background:var(--c-surface); border-radius:16px; padding:26px 30px; text-align:center;
+                  box-shadow:var(--shadow); min-width:240px; }
+  .overlay .ring{ width:46px; height:46px; border:4px solid var(--c-line); border-top-color:var(--c-primary);
+                  border-radius:50%; animation:spin .7s linear infinite; margin:0 auto 14px; }
+  .overlay .msg{ font-size:14px; color:var(--c-ink); font-weight:600; }
+
+  .tabs{ position:sticky; top:57px; z-index:9; background:var(--c-surface); border-bottom:1px solid var(--c-line);
+         padding:8px 12px; display:flex; gap:6px; overflow-x:auto; -webkit-overflow-scrolling:touch;
+         scrollbar-width:thin; }
+  .tabs::-webkit-scrollbar{ height:5px; }
+  .tabs::-webkit-scrollbar-thumb{ background:var(--c-line); border-radius:3px; }
+  .tabs button{ border:1.5px solid transparent; background:#f1f5f9; padding:9px 14px; font-size:13.5px;
+                cursor:pointer; color:var(--c-muted); border-radius:999px; white-space:nowrap; flex:0 0 auto;
+                display:inline-flex; align-items:center; transition:background .15s, color .15s, border-color .15s; }
+  .tabs button:hover{ background:#e6edf5; }
+  .tabs button.active{ color:#fff; font-weight:700;
+    background:linear-gradient(90deg,var(--grad-a),var(--grad-b)); border-color:transparent; }
+  .tabs .tabchk{ margin-right:7px; vertical-align:middle; width:15px; height:15px; cursor:pointer;
+                 accent-color:var(--c-primary); flex:0 0 auto; }
+  .tabs button.active .tabchk{ accent-color:#fff; }
 
   .view{ display:none; }
   .view.active{ display:block; }
@@ -71,7 +164,8 @@
   .cb-slot{ font-weight:600; font-size:.95em; margin-top:.15em; text-transform:uppercase; letter-spacing:.5px; }
 
   /* ---------- LISTS (client etc.) ---------- */
-  .listwrap{ padding:18px; }
+  .listwrap{ padding:18px; overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  .pages{ overflow-x:auto; -webkit-overflow-scrolling:touch; }
   .sheet{ background:#fff; box-shadow:0 2px 10px rgba(0,0,0,.18); margin:0 auto; padding:14px; overflow-x:auto; }
   .sheet h2{ text-align:center; font-size:14px; margin:0 0 4px; }
   table.client{ border-collapse:collapse; width:100%; font-size:11px; color:#000; line-height:1.1; }
@@ -147,6 +241,22 @@
   table.pause td.num{ text-align:center; width:36px; color:#666; }
   table.pause tr.subhead td{ background:#eceff1; font-weight:700; text-align:center; }
 
+  /* ===== MOBILE (screen only — never affects print or the off-screen PDF staging) ===== */
+  @media screen and (max-width:640px){
+    body.working .bar{ padding:8px 10px; gap:8px; }
+    .bar .brand span{ font-size:14px; }
+    .bar .brand img{ height:30px; }
+    .controls{ width:100%; gap:8px; }
+    .controls .field{ flex:1 1 auto; }
+    .btn{ padding:11px 14px; font-size:14px; }
+    #pdf{ flex:1 1 100%; }                 /* full-width download on small screens */
+    .status{ width:100%; margin:2px 0 0; }
+    body.working .status{ margin-left:0; }
+    .tabs{ top:auto; position:sticky; }
+    .listwrap{ padding:12px; }
+    body.landing .controls{ max-width:300px; }
+  }
+
   @media print{
     .bar, .tabs{ display:none; }
     .view:not(.active){ display:none; }
@@ -177,18 +287,31 @@
   @page portraitList{ size:A4 portrait; margin:8mm; }
 </style>
 </head>
-<body>
+<body class="landing">
 
   <div class="bar">
     <div class="brand">
       <img src="logo.png" alt="Friska Wellness Foods">
       <span>Kitchen List</span>
     </div>
-    <input type="date" id="date">
-    <button id="go">Generate</button>
-    <button id="print" class="alt" disabled>Print</button>
-    <button id="pdf" class="alt" disabled>Download Kitchen List PDF</button>
-    <span class="status" id="status">Pick a date to begin.</span>
+    <div class="hero-sub">Pick a date and generate the day's kitchen lists.</div>
+
+    <div class="controls">
+      <div class="field">
+        <input type="date" id="date">
+      </div>
+      <button id="go" class="btn">Generate</button>
+      <button id="print" class="btn alt" disabled>Print</button>
+      <button id="pdf" class="btn alt" disabled>Download Kitchen List PDF</button>
+      <span class="status" id="status"><span class="spinner"></span><span id="statusText">Pick a date to begin.</span></span>
+    </div>
+  </div>
+
+  <div class="overlay" id="overlay">
+    <div class="card">
+      <div class="ring"></div>
+      <div class="msg" id="overlayMsg">Working…</div>
+    </div>
   </div>
 
   <div class="tabs">
@@ -227,6 +350,9 @@
 <script>
   const API = (typeof API_URL !== 'undefined') ? API_URL : '';
 
+  // PDF snapshot scale — higher = sharper print + bigger file + slower render
+  const PDF_SCALE = 3;
+
   const dateEl     = document.getElementById('date');
   const statusEl   = document.getElementById('status');
   const pagesEl    = document.getElementById('pages');
@@ -238,11 +364,24 @@
   const goBtn      = document.getElementById('go');
   const printBtn   = document.getElementById('print');
   const pdfBtn     = document.getElementById('pdf');
+  const statusText = document.getElementById('statusText');
+  const overlay    = document.getElementById('overlay');
+  const overlayMsg = document.getElementById('overlayMsg');
 
   let activeTab = 'tags';
   const loadedView = { tags:false, client:false, meal:false, mise:false, delivery:false, pause:false };
   let cache = { date:null, tags:null, client:null, mise:null, delivery:null, pause:null };  // raw data per date
   let showInactive = false;   // pause-list toggle
+  let hasGenerated = false;   // becomes true after first Generate (controls landing→working)
+
+  // ---- status helpers (preserve the spinner span; only swap the text) ----
+  function setStatus(msg, busyState){
+    if(statusText) statusText.textContent = msg;
+    if(statusEl) statusEl.classList.toggle('busy', !!busyState);
+  }
+  function showOverlay(msg){ if(overlayMsg) overlayMsg.textContent = msg || 'Working…'; overlay.classList.add('show'); }
+  function setOverlay(msg){ if(overlayMsg) overlayMsg.textContent = msg; }
+  function hideOverlay(){ overlay.classList.remove('show'); }
 
   // which sections are ticked for the Kitchen List PDF
   function sectionOn(sec){
@@ -250,12 +389,12 @@
     return cb ? cb.checked : true;
   }
 
-  // ---- date input: click opens calendar, picking a date runs ----
+  // ---- date input: click opens native calendar; picking a date does NOT auto-run ----
   dateEl.addEventListener('click', () => { try{ dateEl.showPicker(); }catch(e){} });
   dateEl.addEventListener('change', () => {
     invalidate();
     pdfBtn.disabled = !dateEl.value;
-    if(dateEl.value) load(activeTab);
+    setStatus(dateEl.value ? 'Press Generate to build the lists.' : 'Pick a date to begin.', false);
   });
 
   // ---- tabs ----
@@ -269,12 +408,20 @@
     ['tags','client','meal','mise','delivery','pause'].forEach(t =>
       document.getElementById('view-' + t).classList.toggle('active', t === tab));
     printBtn.disabled = !loadedView[tab];
-    if(dateEl.value && !loadedView[tab]) load(tab);
+    if(hasGenerated && dateEl.value && !loadedView[tab]) load(tab);
   }
 
+  // ---- Generate: the single explicit trigger ----
   goBtn.addEventListener('click', () => {
-    if(!dateEl.value){ statusEl.textContent = 'Pick a date first.'; return; }
-    loadedView[activeTab] = false; load(activeTab);
+    if(!dateEl.value){ setStatus('Pick a date first.', false); return; }
+    // shift from landing hero to working layout on first generate
+    if(!hasGenerated){
+      hasGenerated = true;
+      document.body.classList.remove('landing');
+      document.body.classList.add('working');
+    }
+    loadedView[activeTab] = false;
+    load(activeTab);
   });
   printBtn.addEventListener('click', () => window.print());
   pdfBtn.addEventListener('click', downloadKitchenPdf);
@@ -359,7 +506,7 @@
     { test: t => t.includes('high protein'),  color: '#cc4125' },
     { test: t => t.includes('no carb'),       color: '#3d85c6' },
     { test: t => t.includes('allergies'),     color: '#595959' },
-    { test: t => t.includes('evening'),       color: '#C0C0C0' },
+    { test: t => t.includes('evening'),       color: '#ffff00' },
     { test: t => t.includes('high carb'),     color: '#cfe2f3' },
     { test: t => t.includes('low carb'),      color: '#6d9eeb' },
     { test: t => t.includes('multi'),         color: '#434343' },
@@ -1080,11 +1227,12 @@
   async function downloadKitchenPdf(){
     if(!guard()) return;
     if(!window.jspdf || !window.html2canvas){
-      statusEl.textContent = 'PDF libraries not loaded — check your connection.';
+      setStatus('PDF libraries not loaded — check your connection.', false);
       return;
     }
     const date = dateEl.value;
     pdfBtn.disabled = true; busy('Building Kitchen List PDF for ' + date + '…');
+    showOverlay('Preparing lists…');
 
     // offscreen staging (rendered, but off-screen so html2canvas can read layout)
     const stage = document.createElement('div');
@@ -1100,11 +1248,12 @@
       const needPause  = sectionOn('pause');
 
       if(!(needTags || needClient || needMeal || needMise || needDel || needPause)){
-        statusEl.textContent = 'Tick at least one list to include in the PDF.';
-        stage.remove(); goBtn.disabled = false; pdfBtn.disabled = false;
+        setStatus('Tick at least one list to include in the PDF.', false);
+        stage.remove(); goBtn.disabled = false; pdfBtn.disabled = false; hideOverlay();
         return;
       }
 
+      setOverlay('Fetching data…');
       const tags = needTags ? await ensureTags(date) : [];
       const rows = (needClient || needMeal) ? await ensureClient(date) : [];
 
@@ -1118,6 +1267,7 @@
       // ---- render tag pages, snapshot each ----
       const tagCanvases = [];
       if(needTags && tags.length){
+        setOverlay('Rendering tags…');
         const pagesC = document.createElement('div');
         pagesC.className = 'pages';
         pagesC.style.cssText = 'padding:0; gap:0;';
@@ -1127,7 +1277,7 @@
         pagesC.querySelectorAll('.inner').forEach(fitInnerSync);
         await waitForImages(pagesC);
         for(const page of pagesC.querySelectorAll('.page')){
-          const c = await html2canvas(page, { scale:2, useCORS:true, backgroundColor:'#ffffff' });
+          const c = await html2canvas(page, { scale:PDF_SCALE, useCORS:true, backgroundColor:'#ffffff' });
           tagCanvases.push(c);
         }
       }
@@ -1135,6 +1285,7 @@
       // ---- render client list, snapshot ----
       let clientCanvas = null;
       if(needClient && rows.length){
+        setOverlay('Rendering client list…');
         const sheet = buildClientSheet(rows, date);
         sheet.style.padding = '0'; sheet.style.boxShadow = 'none'; sheet.style.width = '1400px';
         const sw = document.createElement('div'); sw.className = 'listwrap'; sw.style.padding = '0';
@@ -1142,45 +1293,51 @@
         stage.appendChild(sw);
         fitClientSheet(sheet, rows.length, 965);
         await waitForImages(sw);
-        clientCanvas = await html2canvas(sheet, { scale:2, useCORS:true, backgroundColor:'#ffffff' });
+        clientCanvas = await html2canvas(sheet, { scale:PDF_SCALE, useCORS:true, backgroundColor:'#ffffff' });
       }
 
       // ---- render meal list, snapshot ----
       let mealCanvas = null;
       if(needMeal && rows.length){
+        setOverlay('Rendering meal list…');
         const mealSheet = buildMealSheet(groupMeal(rows), date);
         stage.appendChild(mealSheet);
         fitMealSheet(mealSheet);
-        mealCanvas = await html2canvas(mealSheet, { scale:2, useCORS:true, backgroundColor:'#ffffff' });
+        mealCanvas = await html2canvas(mealSheet, { scale:PDF_SCALE, useCORS:true, backgroundColor:'#ffffff' });
       }
 
       // ---- render mise list, snapshot (optional) ----
       let miseCanvas = null;
       const miseTbl = (miseData && miseData.tables && miseData.tables[0]) ? miseData.tables[0] : null;
       if(needMise && miseTbl){
+        setOverlay('Rendering mise list…');
         const miseSheet = buildMiseSheet(miseTbl, date);
         stage.appendChild(miseSheet);
         fitMiseSheet(miseSheet);
-        miseCanvas = await html2canvas(miseSheet, { scale:2, useCORS:true, backgroundColor:'#ffffff' });
+        miseCanvas = await html2canvas(miseSheet, { scale:PDF_SCALE, useCORS:true, backgroundColor:'#ffffff' });
       }
 
       // ---- render delivery list, snapshot (optional) ----
       let deliveryCanvas = null;
       if(needDel && deliveryData && deliveryData.clients && deliveryData.clients.length){
+        setOverlay('Rendering delivery list…');
         const delSheet = buildDeliverySheet(deliveryData.clients, date);
         delSheet.style.padding = '0'; delSheet.style.boxShadow = 'none'; delSheet.style.width = '760px';
         stage.appendChild(delSheet);
-        deliveryCanvas = await html2canvas(delSheet, { scale:2, useCORS:true, backgroundColor:'#ffffff' });
+        deliveryCanvas = await html2canvas(delSheet, { scale:PDF_SCALE, useCORS:true, backgroundColor:'#ffffff' });
       }
 
       // ---- render pause list, snapshot (optional; respects the inactive toggle) ----
       let pauseCanvas = null;
       if(needPause && pauseData && ((pauseData.paused && pauseData.paused.length) || (showInactive && pauseData.pausedInactive && pauseData.pausedInactive.length))){
+        setOverlay('Rendering pause list…');
         const pauseSheet = buildPauseSheet(pauseData, date);
         pauseSheet.style.padding = '0'; pauseSheet.style.boxShadow = 'none';
         stage.appendChild(pauseSheet);
-        pauseCanvas = await html2canvas(pauseSheet, { scale:2, useCORS:true, backgroundColor:'#ffffff' });
+        pauseCanvas = await html2canvas(pauseSheet, { scale:PDF_SCALE, useCORS:true, backgroundColor:'#ffffff' });
       }
+
+      setOverlay('Assembling PDF…');
 
       // ---- assemble PDF ----
       const { jsPDF } = window.jspdf;
@@ -1196,7 +1353,7 @@
       // tags: full-bleed portrait A4
       for(const c of tagCanvases){
         place('portrait');
-        pdf.addImage(c.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, 210, 297);
+        pdf.addImage(c.toDataURL('image/png'), 'PNG', 0, 0, 210, 297);
       }
 
       // client list: landscape, sliced across pages if taller than one page
@@ -1215,12 +1372,13 @@
       if(pauseCanvas) addImagePaged(pdf, pauseCanvas, place, 'portrait');
 
       pdf.save('Kitchen_List_' + date + '.pdf');
-      statusEl.textContent = 'Kitchen List PDF downloaded for ' + date + '.';
+      setStatus('Kitchen List PDF downloaded for ' + date + '.', false);
     }catch(e){
-      statusEl.textContent = 'PDF error: ' + e.message;
+      setStatus('PDF error: ' + e.message, false);
     }finally{
       stage.remove();
       goBtn.disabled = false; pdfBtn.disabled = false;
+      hideOverlay();
     }
   }
 
@@ -1236,7 +1394,7 @@
     const fullH = Ch * (Pw / Cw);
     if(fullH <= Ph){
       place(orient);
-      pdf.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', margin, margin, Pw, fullH);
+      pdf.addImage(canvas.toDataURL('image/png'), 'PNG', margin, margin, Pw, fullH);
       return;
     }
     const sliceHpx = Math.floor(Cw * (Ph / Pw));
@@ -1244,21 +1402,23 @@
       const h = Math.min(sliceHpx, Ch - y);
       const sc = document.createElement('canvas');
       sc.width = Cw; sc.height = h;
-      sc.getContext('2d').drawImage(canvas, 0, y, Cw, h, 0, 0, Cw, h);
+      const sctx = sc.getContext('2d');
+      sctx.fillStyle = '#ffffff'; sctx.fillRect(0, 0, Cw, h);
+      sctx.drawImage(canvas, 0, y, Cw, h, 0, 0, Cw, h);
       place(orient);
-      pdf.addImage(sc.toDataURL('image/jpeg', 0.92), 'JPEG', margin, margin, Pw, h * (Pw / Cw));
+      pdf.addImage(sc.toDataURL('image/png'), 'PNG', margin, margin, Pw, h * (Pw / Cw));
     }
   }
 
   // ---- small helpers ----
   function guard(){
-    if(!API){ statusEl.textContent = 'No API URL found in config.js.'; return false; }
-    if(!dateEl.value){ statusEl.textContent = 'Pick a date first.'; return false; }
+    if(!API){ setStatus('No API URL found in config.js.', false); return false; }
+    if(!dateEl.value){ setStatus('Pick a date first.', false); return false; }
     return true;
   }
-  function busy(msg){ goBtn.disabled = true; printBtn.disabled = true; statusEl.textContent = msg; }
-  function done(msg, tab){ statusEl.textContent = msg; goBtn.disabled = false; if(activeTab === tab) printBtn.disabled = false; }
-  function fail(e){ statusEl.textContent = 'Error: ' + e.message; goBtn.disabled = false; }
+  function busy(msg){ goBtn.disabled = true; printBtn.disabled = true; setStatus(msg, true); }
+  function done(msg, tab){ setStatus(msg, false); goBtn.disabled = false; if(activeTab === tab) printBtn.disabled = false; }
+  function fail(e){ setStatus('Error: ' + e.message, false); goBtn.disabled = false; }
 </script>
 </body>
 </html>
