@@ -1051,10 +1051,14 @@
     sorted.forEach((r) => {
       const tr = document.createElement('tr');
       const slotChanged  = prevSlot  !== null && r.slot  !== prevSlot;
-      const routeChanged = prevRoute !== null && String(r.route) !== prevRoute;
-      // new group whenever slot OR route changes -> heavy line + restart numbering
+      // route grouping only matters within the Afternoon slot
+      const routeMatters = r.slot === 'Afternoon';
+      const routeChanged = routeMatters && prevRoute !== null && !slotChanged && String(r.route) !== prevRoute;
+
       if(slotChanged) tr.className = 'slotsep';
       else if(routeChanged) tr.className = 'routesep';
+
+      // restart numbering on slot change always; on route change only for Afternoon
       if(slotChanged || routeChanged || prevSlot === null) groupNum = 0;
       prevSlot = r.slot; prevRoute = String(r.route);
       groupNum++;
