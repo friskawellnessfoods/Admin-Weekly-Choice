@@ -87,6 +87,11 @@
   .field input[type=date]:focus{ outline:none; border-color:var(--c-primary);
     box-shadow:0 0 0 3px rgba(14,165,163,.16); }
 
+  .proc-toggle{ display:inline-flex; align-items:center; gap:7px; font-size:14px; color:var(--c-muted);
+                cursor:pointer; white-space:nowrap; user-select:none; }
+  .proc-toggle input{ width:17px; height:17px; cursor:pointer; accent-color:var(--c-primary); }
+  body.landing .proc-toggle{ justify-content:center; }
+
   .btn{ padding:12px 18px; border:0; border-radius:var(--radius); font-size:15px; font-weight:700;
         cursor:pointer; color:#fff; transition:transform .08s, filter .15s, box-shadow .15s;
         background:linear-gradient(90deg,var(--grad-a),var(--grad-b)); box-shadow:0 4px 14px rgba(37,99,235,.25); }
@@ -313,6 +318,7 @@
       <div class="field">
         <input type="date" id="date">
       </div>
+      <label class="proc-toggle"><input type="checkbox" id="procChk" checked>Process orders first</label>
       <button id="go" class="btn">Generate</button>
       <button id="pdf" class="btn alt" disabled>Download Kitchen List PDF</button>
       <span class="status" id="status"><span class="spinner"></span><span id="statusText">Pick a date to begin.</span></span>
@@ -446,11 +452,51 @@
       document.body.classList.remove('landing');
       document.body.classList.add('working');
     }
+
+    const date = dateEl.value;
+    const procChk = document.getElementById('procChk');
+
+    // optional: process Orders_Log -> Orders_Output first (same call as process.html)
+    if(procChk && procChk.checked){
+      goBtn.disabled = true;
+      showOverlay('Processing orders for ' + date + '…');
+      let result;
+      try{
+        result = await runProcess(date);
+      }catch(e){
+        hideOverlay(); goBtn.disabled = false;
+        setStatus('Process error: ' + e.message + ' — lists not generated.', false);
+        return;
+      }
+      hideOverlay();
+      // processing erases & rewrites Orders_Output, so it MUST complete cleanly.
+      // If it didn't, stop — do not render lists off a half-processed/stale sheet.
+      if(!result || !result.success){
+        goBtn.disabled = false;
+        setStatus('Processing did not complete' + (result && result.message ? ' (' + result.message + ')' : '') + ' — lists not generated.', false);
+        return;
+      }
+      // success: drop any cached/prefetched data so lists fetch the fresh output
+      invalidate();
+      pdfBtn.disabled = false;
+      setStatus(result.message || 'Processing done.', false);
+    }
+
     loadedView[activeTab] = false;
     await load(activeTab);          // render the visible tab first
     preloadData();                  // then warm the rest in the background
   });
   pdfBtn.addEventListener('click', downloadKitchenPdf);
+
+  // run the Orders_Log -> Orders_Output processing (POST processLogByDate), same as process.html.
+  // The actual erase/rewrite logic lives server-side in Apps Script; this only triggers it.
+  async function runProcess(date){
+    const params = new URLSearchParams();
+    params.append('action', 'processLogByDate');
+    params.append('date', date);
+    const res = await fetch(API, { method:'POST', body:params });
+    return await res.json();   // caller hard-stops generation unless this returns success:true
+  }
 
   // Prefetch every list's DATA in tab order so switching tabs and building the
   // PDF are instant. Data only (no render) — rendering needs a visible layout,
