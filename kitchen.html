@@ -255,6 +255,18 @@
   table.pause td.num{ text-align:center; width:36px; color:#666; }
   table.pause tr.subhead td{ background:#eceff1; font-weight:700; text-align:center; }
 
+  /* ---------- MEAL OVERVIEW ---------- */
+  .ovsheet{ background:#fff; box-shadow:0 2px 10px rgba(0,0,0,.18); margin:0 auto; padding:20px; max-width:920px; }
+  .ovsheet h2{ text-align:center; font-size:17px; margin:0 0 16px; }
+  .ovgrid{ display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:16px; align-items:start; }
+  table.ov{ border-collapse:collapse; width:100%; font-size:14px; color:#000; }
+  table.ov th, table.ov td{ border:1px solid #cfd8dc; padding:6px 10px; text-align:center; }
+  table.ov th.cap{ background:linear-gradient(90deg,var(--grad-a),var(--grad-b)); color:#fff; font-size:14px; }
+  table.ov thead th{ background:#f1f5f9; font-weight:700; font-size:12.5px; }
+  table.ov td.lbl{ text-align:left; font-weight:600; }
+  table.ov td.rt{ font-weight:700; }
+  table.ov tfoot td{ background:#f7fafc; font-weight:700; border-top:2px solid #90a4ae; }
+
   /* ===== MOBILE (screen only — never affects print or the off-screen PDF staging) ===== */
   @media screen and (max-width:640px){
     body.working .bar{ padding:8px 10px; gap:8px; }
@@ -338,6 +350,7 @@
   <div class="tabs">
     <button data-tab="client" class="active"><input type="checkbox" class="tabchk" data-sec="client" checked onclick="event.stopPropagation()">Client List</button>
     <button data-tab="meal"><input type="checkbox" class="tabchk" data-sec="meal" checked onclick="event.stopPropagation()">Meal List</button>
+    <button data-tab="overview"><input type="checkbox" class="tabchk" data-sec="overview" checked onclick="event.stopPropagation()">Meal Overview</button>
     <button data-tab="mise"><input type="checkbox" class="tabchk" data-sec="mise" checked onclick="event.stopPropagation()">Mise List</button>
     <button data-tab="delivery"><input type="checkbox" class="tabchk" data-sec="delivery" checked onclick="event.stopPropagation()">Delivery List</button>
     <button data-tab="pause"><input type="checkbox" class="tabchk" data-sec="pause" checked onclick="event.stopPropagation()">Pause List</button>
@@ -354,6 +367,10 @@
 
   <div id="view-meal" class="view">
     <div id="mealWrap" class="listwrap"></div>
+  </div>
+
+  <div id="view-overview" class="view">
+    <div id="overviewWrap" class="listwrap"></div>
   </div>
 
   <div id="view-mise" class="view">
@@ -379,6 +396,7 @@
   const pagesEl    = document.getElementById('pages');
   const clientWrap = document.getElementById('clientWrap');
   const mealWrap   = document.getElementById('mealWrap');
+  const overviewWrap = document.getElementById('overviewWrap');
   const miseWrap   = document.getElementById('miseWrap');
   const deliveryWrap = document.getElementById('deliveryWrap');
   const pauseWrap  = document.getElementById('pauseWrap');
@@ -392,7 +410,7 @@
   let overlayTick = null;
 
   let activeTab = 'client';
-  const loadedView = { tags:false, client:false, meal:false, mise:false, delivery:false, pause:false };
+  const loadedView = { tags:false, client:false, meal:false, overview:false, mise:false, delivery:false, pause:false };
   let cache = { date:null, tags:null, client:null, mise:null, delivery:null, pause:null };  // raw data per date
   let showInactive = false;   // pause-list toggle
   let hasGenerated = false;   // becomes true after first Generate (controls landing→working)
@@ -437,7 +455,7 @@
     activeTab = tab;
     document.querySelectorAll('.tabs button').forEach(b =>
       b.classList.toggle('active', b.dataset.tab === tab));
-    ['tags','client','meal','mise','delivery','pause'].forEach(t =>
+    ['tags','client','meal','overview','mise','delivery','pause'].forEach(t =>
       document.getElementById('view-' + t).classList.toggle('active', t === tab));
     printBtn.disabled = !loadedView[tab];
     if(hasGenerated && dateEl.value && !loadedView[tab]) load(tab);
@@ -524,8 +542,9 @@
 
   function invalidate(){
     cache = { date:null, tags:null, client:null, mise:null, delivery:null, pause:null };
-    loadedView.tags = loadedView.client = loadedView.meal = loadedView.mise = loadedView.delivery = loadedView.pause = false;
+    loadedView.tags = loadedView.client = loadedView.meal = loadedView.overview = loadedView.mise = loadedView.delivery = loadedView.pause = false;
     pagesEl.innerHTML = ''; clientWrap.innerHTML = ''; mealWrap.innerHTML = '';
+    overviewWrap.innerHTML = '';
     miseWrap.innerHTML = ''; deliveryWrap.innerHTML = ''; pauseWrap.innerHTML = '';
     printBtn.disabled = true;
   }
@@ -534,6 +553,7 @@
     if(tab === 'tags')     return loadTags();
     if(tab === 'client')   return loadClient();
     if(tab === 'meal')     return loadMeal();
+    if(tab === 'overview') return loadOverview();
     if(tab === 'mise')     return loadMise();
     if(tab === 'delivery') return loadDelivery();
     if(tab === 'pause')    return loadPause();
@@ -804,6 +824,75 @@
     }catch(e){ fail(e); }
   }
 
+  // ============================================================
+  //  MEAL OVERVIEW  (protein × type counts, breakfast/snack/juice splits)
+  // ============================================================
+  async function loadOverview(){
+    if(!guard()) return;
+    const date = dateEl.value;
+    busy('Building meal overview for ' + date + '…');
+    try{
+      const rows = await ensureClient(date);     // same client rows
+      const counts = computeMealCounts(rows);
+      overviewWrap.innerHTML = '';
+      overviewWrap.appendChild(buildOverviewSheet(counts, date));
+      loadedView.overview = true;
+      done('Meal overview ready for ' + date, 'overview');
+    }catch(e){ fail(e); }
+  }
+
+  function buildOverviewSheet(c, date){
+    const wrap = document.createElement('div'); wrap.className = 'ovsheet';
+    const h = document.createElement('h2');
+    h.textContent = 'Meal Overview — ' + new Date(date + 'T00:00:00')
+      .toLocaleDateString(undefined, { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+    wrap.appendChild(h);
+
+    const proteinTable = (title, opt) => {
+      const rows = ['Chicken','Veg','Seafood','Egg'].map(p =>
+        `<tr><td class="lbl">${p}</td><td>${opt[p].nb}</td><td>${opt[p].hp}</td><td class="rt">${opt[p].nb + opt[p].hp}</td></tr>`
+      ).join('');
+      return `
+        <table class="ov">
+          <thead>
+            <tr><th colspan="4" class="cap">${title}</th></tr>
+            <tr><th>Protein</th><th>Nutri Balance</th><th>High Protein</th><th>Total</th></tr>
+          </thead>
+          <tbody>${rows}</tbody>
+          <tfoot><tr><td class="lbl">Total ${title}</td><td></td><td></td><td class="rt">${opt.total}</td></tr></tfoot>
+        </table>`;
+    };
+
+    const splitTable = (title, obj, regLbl, vegLbl) => `
+      <table class="ov">
+        <thead><tr><th colspan="2" class="cap">${title}</th></tr></thead>
+        <tbody>
+          <tr><td class="lbl">${regLbl}</td><td class="rt">${obj.reg}</td></tr>
+          <tr><td class="lbl">${vegLbl}</td><td class="rt">${obj.veg}</td></tr>
+        </tbody>
+        <tfoot><tr><td class="lbl">Total ${title}</td><td class="rt">${obj.total}</td></tr></tfoot>
+      </table>`;
+
+    const juiceTable = `
+      <table class="ov">
+        <thead><tr><th colspan="2" class="cap">Juices</th></tr></thead>
+        <tbody>
+          <tr><td class="lbl">Juice 1</td><td class="rt">${c.juice1}</td></tr>
+          <tr><td class="lbl">Juice 2</td><td class="rt">${c.juice2}</td></tr>
+        </tbody>
+      </table>`;
+
+    const grid = document.createElement('div'); grid.className = 'ovgrid';
+    grid.innerHTML =
+      proteinTable('Option 1', c.option1) +
+      proteinTable('Option 2', c.option2) +
+      splitTable('Breakfast', c.breakfast, 'Breakfast', 'Veg Breakfast') +
+      splitTable('Snack', c.snack, 'Snack', 'Veg Snack') +
+      juiceTable;
+    wrap.appendChild(grid);
+    return wrap;
+  }
+
   // regroup client rows into protein buckets (same shape the meal list needs)
   function groupMeal(rows){
     const opt1 = { Chicken:[], Veg:[], Seafood:[], Egg:[] };
@@ -931,6 +1020,51 @@
     wrap.innerHTML = card('Total Option 1', o1) + card('Total Meals', grand) + card('Total Option 2', o2);
     box.appendChild(wrap);
     return box;
+  }
+
+  // ---- meal counts for write-back / totals panel ----
+  // Type bucket rule (per user): contains "high protein" -> HP; everything else -> NB.
+  // HP and NB never co-occur. Protein comes from the option cell; type from the client's Type col.
+  function computeMealCounts(rows){
+    const proteinOf = code => String(code || '').replace(/\s*\d+\s*$/, '').trim();
+    const isHP = t => /high\s*protein/i.test(String(t || ''));
+
+    const blankOpt = () => ({
+      Chicken:{ nb:0, hp:0 }, Veg:{ nb:0, hp:0 }, Seafood:{ nb:0, hp:0 }, Egg:{ nb:0, hp:0 }, total:0
+    });
+    const c = {
+      option1: blankOpt(),
+      option2: blankOpt(),
+      breakfast:{ reg:0, veg:0, total:0 },
+      snack:{ reg:0, veg:0, total:0 },
+      juice1:0, juice2:0
+    };
+
+    const tallyOpt = (bucket, code, type) => {
+      const p = proteinOf(code);
+      if(!bucket[p]) return;                 // only the four known proteins
+      if(isHP(type)) bucket[p].hp++; else bucket[p].nb++;
+      bucket.total++;
+    };
+
+    rows.forEach(r => {
+      const type = r.type;
+      const o1 = String(r.option1 || '').trim();
+      const o2 = String(r.option2 || '').trim();
+      if(o1 && o1 !== 'N/A') tallyOpt(c.option1, o1, type);
+      if(o2 && o2 !== 'N/A') tallyOpt(c.option2, o2, type);
+
+      const bf = String(r.breakfast || '').trim();
+      if(bf && bf !== 'N/A'){ if(/veg/i.test(bf)) c.breakfast.veg++; else c.breakfast.reg++; c.breakfast.total++; }
+
+      const sn = String(r.snack || '').trim();
+      if(sn && sn !== 'N/A'){ if(/veg/i.test(sn)) c.snack.veg++; else c.snack.reg++; c.snack.total++; }
+
+      if(String(r.juice1 || '').trim() && r.juice1 !== 'N/A') c.juice1++;
+      if(String(r.juice2 || '').trim() && r.juice2 !== 'N/A') c.juice2++;
+    });
+
+    return c;
   }
 
   // scale meal grid to fill — but not overflow — one portrait page
