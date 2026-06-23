@@ -266,6 +266,10 @@
   table.ov td.lbl{ text-align:left; font-weight:600; }
   table.ov td.rt{ font-weight:700; }
   table.ov tfoot td{ background:#f7fafc; font-weight:700; border-top:2px solid #90a4ae; }
+  .ov-actions{ margin-top:16px; display:flex; align-items:center; gap:12px; justify-content:center; flex-wrap:wrap; }
+  .ov-note{ font-size:13px; color:var(--c-muted); }
+  .ov-note.ok{ color:#2e7d32; font-weight:600; }
+  .ov-note.warn{ color:#c62828; font-weight:600; }
 
   /* ===== MOBILE (screen only — never affects print or the off-screen PDF staging) ===== */
   @media screen and (max-width:640px){
@@ -303,6 +307,7 @@
     .delsheet{ box-shadow:none; padding:0; margin:0; page:portraitList; }
     .pausesheet{ box-shadow:none; padding:0; margin:0; width:auto; page:portraitList; }
     .ovsheet{ box-shadow:none; padding:0; margin:0; width:auto; page:portraitList; }
+    .ov-actions{ display:none !important; }
     .pause-toggle{ display:none; }
     table.client{ -webkit-print-color-adjust:exact; print-color-adjust:exact; }
     table.client tr{ page-break-inside:avoid; }
@@ -891,7 +896,32 @@
       splitTable('Snack', c.snack, 'Snack', 'Veg Snack') +
       juiceTable;
     wrap.appendChild(grid);
+
+    const actions = document.createElement('div'); actions.className = 'ov-actions';
+    const writeBtn = document.createElement('button'); writeBtn.className = 'btn'; writeBtn.textContent = 'Write totals to MiseList';
+    const note = document.createElement('span'); note.className = 'ov-note';
+    writeBtn.addEventListener('click', async () => {
+      writeBtn.disabled = true; note.textContent = 'Writing…'; note.className = 'ov-note';
+      try{
+        const res = await writeMiseTotals(date, c);
+        if(res && res.success){ note.textContent = '✓ ' + (res.message || 'Written'); note.className = 'ov-note ok'; }
+        else { note.textContent = '⚠ ' + (res && res.message ? res.message : 'Write failed'); note.className = 'ov-note warn'; }
+      }catch(e){ note.textContent = '⚠ ' + e.message; note.className = 'ov-note warn'; }
+      writeBtn.disabled = false;
+    });
+    actions.appendChild(writeBtn); actions.appendChild(note);
+    wrap.appendChild(actions);
     return wrap;
+  }
+
+  // POST the computed counts to the MiseList write-back (writeMiseTotals)
+  async function writeMiseTotals(date, counts){
+    const params = new URLSearchParams();
+    params.append('action', 'writeMiseTotals');
+    params.append('date', date);
+    params.append('counts', JSON.stringify(counts));
+    const res = await fetch(API, { method:'POST', body:params });
+    return await res.json();
   }
 
   // regroup client rows into protein buckets (same shape the meal list needs)
@@ -1596,6 +1626,7 @@
       if(needOverview && rows.length){
         setOverlay('Rendering meal overview…');
         const ovSheet = buildOverviewSheet(computeMealCounts(rows), date);
+        const ovAct = ovSheet.querySelector('.ov-actions'); if(ovAct) ovAct.remove();
         ovSheet.style.padding = '0'; ovSheet.style.boxShadow = 'none'; ovSheet.style.width = '680px';
         stage.appendChild(ovSheet);
         overviewCanvas = await html2canvas(ovSheet, { scale:PDF_SCALE, useCORS:true, backgroundColor:'#ffffff' });
