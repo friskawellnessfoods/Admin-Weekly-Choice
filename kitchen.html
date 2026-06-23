@@ -337,6 +337,7 @@
         <input type="date" id="date">
       </div>
       <label class="proc-toggle"><input type="checkbox" id="procChk" checked>Process orders first</label>
+      <label class="proc-toggle"><input type="checkbox" id="miseChk">Write totals to MiseList</label>
       <button id="go" class="btn">Generate</button>
       <button id="pdf" class="btn alt" disabled>Download Kitchen List PDF</button>
       <span class="status" id="status"><span class="spinner"></span><span id="statusText">Pick a date to begin.</span></span>
@@ -508,7 +509,20 @@
 
     loadedView[activeTab] = false;
     await load(activeTab);          // render the visible tab first
-    preloadData();                  // then warm the rest in the background
+    await preloadData();            // warm the rest in the background
+
+    // optional: write the meal totals into MiseList (last, so its confirmation stays on screen)
+    const miseChk = document.getElementById('miseChk');
+    if(miseChk && miseChk.checked){
+      try{
+        const rows = await ensureClient(date);
+        const counts = computeMealCounts(rows);
+        setStatus('Writing totals to MiseList…', true);
+        const res = await writeMiseTotals(date, counts);
+        setStatus(res && res.success ? '✓ ' + (res.message || 'Totals written to MiseList.')
+                                     : '⚠ MiseList write: ' + (res && res.message ? res.message : 'failed'), false);
+      }catch(e){ setStatus('⚠ MiseList write error: ' + e.message, false); }
+    }
   });
   pdfBtn.addEventListener('click', downloadKitchenPdf);
 
