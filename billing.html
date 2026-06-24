@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Friska — Client Usage Summary</title>
+<!-- shared API_URL -->
+<script src="config.js"></script>
+<style>
+  :root{
+    --bg:#f6f7f3;
+    --card:#ffffff;
+    --ink:#2b3328;
+    --muted:#6f7a68;
+    --line:#e4e8df;
+    --sage:#4f7a52;
+    --sage-dark:#3c6240;
+    --accent:#eef3ea;
+    --warn-bg:#fff6e6;
+    --warn-line:#f0d9a6;
+    --warn-ink:#8a6112;
+    --pause-bg:#fdeceb;
+    --pause-line:#f1c4c0;
+    --pause-ink:#9a3b34;
+    --radius:14px;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.45;-webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:760px;margin:0 auto;padding:18px 14px 60px}
+  header h1{font-size:1.35rem;margin:6px 0 2px;letter-spacing:-.01em}
+  header p{margin:0 0 16px;color:var(--muted);font-size:.9rem}
+  .card{
+    background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+    padding:16px;margin-bottom:14px;
+  }
+  label{display:block;font-size:.8rem;font-weight:600;color:var(--muted);margin:0 0 5px}
+  input[type=text],input[type=date]{
+    width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:10px;
+    font-size:1rem;background:#fff;color:var(--ink);
+  }
+  input:focus{outline:2px solid var(--sage);outline-offset:1px;border-color:var(--sage)}
+  .row{display:flex;gap:10px;flex-wrap:wrap}
+  .row > div{flex:1 1 140px}
+  .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+  button{
+    font-size:.95rem;font-weight:600;padding:11px 16px;border-radius:10px;
+    border:1px solid transparent;cursor:pointer;flex:1 1 auto;
+  }
+  .btn-primary{background:var(--sage);color:#fff}
+  .btn-primary:hover{background:var(--sage-dark)}
+  .btn-ghost{background:#fff;color:var(--sage-dark);border-color:var(--line)}
+  .btn-ghost:hover{background:var(--accent)}
+  button:disabled{opacity:.55;cursor:not-allowed}
+  .status{font-size:.85rem;margin-top:10px;min-height:1.1em}
+  .status.err{color:var(--pause-ink)}
+  .status.ok{color:var(--sage-dark)}
+  .status.info{color:var(--muted)}
+
+  h2.sec{font-size:1rem;margin:2px 0 12px;display:flex;align-items:center;gap:8px}
+  h2.sec::before{content:"";width:4px;height:16px;background:var(--sage);border-radius:2px}
+
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:6px}
+  .stat{background:var(--accent);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+  .stat .n{font-size:1.45rem;font-weight:700;line-height:1.1}
+  .stat .l{font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-top:2px}
+
+  .kv{display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px dashed var(--line);font-size:.92rem}
+  .kv:last-child{border-bottom:none}
+  .kv .k{color:var(--muted)}
+  .kv .v{font-weight:600;text-align:right}
+
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+  .chip{background:#fff;border:1px solid var(--line);border-radius:999px;padding:3px 10px;font-size:.8rem}
+
+  .note{border-radius:10px;padding:11px 12px;font-size:.88rem;margin-top:10px}
+  .note.warn{background:var(--warn-bg);border:1px solid var(--warn-line);color:var(--warn-ink)}
+  .note.pause{background:var(--pause-bg);border:1px solid var(--pause-line);color:var(--pause-ink)}
+  .note.info{background:var(--accent);border:1px solid var(--line);color:var(--muted)}
+
+  .subtle{color:var(--muted);font-size:.78rem;margin-top:8px}
+  .hidden{display:none}
+  .small{font-size:.82rem;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Client Usage Summary</h1>
+    <p>Reads Orders_Output for one billing cycle and computes meals, paused days, and the next cycle plan.</p>
+  </header>
+
+  <div class="card">
+    <div style="margin-bottom:12px">
+      <label for="client">Client name</label>
+      <input type="text" id="client" placeholder="e.g. Priya Sharma" autocomplete="off" />
+    </div>
+    <div class="row">
+      <div>
+        <label for="start">Cycle start</label>
+        <input type="date" id="start" />
+      </div>
+      <div>
+        <label for="end">Cycle end</label>
+        <input type="date" id="end" />
+      </div>
+    </div>
+    <div class="subtle">Leave both dates blank to use the client's latest cycle from BillingCycle. Fill both to override.</div>
+    <div class="actions">
+      <button class="btn-primary" id="go">Fetch usage</button>
+      <button class="btn-ghost" id="reload" title="Re-pull data from the sheet">Reload data</button>
+    </div>
+    <div class="status info" id="status">Enter a client name and Fetch usage. Dates auto-fill from BillingCycle.</div>
+  </div>
+
+  <!-- USAGE SUMMARY -->
+  <div class="card hidden" id="summaryCard">
+    <h2 class="sec">Usage summary</h2>
+    <div id="activeInfo"></div>
+
+    <div class="grid" id="dayGrid"></div>
+    <div id="usageKV"></div>
+
+    <div id="slotBlock" class="hidden" style="margin-top:12px">
+      <div class="small" style="font-weight:600;margin-bottom:4px">Slot deliveries</div>
+      <div class="chips" id="slotChips"></div>
+    </div>
+
+    <div id="pauseWarn"></div>
+
+    <div style="margin-top:12px">
+      <div class="small" style="font-weight:600;margin-bottom:4px">Paused dates</div>
+      <div id="pausedDates" class="small"></div>
+    </div>
+  </div>
+
+  <!-- NEXT CYCLE PLANNER -->
+  <div class="card hidden" id="plannerCard">
+    <h2 class="sec">Next cycle planner</h2>
+    <div id="plannerKV"></div>
+    <div id="plannerNote"></div>
+  </div>
+</div>
+
+<script>
+/* =================================================================
+   Friska — Client Usage Summary
+   Faithful JS port of the Python usage logic (count_usage +
+   compute_from_range). Pricing / invoice / GST intentionally removed.
+   Reads Orders_Output columns A:M (indices 0..12):
+     0 date | 1 name | 5 slot | 7 opt1 | 8 opt2 | 9 brk | 10 snack | 11 j1 | 12 j2
+   ================================================================= */
+
+const COL = { date:0, name:1, slot:5, opt1:7, opt2:8, brk:9, snk:10, j1:11, j2:12 };
+const NEEDED_BILL = 26;
+const MONTHS = {jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
+const MONTH_ABBR = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+let ordersCache = null;  // Orders_Output rows, cached after first fetch
+let billingCache = null; // BillingCycle rows (incl. header), cached after first fetch
+
+/* ---------- date helpers ---------- */
+function dateOnly(d){ return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 12, 0, 0, 0); }
+function addDays(d, n){ const x = dateOnly(d); x.setDate(x.getDate() + n); return dateOnly(x); }
+function keyOf(d){
+  return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
+}
+function isSunday(d){ return d.getDay() === 0; } // JS Sun=0  (Python had weekday()==6)
+function dtstr(d){ return String(d.getDate()).padStart(2,"0") + "-" + MONTH_ABBR[d.getMonth()] + "-" + d.getFullYear(); }
+
+function serial(n){ const e = new Date(1899,11,30,12,0,0,0); e.setDate(e.getDate() + Math.floor(n)); return dateOnly(e); }
+
+function toDt(v){
+  if(v === null || v === undefined || v === "") return null;
+  if(typeof v === "number") return serial(v);
+  let s = String(v).trim();
+  if(s === "") return null;
+  if(/^\d+(\.\d+)?$/.test(s)) return serial(parseFloat(s));
+  // strip a leading weekday name ("Mon, ", "Monday, ")
+  s = s.replace(/^\s*(mon|tue|wed|thu|fri|sat|sun|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\s*,\s*/i, "");
+  let m;
+  // ISO yyyy-mm-dd (optionally with time)
+  m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if(m) return dateOnly(new Date(+m[1], +m[2]-1, +m[3], 12));
+  // dd-MMM-yyyy / dd MMM yy  (month name)
+  m = s.match(/^(\d{1,2})[-\s]([A-Za-z]{3,})[-\s](\d{2,4})$/);
+  if(m){
+    const mo = MONTHS[m[2].slice(0,3).toLowerCase()];
+    if(mo !== undefined){ let y = +m[3]; if(y < 100) y += 2000; return dateOnly(new Date(y, mo, +m[1], 12)); }
+  }
+  // dd-mm-yyyy / dd/mm/yyyy  (day first)
+  m = s.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})$/);
+  if(m){ let y = +m[3]; if(y < 100) y += 2000; return dateOnly(new Date(y, +m[2]-1, +m[1], 12)); }
+  return null;
+}
+
+function normName(s){ return String(s || "").replace(/\s+/g, " ").trim().toLowerCase(); }
+
+/* ---------- BillingCycle lookup (port of get_prev_cycle_for_client) ---------- */
+function getPrevCycleForClient(billingRows, clientName){
+  if(!billingRows || billingRows.length < 2) return null;
+  const headers = billingRows[0].map(x => String(x).trim().toLowerCase());
+  const ci = headers.indexOf("client");
+  const si = headers.indexOf("start");
+  const ei = headers.indexOf("end");
+  if(ci < 0 || si < 0 || ei < 0) return null;
+  const key = normName(clientName);
+  let last = null;
+  for(let i = 1; i < billingRows.length; i++){
+    const r = billingRows[i];
+    if(r.length <= Math.max(ci, si, ei)) continue;
+    if(normName(r[ci]) === key) last = r; // keep the latest matching row
+  }
+  if(!last) return null;
+  const sd = toDt(last[si]), ed = toDt(last[ei]);
+  if(!sd || !ed) return null;
+  return { start: dateOnly(sd), end: dateOnly(ed) };
+}
+
+/* ---------- core: count_usage ---------- */
+function countUsage(data, start, end, clientName){
+  const clientKey = normName(clientName);
+  const totals = { meal1:0, meal2:0, snack:0, j1:0, j2:0, brk:0, seafood:0 };
+  const activeDaysSet = new Set();
+  const slotCounts = {};
+  let lastActiveDate = null;
+  const pausedDates = [];
+
+  // full billing range excluding Sundays
+  const allServiceDates = [];
+  let cur = dateOnly(start);
+  while(cur <= end){
+    if(!isSunday(cur)) allServiceDates.push(dateOnly(cur));
+    cur = addDays(cur, 1);
+  }
+  const totalDays = allServiceDates.length;
+
+  for(const row of data){
+    if(!row || row.length < 2) continue;
+    const dt = toDt(row[COL.date]);
+    if(!dt) continue;
+    const rowDate = dateOnly(dt);
+    if(!(start <= rowDate && rowDate <= end)) continue;
+    if(isSunday(rowDate)) continue;
+    if(normName(row[COL.name]) !== clientKey) continue;
+
+    const cell = i => (i < row.length ? String(row[i]).trim() : "");
+    const opt1 = cell(COL.opt1), opt2 = cell(COL.opt2);
+    const brk  = cell(COL.brk),  snk  = cell(COL.snk);
+    const j1   = cell(COL.j1),   j2   = cell(COL.j2);
+
+    let mc = 0;
+    if(opt1 && opt1 !== "N/A"){ totals.meal1++; mc++; if(normName(opt1) === "seafood 1") totals.seafood++; }
+    if(opt2 && opt2 !== "N/A"){ totals.meal2++; mc++; if(normName(opt2) === "seafood 2") totals.seafood++; }
+    if(brk  && brk  !== "N/A"){ totals.brk++;   mc++; }
+    if(snk  && snk  !== "N/A"){ totals.snack++; mc++; }
+    if(j1   && j1   !== "N/A"){ totals.j1++;    mc++; }
+    if(j2   && j2   !== "N/A"){ totals.j2++;    mc++; }
+
+    if(mc > 0){
+      activeDaysSet.add(keyOf(rowDate));
+      let slot = (row.length > COL.slot ? String(row[COL.slot]).trim() : "");
+      if(!slot) slot = "No Delivery Slot";
+      slotCounts[slot] = (slotCounts[slot] || 0) + 1;
+      if(!lastActiveDate || rowDate > lastActiveDate) lastActiveDate = rowDate;
+    }
+  }
+
+  const activeDays = activeDaysSet.size;
+  for(const d of allServiceDates){
+    if(!activeDaysSet.has(keyOf(d))) pausedDates.push(dateOnly(d));
+  }
+  const pausedDays = pausedDates.length;
+
+  totals.meals_total  = totals.meal1 + totals.meal2;
+  totals.juices_total = totals.j1 + totals.j2;
+
+  return { totals, activeDays, pausedDays, totalDays, pausedDates, lastActiveDate, slotCounts };
+}
+
+/* ---------- helpers used by planner ---------- */
+function findResumeDate(data, clientName, afterDate, maxDays){
+  maxDays = maxDays || 90;
+  const key = normName(clientName);
+  const limit = addDays(afterDate, maxDays);
+  for(const row of data){
+    if(!row || row.length < 2) continue;
+    const dt = toDt(row[COL.date]); if(!dt) continue;
+    const d = dateOnly(dt);
+    if(!(afterDate < d && d <= limit)) continue;
+    if(normName(row[COL.name]) !== key) continue;
+    for(const idx of [COL.opt1, COL.opt2, COL.brk, COL.snk, COL.j1, COL.j2]){
+      if(idx < row.length){ const val = String(row[idx]).trim(); if(val && val !== "N/A") return d; }
+    }
+  }
+  return null;
+}
+
+function findNextActiveDates(data, clientName, startDate, needed){
+  const key = normName(clientName);
+  const seen = new Set();
+  for(const row of data){
+    if(!row || row.length < 2) continue;
+    const dt = toDt(row[COL.date]); if(!dt) continue;
+    const d = dateOnly(dt);
+    if(d < startDate) continue;
+    if(normName(row[COL.name]) !== key) continue;
+    for(const idx of [COL.opt1, COL.opt2, COL.brk, COL.snk, COL.j1, COL.j2]){
+      if(idx < row.length){ const val = String(row[idx]).trim(); if(val && val !== "N/A"){ seen.add(keyOf(d)); break; } }
+    }
+  }
+  const arr = Array.from(seen).sort().map(k => { const [y,m,da] = k.split("-").map(Number); return dateOnly(new Date(y, m-1, da, 12)); });
+  return arr.slice(0, needed);
+}
+
+function nextServiceCalendarDates(afterDay, needed){
+  const out = [];
+  let cur = addDays(afterDay, 1);
+  while(out.length < needed){
+    if(!isSunday(cur)) out.push(dateOnly(cur));
+    cur = addDays(cur, 1);
+  }
+  return out;
+}
+
+/* ---------- core: compute_from_range ---------- */
+function computeFromRange(data, clientName, prevStart, prevEnd){
+  const today = dateOnly(new Date());
+  let calcEnd, stillActive = false;
+  if(prevEnd > today){ stillActive = true; calcEnd = today; }
+  else { calcEnd = prevEnd; }
+
+  const u = countUsage(data, prevStart, calcEnd, clientName);
+  const neededAdjust = u.pausedDays;
+
+  // resume date
+  let resumeDate;
+  if(prevEnd >= today){ resumeDate = addDays(prevEnd, 1); }
+  else {
+    resumeDate = findResumeDate(data, clientName, prevEnd);
+    if(!resumeDate) resumeDate = addDays(prevEnd, 1);
+  }
+
+  let adjustDates = [], nextStart = null, nextEnd = null, neverResumed = false;
+
+  if(neededAdjust === 0){
+    const future = nextServiceCalendarDates(addDays(resumeDate, -1), NEEDED_BILL);
+    nextStart = future[0]; nextEnd = future[future.length-1];
+  } else {
+    adjustDates = findNextActiveDates(data, clientName, resumeDate, neededAdjust);
+
+    if(adjustDates.length === 0 && u.lastActiveDate && u.lastActiveDate < prevEnd){
+      neverResumed = true; // client never resumed meals after billing end
+    } else {
+      if(adjustDates.length < neededAdjust){
+        const remaining = neededAdjust - adjustDates.length;
+        const startFrom = adjustDates.length ? adjustDates[adjustDates.length-1] : resumeDate;
+        adjustDates = adjustDates.concat(nextServiceCalendarDates(startFrom, remaining));
+      }
+      const adjustEnd = adjustDates.length ? adjustDates[adjustDates.length-1] : resumeDate;
+      const future = nextServiceCalendarDates(adjustEnd, NEEDED_BILL);
+      nextStart = future[0]; nextEnd = future[future.length-1];
+    }
+  }
+
+  return Object.assign({}, u, {
+    prevStart, prevEnd, calcEnd, stillActive, today,
+    neededAdjust, adjustDates, nextStart, nextEnd, neverResumed
+  });
+}
+
+/* ---------- data fetch ---------- */
+async function fetchOrders(force){
+  if(ordersCache && !force) return ordersCache;
+  if(typeof API_URL === "undefined" || !API_URL){
+    throw new Error("API_URL not found. Make sure config.js loads and defines API_URL.");
+  }
+  const res = await fetch(API_URL, {
+    method: "POST",
+    body: JSON.stringify({ action: "getOrdersOutputAll" })
+  });
+  if(!res.ok) throw new Error("Server returned " + res.status);
+  const json = await res.json();
+  const rows = Array.isArray(json) ? json : (json.rows || []);
+  ordersCache = rows;
+  return rows;
+}
+
+async function fetchBilling(force){
+  if(billingCache && !force) return billingCache;
+  if(typeof API_URL === "undefined" || !API_URL){
+    throw new Error("API_URL not found. Make sure config.js loads and defines API_URL.");
+  }
+  const res = await fetch(API_URL, {
+    method: "POST",
+    body: JSON.stringify({ action: "getBillingCycleAll" })
+  });
+  if(!res.ok) throw new Error("Server returned " + res.status);
+  const json = await res.json();
+  const rows = Array.isArray(json) ? json : (json.rows || []);
+  billingCache = rows;
+  return rows;
+}
+
+/* ---------- rendering ---------- */
+function el(id){ return document.getElementById(id); }
+function setStatus(msg, cls){ const s = el("status"); s.textContent = msg; s.className = "status " + (cls || "info"); }
+function statBox(n, l){ return `<div class="stat"><div class="n">${n}</div><div class="l">${l}</div></div>`; }
+function kv(k, v){ return `<div class="kv"><span class="k">${k}</span><span class="v">${v}</span></div>`; }
+
+function renderResult(r){
+  const t = r.totals;
+
+  // active-until info
+  el("activeInfo").innerHTML = r.stillActive
+    ? `<div class="note info">Subscription is still active until <b>${dtstr(r.prevEnd)}</b>. Paused days are counted only up to today (${dtstr(r.today)}).</div>`
+    : "";
+
+  // day stat boxes
+  el("dayGrid").innerHTML =
+    statBox(t.meals_total, "Meals total") +
+    statBox(r.activeDays, "Active days") +
+    statBox(r.pausedDays, "Paused days") +
+    statBox(r.totalDays, "Total days");
+
+  // detail key/values (only show non-zero extras, matching the Python summary)
+  let kvHtml = kv("Meal 1 / Meal 2", `${t.meal1} / ${t.meal2}`);
+  if(t.seafood > 0)      kvHtml += kv("Seafood add-on", t.seafood);
+  if(t.snack > 0)        kvHtml += kv("Snacks total", t.snack);
+  if(t.juices_total > 0) kvHtml += kv("Juices total", `${t.juices_total} (J1: ${t.j1}, J2: ${t.j2})`);
+  if(t.brk > 0)          kvHtml += kv("Breakfast total", t.brk);
+  el("usageKV").innerHTML = kvHtml;
+
+  // slot chips
+  const slots = Object.keys(r.slotCounts).sort();
+  if(slots.length){
+    el("slotBlock").classList.remove("hidden");
+    el("slotChips").innerHTML = slots.map(s => `<span class="chip">${s}: <b>${r.slotCounts[s]}</b></span>`).join("");
+  } else {
+    el("slotBlock").classList.add("hidden");
+  }
+
+  // pause warning (last meal before cycle end)
+  if(r.lastActiveDate && r.prevEnd && r.lastActiveDate < r.prevEnd){
+    const pauseStart = addDays(r.lastActiveDate, 1);
+    el("pauseWarn").innerHTML =
+      `<div class="note pause">Last meal taken on <b>${dtstr(r.lastActiveDate)}</b>. ` +
+      `Subscription paused since <b>${dtstr(pauseStart)}</b>. Client has not resumed meals yet.</div>`;
+  } else {
+    el("pauseWarn").innerHTML = "";
+  }
+
+  // paused dates
+  const paused = r.pausedDates.slice().sort((a,b)=>a-b);
+  el("pausedDates").textContent = paused.length ? paused.map(dtstr).join(", ") : "None";
+
+  el("summaryCard").classList.remove("hidden");
+
+  // ----- planner -----
+  let pHtml = kv("Previous bill range", `${dtstr(r.prevStart)} → ${dtstr(r.prevEnd)}`);
+  pHtml += kv("Paused days to adjust", r.neededAdjust);
+  pHtml += kv("Adjustment dates", r.neededAdjust ? r.adjustDates.map(dtstr).join(", ") : "None");
+  pHtml += kv("New bill start", r.nextStart ? dtstr(r.nextStart) : "Not available");
+  pHtml += kv("New bill end",   r.nextEnd   ? dtstr(r.nextEnd)   : "Not available");
+  el("plannerKV").innerHTML = pHtml;
+
+  el("plannerNote").innerHTML = r.neverResumed
+    ? `<div class="note warn">Client never resumed meals after the cycle end, so a new bill range can't be planned yet.</div>`
+    : "";
+
+  el("plannerCard").classList.remove("hidden");
+}
+
+/* ---------- events ---------- */
+function readDate(id){
+  const v = el(id).value; // yyyy-mm-dd from <input type=date>
+  if(!v) return null;
+  const [y,m,d] = v.split("-").map(Number);
+  return dateOnly(new Date(y, m-1, d, 12));
+}
+
+async function run(force){
+  const client = el("client").value.trim();
+  let start = readDate("start");
+  let end = readDate("end");
+
+  if(!client){ setStatus("Enter a client name.", "err"); return; }
+  if((start && !end) || (!start && end)){
+    setStatus("Enter both dates to override, or leave both blank to use BillingCycle.", "err");
+    return;
+  }
+
+  el("go").disabled = true; el("reload").disabled = true;
+  try{
+    let source;
+    if(start && end){
+      if(start > end){ setStatus("Cycle start is after cycle end.", "err"); return; }
+      source = "entered dates";
+    } else {
+      setStatus(force ? "Reloading from sheet…" : "Looking up cycle in BillingCycle…", "info");
+      const billing = await fetchBilling(force);
+      const cyc = getPrevCycleForClient(billing, client);
+      if(!cyc){
+        setStatus(`No row for "${client}" in BillingCycle. Enter both dates to run manually.`, "err");
+        return;
+      }
+      start = cyc.start; end = cyc.end;
+      source = "BillingCycle";
+    }
+
+    setStatus(force ? "Reloading Orders_Output…" : "Fetching usage…", "info");
+    const rows = await fetchOrders(force);
+    const result = computeFromRange(rows, client, start, end);
+    renderResult(result);
+    setStatus(`Done — cycle from ${source}. Scanned ${rows.length} Orders_Output rows.`, "ok");
+  }catch(err){
+    setStatus("Error: " + err.message, "err");
+  }finally{
+    el("go").disabled = false; el("reload").disabled = false;
+  }
+}
+
+el("go").addEventListener("click", () => run(false));
+el("reload").addEventListener("click", () => run(true));
+el("client").addEventListener("keydown", e => { if(e.key === "Enter") run(false); });
+</script>
+</body>
+</html>
