@@ -101,11 +101,11 @@
     <div class="row">
       <div>
         <label for="start">Cycle start</label>
-        <input type="date" id="start" />
+        <input type="date" id="start" onclick="this.showPicker && this.showPicker()" />
       </div>
       <div>
         <label for="end">Cycle end</label>
-        <input type="date" id="end" />
+        <input type="date" id="end" onclick="this.showPicker && this.showPicker()" />
       </div>
     </div>
     <div class="subtle">Leave both dates blank to use the client's latest cycle from BillingCycle. Fill both to override.</div>
@@ -539,7 +539,7 @@ function renderDiag(d, clientName){
   el("diagCard").classList.remove("hidden");
 }
 
-
+async function run(force){
   const client = el("client").value.trim();
   let start = readDate("start");
   let end = readDate("end");
