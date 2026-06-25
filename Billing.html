@@ -143,6 +143,13 @@
     <div id="plannerKV"></div>
     <div id="plannerNote"></div>
   </div>
+
+  <!-- DIAGNOSTICS -->
+  <div class="card hidden" id="diagCard">
+    <h2 class="sec">Diagnostics</h2>
+    <div id="diagKV"></div>
+    <div id="diagSample"></div>
+  </div>
 </div>
 
 <script>
@@ -161,6 +168,7 @@ const MONTH_ABBR = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct",
 
 let ordersCache = null;  // Orders_Output rows, cached after first fetch
 let billingCache = null; // BillingCycle rows (incl. header), cached after first fetch
+let lastRawResponse = ""; // raw text of the last API call, for diagnostics
 
 /* ---------- date helpers ---------- */
 function dateOnly(d){ return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 12, 0, 0, 0); }
@@ -373,36 +381,32 @@ function computeFromRange(data, clientName, prevStart, prevEnd){
 }
 
 /* ---------- data fetch ---------- */
-async function fetchOrders(force){
-  if(ordersCache && !force) return ordersCache;
+async function apiCall(action){
   if(typeof API_URL === "undefined" || !API_URL){
     throw new Error("API_URL not found. Make sure config.js loads and defines API_URL.");
   }
-  const res = await fetch(API_URL, {
-    method: "POST",
-    body: JSON.stringify({ action: "getOrdersOutputAll" })
-  });
-  if(!res.ok) throw new Error("Server returned " + res.status);
-  const json = await res.json();
-  const rows = Array.isArray(json) ? json : (json.rows || []);
-  ordersCache = rows;
-  return rows;
+  // send action BOTH ways so it works whether doPost reads e.parameter or e.postData
+  const url = API_URL + (API_URL.indexOf("?") >= 0 ? "&" : "?") + "action=" + encodeURIComponent(action);
+  const res = await fetch(url, { method: "POST", body: JSON.stringify({ action: action }) });
+  const text = await res.text();
+  lastRawResponse = text;
+  if(!res.ok) throw new Error("Server returned " + res.status + " — " + text.slice(0, 200));
+  let json;
+  try { json = JSON.parse(text); }
+  catch(e){ throw new Error("Response was not JSON (first 200 chars): " + text.slice(0, 200)); }
+  return Array.isArray(json) ? json : (json.rows || json.data || []);
+}
+
+async function fetchOrders(force){
+  if(ordersCache && !force) return ordersCache;
+  ordersCache = await apiCall("getOrdersOutputAll");
+  return ordersCache;
 }
 
 async function fetchBilling(force){
   if(billingCache && !force) return billingCache;
-  if(typeof API_URL === "undefined" || !API_URL){
-    throw new Error("API_URL not found. Make sure config.js loads and defines API_URL.");
-  }
-  const res = await fetch(API_URL, {
-    method: "POST",
-    body: JSON.stringify({ action: "getBillingCycleAll" })
-  });
-  if(!res.ok) throw new Error("Server returned " + res.status);
-  const json = await res.json();
-  const rows = Array.isArray(json) ? json : (json.rows || []);
-  billingCache = rows;
-  return rows;
+  billingCache = await apiCall("getBillingCycleAll");
+  return billingCache;
 }
 
 /* ---------- rendering ---------- */
@@ -482,7 +486,60 @@ function readDate(id){
   return dateOnly(new Date(y, m-1, d, 12));
 }
 
-async function run(force){
+/* ---------- diagnostics: figure out where matching breaks ---------- */
+function diagnose(data, clientName, start, end){
+  const key = normName(clientName);
+  let nameMatch = 0, dateOk = 0, inRange = 0;
+  let sample = null;
+  for(const row of data){
+    if(!row || row.length < 2) continue;
+    if(normName(row[COL.name]) === key){
+      nameMatch++;
+      if(!sample) sample = row;
+      const dt = toDt(row[COL.date]);
+      if(dt){
+        dateOk++;
+        const rd = dateOnly(dt);
+        if(start <= rd && rd <= end && !isSunday(rd)) inRange++;
+      }
+    }
+  }
+  return { scanned: data.length, nameMatch, dateOk, inRange, sample, start, end };
+}
+
+function renderDiag(d, clientName){
+  let html = "";
+  html += kv("Rows scanned", d.scanned);
+  html += kv(`Rows matching "${clientName}" (any date)`, d.nameMatch);
+  html += kv("…with a parseable date", d.dateOk);
+  html += kv(`…inside ${dtstr(d.start)} → ${dtstr(d.end)} (non-Sunday)`, d.inRange);
+  el("diagKV").innerHTML = html;
+
+  if(d.sample){
+    const s = d.sample;
+    const cell = i => (i < s.length ? String(s[i]) : "—") || "∅";
+    const idxs = [0,1,5,7,8,9,10,11,12];
+    el("diagSample").innerHTML =
+      "<div class='small' style='font-weight:600;margin:10px 0 4px'>First matching row, by column index</div>" +
+      "<div class='chips'>" + idxs.map(i => `<span class="chip">[${i}] ${cell(i)}</span>`).join("") + "</div>" +
+      "<div class='subtle'>Expected: [0]=date [1]=name [5]=slot [7]=meal1 [8]=meal2 [9]=breakfast [10]=snack [11]=juice1 [12]=juice2. " +
+      "Raw parsed date of this row: " + (toDt(s[COL.date]) ? dtstr(dateOnly(toDt(s[COL.date]))) : "could not parse") + ".</div>";
+  } else {
+    el("diagSample").innerHTML =
+      "<div class='subtle'>No row anywhere matched this name. Check spelling, or column B may not be the name column in the live sheet.</div>";
+  }
+
+  if(d.scanned === 0){
+    el("diagSample").innerHTML +=
+      "<div class='note pause' style='margin-top:8px'>The server returned <b>0 rows</b>. Usually the <b>getOrdersOutputAll</b> action isn't live yet — deploy a <b>new version of the existing deployment</b> (saving the code is not enough), and confirm config.js points to that URL.</div>" +
+      "<div class='subtle' style='margin-top:6px'>Raw server response (first 300 chars):</div>" +
+      "<div class='small' style='white-space:pre-wrap;word-break:break-word;background:#f6f7f3;border:1px solid var(--line);border-radius:8px;padding:8px;margin-top:4px'>" +
+      (lastRawResponse ? lastRawResponse.slice(0, 300).replace(/</g, "&lt;") : "(empty)") + "</div>";
+  }
+  el("diagCard").classList.remove("hidden");
+}
+
+
   const client = el("client").value.trim();
   let start = readDate("start");
   let end = readDate("end");
@@ -515,6 +572,7 @@ async function run(force){
     const rows = await fetchOrders(force);
     const result = computeFromRange(rows, client, start, end);
     renderResult(result);
+    renderDiag(diagnose(rows, client, start, end), client);
     setStatus(`Done — cycle from ${source}. Scanned ${rows.length} Orders_Output rows.`, "ok");
   }catch(err){
     setStatus("Error: " + err.message, "err");
