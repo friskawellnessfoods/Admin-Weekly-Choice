@@ -3,587 +3,871 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Friska — Client Usage Summary</title>
-<!-- shared API_URL -->
+<title>Friska — Billing</title>
 <script src="config.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <style>
   :root{
-    --bg:#f6f7f3;
-    --card:#ffffff;
-    --ink:#2b3328;
-    --muted:#6f7a68;
-    --line:#e4e8df;
-    --sage:#4f7a52;
-    --sage-dark:#3c6240;
-    --accent:#eef3ea;
-    --warn-bg:#fff6e6;
-    --warn-line:#f0d9a6;
-    --warn-ink:#8a6112;
-    --pause-bg:#fdeceb;
-    --pause-line:#f1c4c0;
-    --pause-ink:#9a3b34;
-    --radius:14px;
+    --navy:#0a1a6e; --navy-deep:#08155a; --accent:#10b981; --accent-soft:#e7f7f1;
+    --bg:#f4f7fc; --card:#fff; --ink:#16213e; --muted:#6b7596; --line:#e2e7f1;
+    --warn-bg:#fff6e6; --warn-line:#f0d9a6; --warn-ink:#8a6112;
+    --pause-bg:#fdeceb; --pause-line:#f1c4c0; --pause-ink:#9a3b34;
+    --credit:#0a7d4f; --debit:#9a3b34;
   }
   *{box-sizing:border-box}
-  body{
-    margin:0;background:var(--bg);color:var(--ink);
-    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
-    line-height:1.45;-webkit-font-smoothing:antialiased;
-  }
-  .wrap{max-width:760px;margin:0 auto;padding:18px 14px 60px}
-  header h1{font-size:1.35rem;margin:6px 0 2px;letter-spacing:-.01em}
-  header p{margin:0 0 16px;color:var(--muted);font-size:.9rem}
-  .card{
-    background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
-    padding:16px;margin-bottom:14px;
-  }
-  label{display:block;font-size:.8rem;font-weight:600;color:var(--muted);margin:0 0 5px}
-  input[type=text],input[type=date]{
-    width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:10px;
-    font-size:1rem;background:#fff;color:var(--ink);
-  }
-  input:focus{outline:2px solid var(--sage);outline-offset:1px;border-color:var(--sage)}
-  .row{display:flex;gap:10px;flex-wrap:wrap}
-  .row > div{flex:1 1 140px}
-  .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
-  button{
-    font-size:.95rem;font-weight:600;padding:11px 16px;border-radius:10px;
-    border:1px solid transparent;cursor:pointer;flex:1 1 auto;
-  }
-  .btn-primary{background:var(--sage);color:#fff}
-  .btn-primary:hover{background:var(--sage-dark)}
-  .btn-ghost{background:#fff;color:var(--sage-dark);border-color:var(--line)}
-  .btn-ghost:hover{background:var(--accent)}
-  button:disabled{opacity:.55;cursor:not-allowed}
-  .status{font-size:.85rem;margin-top:10px;min-height:1.1em}
-  .status.err{color:var(--pause-ink)}
-  .status.ok{color:var(--sage-dark)}
-  .status.info{color:var(--muted)}
-
-  h2.sec{font-size:1rem;margin:2px 0 12px;display:flex;align-items:center;gap:8px}
-  h2.sec::before{content:"";width:4px;height:16px;background:var(--sage);border-radius:2px}
-
-  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:6px}
-  .stat{background:var(--accent);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
-  .stat .n{font-size:1.45rem;font-weight:700;line-height:1.1}
-  .stat .l{font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-top:2px}
-
-  .kv{display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px dashed var(--line);font-size:.92rem}
-  .kv:last-child{border-bottom:none}
-  .kv .k{color:var(--muted)}
-  .kv .v{font-weight:600;text-align:right}
-
-  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
-  .chip{background:#fff;border:1px solid var(--line);border-radius:999px;padding:3px 10px;font-size:.8rem}
-
-  .note{border-radius:10px;padding:11px 12px;font-size:.88rem;margin-top:10px}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;line-height:1.45;position:relative;overflow-x:hidden}
+  body::before,body::after{content:"";position:fixed;border-radius:50%;filter:blur(70px);z-index:0;pointer-events:none}
+  body::before{width:340px;height:340px;background:rgba(16,185,129,.16);top:-120px;left:-120px}
+  body::after{width:380px;height:380px;background:rgba(10,26,110,.10);bottom:-160px;right:-140px}
+  .wrap{position:relative;z-index:1;max-width:900px;margin:0 auto;padding:18px 16px 80px}
+  .topbar{display:flex;align-items:center;gap:12px;margin:6px 0 14px}
+  .topbar img{height:40px;width:auto}
+  .topbar h1{font-size:1.3rem;font-weight:700;color:var(--navy);margin:0}
+  .tabs{display:flex;gap:8px;background:#fff;padding:6px;border-radius:16px;box-shadow:0 10px 30px rgba(20,33,62,.07);margin-bottom:16px;flex-wrap:wrap}
+  .tab{flex:1 1 auto;text-align:center;padding:11px 14px;border-radius:11px;font-weight:700;font-size:.92rem;color:var(--muted);cursor:pointer;border:none;background:transparent}
+  .tab.active{background:var(--navy);color:#fff;box-shadow:0 6px 14px rgba(10,26,110,.22)}
+  .card{background:var(--card);border-radius:20px;padding:20px;margin-bottom:16px;box-shadow:0 16px 40px rgba(20,33,62,.08)}
+  h2.sec{font-size:1.02rem;font-weight:700;margin:0 0 14px;color:var(--navy);display:flex;align-items:center;gap:9px}
+  h2.sec::before{content:"";width:4px;height:16px;background:var(--accent);border-radius:9px}
+  label{display:block;font-size:.76rem;font-weight:600;color:#445;margin:0 0 5px}
+  input,select{width:100%;padding:11px 12px;border:1.5px solid var(--line);border-radius:12px;font-size:.95rem;background:#fbfcfe;color:var(--ink)}
+  input:focus,select:focus{outline:none;border-color:var(--accent);background:#fff;box-shadow:0 0 0 3px rgba(16,185,129,.12)}
+  .grid{display:grid;gap:12px}
+  .g2{grid-template-columns:1fr 1fr}
+  .g3{grid-template-columns:1fr 1fr 1fr}
+  @media(max-width:560px){.g3{grid-template-columns:1fr 1fr}}
+  .field{min-width:0}
+  .row{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}
+  .chips{display:flex;gap:8px;flex-wrap:wrap}
+  .chk{display:flex;align-items:center;gap:6px;background:#fbfcfe;border:1.5px solid var(--line);border-radius:10px;padding:8px 12px;font-size:.85rem;cursor:pointer}
+  .chk input{width:auto}
+  .chk.on{border-color:var(--accent);background:var(--accent-soft)}
+  button.btn{font-weight:700;padding:13px 16px;border-radius:13px;border:1.5px solid transparent;cursor:pointer;font-size:.95rem}
+  .btn-primary{background:var(--navy);color:#fff;box-shadow:0 6px 16px rgba(10,26,110,.22)}
+  .btn-primary:active{background:var(--navy-deep)}
+  .btn-ghost{background:#fff;color:var(--navy);border:1.5px solid var(--line)}
+  .btn-accent{background:var(--accent);color:#fff}
+  button.btn:disabled{opacity:.5;cursor:not-allowed}
+  .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
+  .actions .btn{flex:1 1 auto}
+  .status{font-size:.85rem;margin-top:12px;min-height:1.1em}
+  .status.err{color:var(--pause-ink)} .status.ok{color:var(--accent)} .status.info{color:var(--muted)}
+  table.lines{width:100%;border-collapse:collapse;font-size:.9rem}
+  table.lines th{text-align:left;font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);padding:6px 6px;border-bottom:1px solid var(--line)}
+  table.lines td{padding:5px 6px;border-bottom:1px solid #f0f2f7;vertical-align:middle}
+  table.lines input{padding:8px 9px;border-radius:9px;font-size:.9rem}
+  td.num{text-align:right;font-variant-numeric:tabular-nums}
+  td.qtycol{width:84px} td.ratecol{width:96px} td.pricecol{width:92px} td.rmcol{width:34px}
+  .lbl-in{border:none;background:transparent;font-weight:600;padding:8px 2px}
+  .rm{background:#fbecec;color:var(--debit);border:none;border-radius:8px;width:28px;height:28px;cursor:pointer;font-weight:700}
+  .totals{margin-top:14px;border-top:2px solid var(--line);padding-top:10px}
+  .tline{display:flex;justify-content:space-between;padding:5px 2px;font-size:.92rem}
+  .tline .k{color:var(--muted)} .tline .v{font-weight:600;font-variant-numeric:tabular-nums}
+  .tline.grand{font-size:1.15rem;border-top:1.5px dashed var(--line);margin-top:6px;padding-top:10px}
+  .tline.grand .v{color:var(--navy);font-weight:800}
+  .credit{color:var(--credit)!important} .debit{color:var(--debit)!important}
+  .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px}
+  .stat{background:var(--accent-soft);border-radius:13px;padding:11px 12px}
+  .stat .n{font-size:1.35rem;font-weight:800;color:var(--navy);line-height:1.1}
+  .stat .l{font-size:.66rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-top:3px;font-weight:600}
+  .kv{display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid #f0f2f7;font-size:.9rem}
+  .kv:last-child{border-bottom:none}.kv .k{color:var(--muted)}.kv .v{font-weight:600}
+  .note{border-radius:12px;padding:11px 13px;font-size:.85rem;margin-top:12px}
   .note.warn{background:var(--warn-bg);border:1px solid var(--warn-line);color:var(--warn-ink)}
   .note.pause{background:var(--pause-bg);border:1px solid var(--pause-line);color:var(--pause-ink)}
-  .note.info{background:var(--accent);border:1px solid var(--line);color:var(--muted)}
-
-  .subtle{color:var(--muted);font-size:.78rem;margin-top:8px}
-  .hidden{display:none}
-  .small{font-size:.82rem;color:var(--muted)}
+  .note.info{background:var(--accent-soft);color:#2f6b58}
+  .hidden{display:none}.subtle{color:var(--muted);font-size:.78rem;margin-top:8px}
+  .add-line{margin-top:8px;background:#fff;border:1.5px dashed var(--line);color:var(--navy);border-radius:10px;padding:8px 12px;font-weight:600;font-size:.85rem;cursor:pointer}
+  /* dashboard */
+  .dtable{width:100%;border-collapse:collapse;font-size:.88rem}
+  .dtable th{text-align:left;font-size:.68rem;text-transform:uppercase;color:var(--muted);padding:8px 8px;border-bottom:1.5px solid var(--line)}
+  .dtable td{padding:9px 8px;border-bottom:1px solid #f0f2f7}
+  .pill{padding:3px 10px;border-radius:99px;font-size:.74rem;font-weight:700;cursor:pointer;border:1.5px solid transparent;white-space:nowrap}
+  .pill.paid{background:var(--accent-soft);color:var(--credit);border-color:#bfe8d6}
+  .pill.unpaid{background:#fdecec;color:var(--debit);border-color:#f3c9c5}
+  .rowtag{font-size:.68rem;font-weight:700;padding:2px 8px;border-radius:99px;background:var(--warn-bg);color:var(--warn-ink);margin-left:6px}
+  .rowtag.exp{background:var(--pause-bg);color:var(--pause-ink)}
+  /* invoice (offscreen) */
+  #invoiceWrap{position:fixed;left:-9999px;top:0}
+  #invoice{width:760px;background:#fff;color:#000;font-family:Arial,Helvetica,sans-serif;border:2px solid #000}
+  #invoice .ihead{display:flex;gap:14px;padding:12px 14px;border-bottom:2px solid #000;align-items:center}
+  #invoice .ihead img{width:78px;height:78px;object-fit:contain}
+  #invoice .biz h2{margin:0;font-size:26px;font-weight:800}
+  #invoice .biz .tg{font-size:15px;font-weight:700;margin:1px 0 3px}
+  #invoice .biz div{font-size:11px;line-height:1.4}
+  #invoice .meta{display:grid;grid-template-columns:1fr 1fr 1fr 1fr}
+  #invoice .meta div{border:1px solid #000;border-top:none;padding:7px 9px;font-size:12.5px}
+  #invoice .meta .lab{font-weight:700;background:#f3f3f3}
+  #invoice .meta .big{font-weight:800;font-size:15px}
+  #invoice table.itab{width:100%;border-collapse:collapse}
+  #invoice table.itab th,#invoice table.itab td{border:1px solid #000;padding:7px 9px;font-size:13px}
+  #invoice table.itab th{background:#f3f3f3;font-weight:700;text-align:center}
+  #invoice table.itab td.d{text-align:center}
+  #invoice table.itab td.n{text-align:center;font-variant-numeric:tabular-nums}
+  #invoice .paid{display:flex;justify-content:space-between;border:1px solid #000;border-top:none;padding:10px 14px;font-weight:800;font-size:18px}
+  #invoice .bank{border:1px solid #000;border-top:none;padding:10px 14px;font-size:11.5px;line-height:1.6}
+  #invoice .bank .upi{font-weight:800;font-size:13px;margin-bottom:3px}
+  #invoice .footnote{padding:8px 14px;font-size:10px;font-style:italic}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <header>
-    <h1>Client Usage Summary</h1>
-    <p>Reads Orders_Output for one billing cycle and computes meals, paused days, and the next cycle plan.</p>
-  </header>
+  <div class="topbar">
+    <img src="logo.png" alt="" onerror="this.style.display='none'" />
+    <h1>Friska Billing</h1>
+  </div>
 
-  <div class="card">
-    <div style="margin-bottom:12px">
-      <label for="client">Client name</label>
-      <input type="text" id="client" placeholder="e.g. Priya Sharma" autocomplete="off" />
-    </div>
-    <div class="row">
-      <div>
-        <label for="start">Cycle start</label>
-        <input type="date" id="start" onclick="this.showPicker && this.showPicker()" />
+  <div class="tabs">
+    <button class="tab active" data-tab="new">New Bill</button>
+    <button class="tab" data-tab="renew">Renew / Reconcile</button>
+    <button class="tab" data-tab="dash">Dashboard</button>
+  </div>
+
+  <!-- ============ NEW BILL ============ -->
+  <section id="tab-new">
+    <div class="card">
+      <h2 class="sec">Client &amp; cycle</h2>
+      <div class="grid g2">
+        <div class="field"><label>Client name</label><input id="n_client" autocomplete="off" /></div>
+        <div class="field"><label>Phone</label><input id="n_phone" autocomplete="off" /></div>
       </div>
-      <div>
-        <label for="end">Cycle end</label>
-        <input type="date" id="end" onclick="this.showPicker && this.showPicker()" />
+      <div class="grid g3" style="margin-top:12px">
+        <div class="field"><label>Plan</label>
+          <select id="n_plan">
+            <option value="nb">Nutri Balance</option>
+            <option value="hp">High Protein</option>
+            <option value="lc">Low Carb</option>
+            <option value="hc">High Carb</option>
+            <option value="nc">No Carb</option>
+          </select>
+        </div>
+        <div class="field"><label>Duration</label>
+          <select id="n_dur">
+            <option value="d">2 day trial</option>
+            <option value="w">1 week</option>
+            <option value="m" selected>1 month</option>
+            <option value="q">3 months</option>
+          </select>
+        </div>
+        <div class="field"><label>Meal style</label>
+          <select id="n_style">
+            <option value="lunch">Lunch only</option>
+            <option value="combo" selected>Lunch + Dinner (combo)</option>
+          </select>
+        </div>
+      </div>
+      <div class="grid g3" style="margin-top:12px">
+        <div class="field"><label>Days</label><input id="n_days" type="number" value="26" min="1" /></div>
+        <div class="field"><label>Start date</label><input id="n_start" type="date" onclick="this.showPicker&&this.showPicker()" /></div>
+        <div class="field"><label>End date</label><input id="n_end" type="date" onclick="this.showPicker&&this.showPicker()" /></div>
+      </div>
+      <div style="margin-top:12px">
+        <label>Delivery slots</label>
+        <div class="chips" id="n_slots">
+          <label class="chk"><input type="checkbox" value="Morning"/>Morning</label>
+          <label class="chk"><input type="checkbox" value="Afternoon"/>Afternoon</label>
+          <label class="chk"><input type="checkbox" value="Evening"/>Evening</label>
+        </div>
       </div>
     </div>
-    <div class="subtle">Leave both dates blank to use the client's latest cycle from BillingCycle. Fill both to override.</div>
-    <div class="actions">
-      <button class="btn-primary" id="go">Fetch usage</button>
-      <button class="btn-ghost" id="reload" title="Re-pull data from the sheet">Reload data</button>
+
+    <div class="card">
+      <h2 class="sec">Bill items</h2>
+      <table class="lines"><thead><tr><th>Item</th><th>Qty</th><th>Rate</th><th>Price</th><th></th></tr></thead>
+        <tbody id="n_lines"></tbody>
+      </table>
+      <button class="add-line" id="n_addline">+ Add custom line</button>
+
+      <div class="grid g2" style="margin-top:16px">
+        <div class="field"><label>Discount %</label><input id="n_disc" type="number" value="0" min="0" /></div>
+        <div class="field"><label>GST % (food only)</label><input id="n_gst" type="number" value="5" min="0" /></div>
+      </div>
+
+      <div class="totals" id="n_totals"></div>
+
+      <div class="grid g3" style="margin-top:16px">
+        <div class="field"><label>Bill no.</label><input id="n_billno" /></div>
+        <div class="field"><label>Bill date</label><input id="n_billdate" type="date" onclick="this.showPicker&&this.showPicker()" /></div>
+        <div class="field"><label>&nbsp;</label><button class="btn btn-ghost" id="n_suggestno" style="width:100%">Suggest no.</button></div>
+      </div>
+
+      <div class="actions">
+        <button class="btn btn-ghost" id="n_preview">Preview invoice</button>
+        <button class="btn btn-primary" id="n_save">Generate &amp; save</button>
+      </div>
+      <div class="status info" id="n_status">Fill the cycle, set quantities, generate.</div>
     </div>
-    <div class="status info" id="status">Enter a client name and Fetch usage. Dates auto-fill from BillingCycle.</div>
-  </div>
+  </section>
 
-  <!-- USAGE SUMMARY -->
-  <div class="card hidden" id="summaryCard">
-    <h2 class="sec">Usage summary</h2>
-    <div id="activeInfo"></div>
-
-    <div class="grid" id="dayGrid"></div>
-    <div id="usageKV"></div>
-
-    <div id="slotBlock" class="hidden" style="margin-top:12px">
-      <div class="small" style="font-weight:600;margin-bottom:4px">Slot deliveries</div>
-      <div class="chips" id="slotChips"></div>
+  <!-- ============ RENEW / RECONCILE ============ -->
+  <section id="tab-renew" class="hidden">
+    <div class="card">
+      <h2 class="sec">Find client</h2>
+      <div class="row">
+        <div class="field" style="flex:1 1 220px"><label>Client name</label><input id="r_client" autocomplete="off" /></div>
+        <button class="btn btn-primary" id="r_fetch" style="flex:0 0 auto">Fetch &amp; reconcile</button>
+        <button class="btn btn-ghost" id="r_reload" style="flex:0 0 auto" title="Re-pull sheets">Reload</button>
+      </div>
+      <div class="status info" id="r_status">Enter a name to pull their last bill and compute usage.</div>
     </div>
 
-    <div id="pauseWarn"></div>
-
-    <div style="margin-top:12px">
-      <div class="small" style="font-weight:600;margin-bottom:4px">Paused dates</div>
-      <div id="pausedDates" class="small"></div>
+    <div class="card hidden" id="r_usageCard">
+      <h2 class="sec">Previous cycle usage</h2>
+      <div id="r_prevline" class="note info" style="margin-top:0"></div>
+      <div class="stat-grid" id="r_stats" style="margin-top:12px"></div>
+      <div id="r_usageKV" style="margin-top:12px"></div>
+      <div id="r_pauseWarn"></div>
+      <div style="margin-top:10px"><div class="subtle" style="font-weight:600">Paused dates</div><div id="r_paused" class="subtle"></div></div>
     </div>
-  </div>
 
-  <!-- NEXT CYCLE PLANNER -->
-  <div class="card hidden" id="plannerCard">
-    <h2 class="sec">Next cycle planner</h2>
-    <div id="plannerKV"></div>
-    <div id="plannerNote"></div>
-  </div>
+    <div class="card hidden" id="r_reconCard">
+      <h2 class="sec">Actual usage (priced)</h2>
+      <p class="subtle" style="margin-top:0">Counts from Orders_Output, priced at the previous bill's rates. Edit any qty or rate.</p>
+      <table class="lines"><thead><tr><th>Item</th><th>Qty</th><th>Rate</th><th>Price</th><th></th></tr></thead>
+        <tbody id="r_lines"></tbody>
+      </table>
+      <div class="totals" id="r_actualTotals"></div>
+      <div class="kv" style="margin-top:10px"><span class="k">Paid for previous cycle</span><span class="v" id="r_paid">—</span></div>
+      <div class="kv"><span class="k">Carry-forward adjustment</span><span class="v" id="r_adj">—</span></div>
+    </div>
 
-  <!-- DIAGNOSTICS -->
-  <div class="card hidden" id="diagCard">
-    <h2 class="sec">Diagnostics</h2>
-    <div id="diagKV"></div>
-    <div id="diagSample"></div>
-  </div>
+    <div class="card hidden" id="r_nextCard">
+      <h2 class="sec">Next bill</h2>
+      <div class="grid g3">
+        <div class="field"><label>Start date</label><input id="r_start" type="date" onclick="this.showPicker&&this.showPicker()" /></div>
+        <div class="field"><label>End date</label><input id="r_end" type="date" onclick="this.showPicker&&this.showPicker()" /></div>
+        <div class="field"><label>Days</label><input id="r_days" type="number" value="26" min="1" /></div>
+      </div>
+      <table class="lines" style="margin-top:14px"><thead><tr><th>Item</th><th>Qty</th><th>Rate</th><th>Price</th><th></th></tr></thead>
+        <tbody id="r_nextlines"></tbody>
+      </table>
+      <button class="add-line" id="r_addline">+ Add custom line</button>
+      <div class="grid g2" style="margin-top:16px">
+        <div class="field"><label>Discount %</label><input id="r_disc" type="number" value="0" min="0" /></div>
+        <div class="field"><label>GST % (food only)</label><input id="r_gst" type="number" value="5" min="0" /></div>
+      </div>
+      <div class="totals" id="r_nextTotals"></div>
+      <div class="grid g2" style="margin-top:16px">
+        <div class="field"><label>Bill no.</label><input id="r_billno" /></div>
+        <div class="field"><label>Bill date</label><input id="r_billdate" type="date" onclick="this.showPicker&&this.showPicker()" /></div>
+      </div>
+      <div class="actions">
+        <button class="btn btn-ghost" id="r_preview">Preview invoice</button>
+        <button class="btn btn-primary" id="r_save">Generate &amp; save</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ DASHBOARD ============ -->
+  <section id="tab-dash" class="hidden">
+    <div class="card">
+      <h2 class="sec">Follow-ups — expiring &amp; expired</h2>
+      <div id="d_followups"><div class="subtle">Loading…</div></div>
+    </div>
+    <div class="card">
+      <h2 class="sec">All bills</h2>
+      <div class="row" style="margin-bottom:12px">
+        <div class="field" style="flex:1 1 200px"><input id="d_search" placeholder="Search name or bill no." /></div>
+        <select id="d_filter" style="flex:0 0 140px"><option value="all">All</option><option value="unpaid">Unpaid</option><option value="paid">Paid</option></select>
+        <button class="btn btn-ghost" id="d_reload" style="flex:0 0 auto">Reload</button>
+      </div>
+      <div style="overflow-x:auto"><table class="dtable" id="d_table"><tbody></tbody></table></div>
+      <div class="status info" id="d_status"></div>
+    </div>
+  </section>
 </div>
 
+<div id="invoiceWrap"><div id="invoice"></div></div>
+
 <script>
-/* =================================================================
-   Friska — Client Usage Summary
-   Faithful JS port of the Python usage logic (count_usage +
-   compute_from_range). Pricing / invoice / GST intentionally removed.
-   Reads Orders_Output columns A:M (indices 0..12):
-     0 date | 1 name | 5 slot | 7 opt1 | 8 opt2 | 9 brk | 10 snack | 11 j1 | 12 j2
-   ================================================================= */
+/* =====================================================================
+   Friska Billing — single page, 3 tabs.
+   Pricing keys: {plan}_{dur}_{item}  (plan nb/hp/lc/hc/nc, dur d/w/m/q,
+   item breakfast/lunch/combo/snack/juice1/juice2). Globals: delivery, gst, seafood.
+   combo = per-meal rate, charged x2 meals/day.
+   Orders_Output cols: 0 date 1 name 2 phone 5 slot 7 opt1 8 opt2 9 brk 10 snack 11 j1 12 j2
+   ===================================================================== */
 
-const COL = { date:0, name:1, slot:5, opt1:7, opt2:8, brk:9, snk:10, j1:11, j2:12 };
-const NEEDED_BILL = 26;
-const MONTHS = {jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
-const MONTH_ABBR = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const BIZ = {  // verify GST / FSSAI against your records
+  name:"Friska Wellness", tagline:"Healthy Meals",
+  address:"Moti Nagar, Hyderabad, Telangana 500018",
+  gst:"38AAKFF6850B1ZI", fssai:"23624030000435",
+  upi:"friskawellnessllp@idfcbank", acHolder:"FRISKA WELLNESS LLP",
+  acNumber:"50200087206209", ifsc:"HDFC0005486", branch:"LIBERTY CROSS ROADS",
+  acType:"CURRENT", logo:"logo.png"
+};
 
-let ordersCache = null;  // Orders_Output rows, cached after first fetch
-let billingCache = null; // BillingCycle rows (incl. header), cached after first fetch
-let lastRawResponse = ""; // raw text of the last API call, for diagnostics
+const COL = { date:0, name:1, phone:2, slot:5, opt1:7, opt2:8, brk:9, snk:10, j1:11, j2:12 };
+const MONTH_ABBR=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const MONTHS={jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
+const PLAN_LABEL={nb:"Nutri Balance",hp:"High Protein",lc:"Low Carb",hc:"High Carb",nc:"No Carb"};
+
+let ordersCache=null, billsCache=null, priceMap=null, lastRaw="";
 
 /* ---------- date helpers ---------- */
-function dateOnly(d){ return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 12, 0, 0, 0); }
-function addDays(d, n){ const x = dateOnly(d); x.setDate(x.getDate() + n); return dateOnly(x); }
-function keyOf(d){
-  return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
-}
-function isSunday(d){ return d.getDay() === 0; } // JS Sun=0  (Python had weekday()==6)
-function dtstr(d){ return String(d.getDate()).padStart(2,"0") + "-" + MONTH_ABBR[d.getMonth()] + "-" + d.getFullYear(); }
-
-function serial(n){ const e = new Date(1899,11,30,12,0,0,0); e.setDate(e.getDate() + Math.floor(n)); return dateOnly(e); }
-
+function dateOnly(d){ return new Date(d.getFullYear(),d.getMonth(),d.getDate(),12,0,0,0); }
+function addDays(d,n){ const x=dateOnly(d); x.setDate(x.getDate()+n); return dateOnly(x); }
+function keyOf(d){ return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+function isSunday(d){ return d.getDay()===0; }
+function dtstr(d){ return d? String(d.getDate()).padStart(2,"0")+"-"+MONTH_ABBR[d.getMonth()]+"-"+d.getFullYear() : ""; }
+function serial(n){ const e=new Date(1899,11,30,12); e.setDate(e.getDate()+Math.floor(n)); return dateOnly(e); }
 function toDt(v){
-  if(v === null || v === undefined || v === "") return null;
-  if(typeof v === "number") return serial(v);
-  let s = String(v).trim();
-  if(s === "") return null;
-  if(/^\d+(\.\d+)?$/.test(s)) return serial(parseFloat(s));
-  // strip a leading weekday name ("Mon, ", "Monday, ")
-  s = s.replace(/^\s*(mon|tue|wed|thu|fri|sat|sun|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\s*,\s*/i, "");
+  if(v===null||v===undefined||v==="")return null;
+  if(typeof v==="number")return serial(v);
+  let s=String(v).trim(); if(!s)return null;
+  if(/^\d+(\.\d+)?$/.test(s))return serial(parseFloat(s));
+  s=s.replace(/^\s*(mon|tue|wed|thu|fri|sat|sun|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\s*,\s*/i,"");
   let m;
-  // ISO yyyy-mm-dd (optionally with time)
-  m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
-  if(m) return dateOnly(new Date(+m[1], +m[2]-1, +m[3], 12));
-  // dd-MMM-yyyy / dd MMM yy  (month name)
-  m = s.match(/^(\d{1,2})[-\s]([A-Za-z]{3,})[-\s](\d{2,4})$/);
-  if(m){
-    const mo = MONTHS[m[2].slice(0,3).toLowerCase()];
-    if(mo !== undefined){ let y = +m[3]; if(y < 100) y += 2000; return dateOnly(new Date(y, mo, +m[1], 12)); }
-  }
-  // dd-mm-yyyy / dd/mm/yyyy  (day first)
-  m = s.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})$/);
-  if(m){ let y = +m[3]; if(y < 100) y += 2000; return dateOnly(new Date(y, +m[2]-1, +m[1], 12)); }
+  m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/); if(m)return dateOnly(new Date(+m[1],+m[2]-1,+m[3],12));
+  m=s.match(/^(\d{1,2})[-\s]([A-Za-z]{3,})[-\s](\d{2,4})$/);
+  if(m){const mo=MONTHS[m[2].slice(0,3).toLowerCase()]; if(mo!==undefined){let y=+m[3];if(y<100)y+=2000;return dateOnly(new Date(y,mo,+m[1],12));}}
+  m=s.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})$/);
+  if(m){let y=+m[3];if(y<100)y+=2000;return dateOnly(new Date(y,+m[2]-1,+m[1],12));}
   return null;
 }
+function normName(s){ return String(s||"").replace(/\s+/g," ").trim().toLowerCase(); }
+function readDate(id){ const v=el(id).value; if(!v)return null; const [y,m,d]=v.split("-").map(Number); return dateOnly(new Date(y,m-1,d,12)); }
+function setDate(id,d){ el(id).value = d ? keyOf(d) : ""; }
+function nextServiceDates(afterDay, needed){ const out=[]; let cur=addDays(afterDay,1); while(out.length<needed){ if(!isSunday(cur))out.push(dateOnly(cur)); cur=addDays(cur,1);} return out; }
+function money(n){ n=Math.round((Number(n)||0)*100)/100; return Number.isInteger(n)? String(n) : String(n); }
 
-function normName(s){ return String(s || "").replace(/\s+/g, " ").trim().toLowerCase(); }
-
-/* ---------- BillingCycle lookup (port of get_prev_cycle_for_client) ---------- */
-function getPrevCycleForClient(billingRows, clientName){
-  if(!billingRows || billingRows.length < 2) return null;
-  const headers = billingRows[0].map(x => String(x).trim().toLowerCase());
-  const ci = headers.indexOf("client");
-  const si = headers.indexOf("start");
-  const ei = headers.indexOf("end");
-  if(ci < 0 || si < 0 || ei < 0) return null;
-  const key = normName(clientName);
-  let last = null;
-  for(let i = 1; i < billingRows.length; i++){
-    const r = billingRows[i];
-    if(r.length <= Math.max(ci, si, ei)) continue;
-    if(normName(r[ci]) === key) last = r; // keep the latest matching row
-  }
-  if(!last) return null;
-  const sd = toDt(last[si]), ed = toDt(last[ei]);
-  if(!sd || !ed) return null;
-  return { start: dateOnly(sd), end: dateOnly(ed) };
+/* ---------- api ---------- */
+async function apiCall(action, params){
+  if(typeof API_URL==="undefined"||!API_URL) throw new Error("API_URL not found (config.js).");
+  const body=new URLSearchParams(); body.set("action",action);
+  if(params) for(const k in params) body.set(k, params[k]);
+  const res=await fetch(API_URL,{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded;charset=UTF-8"},body:body.toString()});
+  const text=await res.text(); lastRaw=text;
+  if(!res.ok) throw new Error("Server "+res.status+" — "+text.slice(0,160));
+  let json; try{ json=JSON.parse(text);}catch(e){ throw new Error("Non-JSON response: "+text.slice(0,160)); }
+  return json;
 }
+async function fetchOrders(force){ if(ordersCache&&!force)return ordersCache; const j=await apiCall("getOrdersOutputAll"); ordersCache=Array.isArray(j)?j:(j.rows||[]); return ordersCache; }
+async function fetchBills(force){ if(billsCache&&!force)return billsCache; const j=await apiCall("getBillsAll"); billsCache=Array.isArray(j)?j:(j.rows||[]); return billsCache; }
+async function fetchPrices(force){
+  if(priceMap&&!force)return priceMap;
+  const j=await apiCall("getPricesAll"); const rows=Array.isArray(j)?j:(j.rows||[]);
+  const map={};
+  for(const r of rows){ if(!r||r.length<2)continue; const k=String(r[0]).trim(); const v=String(r[1]).trim(); if(!k)continue; const num=parseFloat(v.replace(/[^0-9.\-]/g,"")); if(v!=="" && !isNaN(num)) map[k.toLowerCase()]=num; }
+  priceMap=map; return map;
+}
+function rate(plan,dur,item){ const k=(plan+"_"+dur+"_"+item).toLowerCase(); return priceMap&&(k in priceMap)?priceMap[k]:0; }
+function gRate(item){ return priceMap&&(item in priceMap)?priceMap[item]:0; }
 
-/* ---------- core: count_usage ---------- */
-function countUsage(data, start, end, clientName){
-  const clientKey = normName(clientName);
-  const totals = { meal1:0, meal2:0, snack:0, j1:0, j2:0, brk:0, seafood:0 };
-  const activeDaysSet = new Set();
-  const slotCounts = {};
-  let lastActiveDate = null;
-  const pausedDates = [];
-
-  // full billing range excluding Sundays
-  const allServiceDates = [];
-  let cur = dateOnly(start);
-  while(cur <= end){
-    if(!isSunday(cur)) allServiceDates.push(dateOnly(cur));
-    cur = addDays(cur, 1);
-  }
-  const totalDays = allServiceDates.length;
-
+/* ---------- usage computation (ported, tested) ---------- */
+function countUsage(data,start,end,clientName){
+  const key=normName(clientName);
+  const totals={meal1:0,meal2:0,snack:0,j1:0,j2:0,brk:0,seafood:0};
+  const activeSet=new Set(); const slotCounts={}; let lastActive=null; const paused=[];
+  const service=[]; let cur=dateOnly(start);
+  while(cur<=end){ if(!isSunday(cur))service.push(dateOnly(cur)); cur=addDays(cur,1); }
   for(const row of data){
-    if(!row || row.length < 2) continue;
-    const dt = toDt(row[COL.date]);
-    if(!dt) continue;
-    const rowDate = dateOnly(dt);
-    if(!(start <= rowDate && rowDate <= end)) continue;
-    if(isSunday(rowDate)) continue;
-    if(normName(row[COL.name]) !== clientKey) continue;
-
-    const cell = i => (i < row.length ? String(row[i]).trim() : "");
-    const opt1 = cell(COL.opt1), opt2 = cell(COL.opt2);
-    const brk  = cell(COL.brk),  snk  = cell(COL.snk);
-    const j1   = cell(COL.j1),   j2   = cell(COL.j2);
-
-    let mc = 0;
-    if(opt1 && opt1 !== "N/A"){ totals.meal1++; mc++; if(normName(opt1) === "seafood 1") totals.seafood++; }
-    if(opt2 && opt2 !== "N/A"){ totals.meal2++; mc++; if(normName(opt2) === "seafood 2") totals.seafood++; }
-    if(brk  && brk  !== "N/A"){ totals.brk++;   mc++; }
-    if(snk  && snk  !== "N/A"){ totals.snack++; mc++; }
-    if(j1   && j1   !== "N/A"){ totals.j1++;    mc++; }
-    if(j2   && j2   !== "N/A"){ totals.j2++;    mc++; }
-
-    if(mc > 0){
-      activeDaysSet.add(keyOf(rowDate));
-      let slot = (row.length > COL.slot ? String(row[COL.slot]).trim() : "");
-      if(!slot) slot = "No Delivery Slot";
-      slotCounts[slot] = (slotCounts[slot] || 0) + 1;
-      if(!lastActiveDate || rowDate > lastActiveDate) lastActiveDate = rowDate;
+    if(!row||row.length<2)continue;
+    const dt=toDt(row[COL.date]); if(!dt)continue; const rd=dateOnly(dt);
+    if(!(start<=rd&&rd<=end))continue; if(isSunday(rd))continue;
+    if(normName(row[COL.name])!==key)continue;
+    const c=i=>(i<row.length?String(row[i]).trim():"");
+    const o1=c(COL.opt1),o2=c(COL.opt2),brk=c(COL.brk),snk=c(COL.snk),j1=c(COL.j1),j2=c(COL.j2);
+    let mc=0;
+    if(o1&&o1!=="N/A"){totals.meal1++;mc++;if(normName(o1)==="seafood 1")totals.seafood++;}
+    if(o2&&o2!=="N/A"){totals.meal2++;mc++;if(normName(o2)==="seafood 2")totals.seafood++;}
+    if(brk&&brk!=="N/A"){totals.brk++;mc++;}
+    if(snk&&snk!=="N/A"){totals.snack++;mc++;}
+    if(j1&&j1!=="N/A"){totals.j1++;mc++;}
+    if(j2&&j2!=="N/A"){totals.j2++;mc++;}
+    if(mc>0){ activeSet.add(keyOf(rd)); let slot=(row.length>COL.slot?String(row[COL.slot]).trim():"")||"No slot"; slotCounts[slot]=(slotCounts[slot]||0)+1; if(!lastActive||rd>lastActive)lastActive=rd; }
+  }
+  for(const d of service){ if(!activeSet.has(keyOf(d)))paused.push(dateOnly(d)); }
+  totals.meals_total=totals.meal1+totals.meal2; totals.juices_total=totals.j1+totals.j2;
+  let deliveries=0; for(const s in slotCounts)deliveries+=slotCounts[s];
+  return {totals,activeDays:activeSet.size,pausedDays:paused.length,totalDays:service.length,pausedDates:paused,lastActiveDate:lastActive,slotCounts,deliveries};
+}
+function findResumeDate(data,name,after,maxDays){ maxDays=maxDays||90; const key=normName(name); const lim=addDays(after,maxDays);
+  for(const row of data){ if(!row||row.length<2)continue; const dt=toDt(row[COL.date]); if(!dt)continue; const d=dateOnly(dt);
+    if(!(after<d&&d<=lim))continue; if(normName(row[COL.name])!==key)continue;
+    for(const i of [7,8,9,10,11,12]){ if(i<row.length){const v=String(row[i]).trim(); if(v&&v!=="N/A")return d;} } } return null; }
+function findNextActiveDates(data,name,startDate,needed){ const key=normName(name); const seen=new Set();
+  for(const row of data){ if(!row||row.length<2)continue; const dt=toDt(row[COL.date]); if(!dt)continue; const d=dateOnly(dt);
+    if(d<startDate)continue; if(normName(row[COL.name])!==key)continue;
+    for(const i of [7,8,9,10,11,12]){ if(i<row.length){const v=String(row[i]).trim(); if(v&&v!=="N/A"){seen.add(keyOf(d));break;}} } }
+  return Array.from(seen).sort().map(k=>{const [y,m,da]=k.split("-").map(Number);return dateOnly(new Date(y,m-1,da,12));}).slice(0,needed); }
+function computeFromRange(data,name,prevStart,prevEnd){
+  const today=dateOnly(new Date()); let calcEnd=prevEnd>today?today:prevEnd, stillActive=prevEnd>today;
+  const u=countUsage(data,prevStart,calcEnd,name); const needAdj=u.pausedDays;
+  let resume = prevEnd>=today?addDays(prevEnd,1):(findResumeDate(data,name,prevEnd)||addDays(prevEnd,1));
+  let adjustDates=[],nextStart=null,nextEnd=null,neverResumed=false;
+  if(needAdj===0){ const f=nextServiceDates(addDays(resume,-1),26); nextStart=f[0];nextEnd=f[f.length-1]; }
+  else{
+    adjustDates=findNextActiveDates(data,name,resume,needAdj);
+    if(adjustDates.length===0&&u.lastActiveDate&&u.lastActiveDate<prevEnd){ neverResumed=true; }
+    else{
+      if(adjustDates.length<needAdj){ const rem=needAdj-adjustDates.length; const from=adjustDates.length?adjustDates[adjustDates.length-1]:resume; adjustDates=adjustDates.concat(nextServiceDates(from,rem)); }
+      const ae=adjustDates.length?adjustDates[adjustDates.length-1]:resume; const f=nextServiceDates(ae,26); nextStart=f[0];nextEnd=f[f.length-1];
     }
   }
-
-  const activeDays = activeDaysSet.size;
-  for(const d of allServiceDates){
-    if(!activeDaysSet.has(keyOf(d))) pausedDates.push(dateOnly(d));
-  }
-  const pausedDays = pausedDates.length;
-
-  totals.meals_total  = totals.meal1 + totals.meal2;
-  totals.juices_total = totals.j1 + totals.j2;
-
-  return { totals, activeDays, pausedDays, totalDays, pausedDates, lastActiveDate, slotCounts };
+  return Object.assign({},u,{prevStart,prevEnd,calcEnd,stillActive,today,needAdj,adjustDates,nextStart,nextEnd,neverResumed});
 }
 
-/* ---------- helpers used by planner ---------- */
-function findResumeDate(data, clientName, afterDate, maxDays){
-  maxDays = maxDays || 90;
-  const key = normName(clientName);
-  const limit = addDays(afterDate, maxDays);
-  for(const row of data){
-    if(!row || row.length < 2) continue;
-    const dt = toDt(row[COL.date]); if(!dt) continue;
-    const d = dateOnly(dt);
-    if(!(afterDate < d && d <= limit)) continue;
-    if(normName(row[COL.name]) !== key) continue;
-    for(const idx of [COL.opt1, COL.opt2, COL.brk, COL.snk, COL.j1, COL.j2]){
-      if(idx < row.length){ const val = String(row[idx]).trim(); if(val && val !== "N/A") return d; }
-    }
-  }
-  return null;
+/* ---------- generic helpers ---------- */
+function el(id){ return document.getElementById(id); }
+function setStatus(id,msg,cls){ const s=el(id); s.textContent=msg; s.className="status "+(cls||"info"); }
+
+/* ---------- line-item engine ---------- */
+// line = {id,label,qty,rate,food,custom}
+function lineRowHtml(line){
+  const lbl = line.custom
+    ? `<input class="lbl-in" value="${(line.label||"").replace(/"/g,"&quot;")}" data-f="label">`
+    : `<span style="font-weight:600">${line.label}</span>`;
+  return `<tr data-id="${line.id}">
+    <td>${lbl}</td>
+    <td class="qtycol"><input type="number" min="0" value="${line.qty}" data-f="qty"></td>
+    <td class="ratecol"><input type="number" min="0" step="0.5" value="${line.rate}" data-f="rate"></td>
+    <td class="pricecol num" data-price>${money(line.qty*line.rate)}</td>
+    <td class="rmcol">${line.custom?`<button class="rm" data-rm>×</button>`:""}</td>
+  </tr>`;
+}
+function renderLines(tbodyId, lines){ el(tbodyId).innerHTML = lines.map(lineRowHtml).join(""); }
+function readLines(tbodyId){
+  const out=[];
+  el(tbodyId).querySelectorAll("tr").forEach(tr=>{
+    const id=tr.getAttribute("data-id");
+    const get=f=>tr.querySelector(`[data-f="${f}"]`);
+    const label = get("label")? get("label").value : tr.querySelector("span")?.textContent || "";
+    const qty=parseFloat(get("qty").value)||0;
+    const rt=parseFloat(get("rate").value)||0;
+    out.push({id,label,qty,rate:rt,custom:!!get("label"),food:tr.dataset.food!=="0"});
+  });
+  return out;
+}
+function computeTotals(lines, discPct, gstPct, adjustment){
+  let food=0, delivery=0;
+  lines.forEach(l=>{ const amt=l.qty*l.rate; if(l.id==="delivery"||l.food===false)delivery+=amt; else food+=amt; });
+  const discAmt=food*(discPct||0)/100;
+  const foodAfter=food-discAmt;
+  const gst=foodAfter*(gstPct||0)/100;
+  const grand=foodAfter+gst+delivery+(adjustment||0);
+  return {food,discAmt,foodAfter,gst,delivery,adjustment:adjustment||0,grand};
+}
+function renderTotals(containerId, t){
+  let h="";
+  h+=`<div class="tline"><span class="k">Food subtotal</span><span class="v">₹${money(t.food)}</span></div>`;
+  if(t.discAmt>0) h+=`<div class="tline"><span class="k">Discount</span><span class="v credit">−₹${money(t.discAmt)}</span></div>`;
+  h+=`<div class="tline"><span class="k">GST</span><span class="v">₹${money(t.gst)}</span></div>`;
+  if(t.delivery>0) h+=`<div class="tline"><span class="k">Delivery</span><span class="v">₹${money(t.delivery)}</span></div>`;
+  if(t.adjustment) h+=`<div class="tline"><span class="k">Prev-cycle adjustment</span><span class="v ${t.adjustment<0?'credit':'debit'}">${t.adjustment<0?'−':'+'}₹${money(Math.abs(t.adjustment))}</span></div>`;
+  h+=`<div class="tline grand"><span class="k">Grand total</span><span class="v">₹${money(t.grand)}</span></div>`;
+  el(containerId).innerHTML=h;
+}
+// keep price cells live without full re-render
+function bindLineInputs(tbodyId, onChange){
+  el(tbodyId).addEventListener("input", e=>{
+    const tr=e.target.closest("tr"); if(tr){ const q=tr.querySelector('[data-f="qty"]'),r=tr.querySelector('[data-f="rate"]'),p=tr.querySelector('[data-price]'); if(q&&r&&p)p.textContent=money((parseFloat(q.value)||0)*(parseFloat(r.value)||0)); }
+    onChange&&onChange();
+  });
+  el(tbodyId).addEventListener("click", e=>{ if(e.target.dataset.rm!==undefined){ e.target.closest("tr").remove(); onChange&&onChange(); } });
 }
 
-function findNextActiveDates(data, clientName, startDate, needed){
-  const key = normName(clientName);
-  const seen = new Set();
-  for(const row of data){
-    if(!row || row.length < 2) continue;
-    const dt = toDt(row[COL.date]); if(!dt) continue;
-    const d = dateOnly(dt);
-    if(d < startDate) continue;
-    if(normName(row[COL.name]) !== key) continue;
-    for(const idx of [COL.opt1, COL.opt2, COL.brk, COL.snk, COL.j1, COL.j2]){
-      if(idx < row.length){ const val = String(row[idx]).trim(); if(val && val !== "N/A"){ seen.add(keyOf(d)); break; } }
-    }
-  }
-  const arr = Array.from(seen).sort().map(k => { const [y,m,da] = k.split("-").map(Number); return dateOnly(new Date(y, m-1, da, 12)); });
-  return arr.slice(0, needed);
+/* =====================================================================
+   NEW BILL
+   ===================================================================== */
+function newDefaultLines(){
+  return [
+    {id:"main",label:"Combo (Lunch + Dinner)",qty:52,rate:0,food:true,custom:false},
+    {id:"breakfast",label:"Breakfast",qty:0,rate:0,food:true,custom:false},
+    {id:"snack",label:"Snack",qty:0,rate:0,food:true,custom:false},
+    {id:"juice1",label:"Juice 1",qty:0,rate:0,food:true,custom:false},
+    {id:"juice2",label:"Juice 2",qty:0,rate:0,food:true,custom:false},
+    {id:"seafood",label:"Seafood add-on",qty:0,rate:0,food:true,custom:false},
+    {id:"delivery",label:"Delivery",qty:0,rate:0,food:false,custom:false}
+  ];
+}
+function applyPricingTo(lines, plan, dur, style){
+  lines.forEach(l=>{
+    if(l.id==="main"){ l.rate = style==="combo"?rate(plan,dur,"combo"):rate(plan,dur,"lunch"); l.label = style==="combo"?"Combo (Lunch + Dinner)":"Lunch"; }
+    else if(l.id==="breakfast") l.rate=rate(plan,dur,"breakfast");
+    else if(l.id==="snack") l.rate=rate(plan,dur,"snack");
+    else if(l.id==="juice1") l.rate=rate(plan,dur,"juice1");
+    else if(l.id==="juice2") l.rate=rate(plan,dur,"juice2");
+    else if(l.id==="seafood") l.rate=gRate("seafood");
+    else if(l.id==="delivery") l.rate=gRate("delivery");
+  });
+}
+function newSlotCount(){ return el("n_slots").querySelectorAll("input:checked").length; }
+function rebuildNewLines(){
+  const plan=el("n_plan").value, dur=el("n_dur").value, style=el("n_style").value;
+  const days=parseInt(el("n_days").value)||0; const slots=newSlotCount();
+  const lines=newDefaultLines();
+  applyPricingTo(lines,plan,dur,style);
+  lines.find(l=>l.id==="main").qty = style==="combo"?days*2:days;
+  lines.find(l=>l.id==="delivery").qty = days*(slots||1);
+  renderLines("n_lines",lines);
+  el("n_lines").querySelectorAll("tr").forEach(tr=>{ const id=tr.dataset.id; if(id==="delivery")tr.dataset.food="0"; });
+  recalcNew();
+}
+function recalcNew(){
+  const lines=readLines("n_lines");
+  const t=computeTotals(lines, parseFloat(el("n_disc").value)||0, parseFloat(el("n_gst").value)||0, 0);
+  renderTotals("n_totals",t);
+}
+function newDatesFromStart(){
+  const s=readDate("n_start"); const days=parseInt(el("n_days").value)||26;
+  if(s){ const f=nextServiceDates(addDays(s,-1),days); setDate("n_end", f[f.length-1]); }
 }
 
-function nextServiceCalendarDates(afterDay, needed){
-  const out = [];
-  let cur = addDays(afterDay, 1);
-  while(out.length < needed){
-    if(!isSunday(cur)) out.push(dateOnly(cur));
-    cur = addDays(cur, 1);
+/* =====================================================================
+   RENEW / RECONCILE
+   ===================================================================== */
+let renewCtx=null; // {prevBill, usage}
+
+function billHeaderIndex(billsRows){
+  const h=billsRows[0].map(x=>String(x).trim());
+  const idx={}; h.forEach((name,i)=>idx[name]=i); return idx;
+}
+function lastBillForClient(billsRows, name){
+  if(!billsRows||billsRows.length<2)return null;
+  const idx=billHeaderIndex(billsRows);
+  const ci=idx["Client"]; if(ci===undefined)return null;
+  const key=normName(name); let last=null;
+  for(let i=1;i<billsRows.length;i++){ if(normName(billsRows[i][ci])===key)last=billsRows[i]; }
+  if(!last)return null;
+  const get=k=>{ const j=idx[k]; return (j===undefined||j>=last.length)?"":last[j]; };
+  let lines=[]; try{ lines=JSON.parse(get("LinesJSON")||"[]"); }catch(e){}
+  return {
+    raw:last, idx,
+    billNo:get("BillNo"), plan:get("Plan"), duration:get("Duration"), style:get("Style"), slots:get("Slots"),
+    start:toDt(get("Start")), end:toDt(get("End")),
+    grandTotal:parseFloat(get("GrandTotal"))||0,
+    discPct:parseFloat(get("Discount"))||0, gstPct:parseFloat(get("GST"))||0,
+    lines
+  };
+}
+
+async function runRenew(force){
+  const name=el("r_client").value.trim();
+  if(!name){ setStatus("r_status","Enter a client name.","err"); return; }
+  setStatus("r_status","Loading…","info");
+  try{
+    const [bills, prices] = await Promise.all([fetchBills(force), fetchPrices(force)]);
+    const prev=lastBillForClient(bills,name);
+    if(!prev){ setStatus("r_status",`No previous bill found for "${name}" in Bills.`,"err"); return; }
+    if(!prev.start||!prev.end){ setStatus("r_status","Previous bill has no readable Start/End dates.","err"); return; }
+    const orders=await fetchOrders(force);
+    const usage=computeFromRange(orders,name,prev.start,prev.end);
+    renewCtx={prev,usage};
+    renderRenew(prev,usage);
+    setStatus("r_status",`Loaded bill ${prev.billNo}. Review the reconciliation below.`,"ok");
+  }catch(err){ setStatus("r_status","Error: "+err.message,"err"); }
+}
+
+function renderRenew(prev, u){
+  const t=u.totals;
+  el("r_usageCard").classList.remove("hidden");
+  el("r_prevline").innerHTML = `Previous cycle <b>${dtstr(prev.start)} → ${dtstr(prev.end)}</b> · ${PLAN_LABEL[prev.plan]||prev.plan||"—"} · ${prev.style||""}${u.stillActive?` · still active, counted to today (${dtstr(u.today)})`:""}`;
+  el("r_stats").innerHTML =
+    statBox(t.meals_total,"Meals") + statBox(u.activeDays,"Active days") + statBox(u.pausedDays,"Paused days") + statBox(u.deliveries,"Deliveries");
+  let kv="";
+  if(t.seafood>0)kv+=kvRow("Seafood",t.seafood);
+  if(t.brk>0)kv+=kvRow("Breakfast",t.brk);
+  if(t.snack>0)kv+=kvRow("Snack",t.snack);
+  if(t.juices_total>0)kv+=kvRow("Juices",`${t.juices_total} (J1 ${t.j1}, J2 ${t.j2})`);
+  kv+=kvRow("Total service days",u.totalDays);
+  el("r_usageKV").innerHTML=kv;
+  if(u.lastActiveDate&&u.lastActiveDate<prev.end){
+    el("r_pauseWarn").innerHTML=`<div class="note pause">Last meal on <b>${dtstr(u.lastActiveDate)}</b>; paused since <b>${dtstr(addDays(u.lastActiveDate,1))}</b>.</div>`;
+  } else el("r_pauseWarn").innerHTML="";
+  el("r_paused").textContent = u.pausedDates.length? u.pausedDates.map(dtstr).join(", ") : "None";
+
+  // actual usage lines, priced at prev bill's plan/dur/style
+  const plan=prev.plan,dur=prev.duration,style=prev.style;
+  const actual=[
+    {id:"main",label:style==="combo"?"Combo meals":"Lunch meals",qty:t.meals_total,rate:style==="combo"?rate(plan,dur,"combo"):rate(plan,dur,"lunch"),food:true,custom:false},
+    {id:"breakfast",label:"Breakfast",qty:t.brk,rate:rate(plan,dur,"breakfast"),food:true,custom:false},
+    {id:"snack",label:"Snack",qty:t.snack,rate:rate(plan,dur,"snack"),food:true,custom:false},
+    {id:"juice1",label:"Juice 1",qty:t.j1,rate:rate(plan,dur,"juice1"),food:true,custom:false},
+    {id:"juice2",label:"Juice 2",qty:t.j2,rate:rate(plan,dur,"juice2"),food:true,custom:false},
+    {id:"seafood",label:"Seafood add-on",qty:t.seafood,rate:gRate("seafood"),food:true,custom:false},
+    {id:"delivery",label:"Delivery",qty:u.deliveries,rate:gRate("delivery"),food:false,custom:false}
+  ];
+  el("r_reconCard").classList.remove("hidden");
+  renderLines("r_lines",actual);
+  el("r_lines").querySelectorAll("tr").forEach(tr=>{ if(tr.dataset.id==="delivery")tr.dataset.food="0"; });
+  recalcRenewActual();
+
+  // next bill — reuse prev composition, new dates
+  el("r_nextCard").classList.remove("hidden");
+  setDate("r_start", u.nextStart); setDate("r_end", u.nextEnd);
+  el("r_days").value=26; el("r_disc").value=prev.discPct||0; el("r_gst").value=prev.gstPct||5;
+  el("r_billdate").value=keyOf(dateOnly(new Date()));
+  const nextLines = (prev.lines&&prev.lines.length? prev.lines.map(l=>({id:l.id,label:l.label,qty:l.qty,rate:l.rate,food:l.food!==false,custom:!!l.custom}))
+                    : newDefaultLines());
+  if(!prev.lines||!prev.lines.length){ applyPricingTo(nextLines,plan,dur,style); nextLines.find(l=>l.id==="main").qty=style==="combo"?52:26; nextLines.find(l=>l.id==="delivery").qty=26; }
+  renderLines("r_nextlines",nextLines);
+  el("r_nextlines").querySelectorAll("tr").forEach(tr=>{ if(tr.dataset.id==="delivery")tr.dataset.food="0"; });
+  suggestBillNo("r_billno","r_billdate");
+  recalcRenewNext();
+}
+function recalcRenewActual(){
+  if(!renewCtx)return;
+  const lines=readLines("r_lines");
+  const t=computeTotals(lines, renewCtx.prev.discPct||0, renewCtx.prev.gstPct||0, 0);
+  renderTotals("r_actualTotals",t);
+  const paid=renewCtx.prev.grandTotal;
+  const adj = (Math.round(t.grand*100)/100) - paid; // actual − paid
+  renewCtx.adjustment=adj;
+  el("r_paid").textContent="₹"+money(paid);
+  el("r_adj").innerHTML = adj===0 ? "₹0" :
+    `<span class="${adj<0?'credit':'debit'}">${adj<0?'−':'+'}₹${money(Math.abs(adj))} ${adj<0?'(credit to client)':'(client owes)'}</span>`;
+  recalcRenewNext();
+}
+function recalcRenewNext(){
+  if(!renewCtx)return;
+  const lines=readLines("r_nextlines");
+  const t=computeTotals(lines, parseFloat(el("r_disc").value)||0, parseFloat(el("r_gst").value)||0, renewCtx.adjustment||0);
+  renderTotals("r_nextTotals",t);
+}
+
+/* ---------- small render helpers ---------- */
+function statBox(n,l){ return `<div class="stat"><div class="n">${n}</div><div class="l">${l}</div></div>`; }
+function kvRow(k,v){ return `<div class="kv"><span class="k">${k}</span><span class="v">${v}</span></div>`; }
+
+/* ---------- bill number ---------- */
+function suggestBillNo(billnoId, billdateId){
+  const bd=readDate(billdateId)||dateOnly(new Date());
+  const month=bd.getMonth()+1; const prefix=month*100;
+  let maxSeq=0;
+  if(billsCache&&billsCache.length>1){
+    const idx=billHeaderIndex(billsCache); const bi=idx["BillNo"];
+    if(bi!==undefined) for(let i=1;i<billsCache.length;i++){ const n=parseInt(String(billsCache[i][bi]).replace(/\D/g,"")); if(!isNaN(n)&&Math.floor(n/100)===month) maxSeq=Math.max(maxSeq, n-prefix); }
+  }
+  el(billnoId).value = prefix + (maxSeq+1);
+}
+
+/* ---------- invoice ---------- */
+function buildInvoice(meta, lines, totals){
+  const visible=lines.filter(l=>l.qty>0 || l.rate>0);
+  let rows="";
+  visible.forEach(l=>{
+    const isDelivery=(l.id==="delivery"||l.food===false);
+    const price = isDelivery? totals.delivery : l.qty*l.rate;
+    rows+=`<tr><td>${l.label}</td><td class="d">${l.qty||""}</td><td class="n">${l.rate?money(l.rate):""}</td><td class="n">${price?money(price):""}</td></tr>`;
+  });
+  if(totals.discAmt>0) rows+=`<tr><td>Discount</td><td class="d">${meta.discPct}%</td><td></td><td class="n">−${money(totals.discAmt)}</td></tr>`;
+  rows+=`<tr><td>GST</td><td class="d">${meta.gstPct}%</td><td></td><td class="n">${money(totals.gst)}</td></tr>`;
+  if(totals.adjustment) rows+=`<tr><td>Prev-cycle adjustment</td><td></td><td></td><td class="n">${totals.adjustment<0?'−':'+'}${money(Math.abs(totals.adjustment))}</td></tr>`;
+  el("invoice").innerHTML=`
+    <div class="ihead">
+      <img src="${BIZ.logo}" onerror="this.style.visibility='hidden'">
+      <div class="biz">
+        <h2>${BIZ.name}</h2><div class="tg">${BIZ.tagline}</div>
+        <div>${BIZ.address}</div><div>GST - ${BIZ.gst}</div><div>FSSAI - ${BIZ.fssai}</div>
+      </div>
+    </div>
+    <div class="meta">
+      <div class="lab">Invoice Number</div><div class="big">${meta.billNo}</div>
+      <div class="lab">Bill Start</div><div>${dtstr(meta.start)}</div>
+      <div class="lab">Billing Date</div><div>${dtstr(meta.billDate)}</div>
+      <div class="lab">Bill End</div><div>${dtstr(meta.end)}</div>
+      <div class="lab">Days - ${meta.days}</div><div></div>
+      <div class="lab">Client</div><div class="big">${meta.client}</div>
+    </div>
+    <table class="itab"><thead><tr><th>Description</th><th>Qty</th><th>Rate</th><th>Price</th></tr></thead><tbody>${rows}</tbody></table>
+    <div class="paid"><span>${meta.paidStatus==="Paid"?"Paid":"Total"}</span><span>₹${money(totals.grand)}</span></div>
+    <div class="bank">
+      <div class="upi">UPI ID : ${BIZ.upi}</div>
+      Account Holder: ${BIZ.acHolder}<br>Account Number: ${BIZ.acNumber}<br>IFSC: ${BIZ.ifsc}<br>Branch: ${BIZ.branch}<br>Account Type: ${BIZ.acType}
+    </div>
+    <div class="footnote">*Note: Please ensure you read all Terms &amp; Conditions related to delivery timings, meal storage &amp; shelf life — Refunds, substitutions &amp; cancellation policy on our website.</div>`;
+}
+async function exportInvoicePDF(filename){
+  const node=el("invoice");
+  const canvas=await html2canvas(node,{scale:2,backgroundColor:"#ffffff"});
+  const img=canvas.toDataURL("image/png");
+  const { jsPDF }=window.jspdf;
+  const pdf=new jsPDF("p","mm","a4");
+  const pw=pdf.internal.pageSize.getWidth(), margin=8;
+  const w=pw-margin*2; const h=canvas.height*(w/canvas.width);
+  pdf.addImage(img,"PNG",margin,margin,w,h);
+  pdf.save(filename);
+}
+
+/* ---------- gather meta + save ---------- */
+function gatherNewMeta(){
+  return {
+    billNo:el("n_billno").value.trim(), billDate:readDate("n_billdate")||dateOnly(new Date()),
+    client:el("n_client").value.trim(), phone:el("n_phone").value.trim(),
+    plan:el("n_plan").value, duration:el("n_dur").value, style:el("n_style").value,
+    days:parseInt(el("n_days").value)||26, start:readDate("n_start"), end:readDate("n_end"),
+    slots:Array.from(el("n_slots").querySelectorAll("input:checked")).map(c=>c.value).join(", "),
+    discPct:parseFloat(el("n_disc").value)||0, gstPct:parseFloat(el("n_gst").value)||5,
+    paidStatus:"Unpaid"
+  };
+}
+function billObject(meta, lines, totals){
+  return {
+    BillNo:meta.billNo, Date:keyOf(meta.billDate), Client:meta.client, Phone:meta.phone,
+    Plan:meta.plan, Duration:meta.duration, Style:meta.style, Slots:meta.slots,
+    Start:meta.start?keyOf(meta.start):"", End:meta.end?keyOf(meta.end):"",
+    Food:money(totals.food), Discount:meta.discPct, GST:meta.gstPct, Delivery:money(totals.delivery),
+    Adjustment:money(totals.adjustment), GrandTotal:money(totals.grand), PaidStatus:meta.paidStatus,
+    LinesJSON:JSON.stringify(lines.map(l=>({id:l.id,label:l.label,qty:l.qty,rate:l.rate,food:l.food!==false,custom:!!l.custom})))
+  };
+}
+async function saveBill(obj, statusId){
+  setStatus(statusId,"Saving bill…","info");
+  const res=await apiCall("appendBill",{payload:JSON.stringify(obj)});
+  if(res&&res.ok){ billsCache=null; setStatus(statusId,`Saved bill ${obj.BillNo}.`,"ok"); return true; }
+  setStatus(statusId,"Save failed: "+(res&&res.message||"unknown"),"err"); return false;
+}
+
+/* =====================================================================
+   DASHBOARD
+   ===================================================================== */
+async function loadDashboard(force){
+  setStatus("d_status","Loading bills…","info");
+  try{
+    const bills=await fetchBills(force);
+    renderDashboard(bills);
+    setStatus("d_status",`${Math.max(0,bills.length-1)} bills.`,"ok");
+  }catch(err){ setStatus("d_status","Error: "+err.message,"err"); el("d_followups").innerHTML=""; }
+}
+function dashRows(){
+  if(!billsCache||billsCache.length<2)return [];
+  const idx=billHeaderIndex(billsCache); const out=[];
+  for(let i=1;i<billsCache.length;i++){
+    const r=billsCache[i]; const g=k=>{const j=idx[k];return (j===undefined||j>=r.length)?"":r[j];};
+    out.push({ billNo:g("BillNo"), client:g("Client"), plan:g("Plan"), start:toDt(g("Start")), end:toDt(g("End")), grand:g("GrandTotal"), paid:String(g("PaidStatus")||"Unpaid") });
   }
   return out;
 }
-
-/* ---------- core: compute_from_range ---------- */
-function computeFromRange(data, clientName, prevStart, prevEnd){
-  const today = dateOnly(new Date());
-  let calcEnd, stillActive = false;
-  if(prevEnd > today){ stillActive = true; calcEnd = today; }
-  else { calcEnd = prevEnd; }
-
-  const u = countUsage(data, prevStart, calcEnd, clientName);
-  const neededAdjust = u.pausedDays;
-
-  // resume date
-  let resumeDate;
-  if(prevEnd >= today){ resumeDate = addDays(prevEnd, 1); }
-  else {
-    resumeDate = findResumeDate(data, clientName, prevEnd);
-    if(!resumeDate) resumeDate = addDays(prevEnd, 1);
+function renderDashboard(){
+  const today=dateOnly(new Date());
+  const rows=dashRows();
+  // follow-ups: end <= today, not superseded by a later bill for same client
+  const latestEndByClient={};
+  rows.forEach(r=>{ if(r.end){ const k=normName(r.client); if(!latestEndByClient[k]||r.end>latestEndByClient[k])latestEndByClient[k]=r.end; } });
+  const follow=rows.filter(r=>r.end && r.end<=addDays(today,3) && r.end>=addDays(today,-365) && latestEndByClient[normName(r.client)] && keyOf(latestEndByClient[normName(r.client)])===keyOf(r.end));
+  follow.sort((a,b)=>a.end-b.end);
+  if(!follow.length){ el("d_followups").innerHTML=`<div class="subtle">Nothing expiring in the next 3 days.</div>`; }
+  else{
+    el("d_followups").innerHTML=`<div style="overflow-x:auto"><table class="dtable"><tbody>`+follow.map(r=>{
+      const expired=r.end<today, todayTag=keyOf(r.end)===keyOf(today);
+      const tag = expired?`<span class="rowtag exp">expired</span>`:(todayTag?`<span class="rowtag">today</span>`:`<span class="rowtag">${Math.round((r.end-today)/86400000)}d</span>`);
+      return `<tr><td><b>${r.client}</b>${tag}</td><td>${dtstr(r.end)}</td><td>${r.billNo}</td><td>${pillHtml(r)}</td></tr>`;
+    }).join("")+`</tbody></table></div>`;
+    bindPills("d_followups");
   }
-
-  let adjustDates = [], nextStart = null, nextEnd = null, neverResumed = false;
-
-  if(neededAdjust === 0){
-    const future = nextServiceCalendarDates(addDays(resumeDate, -1), NEEDED_BILL);
-    nextStart = future[0]; nextEnd = future[future.length-1];
-  } else {
-    adjustDates = findNextActiveDates(data, clientName, resumeDate, neededAdjust);
-
-    if(adjustDates.length === 0 && u.lastActiveDate && u.lastActiveDate < prevEnd){
-      neverResumed = true; // client never resumed meals after billing end
-    } else {
-      if(adjustDates.length < neededAdjust){
-        const remaining = neededAdjust - adjustDates.length;
-        const startFrom = adjustDates.length ? adjustDates[adjustDates.length-1] : resumeDate;
-        adjustDates = adjustDates.concat(nextServiceCalendarDates(startFrom, remaining));
-      }
-      const adjustEnd = adjustDates.length ? adjustDates[adjustDates.length-1] : resumeDate;
-      const future = nextServiceCalendarDates(adjustEnd, NEEDED_BILL);
-      nextStart = future[0]; nextEnd = future[future.length-1];
-    }
-  }
-
-  return Object.assign({}, u, {
-    prevStart, prevEnd, calcEnd, stillActive, today,
-    neededAdjust, adjustDates, nextStart, nextEnd, neverResumed
+  applyDashFilter();
+}
+function pillHtml(r){ const cls=r.paid.toLowerCase()==="paid"?"paid":"unpaid"; return `<span class="pill ${cls}" data-bill="${r.billNo}" data-status="${r.paid}">${r.paid.toLowerCase()==="paid"?"Paid":"Unpaid"}</span>`; }
+function bindPills(scopeId){
+  el(scopeId).querySelectorAll(".pill").forEach(p=>{
+    p.onclick=async()=>{
+      const billNo=p.dataset.bill; const next=p.dataset.status.toLowerCase()==="paid"?"Unpaid":"Paid";
+      p.textContent="…";
+      try{ const res=await apiCall("updateBillStatus",{billNo,status:next});
+        if(res&&res.ok){ // update cache
+          const idx=billHeaderIndex(billsCache); const bi=idx["BillNo"], si=idx["PaidStatus"];
+          for(let i=1;i<billsCache.length;i++){ if(String(billsCache[i][bi])===String(billNo)){ billsCache[i][si]=next; break; } }
+          renderDashboard();
+        } else { p.textContent="!"; }
+      }catch(e){ p.textContent="!"; }
+    };
   });
 }
-
-/* ---------- data fetch ---------- */
-async function apiCall(action){
-  if(typeof API_URL === "undefined" || !API_URL){
-    throw new Error("API_URL not found. Make sure config.js loads and defines API_URL.");
-  }
-  // send action BOTH ways so it works whether doPost reads e.parameter or e.postData
-  const url = API_URL + (API_URL.indexOf("?") >= 0 ? "&" : "?") + "action=" + encodeURIComponent(action);
-  const res = await fetch(url, { method: "POST", body: JSON.stringify({ action: action }) });
-  const text = await res.text();
-  lastRawResponse = text;
-  if(!res.ok) throw new Error("Server returned " + res.status + " — " + text.slice(0, 200));
-  let json;
-  try { json = JSON.parse(text); }
-  catch(e){ throw new Error("Response was not JSON (first 200 chars): " + text.slice(0, 200)); }
-  return Array.isArray(json) ? json : (json.rows || json.data || []);
+function applyDashFilter(){
+  const q=normName(el("d_search").value); const f=el("d_filter").value;
+  let rows=dashRows();
+  if(f!=="all") rows=rows.filter(r=>r.paid.toLowerCase()===f);
+  if(q) rows=rows.filter(r=>normName(r.client).includes(q)||String(r.billNo).includes(q));
+  rows.sort((a,b)=> (b.start&&a.start)? b.start-a.start : 0);
+  const head=`<thead><tr><th>Bill</th><th>Client</th><th>Plan</th><th>Start</th><th>End</th><th>Total</th><th>Status</th></tr></thead>`;
+  const body=rows.map(r=>`<tr><td>${r.billNo}</td><td>${r.client}</td><td>${PLAN_LABEL[r.plan]||r.plan||""}</td><td>${dtstr(r.start)}</td><td>${dtstr(r.end)}</td><td>₹${money(r.grand)}</td><td>${pillHtml(r)}</td></tr>`).join("");
+  el("d_table").innerHTML=head+`<tbody>${body}</tbody>`;
+  bindPills("d_table");
 }
 
-async function fetchOrders(force){
-  if(ordersCache && !force) return ordersCache;
-  ordersCache = await apiCall("getOrdersOutputAll");
-  return ordersCache;
+/* =====================================================================
+   WIRING
+   ===================================================================== */
+function switchTab(name){
+  document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("active",t.dataset.tab===name));
+  el("tab-new").classList.toggle("hidden",name!=="new");
+  el("tab-renew").classList.toggle("hidden",name!=="renew");
+  el("tab-dash").classList.toggle("hidden",name!=="dash");
+  if(name==="dash") loadDashboard(false);
+  if(name==="new") ensurePricesThen(rebuildNewLines);
+}
+async function ensurePricesThen(cb){
+  try{ await fetchPrices(false); cb&&cb(); }
+  catch(e){ setStatus("n_status","Couldn't load Prices: "+e.message,"err"); }
 }
 
-async function fetchBilling(force){
-  if(billingCache && !force) return billingCache;
-  billingCache = await apiCall("getBillingCycleAll");
-  return billingCache;
+document.querySelectorAll(".tab").forEach(t=>t.addEventListener("click",()=>switchTab(t.dataset.tab)));
+
+// New bill events
+["n_plan","n_dur","n_style"].forEach(id=>el(id).addEventListener("change",rebuildNewLines));
+el("n_days").addEventListener("input",()=>{ rebuildNewLines(); newDatesFromStart(); });
+el("n_start").addEventListener("change",newDatesFromStart);
+el("n_slots").addEventListener("change",e=>{ e.target.closest(".chk").classList.toggle("on",e.target.checked); rebuildNewLines(); });
+el("n_disc").addEventListener("input",recalcNew); el("n_gst").addEventListener("input",recalcNew);
+bindLineInputs("n_lines",recalcNew);
+el("n_addline").addEventListener("click",()=>{ const tr=document.createElement("tbody"); const tmp=lineRowHtml({id:"custom_"+Date.now(),label:"Custom item",qty:0,rate:0,food:true,custom:true}); el("n_lines").insertAdjacentHTML("beforeend",tmp); recalcNew(); });
+el("n_suggestno").addEventListener("click",()=>{ ensureBillsThen(()=>suggestBillNo("n_billno","n_billdate")); });
+el("n_billdate").addEventListener("change",()=>suggestBillNo("n_billno","n_billdate"));
+el("n_preview").addEventListener("click",async()=>{
+  const meta=gatherNewMeta(); const lines=readLines("n_lines"); const t=computeTotals(lines,meta.discPct,meta.gstPct,0);
+  buildInvoice(meta,lines,t); await exportInvoicePDF(`Invoice_${(meta.client||"Client").replace(/\s+/g,"_")}_${meta.billNo||"draft"}.pdf`);
+});
+el("n_save").addEventListener("click",async()=>{
+  const meta=gatherNewMeta();
+  if(!meta.client){ setStatus("n_status","Enter client name.","err"); return; }
+  if(!meta.billNo){ setStatus("n_status","Set a bill number.","err"); return; }
+  const lines=readLines("n_lines"); const t=computeTotals(lines,meta.discPct,meta.gstPct,0);
+  const ok=await saveBill(billObject(meta,lines,t),"n_status");
+  if(ok){ buildInvoice(meta,lines,t); await exportInvoicePDF(`Invoice_${meta.client.replace(/\s+/g,"_")}_${meta.billNo}.pdf`); }
+});
+
+// Renew events
+el("r_fetch").addEventListener("click",()=>runRenew(false));
+el("r_reload").addEventListener("click",()=>runRenew(true));
+el("r_client").addEventListener("keydown",e=>{ if(e.key==="Enter")runRenew(false); });
+bindLineInputs("r_lines",recalcRenewActual);
+bindLineInputs("r_nextlines",recalcRenewNext);
+el("r_disc").addEventListener("input",recalcRenewNext); el("r_gst").addEventListener("input",recalcRenewNext);
+el("r_addline").addEventListener("click",()=>{ el("r_nextlines").insertAdjacentHTML("beforeend",lineRowHtml({id:"custom_"+Date.now(),label:"Custom item",qty:0,rate:0,food:true,custom:true})); recalcRenewNext(); });
+el("r_billdate").addEventListener("change",()=>suggestBillNo("r_billno","r_billdate"));
+el("r_preview").addEventListener("click",async()=>{
+  if(!renewCtx)return; const meta=gatherRenewMeta(); const lines=readLines("r_nextlines"); const t=computeTotals(lines,meta.discPct,meta.gstPct,renewCtx.adjustment||0);
+  buildInvoice(meta,lines,t); await exportInvoicePDF(`Invoice_${(meta.client||"Client").replace(/\s+/g,"_")}_${meta.billNo||"draft"}.pdf`);
+});
+el("r_save").addEventListener("click",async()=>{
+  if(!renewCtx)return; const meta=gatherRenewMeta();
+  if(!meta.billNo){ setStatus("r_status","Set a bill number.","err"); return; }
+  const lines=readLines("r_nextlines"); const t=computeTotals(lines,meta.discPct,meta.gstPct,renewCtx.adjustment||0);
+  const ok=await saveBill(billObject(meta,lines,t),"r_status");
+  if(ok){ buildInvoice(meta,lines,t); await exportInvoicePDF(`Invoice_${meta.client.replace(/\s+/g,"_")}_${meta.billNo}.pdf`); }
+});
+function gatherRenewMeta(){
+  const p=renewCtx.prev;
+  return { billNo:el("r_billno").value.trim(), billDate:readDate("r_billdate")||dateOnly(new Date()),
+    client:p.raw[p.idx["Client"]], phone:p.idx["Phone"]!==undefined?p.raw[p.idx["Phone"]]:"",
+    plan:p.plan, duration:p.duration, style:p.style, slots:p.slots,
+    days:parseInt(el("r_days").value)||26, start:readDate("r_start"), end:readDate("r_end"),
+    discPct:parseFloat(el("r_disc").value)||0, gstPct:parseFloat(el("r_gst").value)||5, paidStatus:"Unpaid" };
 }
 
-/* ---------- rendering ---------- */
-function el(id){ return document.getElementById(id); }
-function setStatus(msg, cls){ const s = el("status"); s.textContent = msg; s.className = "status " + (cls || "info"); }
-function statBox(n, l){ return `<div class="stat"><div class="n">${n}</div><div class="l">${l}</div></div>`; }
-function kv(k, v){ return `<div class="kv"><span class="k">${k}</span><span class="v">${v}</span></div>`; }
+// Dashboard events
+el("d_search").addEventListener("input",applyDashFilter);
+el("d_filter").addEventListener("change",applyDashFilter);
+el("d_reload").addEventListener("click",()=>loadDashboard(true));
 
-function renderResult(r){
-  const t = r.totals;
+async function ensureBillsThen(cb){ try{ await fetchBills(false); cb&&cb(); }catch(e){ setStatus("n_status","Couldn't load Bills: "+e.message,"err"); } }
 
-  // active-until info
-  el("activeInfo").innerHTML = r.stillActive
-    ? `<div class="note info">Subscription is still active until <b>${dtstr(r.prevEnd)}</b>. Paused days are counted only up to today (${dtstr(r.today)}).</div>`
-    : "";
-
-  // day stat boxes
-  el("dayGrid").innerHTML =
-    statBox(t.meals_total, "Meals total") +
-    statBox(r.activeDays, "Active days") +
-    statBox(r.pausedDays, "Paused days") +
-    statBox(r.totalDays, "Total days");
-
-  // detail key/values (only show non-zero extras, matching the Python summary)
-  let kvHtml = kv("Meal 1 / Meal 2", `${t.meal1} / ${t.meal2}`);
-  if(t.seafood > 0)      kvHtml += kv("Seafood add-on", t.seafood);
-  if(t.snack > 0)        kvHtml += kv("Snacks total", t.snack);
-  if(t.juices_total > 0) kvHtml += kv("Juices total", `${t.juices_total} (J1: ${t.j1}, J2: ${t.j2})`);
-  if(t.brk > 0)          kvHtml += kv("Breakfast total", t.brk);
-  el("usageKV").innerHTML = kvHtml;
-
-  // slot chips
-  const slots = Object.keys(r.slotCounts).sort();
-  if(slots.length){
-    el("slotBlock").classList.remove("hidden");
-    el("slotChips").innerHTML = slots.map(s => `<span class="chip">${s}: <b>${r.slotCounts[s]}</b></span>`).join("");
-  } else {
-    el("slotBlock").classList.add("hidden");
-  }
-
-  // pause warning (last meal before cycle end)
-  if(r.lastActiveDate && r.prevEnd && r.lastActiveDate < r.prevEnd){
-    const pauseStart = addDays(r.lastActiveDate, 1);
-    el("pauseWarn").innerHTML =
-      `<div class="note pause">Last meal taken on <b>${dtstr(r.lastActiveDate)}</b>. ` +
-      `Subscription paused since <b>${dtstr(pauseStart)}</b>. Client has not resumed meals yet.</div>`;
-  } else {
-    el("pauseWarn").innerHTML = "";
-  }
-
-  // paused dates
-  const paused = r.pausedDates.slice().sort((a,b)=>a-b);
-  el("pausedDates").textContent = paused.length ? paused.map(dtstr).join(", ") : "None";
-
-  el("summaryCard").classList.remove("hidden");
-
-  // ----- planner -----
-  let pHtml = kv("Previous bill range", `${dtstr(r.prevStart)} → ${dtstr(r.prevEnd)}`);
-  pHtml += kv("Paused days to adjust", r.neededAdjust);
-  pHtml += kv("Adjustment dates", r.neededAdjust ? r.adjustDates.map(dtstr).join(", ") : "None");
-  pHtml += kv("New bill start", r.nextStart ? dtstr(r.nextStart) : "Not available");
-  pHtml += kv("New bill end",   r.nextEnd   ? dtstr(r.nextEnd)   : "Not available");
-  el("plannerKV").innerHTML = pHtml;
-
-  el("plannerNote").innerHTML = r.neverResumed
-    ? `<div class="note warn">Client never resumed meals after the cycle end, so a new bill range can't be planned yet.</div>`
-    : "";
-
-  el("plannerCard").classList.remove("hidden");
-}
-
-/* ---------- events ---------- */
-function readDate(id){
-  const v = el(id).value; // yyyy-mm-dd from <input type=date>
-  if(!v) return null;
-  const [y,m,d] = v.split("-").map(Number);
-  return dateOnly(new Date(y, m-1, d, 12));
-}
-
-/* ---------- diagnostics: figure out where matching breaks ---------- */
-function diagnose(data, clientName, start, end){
-  const key = normName(clientName);
-  let nameMatch = 0, dateOk = 0, inRange = 0;
-  let sample = null;
-  for(const row of data){
-    if(!row || row.length < 2) continue;
-    if(normName(row[COL.name]) === key){
-      nameMatch++;
-      if(!sample) sample = row;
-      const dt = toDt(row[COL.date]);
-      if(dt){
-        dateOk++;
-        const rd = dateOnly(dt);
-        if(start <= rd && rd <= end && !isSunday(rd)) inRange++;
-      }
-    }
-  }
-  return { scanned: data.length, nameMatch, dateOk, inRange, sample, start, end };
-}
-
-function renderDiag(d, clientName){
-  let html = "";
-  html += kv("Rows scanned", d.scanned);
-  html += kv(`Rows matching "${clientName}" (any date)`, d.nameMatch);
-  html += kv("…with a parseable date", d.dateOk);
-  html += kv(`…inside ${dtstr(d.start)} → ${dtstr(d.end)} (non-Sunday)`, d.inRange);
-  el("diagKV").innerHTML = html;
-
-  if(d.sample){
-    const s = d.sample;
-    const cell = i => (i < s.length ? String(s[i]) : "—") || "∅";
-    const idxs = [0,1,5,7,8,9,10,11,12];
-    el("diagSample").innerHTML =
-      "<div class='small' style='font-weight:600;margin:10px 0 4px'>First matching row, by column index</div>" +
-      "<div class='chips'>" + idxs.map(i => `<span class="chip">[${i}] ${cell(i)}</span>`).join("") + "</div>" +
-      "<div class='subtle'>Expected: [0]=date [1]=name [5]=slot [7]=meal1 [8]=meal2 [9]=breakfast [10]=snack [11]=juice1 [12]=juice2. " +
-      "Raw parsed date of this row: " + (toDt(s[COL.date]) ? dtstr(dateOnly(toDt(s[COL.date]))) : "could not parse") + ".</div>";
-  } else {
-    el("diagSample").innerHTML =
-      "<div class='subtle'>No row anywhere matched this name. Check spelling, or column B may not be the name column in the live sheet.</div>";
-  }
-
-  if(d.scanned === 0){
-    el("diagSample").innerHTML +=
-      "<div class='note pause' style='margin-top:8px'>The server returned <b>0 rows</b>. Usually the <b>getOrdersOutputAll</b> action isn't live yet — deploy a <b>new version of the existing deployment</b> (saving the code is not enough), and confirm config.js points to that URL.</div>" +
-      "<div class='subtle' style='margin-top:6px'>Raw server response (first 300 chars):</div>" +
-      "<div class='small' style='white-space:pre-wrap;word-break:break-word;background:#f6f7f3;border:1px solid var(--line);border-radius:8px;padding:8px;margin-top:4px'>" +
-      (lastRawResponse ? lastRawResponse.slice(0, 300).replace(/</g, "&lt;") : "(empty)") + "</div>";
-  }
-  el("diagCard").classList.remove("hidden");
-}
-
-async function run(force){
-  const client = el("client").value.trim();
-  let start = readDate("start");
-  let end = readDate("end");
-
-  if(!client){ setStatus("Enter a client name.", "err"); return; }
-  if((start && !end) || (!start && end)){
-    setStatus("Enter both dates to override, or leave both blank to use BillingCycle.", "err");
-    return;
-  }
-
-  el("go").disabled = true; el("reload").disabled = true;
-  try{
-    let source;
-    if(start && end){
-      if(start > end){ setStatus("Cycle start is after cycle end.", "err"); return; }
-      source = "entered dates";
-    } else {
-      setStatus(force ? "Reloading from sheet…" : "Looking up cycle in BillingCycle…", "info");
-      const billing = await fetchBilling(force);
-      const cyc = getPrevCycleForClient(billing, client);
-      if(!cyc){
-        setStatus(`No row for "${client}" in BillingCycle. Enter both dates to run manually.`, "err");
-        return;
-      }
-      start = cyc.start; end = cyc.end;
-      source = "BillingCycle";
-    }
-
-    setStatus(force ? "Reloading Orders_Output…" : "Fetching usage…", "info");
-    const rows = await fetchOrders(force);
-    const result = computeFromRange(rows, client, start, end);
-    renderResult(result);
-    renderDiag(diagnose(rows, client, start, end), client);
-    setStatus(`Done — cycle from ${source}. Scanned ${rows.length} Orders_Output rows.`, "ok");
-  }catch(err){
-    setStatus("Error: " + err.message, "err");
-  }finally{
-    el("go").disabled = false; el("reload").disabled = false;
-  }
-}
-
-el("go").addEventListener("click", () => run(false));
-el("reload").addEventListener("click", () => run(true));
-el("client").addEventListener("keydown", e => { if(e.key === "Enter") run(false); });
+// init
+el("n_billdate").value=keyOf(dateOnly(new Date()));
+el("n_slots").querySelectorAll("input").forEach(i=>i.parentElement.classList.toggle("on",i.checked));
+ensurePricesThen(rebuildNewLines);
 </script>
 </body>
 </html>
