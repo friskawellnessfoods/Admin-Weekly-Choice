@@ -368,8 +368,8 @@
     <button data-tab="meal"><input type="checkbox" class="tabchk" data-sec="meal" checked onclick="event.stopPropagation()">Meal List</button>
     <button data-tab="mise"><input type="checkbox" class="tabchk" data-sec="mise" checked onclick="event.stopPropagation()">Mise List</button>
     <button data-tab="delivery"><input type="checkbox" class="tabchk" data-sec="delivery" checked onclick="event.stopPropagation()">Delivery List</button>
-    <button data-tab="overview"><input type="checkbox" class="tabchk" data-sec="overview" checked onclick="event.stopPropagation()">Meal Overview</button>
-    <button data-tab="pause"><input type="checkbox" class="tabchk" data-sec="pause" checked onclick="event.stopPropagation()">Pause List</button>
+    <button data-tab="overview"><input type="checkbox" class="tabchk" data-sec="overview" onclick="event.stopPropagation()">Meal Overview</button>
+    <button data-tab="pause"><input type="checkbox" class="tabchk" data-sec="pause" onclick="event.stopPropagation()">Pause List</button>
     <button data-tab="tags"><input type="checkbox" class="tabchk" data-sec="tags" checked onclick="event.stopPropagation()">Tags</button>
   </div>
 
@@ -1762,7 +1762,7 @@
       if(overviewCanvas) addImagePaged(pdf, overviewCanvas, place, 'portrait');
 
       // pause list: portrait (if present)
-      if(pauseCanvas) addImagePaged(pdf, pauseCanvas, place, 'portrait');
+      if(pauseCanvas) addImageFitOnePage(pdf, pauseCanvas, place, 'portrait');
 
       pdf.save('Kitchen_List_' + date + '.pdf');
       setStatus('Kitchen List PDF downloaded for ' + date + '.', false);
@@ -1776,6 +1776,22 @@
   }
 
   // place a canvas onto A4 page(s) in the given orientation, 6mm margins, slicing if too tall
+  // Always fit the whole image on ONE page (scale down if needed, never slice). For the pause list.
+  function addImageFitOnePage(pdf, canvas, place, orient){
+    const margin = 6;
+    const pageW = orient === 'landscape' ? 297 : 210;
+    const pageH = orient === 'landscape' ? 210 : 297;
+    const Pw = pageW - 2*margin, Ph = pageH - 2*margin;
+    const Cw = canvas.width, Ch = canvas.height;
+    if(!Cw || !Ch) return;
+    // scale so both width and height fit within the page box
+    const scale = Math.min(Pw / Cw, Ph / Ch);
+    const w = Cw * scale, h = Ch * scale;
+    const x = margin + (Pw - w) / 2;   // center horizontally
+    place(orient);
+    pdf.addImage(canvas.toDataURL('image/jpeg', 0.96), 'JPEG', x, margin, w, h);
+  }
+
   function addImagePaged(pdf, canvas, place, orient){
     const margin = 6;
     const pageW = orient === 'landscape' ? 297 : 210;
@@ -1785,14 +1801,18 @@
     if(!Cw || !Ch) return;
 
     const fullH = Ch * (Pw / Cw);
-    if(fullH <= Ph){
+    // tolerance: if it's within ~3mm of fitting, scale it down to one page instead of spilling
+    if(fullH <= Ph + 3){
       place(orient);
-      pdf.addImage(canvas.toDataURL('image/jpeg', 0.96), 'JPEG', margin, margin, Pw, fullH);
+      const drawH = Math.min(fullH, Ph);
+      pdf.addImage(canvas.toDataURL('image/jpeg', 0.96), 'JPEG', margin, margin, Pw, drawH);
       return;
     }
     const sliceHpx = Math.floor(Cw * (Ph / Pw));
+    const minSlicePx = Math.max(8, Cw * 0.01);   // skip slivers thinner than ~1% (blank-page guard)
     for(let y = 0; y < Ch; y += sliceHpx){
       const h = Math.min(sliceHpx, Ch - y);
+      if(h < minSlicePx) break;                  // trailing sliver → don't emit a near-blank page
       const sc = document.createElement('canvas');
       sc.width = Cw; sc.height = h;
       const sctx = sc.getContext('2d');
