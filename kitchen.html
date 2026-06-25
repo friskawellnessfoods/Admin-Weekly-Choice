@@ -50,7 +50,7 @@
     border-bottom:0;
   }
   body.landing .tabs, body.landing .view{ display:none; }
-  body.landing #pdf{ display:none; }   /* only show after Generate */
+  body.landing #pdf, body.landing #refresh{ display:none; }   /* only show after Generate */
 
   body.working .bar{
     position:sticky; top:0; z-index:10; flex-direction:row; min-height:auto;
@@ -336,9 +336,10 @@
       <div class="field">
         <input type="date" id="date">
       </div>
-      <label class="proc-toggle"><input type="checkbox" id="procChk" checked>Process orders first</label>
+      <label class="proc-toggle"><input type="checkbox" id="procChk">Process orders first</label>
       <label class="proc-toggle"><input type="checkbox" id="miseChk">Write totals to MiseList</label>
       <button id="go" class="btn">Generate</button>
+      <button id="refresh" class="btn alt" disabled>Refresh</button>
       <button id="pdf" class="btn alt" disabled>Download Kitchen List PDF</button>
       <span class="status" id="status"><span class="spinner"></span><span id="statusText">Pick a date to begin.</span></span>
     </div>
@@ -408,6 +409,7 @@
   const deliveryWrap = document.getElementById('deliveryWrap');
   const pauseWrap  = document.getElementById('pauseWrap');
   const goBtn      = document.getElementById('go');
+  const refreshBtn = document.getElementById('refresh');
   const printBtn   = { disabled:false };   // Print button removed; stub keeps refs harmless
   const pdfBtn     = document.getElementById('pdf');
   const statusText = document.getElementById('statusText');
@@ -509,6 +511,7 @@
 
     loadedView[activeTab] = false;
     await load(activeTab);          // render the visible tab first
+    refreshBtn.disabled = false;    // refresh available once something is loaded
     await preloadData();            // warm the rest in the background
 
     // optional: write the meal totals into MiseList (last, so its confirmation stays on screen)
@@ -525,6 +528,20 @@
     }
   });
   pdfBtn.addEventListener('click', downloadKitchenPdf);
+
+  // Refresh: re-fetch fresh data for the open tab first, then warm the rest in the background.
+  // Does NOT re-run processing or the mise write — purely reloads list data from the sheet.
+  refreshBtn.addEventListener('click', async () => {
+    if(!dateEl.value){ setStatus('Pick a date first.', false); return; }
+    refreshBtn.disabled = true;
+    invalidate();                   // drop all cached data + clear rendered tabs
+    loadedView[activeTab] = false;
+    try{
+      await load(activeTab);        // re-render the visible tab from fresh data
+      await preloadData();          // re-warm the others in the background
+    }catch(e){ setStatus('Refresh error: ' + e.message, false); }
+    refreshBtn.disabled = false;
+  });
 
   // run the Orders_Log -> Orders_Output processing (POST processLogByDate), same as process.html.
   // The actual erase/rewrite logic lives server-side in Apps Script; this only triggers it.
@@ -917,7 +934,10 @@
     writeBtn.addEventListener('click', async () => {
       writeBtn.disabled = true; note.textContent = 'Writing…'; note.className = 'ov-note';
       try{
-        const res = await writeMiseTotals(date, c);
+        // recompute fresh from current client rows at click time (avoids any stale/zero counts)
+        const freshRows = await ensureClient(date);
+        const freshCounts = computeMealCounts(freshRows);
+        const res = await writeMiseTotals(date, freshCounts);
         if(res && res.success){ note.textContent = '✓ ' + (res.message || 'Written'); note.className = 'ov-note ok'; }
         else { note.textContent = '⚠ ' + (res && res.message ? res.message : 'Write failed'); note.className = 'ov-note warn'; }
       }catch(e){ note.textContent = '⚠ ' + e.message; note.className = 'ov-note warn'; }
