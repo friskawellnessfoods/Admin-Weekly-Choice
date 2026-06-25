@@ -285,6 +285,9 @@
     .tabs{ top:auto; position:sticky; }
     .listwrap{ padding:12px; }
     body.landing .controls{ max-width:300px; }
+    /* keep wide sheets at full desktop width on mobile and scroll, instead of squeezing text */
+    .mealsheet, .ovsheet{ max-width:none; }
+    .listwrap{ overflow-x:auto; -webkit-overflow-scrolling:touch; }
   }
 
   @media print{
@@ -509,23 +512,29 @@
       setStatus(result.message || 'Processing done.', false);
     }
 
-    loadedView[activeTab] = false;
-    await load(activeTab);          // render the visible tab first
-    refreshBtn.disabled = false;    // refresh available once something is loaded
-    await preloadData();            // warm the rest in the background
-
-    // optional: write the meal totals into MiseList (last, so its confirmation stays on screen)
+    // optional: write the meal totals into MiseList FIRST — before any tab (esp. the
+    // mise list) is fetched, so the mise list reads the freshly-written numbers, not zeros.
     const miseChk = document.getElementById('miseChk');
     if(miseChk && miseChk.checked){
       try{
-        const rows = await ensureClient(date);
-        const counts = computeMealCounts(rows);
+        goBtn.disabled = true;
         setStatus('Writing totals to MiseList…', true);
+        const rows = await ensureClient(date);          // client data (cached after process)
+        const counts = computeMealCounts(rows);
         const res = await writeMiseTotals(date, counts);
         setStatus(res && res.success ? '✓ ' + (res.message || 'Totals written to MiseList.')
                                      : '⚠ MiseList write: ' + (res && res.message ? res.message : 'failed'), false);
+        if(res && res.success){
+          invalidate();                                 // drop pre-write cached data so it re-fetches fresh
+          await new Promise(r => setTimeout(r, 1200));  // let the sheet's dependent formulas recalculate
+        }
       }catch(e){ setStatus('⚠ MiseList write error: ' + e.message, false); }
     }
+
+    loadedView[activeTab] = false;
+    await load(activeTab);          // render the visible tab first
+    refreshBtn.disabled = false;    // refresh available once something is loaded
+    await preloadData();            // warm the rest in the background (mise now reads written numbers)
   });
   pdfBtn.addEventListener('click', downloadKitchenPdf);
 
