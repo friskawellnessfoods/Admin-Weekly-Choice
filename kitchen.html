@@ -1377,7 +1377,7 @@
     const inactive  = (data.pausedInactive || []).map(norm).sort(byName);
 
     // tomorrow-reminder message for paused clients
-    const REMIND_MSG = "Hi! It looks like tomorrow meal choice hasn't been selected yet. Just checking if you'd like to add the meal or pause for tomorrow. Let us know and we'll update it for you.";
+    const REMIND_MSG = (name) => "Hi " + name + "! It looks like tomorrow meal choice hasn't been selected yet. Just checking if you'd like to add the meal or pause for tomorrow. Let us know and we'll update it for you.";
 
     const wrap = document.createElement('div'); wrap.className = 'pausesheet';
     const h = document.createElement('h2');
@@ -1396,7 +1396,7 @@
     const waLink = (phone, msg) => {
       let p = String(phone || '').replace(/\D/g,'');
       if(p.length === 10) p = '91' + p;               // default to India country code
-      return 'https://wa.me/' + p + '?text=' + encodeURIComponent(msg);
+      return 'intent://send?phone=' + p + '&text=' + encodeURIComponent(msg) + '#Intent;scheme=whatsapp;package=com.whatsapp.w4b;end';
     };
 
     const table = document.createElement('table'); table.className = 'pause';
@@ -1408,7 +1408,7 @@
       const act = document.createElement('td'); act.className = 'wa-cell';
       if(c.phone){
         const a = document.createElement('a');
-        a.className = 'wa-btn'; a.href = waLink(c.phone, REMIND_MSG);
+        a.className = 'wa-btn'; a.href = waLink(c.phone, REMIND_MSG(c.name));
         a.target = '_blank'; a.rel = 'noopener'; a.textContent = 'WhatsApp';
         act.appendChild(a);
       }
