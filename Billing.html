@@ -619,10 +619,9 @@ function invoiceBlob(){return new Promise((resolve,reject)=>{html2canvas(el("inv
 async function sendWhatsApp(meta,t){
   const blob=await invoiceBlob();const file=new File([blob],`Bill_${meta.billNo}.png`,{type:"image/png"});
   const phone="91"+String(meta.phone||"").replace(/\D/g,"").slice(-10);
-  const text=`Hi ${meta.client}, here is your Friska Wellness bill ${meta.billNo} for ₹${money(t.grand)}. Thank you!`;
-  if(navigator.canShare&&navigator.canShare({files:[file]})){try{await navigator.share({files:[file],text});return;}catch(e){if(e&&e.name==="AbortError")return;}}
+  if(navigator.canShare&&navigator.canShare({files:[file]})){try{await navigator.share({files:[file]});return;}catch(e){if(e&&e.name==="AbortError")return;}}
   const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=file.name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1500);
-  window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`,"_blank");
+  window.open(`https://wa.me/${phone}`,"_blank");
 }
 
 /* meta + save */
