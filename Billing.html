@@ -127,7 +127,7 @@
     <div class="card">
       <h2 class="sec">Client &amp; cycle</h2>
       <div class="grid g2">
-        <div class="field"><label>Client name</label><input id="n_client" list="n_clientNames" autocomplete="off" placeholder="type 2+ letters" /><datalist id="n_clientNames"></datalist></div>
+        <div class="field"><label>Client name</label><input id="n_client" list="n_clientNames" autocomplete="off" /><datalist id="n_clientNames"></datalist></div>
         <div class="field"><label>Phone</label><input id="n_phone" autocomplete="off" /><select id="n_phoneSel" class="hidden" style="margin-top:6px"></select></div>
       </div>
       <div class="grid g3" style="margin-top:12px">
@@ -159,8 +159,8 @@
           <label class="chk"><input type="checkbox" value="dinner"/>Dinner</label>
           <label class="chk"><input type="checkbox" value="breakfast"/>Breakfast</label>
           <label class="chk"><input type="checkbox" value="snack"/>Snack</label>
-          <label class="chk"><input type="checkbox" value="juice1"/>Juice 1</label>
-          <label class="chk"><input type="checkbox" value="juice2"/>Juice 2</label>
+          <label class="chk"><input type="checkbox" value="juice1x"/>1× Juice</label>
+          <label class="chk"><input type="checkbox" value="juice2x"/>2× Juice</label>
           <label class="chk"><input type="checkbox" value="seafood"/>Seafood add-on</label>
         </div>
         <div class="subtle">Lunch + Dinner together uses the combo rate. A separate meal line is created per selected plan.</div>
@@ -192,8 +192,8 @@
         <div class="field"><label>&nbsp;</label><button class="btn btn-ghost" id="n_suggestno" style="width:100%">Refresh no.</button></div>
       </div>
       <div class="actions">
-        <button class="btn btn-ghost" id="n_preview">Preview invoice</button>
-        <button class="btn btn-primary" id="n_save">Generate &amp; save</button>
+        <button class="btn btn-ghost" id="n_save">Save to sheet</button>
+        <button class="btn btn-primary" id="n_whatsapp">Bill image &amp; WhatsApp</button>
       </div>
       <div class="status info" id="n_status">Choose what the client takes, set quantities, generate.</div>
     </div>
@@ -245,8 +245,8 @@
         <div class="field"><label>Bill date</label><input id="r_billdate" type="date" onclick="this.showPicker&&this.showPicker()" /></div>
       </div>
       <div class="actions">
-        <button class="btn btn-ghost" id="r_preview">Preview invoice</button>
-        <button class="btn btn-primary" id="r_save">Generate &amp; save</button>
+        <button class="btn btn-ghost" id="r_save">Save to sheet</button>
+        <button class="btn btn-primary" id="r_whatsapp">Bill image &amp; WhatsApp</button>
       </div>
     </div>
   </section>
@@ -301,7 +301,7 @@ const MONTHS={jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10
 const PLAN_LABEL={nb:"Nutri Balance",hp:"High Protein",lc:"Low Carb",hc:"High Carb",nc:"No Carb"};
 const DUR_LABEL={d:"2 day trial",w:"Weekly",m:"1 month",q:"3 months",custom:"Custom"};
 const DUR_DAYS={d:2,w:6,m:26,q:78};
-const ITEM_LABEL={breakfast:"Breakfast",snack:"Snack",juice1:"Juice 1",juice2:"Juice 2"};
+const ITEM_LABEL={breakfast:"Breakfast",snack:"Snack"};
 let ordersCache=null,billsCache=null,priceMap=null,masterCache=null,lastRaw="";
 
 /* date helpers */
@@ -443,7 +443,8 @@ function bindLivePrice(tbodyId,onChange){
 }
 function statBox(n,l){return `<div class="stat"><div class="n">${n}</div><div class="l">${l}</div></div>`;}
 function kvRow(k,v){return `<div class="kv"><span class="k">${k}</span><span class="v">${v}</span></div>`;}
-function itemsReadable(lines){return lines.filter(l=>l.qty>0).map(l=>`${l.label} ×${l.qty}`).join(" · ");}
+function stripPlan(label){const i=String(label).indexOf("· ");return i>=0?String(label).slice(i+2):String(label);}
+function itemsReadable(lines){const map={};const order=[];lines.forEach(l=>{if(l.qty<=0||l.id==="delivery"||l.food===false)return;const lab=stripPlan(l.label);if(!(lab in map)){map[lab]=0;order.push(lab);}map[lab]+=l.qty;});return order.map(lab=>`${lab} ×${map[lab]}`).join(" · ");}
 
 /* ===================== NEW BILL ===================== */
 function nPlans(){return Array.from(el("n_planPanel").querySelectorAll("input:checked")).map(c=>c.value);}
@@ -466,7 +467,9 @@ function buildNewLines(resetQty){
       out.push({id,label:mealLabel(p,both,hasLunch),qty:keepQ(id,both?days*2:days),rate:keepR(id,both?rate(p,dur,"combo"):rate(p,dur,"lunch")),food:true});
     });
   }
-  ["breakfast","snack","juice1","juice2"].forEach(it=>{if(chosen.includes(it)){const fr=plans.length?rate(plans[0],dur,it):gRate(it);out.push({id:it,label:ITEM_LABEL[it],qty:keepQ(it,days),rate:keepR(it,fr),food:true});}});
+  ["breakfast","snack"].forEach(it=>{if(chosen.includes(it)){const fr=plans.length?rate(plans[0],dur,it):gRate(it);out.push({id:it,label:ITEM_LABEL[it],qty:keepQ(it,days),rate:keepR(it,fr),food:true});}});
+  if(chosen.includes("juice2x")){const p0=plans[0];out.push({id:"juice",label:"2× Juice",qty:keepQ("juice",days*2),rate:keepR("juice",p0?rate(p0,dur,"juice2"):gRate("juice2")),food:true});}
+  else if(chosen.includes("juice1x")){const p0=plans[0];out.push({id:"juice",label:"1× Juice",qty:keepQ("juice",days),rate:keepR("juice",p0?rate(p0,dur,"juice1"):gRate("juice1")),food:true});}
   if(chosen.includes("seafood"))out.push({id:"seafood",label:"Seafood add-on",qty:keepQ("seafood",days),rate:keepR("seafood",gRate("seafood")),food:true});
   Object.values(prev).filter(l=>l.custom).forEach(l=>out.push(l));
   const km=parseFloat(el("n_km").value)||0;
@@ -478,7 +481,8 @@ function refreshNewRates(){
   const lines=readLines("n_lines");
   lines.forEach(l=>{
     if(l.id&&l.id.indexOf("main_")===0){const p=l.id.slice(5);l.rate=both?rate(p,dur,"combo"):rate(p,dur,"lunch");}
-    else if(["breakfast","snack","juice1","juice2"].includes(l.id))l.rate=plans.length?rate(plans[0],dur,l.id):gRate(l.id);
+    else if(["breakfast","snack"].includes(l.id))l.rate=plans.length?rate(plans[0],dur,l.id):gRate(l.id);
+    else if(l.id==="juice"){const two=el("n_items").querySelector('input[value="juice2x"]').checked;l.rate=plans.length?rate(plans[0],dur,two?"juice2":"juice1"):gRate(two?"juice2":"juice1");}
     else if(l.id==="seafood")l.rate=gRate("seafood");
     else if(l.id==="delivery")l.rate=(parseFloat(el("n_km").value)||0)*gRate("delivery");
   });
@@ -493,12 +497,26 @@ function updatePlanHead(){const p=nPlans();el("n_planHead").textContent=p.length
 /* ===================== RENEW ===================== */
 let renewCtx=null;
 function billHeaderIndex(rows){const h=rows[0].map(x=>String(x).trim());const idx={};h.forEach((n,i)=>idx[n]=i);return idx;}
+function planCodesFromLabel(label){const rev={};for(const k in PLAN_LABEL)rev[normName(PLAN_LABEL[k])]=k;return String(label||"").split(",").map(s=>rev[normName(s)]).filter(Boolean);}
+function durCodeFromLabel(label){const rev={};for(const k in DUR_LABEL)rev[normName(DUR_LABEL[k])]=k;return rev[normName(label)]||"m";}
+function parseItems(str){const out={};String(str||"").split("·").map(s=>s.trim()).filter(Boolean).forEach(tok=>{const m=tok.match(/^(.*?)\s*[×x]\s*(\d+(?:\.\d+)?)$/);if(!m)return;const n=m[1].trim().toLowerCase();const qty=parseFloat(m[2])||0;if(n.indexOf("lunch")>=0&&n.indexOf("dinner")>=0)out.meal={type:"both",qty};else if(n==="lunch")out.meal={type:"lunch",qty};else if(n==="dinner")out.meal={type:"dinner",qty};else if(n.indexOf("breakfast")>=0)out.breakfast=qty;else if(n.indexOf("snack")>=0)out.snack=qty;else if(n.indexOf("juice")>=0)out.juice={two:n.indexOf("2")>=0,qty};else if(n.indexOf("seafood")>=0)out.seafood=qty;});return out;}
+function reconstructLines(prev){
+  const plans=planCodesFromLabel(prev.plan);const dur=durCodeFromLabel(prev.duration);const it=parseItems(prev.items);const p0=plans[0]||"nb";const lines=[];
+  if(it.meal){const both=it.meal.type==="both";(plans.length?plans:["nb"]).forEach((p,i)=>{lines.push({id:"main_"+p,label:mealLabel(p,both,it.meal.type!=="dinner"),qty:i===0?it.meal.qty:0,rate:both?rate(p,dur,"combo"):rate(p,dur,"lunch"),food:true});});}
+  if(it.breakfast)lines.push({id:"breakfast",label:"Breakfast",qty:it.breakfast,rate:rate(p0,dur,"breakfast"),food:true});
+  if(it.snack)lines.push({id:"snack",label:"Snack",qty:it.snack,rate:rate(p0,dur,"snack"),food:true});
+  if(it.juice)lines.push({id:"juice",label:it.juice.two?"2× Juice":"1× Juice",qty:it.juice.qty,rate:it.juice.two?rate(p0,dur,"juice2"):rate(p0,dur,"juice1"),food:true});
+  if(it.seafood)lines.push({id:"seafood",label:"Seafood add-on",qty:it.seafood,rate:gRate("seafood"),food:true});
+  lines.push({id:"delivery",label:"Delivery",qty:0,rate:0,food:false});
+  return lines;
+}
 function lastBillForClient(rows,name){
   if(!rows||rows.length<2)return null;const idx=billHeaderIndex(rows);const ci=idx["Client"];if(ci===undefined)return null;
   const key=normName(name);let last=null;for(let i=1;i<rows.length;i++){if(normName(rows[i][ci])===key)last=rows[i];}
   if(!last)return null;const get=k=>{const j=idx[k];return (j===undefined||j>=last.length)?"":last[j];};
-  let lines=[];try{lines=JSON.parse(get("LinesJSON")||"[]");}catch(e){}
-  return {raw:last,idx,billNo:get("BillNo"),plan:get("Plan"),duration:get("Duration"),slots:get("Slots"),start:toDt(get("Start")),end:toDt(get("End")),grandTotal:parseFloat(get("GrandTotal"))||0,discPct:parseFloat(get("Discount"))||0,gstPct:parseFloat(get("GST"))||5,lines};
+  const prev={raw:last,idx,billNo:get("BillNo"),plan:get("Plan"),duration:get("Duration"),slots:get("Slots"),items:get("Items"),start:toDt(get("Start")),end:toDt(get("End")),grandTotal:parseFloat(get("GrandTotal"))||0,discPct:parseFloat(get("Discount"))||0,gstPct:parseFloat(get("GST"))||5};
+  prev.lines=reconstructLines(prev);
+  return prev;
 }
 function prevRate(prev,id,fallback){
   if(prev.lines){let l=prev.lines.find(x=>x.id===id);if(!l&&id==="main")l=prev.lines.find(x=>String(x.id).indexOf("main")===0);if(l)return l.rate;}
@@ -560,6 +578,7 @@ function suggestBillNo(billnoId,billdateId){
     if(bi!==undefined)for(let i=1;i<billsCache.length;i++){const n=parseInt(String(billsCache[i][bi]).replace(/\D/g,""));if(!isNaN(n)&&Math.floor(n/100)===month)maxSeq=Math.max(maxSeq,n-prefix);}}
   el(billnoId).value=prefix+(maxSeq+1);
 }
+function billNoExists(no){if(!billsCache||billsCache.length<2)return false;const idx=billHeaderIndex(billsCache);const bi=idx["BillNo"];if(bi===undefined)return false;for(let i=1;i<billsCache.length;i++){if(String(billsCache[i][bi]).trim()===String(no).trim())return true;}return false;}
 
 /* invoice */
 function buildInvoice(meta,lines,t){
@@ -607,8 +626,7 @@ function billObject(meta,lines,t){
     Plan:meta.plan,Duration:meta.duration,Slots:meta.slots,
     Start:meta.start?keyOf(meta.start):"",End:meta.end?keyOf(meta.end):"",
     Items:itemsReadable(lines),Food:money(t.food),Discount:meta.discPct,Delivery:money(t.delivery),
-    Adjustment:money(t.adjustment),GrandTotal:money(t.grand),PaidStatus:meta.paidStatus,
-    LinesJSON:JSON.stringify(lines.map(l=>({id:l.id,label:l.label,qty:l.qty,rate:l.rate,food:l.food!==false,custom:!!l.custom})))};
+    Adjustment:money(t.adjustment),GrandTotal:money(t.grand),PaidStatus:meta.paidStatus};
 }
 async function saveBill(obj,statusId){
   setStatus(statusId,"Saving bill…","info");
@@ -718,7 +736,11 @@ el("n_client").addEventListener("change",onClientNameChange);
 el("n_dur").addEventListener("change",applyDuration);
 el("n_days").addEventListener("input",()=>{nRender(true);newDatesFromStart();});
 el("n_start").addEventListener("change",newDatesFromStart);
-el("n_items").addEventListener("change",e=>{e.target.closest(".chk").classList.toggle("on",e.target.checked);nRender(false);});
+el("n_items").addEventListener("change",e=>{
+  const v=e.target.value;
+  if(e.target.checked&&(v==="juice1x"||v==="juice2x")){const other=v==="juice1x"?"juice2x":"juice1x";const o=el("n_items").querySelector(`input[value="${other}"]`);if(o&&o.checked){o.checked=false;o.closest(".chk").classList.remove("on");}}
+  e.target.closest(".chk").classList.toggle("on",e.target.checked);nRender(false);
+});
 el("n_slots").addEventListener("change",e=>{e.target.closest(".chk").classList.toggle("on",e.target.checked);nRender(false);});
 el("n_km").addEventListener("input",()=>nRender(false));
 el("n_disc").addEventListener("input",recalcNew);
@@ -727,15 +749,26 @@ bindLivePrice("n_lines",recalcNew);
 el("n_addline").addEventListener("click",()=>{el("n_lines").insertAdjacentHTML("beforeend",lineRowHtml({id:"custom_"+Date.now(),label:"Custom item",qty:0,rate:0,food:true,custom:true}));recalcNew();});
 el("n_suggestno").addEventListener("click",async()=>{try{await fetchBills(true);suggestBillNo("n_billno","n_billdate");}catch(e){setStatus("n_status","Couldn't load Bills: "+e.message,"err");}});
 el("n_billdate").addEventListener("change",()=>{if(billsCache)suggestBillNo("n_billno","n_billdate");});
-el("n_preview").addEventListener("click",async()=>{try{const meta=gatherNewMeta();const lines=readLines("n_lines");const t=computeTotals(lines,meta.discPct,meta.gstPct,0);buildInvoice(meta,lines,t);await exportInvoicePDF(`Invoice_${(meta.client||"Client").replace(/\s+/g,"_")}_${meta.billNo||"draft"}.pdf`);setStatus("n_status","Preview PDF downloaded.","ok");}catch(e){setStatus("n_status","Preview error: "+e.message,"err");}});
+function waLink(phone,text){let p=String(phone||"").replace(/\D/g,"");if(p.length===10)p="91"+p;return "https://wa.me/"+p+"?text="+encodeURIComponent(text);}
+async function exportInvoiceImage(filename){const canvas=await html2canvas(el("invoice"),{scale:2,backgroundColor:"#ffffff"});const a=document.createElement("a");a.href=canvas.toDataURL("image/png");a.download=filename;document.body.appendChild(a);a.click();a.remove();}
+el("n_billno").addEventListener("input",()=>{const no=el("n_billno").value.trim();if(no&&billNoExists(no))setStatus("n_status",`Bill no. ${no} already exists — choose another.`,"err");});
 el("n_save").addEventListener("click",async()=>{try{
   const meta=gatherNewMeta();
   if(!meta.client){setStatus("n_status","Enter client name.","err");return;}
   if(!meta.billNo){setStatus("n_status","Set a bill number.","err");return;}
+  if(billNoExists(meta.billNo)){setStatus("n_status",`Bill no. ${meta.billNo} already exists — choose another.`,"err");return;}
   const lines=readLines("n_lines");const t=computeTotals(lines,meta.discPct,meta.gstPct,0);
   await saveBill(billObject(meta,lines,t),"n_status");
-  buildInvoice(meta,lines,t);await exportInvoicePDF(`Invoice_${meta.client.replace(/\s+/g,"_")}_${meta.billNo}.pdf`);
 }catch(e){setStatus("n_status","Save error: "+e.message,"err");}});
+el("n_whatsapp").addEventListener("click",async()=>{try{
+  const meta=gatherNewMeta();
+  if(!meta.client){setStatus("n_status","Enter client name.","err");return;}
+  const lines=readLines("n_lines");const t=computeTotals(lines,meta.discPct,meta.gstPct,0);
+  buildInvoice(meta,lines,t);
+  await exportInvoiceImage(`Bill_${meta.client.replace(/\s+/g,"_")}_${meta.billNo||"draft"}.png`);
+  window.open(waLink(meta.phone,`Hi ${meta.client}, here is your Friska Wellness bill ${meta.billNo} — total ₹${money(t.grand)}. (Bill image saved to your device — please attach it here.)`),"_blank");
+  setStatus("n_status","Bill image saved & WhatsApp opened — attach the image to send.","ok");
+}catch(e){setStatus("n_status","Error: "+e.message,"err");}});
 
 // renew
 el("r_fetch").addEventListener("click",()=>runRenew(false));
@@ -748,13 +781,20 @@ el("r_disc").addEventListener("input",recalcRenewNext);
 el("r_gst").addEventListener("input",recalcRenewNext);
 el("r_addline").addEventListener("click",()=>{el("r_nextlines").insertAdjacentHTML("beforeend",lineRowHtml({id:"custom_"+Date.now(),label:"Custom item",qty:0,rate:0,food:true,custom:true}));recalcRenewNext();});
 el("r_billdate").addEventListener("change",()=>{if(billsCache)suggestBillNo("r_billno","r_billdate");});
-el("r_preview").addEventListener("click",async()=>{try{if(!renewCtx)return;const meta=gatherRenewMeta();const lines=readLines("r_nextlines");const t=computeTotals(lines,meta.discPct,meta.gstPct,renewCtx.adjustment||0);buildInvoice(meta,lines,t);await exportInvoicePDF(`Invoice_${(meta.client||"Client").replace(/\s+/g,"_")}_${meta.billNo||"draft"}.pdf`);}catch(e){setStatus("r_status","Preview error: "+e.message,"err");}});
+el("r_billno").addEventListener("input",()=>{const no=el("r_billno").value.trim();if(no&&billNoExists(no))setStatus("r_status",`Bill no. ${no} already exists — choose another.`,"err");});
 el("r_save").addEventListener("click",async()=>{try{if(!renewCtx)return;const meta=gatherRenewMeta();
   if(!meta.billNo){setStatus("r_status","Set a bill number.","err");return;}
+  if(billNoExists(meta.billNo)){setStatus("r_status",`Bill no. ${meta.billNo} already exists — choose another.`,"err");return;}
   const lines=readLines("r_nextlines");const t=computeTotals(lines,meta.discPct,meta.gstPct,renewCtx.adjustment||0);
   await saveBill(billObject(meta,lines,t),"r_status");
-  buildInvoice(meta,lines,t);await exportInvoicePDF(`Invoice_${meta.client.replace(/\s+/g,"_")}_${meta.billNo}.pdf`);
 }catch(e){setStatus("r_status","Save error: "+e.message,"err");}});
+el("r_whatsapp").addEventListener("click",async()=>{try{if(!renewCtx)return;const meta=gatherRenewMeta();
+  const lines=readLines("r_nextlines");const t=computeTotals(lines,meta.discPct,meta.gstPct,renewCtx.adjustment||0);
+  buildInvoice(meta,lines,t);
+  await exportInvoiceImage(`Bill_${(meta.client||"Client").replace(/\s+/g,"_")}_${meta.billNo||"draft"}.png`);
+  window.open(waLink(meta.phone,`Hi ${meta.client}, here is your Friska Wellness bill ${meta.billNo} — total ₹${money(t.grand)}. (Bill image saved — please attach it here.)`),"_blank");
+  setStatus("r_status","Bill image saved & WhatsApp opened.","ok");
+}catch(e){setStatus("r_status","Error: "+e.message,"err");}});
 function gatherRenewMeta(){const p=renewCtx.prev;
   return {billNo:el("r_billno").value.trim(),billDate:readDate("r_billdate")||dateOnly(new Date()),
     client:p.raw[p.idx["Client"]],phone:p.idx["Phone"]!==undefined?p.raw[p.idx["Phone"]]:"",
