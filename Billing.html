@@ -124,6 +124,7 @@
     <button class="tab active" data-tab="new">New Bill</button>
     <button class="tab" data-tab="renew">Renew / Reconcile</button>
     <button class="tab" data-tab="dash">Dashboard</button>
+    <button class="tab" data-tab="usage">Usage Check</button>
   </div>
 
   <!-- ============ NEW BILL ============ -->
@@ -261,6 +262,33 @@
       </div>
       <div style="overflow-x:auto"><table class="dtable" id="d_table"><tbody></tbody></table></div>
       <div class="status info" id="d_status"></div>
+    </div>
+  </section>
+
+  <!-- ============ USAGE CHECK ============ -->
+  <section id="tab-usage" class="hidden">
+    <div class="card">
+      <h2 class="sec">Usage check</h2>
+      <p class="subtle" style="margin-top:0">Enter a client and a date range to see their actual usage from Orders_Output. Read-only — no bill is created.</p>
+      <div class="grid g3">
+        <div class="field"><label>Client name</label><input id="u_client" list="n_clientNames" autocomplete="off" /></div>
+        <div class="field"><label>Start date</label><input id="u_start" type="date" onclick="this.showPicker&&this.showPicker()" /></div>
+        <div class="field"><label>End date</label><input id="u_end" type="date" onclick="this.showPicker&&this.showPicker()" /></div>
+      </div>
+      <div class="actions">
+        <button class="btn btn-primary" id="u_fetch">Get usage report</button>
+        <button class="btn btn-ghost" id="u_reload" title="Re-pull Orders_Output">Reload</button>
+      </div>
+      <div class="status info" id="u_status">Enter a client and date range, then Get usage report.</div>
+    </div>
+    <div class="card hidden" id="u_card">
+      <h2 class="sec">Usage report</h2>
+      <div id="u_range" class="note info" style="margin-top:0"></div>
+      <div class="stat-grid" id="u_stats" style="margin-top:12px"></div>
+      <div id="u_kv" style="margin-top:12px"></div>
+      <div id="u_slots" style="margin-top:12px"></div>
+      <div id="u_pauseWarn"></div>
+      <div style="margin-top:12px"><div class="subtle" style="font-weight:600">Paused dates</div><div id="u_paused" class="subtle"></div></div>
     </div>
   </section>
 </div>
@@ -702,6 +730,7 @@ function switchTab(name){
   el("tab-new").classList.toggle("hidden",name!=="new");
   el("tab-renew").classList.toggle("hidden",name!=="renew");
   el("tab-dash").classList.toggle("hidden",name!=="dash");
+  el("tab-usage").classList.toggle("hidden",name!=="usage");
   if(name==="dash")loadDashboard(false);
 }
 document.querySelectorAll(".tab").forEach(t=>t.addEventListener("click",()=>switchTab(t.dataset.tab)));
@@ -768,6 +797,41 @@ function gatherRenewMeta(){const p=renewCtx.prev;
     plan:p.plan,duration:p.duration,style:p.style,slots:p.slots,
     days:parseInt(el("r_days").value)||26,start:readDate("r_start"),end:readDate("r_end"),
     discPct:parseFloat(el("r_disc").value)||0,gstPct:parseFloat(el("r_gst").value)||5,paidStatus:"Unpaid"};}
+
+// usage check
+async function runUsageCheck(force){
+  const name=el("u_client").value.trim();
+  const start=readDate("u_start"),end=readDate("u_end");
+  if(!name){setStatus("u_status","Enter a client name.","err");return;}
+  if(!start||!end){setStatus("u_status","Enter both dates.","err");return;}
+  if(start>end){setStatus("u_status","Start date is after end date.","err");return;}
+  setStatus("u_status","Computing…","info");
+  try{
+    const orders=await fetchOrders(force);
+    const u=countUsage(orders,start,end,name);
+    renderUsageReport(u,start,end);
+    setStatus("u_status",`Done — scanned ${orders.length} rows.`,"ok");
+  }catch(e){setStatus("u_status","Error: "+e.message,"err");}
+}
+function renderUsageReport(u,start,end){
+  const t=u.totals;
+  el("u_card").classList.remove("hidden");
+  el("u_range").innerHTML=`Usage for <b>${dtstr(start)} → ${dtstr(end)}</b> (Sundays excluded)`;
+  el("u_stats").innerHTML=statBox(t.meals_total,"Meals")+statBox(u.activeDays,"Active days")+statBox(u.pausedDays,"Paused days")+statBox(u.totalDays,"Total days")+statBox(u.deliveries,"Deliveries");
+  let kv=kvRow("Lunch (option 1)",t.meal1)+kvRow("Dinner (option 2)",t.meal2);
+  if(t.seafood>0)kv+=kvRow("Seafood",t.seafood);
+  if(t.brk>0)kv+=kvRow("Breakfast",t.brk);
+  if(t.snack>0)kv+=kvRow("Snack",t.snack);
+  if(t.juices_total>0)kv+=kvRow("Juices",`${t.juices_total} (J1 ${t.j1}, J2 ${t.j2})`);
+  el("u_kv").innerHTML=kv;
+  const slots=Object.keys(u.slotCounts).sort();
+  el("u_slots").innerHTML=slots.length?`<div class="subtle" style="font-weight:600;margin-bottom:4px">Slot deliveries</div><div class="chips">`+slots.map(s=>`<span class="chip">${s}: <b>${u.slotCounts[s]}</b></span>`).join("")+`</div>`:"";
+  el("u_pauseWarn").innerHTML=(u.lastActiveDate&&u.lastActiveDate<end)?`<div class="note pause">Last meal on <b>${dtstr(u.lastActiveDate)}</b>; no meals after that in this range.</div>`:"";
+  el("u_paused").textContent=u.pausedDates.length?u.pausedDates.map(dtstr).join(", "):"None";
+}
+el("u_fetch").addEventListener("click",()=>runUsageCheck(false));
+el("u_reload").addEventListener("click",()=>runUsageCheck(true));
+el("u_client").addEventListener("keydown",e=>{if(e.key==="Enter")runUsageCheck(false);});
 
 // dashboard
 el("d_search").addEventListener("input",applyDashFilter);
