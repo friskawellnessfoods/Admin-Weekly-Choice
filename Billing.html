@@ -541,13 +541,17 @@ function renderRenew(){
   else el("r_pauseWarn").innerHTML="";
   el("r_paused").textContent=u.pausedDates.length?u.pausedDates.map(dtstr).join(", "):"None";
 
-  // actual usage — only opted items, priced from sheet, juices combined
-  const p0=plans[0]||"nb";const actual=[];
-  if(op.main){const both=op.main==="both";actual.push({id:"main",label:both?"Lunch + Dinner":"Meals",qty:b.totals.meals_total,rate:both?rate(p0,dur,"combo"):rate(p0,dur,"lunch"),food:true});}
-  if(op.breakfast)actual.push({id:"breakfast",label:"Breakfast",qty:b.totals.brk,rate:rate(p0,dur,"breakfast"),food:true});
-  if(op.snack)actual.push({id:"snack",label:"Snack",qty:b.totals.snack,rate:rate(p0,dur,"snack"),food:true});
-  if(op.juices)actual.push({id:"juices",label:"Juices",qty:b.totals.juices_total,rate:rate(p0,dur,"juice1"),food:true});
-  if(op.seafood)actual.push({id:"seafood",label:"Seafood add-on",qty:b.totals.seafood,rate:gRate("seafood"),food:true});
+ // actual usage — driven by REAL orders (b.totals), not by what the old bill text said was opted
+  const p0=plans[0]||"nb";const actual=[];const at=b.totals;
+  if(at.meal1>0||at.meal2>0){
+    const both=at.meal1>0&&at.meal2>0;
+    const label=both?"Lunch + Dinner":(at.meal1>0?"Lunch":"Dinner");
+    actual.push({id:"main",label,qty:at.meals_total,rate:both?rate(p0,dur,"combo"):rate(p0,dur,"lunch"),food:true});
+  }
+  if(at.brk>0)actual.push({id:"breakfast",label:"Breakfast",qty:at.brk,rate:rate(p0,dur,"breakfast"),food:true});
+  if(at.snack>0)actual.push({id:"snack",label:"Snack",qty:at.snack,rate:rate(p0,dur,"snack"),food:true});
+  if(at.juices_total>0)actual.push({id:"juices",label:"Juices",qty:at.juices_total,rate:rate(p0,dur,"juice1"),food:true});
+  if(at.seafood>0)actual.push({id:"seafood",label:"Seafood add-on",qty:at.seafood,rate:gRate("seafood"),food:true});
   actual.push({id:"delivery",label:"Delivery",qty:b.deliveries,rate:prevDeliveryUnit(prev),food:false});
   el("r_reconCard").classList.remove("hidden");renderLines("r_lines",actual);recalcRenewActual();
 
