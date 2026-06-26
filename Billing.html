@@ -8,13 +8,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <style>
-  :root{
-    --navy:#0a1a6e; --navy-deep:#08155a; --accent:#10b981; --accent-soft:#e7f7f1;
-    --bg:#f4f7fc; --card:#fff; --ink:#16213e; --muted:#6b7596; --line:#e2e7f1;
-    --warn-bg:#fff6e6; --warn-line:#f0d9a6; --warn-ink:#8a6112;
-    --pause-bg:#fdeceb; --pause-line:#f1c4c0; --pause-ink:#9a3b34;
-    --credit:#0a7d4f; --debit:#9a3b34;
-  }
+  :root{--navy:#0a1a6e;--navy-deep:#08155a;--accent:#10b981;--accent-soft:#e7f7f1;--bg:#f4f7fc;--card:#fff;--ink:#16213e;--muted:#6b7596;--line:#e2e7f1;--warn-bg:#fff6e6;--warn-line:#f0d9a6;--warn-ink:#8a6112;--pause-bg:#fdeceb;--pause-line:#f1c4c0;--pause-ink:#9a3b34;--credit:#0a7d4f;--debit:#9a3b34;}
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;line-height:1.45;position:relative;overflow-x:hidden}
   body::before,body::after{content:"";position:fixed;border-radius:50%;filter:blur(70px);z-index:0;pointer-events:none}
@@ -34,39 +28,41 @@
   input,select{width:100%;padding:11px 12px;border:1.5px solid var(--line);border-radius:12px;font-size:.95rem;background:#fbfcfe;color:var(--ink)}
   input[readonly]{background:#eef1f7;color:var(--muted)}
   input:focus,select:focus{outline:none;border-color:var(--accent);background:#fff;box-shadow:0 0 0 3px rgba(16,185,129,.12)}
-  .grid{display:grid;gap:12px}
-  .g2{grid-template-columns:1fr 1fr}
-  .g3{grid-template-columns:1fr 1fr 1fr}
+  .grid{display:grid;gap:12px}.g2{grid-template-columns:1fr 1fr}.g3{grid-template-columns:1fr 1fr 1fr}
   @media(max-width:560px){.g3{grid-template-columns:1fr 1fr}}
   .field{min-width:0}
   .row{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}
   .chips{display:flex;gap:8px;flex-wrap:wrap}
   .chk{display:flex;align-items:center;gap:6px;background:#fbfcfe;border:1.5px solid var(--line);border-radius:10px;padding:8px 12px;font-size:.85rem;cursor:pointer}
-  .chk input{width:auto}
-  .chk.on{border-color:var(--accent);background:var(--accent-soft)}
+  .chk input{width:auto}.chk.on{border-color:var(--accent);background:var(--accent-soft)}
+  /* multiselect */
+  .msel{position:relative}
+  .msel-head{width:100%;text-align:left;padding:11px 12px;border:1.5px solid var(--line);border-radius:12px;background:#fbfcfe;font-size:.95rem;cursor:pointer;color:var(--ink)}
+  .msel-panel{position:absolute;z-index:30;top:calc(100% + 4px);left:0;right:0;background:#fff;border:1.5px solid var(--line);border-radius:12px;box-shadow:0 12px 30px rgba(20,33,62,.12);padding:6px;max-height:240px;overflow:auto}
+  .msel-opt{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;font-size:.9rem;cursor:pointer}
+  .msel-opt:hover{background:var(--accent-soft)}.msel-opt input{width:auto}
   button.btn{font-weight:700;padding:13px 16px;border-radius:13px;border:1.5px solid transparent;cursor:pointer;font-size:.95rem}
   .btn-primary{background:var(--navy);color:#fff;box-shadow:0 6px 16px rgba(10,26,110,.22)}
   .btn-primary:active{background:var(--navy-deep)}
   .btn-ghost{background:#fff;color:var(--navy);border:1.5px solid var(--line)}
   button.btn:disabled{opacity:.5;cursor:not-allowed}
-  .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
-  .actions .btn{flex:1 1 auto}
+  .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}.actions .btn{flex:1 1 auto}
   .status{font-size:.85rem;margin-top:12px;min-height:1.1em}
-  .status.err{color:var(--pause-ink)} .status.ok{color:var(--accent)} .status.info{color:var(--muted)}
+  .status.err{color:var(--pause-ink)}.status.ok{color:var(--accent)}.status.info{color:var(--muted)}
   table.lines{width:100%;border-collapse:collapse;font-size:.9rem}
   table.lines th{text-align:left;font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);padding:6px 6px;border-bottom:1px solid var(--line)}
   table.lines td{padding:5px 6px;border-bottom:1px solid #f0f2f7;vertical-align:middle}
   table.lines input{padding:8px 9px;border-radius:9px;font-size:.9rem}
   td.num{text-align:right;font-variant-numeric:tabular-nums}
-  td.qtycol{width:84px} td.ratecol{width:104px} td.pricecol{width:92px} td.rmcol{width:34px}
+  td.qtycol{width:84px}td.ratecol{width:104px}td.pricecol{width:92px}td.rmcol{width:34px}
   .lbl-in{border:none;background:transparent;font-weight:600;padding:8px 2px}
   .rm{background:#fbecec;color:var(--debit);border:none;border-radius:8px;width:28px;height:28px;cursor:pointer;font-weight:700}
   .totals{margin-top:14px;border-top:2px solid var(--line);padding-top:10px}
   .tline{display:flex;justify-content:space-between;padding:5px 2px;font-size:.92rem}
-  .tline .k{color:var(--muted)} .tline .v{font-weight:600;font-variant-numeric:tabular-nums}
+  .tline .k{color:var(--muted)}.tline .v{font-weight:600;font-variant-numeric:tabular-nums}
   .tline.grand{font-size:1.15rem;border-top:1.5px dashed var(--line);margin-top:6px;padding-top:10px}
   .tline.grand .v{color:var(--navy);font-weight:800}
-  .credit{color:var(--credit)!important} .debit{color:var(--debit)!important}
+  .credit{color:var(--credit)!important}.debit{color:var(--debit)!important}
   .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px}
   .stat{background:var(--accent-soft);border-radius:13px;padding:11px 12px}
   .stat .n{font-size:1.35rem;font-weight:800;color:var(--navy);line-height:1.1}
@@ -87,7 +83,6 @@
   .pill.unpaid{background:#fdecec;color:var(--debit);border-color:#f3c9c5}
   .rowtag{font-size:.68rem;font-weight:700;padding:2px 8px;border-radius:99px;background:var(--warn-bg);color:var(--warn-ink);margin-left:6px}
   .rowtag.exp{background:var(--pause-bg);color:var(--pause-ink)}
-  /* ---------- themed invoice ---------- */
   #invoiceWrap{position:fixed;left:-9999px;top:0}
   #invoice{width:760px;background:#fff;color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Arial,sans-serif;border-radius:18px;overflow:hidden;box-shadow:0 0 0 1px #e6e9f2}
   #invoice .ihead{background:linear-gradient(135deg,var(--navy) 0%,#16277f 60%,#0f7a55 160%);color:#fff;display:flex;align-items:center;gap:16px;padding:20px 24px}
@@ -127,20 +122,29 @@
     <button class="tab" data-tab="usage">Usage Check</button>
   </div>
 
-  <!-- ============ NEW BILL ============ -->
+  <!-- NEW BILL -->
   <section id="tab-new">
     <div class="card">
       <h2 class="sec">Client &amp; cycle</h2>
       <div class="grid g2">
-        <div class="field"><label>Client name</label><input id="n_client" list="n_clientNames" autocomplete="off" /><datalist id="n_clientNames"></datalist></div>
+        <div class="field"><label>Client name</label><input id="n_client" list="n_clientNames" autocomplete="off" placeholder="type 2+ letters" /><datalist id="n_clientNames"></datalist></div>
         <div class="field"><label>Phone</label><input id="n_phone" autocomplete="off" /><select id="n_phoneSel" class="hidden" style="margin-top:6px"></select></div>
       </div>
       <div class="grid g3" style="margin-top:12px">
-        <div class="field"><label>Plan</label>
-          <select id="n_plan"><option value="nb">Nutri Balance</option><option value="hp">High Protein</option><option value="lc">Low Carb</option><option value="hc">High Carb</option><option value="nc">No Carb</option></select>
+        <div class="field"><label>Plan(s)</label>
+          <div class="msel" id="n_planSel">
+            <button type="button" class="msel-head" id="n_planHead">Nutri Balance</button>
+            <div class="msel-panel hidden" id="n_planPanel">
+              <label class="msel-opt"><input type="checkbox" value="nb" checked>Nutri Balance</label>
+              <label class="msel-opt"><input type="checkbox" value="hp">High Protein</label>
+              <label class="msel-opt"><input type="checkbox" value="lc">Low Carb</label>
+              <label class="msel-opt"><input type="checkbox" value="hc">High Carb</label>
+              <label class="msel-opt"><input type="checkbox" value="nc">No Carb</label>
+            </div>
+          </div>
         </div>
         <div class="field"><label>Duration</label>
-          <select id="n_dur"><option value="d">2 day trial</option><option value="w">1 week</option><option value="m" selected>1 month</option><option value="q">3 months</option><option value="custom">Custom</option></select>
+          <select id="n_dur"><option value="d">2 day trial</option><option value="w">Weekly</option><option value="m" selected>1 month</option><option value="q">3 months</option><option value="custom">Custom</option></select>
         </div>
         <div class="field"><label>Days</label><input id="n_days" type="number" value="26" min="1" readonly /></div>
       </div>
@@ -148,7 +152,6 @@
         <div class="field"><label>Start date</label><input id="n_start" type="date" onclick="this.showPicker&&this.showPicker()" /></div>
         <div class="field"><label>End date</label><input id="n_end" type="date" onclick="this.showPicker&&this.showPicker()" /></div>
       </div>
-
       <div style="margin-top:14px">
         <label>Client takes</label>
         <div class="chips" id="n_items">
@@ -160,12 +163,10 @@
           <label class="chk"><input type="checkbox" value="juice2"/>Juice 2</label>
           <label class="chk"><input type="checkbox" value="seafood"/>Seafood add-on</label>
         </div>
-        <div class="subtle">Lunch + Dinner together = combo rate. Pick only what the client opted for.</div>
+        <div class="subtle">Lunch + Dinner together uses the combo rate. A separate meal line is created per selected plan.</div>
       </div>
-
       <div class="grid g2" style="margin-top:14px">
-        <div class="field">
-          <label>Delivery slots</label>
+        <div class="field"><label>Delivery slots</label>
           <div class="chips" id="n_slots">
             <label class="chk"><input type="checkbox" value="Morning"/>Morning</label>
             <label class="chk"><input type="checkbox" value="Afternoon"/>Afternoon</label>
@@ -188,7 +189,7 @@
       <div class="grid g3" style="margin-top:16px">
         <div class="field"><label>Bill no.</label><input id="n_billno" /></div>
         <div class="field"><label>Bill date</label><input id="n_billdate" type="date" onclick="this.showPicker&&this.showPicker()" /></div>
-        <div class="field"><label>&nbsp;</label><button class="btn btn-ghost" id="n_suggestno" style="width:100%">Suggest no.</button></div>
+        <div class="field"><label>&nbsp;</label><button class="btn btn-ghost" id="n_suggestno" style="width:100%">Refresh no.</button></div>
       </div>
       <div class="actions">
         <button class="btn btn-ghost" id="n_preview">Preview invoice</button>
@@ -198,14 +199,14 @@
     </div>
   </section>
 
-  <!-- ============ RENEW / RECONCILE ============ -->
+  <!-- RENEW -->
   <section id="tab-renew" class="hidden">
     <div class="card">
       <h2 class="sec">Find client</h2>
       <div class="row">
-        <div class="field" style="flex:1 1 220px"><label>Client name</label><input id="r_client" autocomplete="off" /></div>
+        <div class="field" style="flex:1 1 220px"><label>Client name</label><input id="r_client" list="n_clientNames" autocomplete="off" /></div>
         <button class="btn btn-primary" id="r_fetch" style="flex:0 0 auto">Fetch &amp; reconcile</button>
-        <button class="btn btn-ghost" id="r_reload" style="flex:0 0 auto" title="Re-pull sheets">Reload</button>
+        <button class="btn btn-ghost" id="r_reload" style="flex:0 0 auto">Reload</button>
       </div>
       <div class="status info" id="r_status">Enter a name to pull their last bill and compute usage.</div>
     </div>
@@ -250,7 +251,7 @@
     </div>
   </section>
 
-  <!-- ============ DASHBOARD ============ -->
+  <!-- DASHBOARD -->
   <section id="tab-dash" class="hidden">
     <div class="card"><h2 class="sec">Follow-ups — expiring &amp; expired</h2><div id="d_followups"><div class="subtle">Loading…</div></div></div>
     <div class="card">
@@ -265,20 +266,17 @@
     </div>
   </section>
 
-  <!-- ============ USAGE CHECK ============ -->
+  <!-- USAGE CHECK -->
   <section id="tab-usage" class="hidden">
     <div class="card">
       <h2 class="sec">Usage check</h2>
-      <p class="subtle" style="margin-top:0">Enter a client and a date range to see their actual usage from Orders_Output. Read-only — no bill is created.</p>
+      <p class="subtle" style="margin-top:0">Enter a client and a date range to see their actual usage from Orders_Output. Read-only.</p>
       <div class="grid g3">
         <div class="field"><label>Client name</label><input id="u_client" list="n_clientNames" autocomplete="off" /></div>
         <div class="field"><label>Start date</label><input id="u_start" type="date" onclick="this.showPicker&&this.showPicker()" /></div>
         <div class="field"><label>End date</label><input id="u_end" type="date" onclick="this.showPicker&&this.showPicker()" /></div>
       </div>
-      <div class="actions">
-        <button class="btn btn-primary" id="u_fetch">Get usage report</button>
-        <button class="btn btn-ghost" id="u_reload" title="Re-pull Orders_Output">Reload</button>
-      </div>
+      <div class="actions"><button class="btn btn-primary" id="u_fetch">Get usage report</button><button class="btn btn-ghost" id="u_reload">Reload</button></div>
       <div class="status info" id="u_status">Enter a client and date range, then Get usage report.</div>
     </div>
     <div class="card hidden" id="u_card">
@@ -296,24 +294,17 @@
 <div id="invoiceWrap"><div id="invoice"></div></div>
 
 <script>
-const BIZ = {  // verify GST / FSSAI against your records
-  name:"Friska Wellness", tagline:"Healthy Meals",
-  address:"Moti Nagar, Hyderabad, Telangana 500018",
-  gst:"38AAKFF6850B1ZI", fssai:"23624030000435",
-  upi:"friskawellnessllp@idfcbank", acHolder:"FRISKA WELLNESS LLP",
-  acNumber:"50200087206209", ifsc:"HDFC0005486", branch:"LIBERTY CROSS ROADS",
-  acType:"CURRENT", logo:"logo.png"
-};
+const BIZ={name:"Friska Wellness",tagline:"Healthy Meals",address:"Moti Nagar, Hyderabad, Telangana 500018",gst:"38AAKFF6850B1ZI",fssai:"23624030000435",upi:"friskawellnessllp@idfcbank",acHolder:"FRISKA WELLNESS LLP",acNumber:"50200087206209",ifsc:"HDFC0005486",branch:"LIBERTY CROSS ROADS",acType:"CURRENT",logo:"logo.png"};
 const COL={date:0,name:1,phone:2,slot:5,opt1:7,opt2:8,brk:9,snk:10,j1:11,j2:12};
 const MONTH_ABBR=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 const MONTHS={jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
 const PLAN_LABEL={nb:"Nutri Balance",hp:"High Protein",lc:"Low Carb",hc:"High Carb",nc:"No Carb"};
+const DUR_LABEL={d:"2 day trial",w:"Weekly",m:"1 month",q:"3 months",custom:"Custom"};
 const DUR_DAYS={d:2,w:6,m:26,q:78};
 const ITEM_LABEL={breakfast:"Breakfast",snack:"Snack",juice1:"Juice 1",juice2:"Juice 2"};
-
 let ordersCache=null,billsCache=null,priceMap=null,masterCache=null,lastRaw="";
 
-/* ---------- date helpers ---------- */
+/* date helpers */
 function dateOnly(d){return new Date(d.getFullYear(),d.getMonth(),d.getDate(),12,0,0,0);}
 function addDays(d,n){const x=dateOnly(d);x.setDate(x.getDate()+n);return dateOnly(x);}
 function keyOf(d){return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");}
@@ -323,32 +314,32 @@ function serial(n){const e=new Date(1899,11,30,12);e.setDate(e.getDate()+Math.fl
 function toDt(v){
   if(v===null||v===undefined||v==="")return null;
   if(typeof v==="number")return serial(v);
-  let s=String(v).trim(); if(!s)return null;
+  let s=String(v).trim();if(!s)return null;
   if(/^\d+(\.\d+)?$/.test(s))return serial(parseFloat(s));
   s=s.replace(/^\s*(mon|tue|wed|thu|fri|sat|sun|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\s*,\s*/i,"");
   let m;
-  m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/); if(m)return dateOnly(new Date(+m[1],+m[2]-1,+m[3],12));
-  m=s.match(/^(\d{1,2})[-\s]([A-Za-z]{3,})[-\s](\d{2,4})$/); if(m){const mo=MONTHS[m[2].slice(0,3).toLowerCase()];if(mo!==undefined){let y=+m[3];if(y<100)y+=2000;return dateOnly(new Date(y,mo,+m[1],12));}}
-  m=s.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})$/); if(m){let y=+m[3];if(y<100)y+=2000;return dateOnly(new Date(y,+m[2]-1,+m[1],12));}
+  m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);if(m)return dateOnly(new Date(+m[1],+m[2]-1,+m[3],12));
+  m=s.match(/^(\d{1,2})[-\s]([A-Za-z]{3,})[-\s](\d{2,4})$/);if(m){const mo=MONTHS[m[2].slice(0,3).toLowerCase()];if(mo!==undefined){let y=+m[3];if(y<100)y+=2000;return dateOnly(new Date(y,mo,+m[1],12));}}
+  m=s.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})$/);if(m){let y=+m[3];if(y<100)y+=2000;return dateOnly(new Date(y,+m[2]-1,+m[1],12));}
   return null;
 }
 function normName(s){return String(s||"").replace(/\s+/g," ").trim().toLowerCase();}
 function readDate(id){const v=el(id).value;if(!v)return null;const [y,m,d]=v.split("-").map(Number);return dateOnly(new Date(y,m-1,d,12));}
 function setDate(id,d){el(id).value=d?keyOf(d):"";}
 function nextServiceDates(afterDay,needed){const out=[];let cur=addDays(afterDay,1);while(out.length<needed){if(!isSunday(cur))out.push(dateOnly(cur));cur=addDays(cur,1);}return out;}
-function money(n){n=Math.round((Number(n)||0)*100)/100;return String(n);}
+function money(n){return String(Math.round((Number(n)||0)*100)/100);}
 function el(id){return document.getElementById(id);}
 function setStatus(id,msg,cls){const s=el(id);s.textContent=msg;s.className="status "+(cls||"info");}
 
-/* ---------- api ---------- */
+/* api */
 async function apiCall(action,params){
   if(typeof API_URL==="undefined"||!API_URL)throw new Error("API_URL not found (config.js).");
-  const body=new URLSearchParams(); body.set("action",action);
+  const body=new URLSearchParams();body.set("action",action);
   if(params)for(const k in params)body.set(k,params[k]);
   const res=await fetch(API_URL,{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded;charset=UTF-8"},body:body.toString()});
-  const text=await res.text(); lastRaw=text;
+  const text=await res.text();lastRaw=text;
   if(!res.ok)throw new Error("Server "+res.status+" — "+text.slice(0,160));
-  let json; try{json=JSON.parse(text);}catch(e){throw new Error("Non-JSON response: "+text.slice(0,160));}
+  let json;try{json=JSON.parse(text);}catch(e){throw new Error("Non-JSON response: "+text.slice(0,160));}
   return json;
 }
 async function fetchOrders(force){if(ordersCache&&!force)return ordersCache;const j=await apiCall("getOrdersOutputAll");ordersCache=Array.isArray(j)?j:(j.rows||[]);return ordersCache;}
@@ -356,17 +347,16 @@ async function fetchBills(force){if(billsCache&&!force)return billsCache;const j
 async function fetchMaster(force){if(masterCache&&!force)return masterCache;const j=await apiCall("getMasterClientsAll");masterCache=(j&&j.clients)||[];return masterCache;}
 async function fetchPrices(force){
   if(priceMap&&!force)return priceMap;
-  const j=await apiCall("getPricesAll"); const rows=Array.isArray(j)?j:(j.rows||[]); const map={};
+  const j=await apiCall("getPricesAll");const rows=Array.isArray(j)?j:(j.rows||[]);const map={};
   for(const r of rows){if(!r||r.length<2)continue;const k=String(r[0]).trim();const v=String(r[1]).trim();if(!k)continue;const num=parseFloat(v.replace(/[^0-9.\-]/g,""));if(v!==""&&!isNaN(num))map[k.toLowerCase()]=num;}
-  priceMap=map; return map;
+  priceMap=map;return map;
 }
 function rate(plan,dur,item){const k=(plan+"_"+dur+"_"+item).toLowerCase();return priceMap&&(k in priceMap)?priceMap[k]:0;}
 function gRate(item){return priceMap&&(item in priceMap)?priceMap[item]:0;}
 
-/* ---------- usage computation ---------- */
+/* usage computation */
 function countUsage(data,start,end,clientName){
-  const key=normName(clientName);
-  const totals={meal1:0,meal2:0,snack:0,j1:0,j2:0,brk:0,seafood:0};
+  const key=normName(clientName);const totals={meal1:0,meal2:0,snack:0,j1:0,j2:0,brk:0,seafood:0};
   const activeSet=new Set();const slotCounts={};let lastActive=null;const paused=[];
   const service=[];let cur=dateOnly(start);
   while(cur<=end){if(!isSunday(cur))service.push(dateOnly(cur));cur=addDays(cur,1);}
@@ -413,16 +403,14 @@ function computeFromRange(data,name,prevStart,prevEnd){
   return Object.assign({},u,{prevStart,prevEnd,calcEnd,stillActive,today,needAdj,adjustDates,nextStart,nextEnd,neverResumed});
 }
 
-/* ---------- line table ---------- */
+/* line table */
 function lineRowHtml(line){
   const lbl=line.custom?`<input class="lbl-in" value="${(line.label||"").replace(/"/g,"&quot;")}" data-f="label">`:`<span style="font-weight:600">${line.label}</span>`;
   return `<tr data-id="${line.id}" data-food="${line.food===false?0:1}">
-    <td>${lbl}</td>
-    <td class="qtycol"><input type="number" min="0" value="${line.qty}" data-f="qty"></td>
+    <td>${lbl}</td><td class="qtycol"><input type="number" min="0" value="${line.qty}" data-f="qty"></td>
     <td class="ratecol"><input type="number" min="0" step="0.5" value="${line.rate}" data-f="rate"></td>
     <td class="pricecol num" data-price>${money(line.qty*line.rate)}</td>
-    <td class="rmcol">${line.custom?`<button class="rm" data-rm>×</button>`:""}</td>
-  </tr>`;
+    <td class="rmcol">${line.custom?`<button class="rm" data-rm>×</button>`:""}</td></tr>`;
 }
 function renderLines(tbodyId,lines){el(tbodyId).innerHTML=lines.map(lineRowHtml).join("");}
 function readLines(tbodyId){
@@ -438,12 +426,10 @@ function computeTotals(lines,discPct,gstPct,adjustment){
   let food=0,delivery=0;
   lines.forEach(l=>{const amt=l.qty*l.rate;if(l.id==="delivery"||l.food===false)delivery+=amt;else food+=amt;});
   const discAmt=food*(discPct||0)/100;const foodAfter=food-discAmt;const gst=foodAfter*(gstPct||0)/100;
-  const grand=foodAfter+gst+delivery+(adjustment||0);
-  return {food,discAmt,foodAfter,gst,delivery,adjustment:adjustment||0,grand};
+  return {food,discAmt,foodAfter,gst,delivery,adjustment:adjustment||0,grand:foodAfter+gst+delivery+(adjustment||0)};
 }
 function renderTotals(containerId,t){
-  let h="";
-  h+=`<div class="tline"><span class="k">Food subtotal</span><span class="v">₹${money(t.food)}</span></div>`;
+  let h=`<div class="tline"><span class="k">Food subtotal</span><span class="v">₹${money(t.food)}</span></div>`;
   if(t.discAmt>0)h+=`<div class="tline"><span class="k">Discount</span><span class="v credit">−₹${money(t.discAmt)}</span></div>`;
   h+=`<div class="tline"><span class="k">GST (food only)</span><span class="v">₹${money(t.gst)}</span></div>`;
   if(t.delivery>0)h+=`<div class="tline"><span class="k">Delivery</span><span class="v">₹${money(t.delivery)}</span></div>`;
@@ -452,51 +438,47 @@ function renderTotals(containerId,t){
   el(containerId).innerHTML=h;
 }
 function bindLivePrice(tbodyId,onChange){
-  el(tbodyId).addEventListener("input",e=>{
-    const tr=e.target.closest("tr");
-    if(tr){const q=tr.querySelector('[data-f="qty"]'),r=tr.querySelector('[data-f="rate"]'),p=tr.querySelector('[data-price]');if(q&&r&&p)p.textContent=money((parseFloat(q.value)||0)*(parseFloat(r.value)||0));}
-    onChange&&onChange();
-  });
+  el(tbodyId).addEventListener("input",e=>{const tr=e.target.closest("tr");if(tr){const q=tr.querySelector('[data-f="qty"]'),r=tr.querySelector('[data-f="rate"]'),p=tr.querySelector('[data-price]');if(q&&r&&p)p.textContent=money((parseFloat(q.value)||0)*(parseFloat(r.value)||0));}onChange&&onChange();});
   el(tbodyId).addEventListener("click",e=>{if(e.target.dataset.rm!==undefined){e.target.closest("tr").remove();onChange&&onChange();}});
 }
 function statBox(n,l){return `<div class="stat"><div class="n">${n}</div><div class="l">${l}</div></div>`;}
 function kvRow(k,v){return `<div class="kv"><span class="k">${k}</span><span class="v">${v}</span></div>`;}
+function itemsReadable(lines){return lines.filter(l=>l.qty>0).map(l=>`${l.label} ×${l.qty}`).join(" · ");}
 
-/* =====================================================================
-   NEW BILL  — edit-preserving rebuilds
-   ===================================================================== */
+/* ===================== NEW BILL ===================== */
+function nPlans(){return Array.from(el("n_planPanel").querySelectorAll("input:checked")).map(c=>c.value);}
 function nChosen(){return Array.from(el("n_items").querySelectorAll("input:checked")).map(c=>c.value);}
 function nSlots(){return el("n_slots").querySelectorAll("input:checked").length;}
 function nDays(){return parseInt(el("n_days").value)||0;}
-// read current DOM values into a map by id so edits survive a rebuild
+function mealLabel(plan,both,onlyLunch){return `${PLAN_LABEL[plan]} · `+(both?"Lunch + Dinner":(onlyLunch?"Lunch":"Dinner"));}
 function domLines(tbodyId){const m={};readLines(tbodyId).forEach(l=>m[l.id]=l);return m;}
 function buildNewLines(resetQty){
   const prev=domLines("n_lines");
-  const chosen=nChosen();const plan=el("n_plan").value,dur=el("n_dur").value;const days=nDays();
-  const both=chosen.includes("lunch")&&chosen.includes("dinner");
+  const plans=nPlans(),chosen=nChosen(),dur=el("n_dur").value,days=nDays();
+  const hasLunch=chosen.includes("lunch"),hasDinner=chosen.includes("dinner");
+  const both=hasLunch&&hasDinner;
   const keepQ=(id,def)=>(prev[id]&&!resetQty)?prev[id].qty:def;
-  const keepR=(id,def)=>prev[id]?prev[id].rate:def;   // preserve manual rate overrides
+  const keepR=(id,def)=>prev[id]?prev[id].rate:def;
   const out=[];
-  if(chosen.includes("lunch")||chosen.includes("dinner")){
-    if(both)out.push({id:"main",label:"Combo (Lunch + Dinner)",qty:keepQ("main",days*2),rate:keepR("main",rate(plan,dur,"combo")),food:true});
-    else out.push({id:"main",label:chosen.includes("lunch")?"Lunch":"Dinner",qty:keepQ("main",days),rate:keepR("main",rate(plan,dur,"lunch")),food:true});
+  if(hasLunch||hasDinner){
+    plans.forEach(p=>{
+      const id="main_"+p;
+      out.push({id,label:mealLabel(p,both,hasLunch),qty:keepQ(id,both?days*2:days),rate:keepR(id,both?rate(p,dur,"combo"):rate(p,dur,"lunch")),food:true});
+    });
   }
-  ["breakfast","snack","juice1","juice2"].forEach(it=>{if(chosen.includes(it))out.push({id:it,label:ITEM_LABEL[it],qty:keepQ(it,days),rate:keepR(it,rate(plan,dur,it)),food:true});});
+  ["breakfast","snack","juice1","juice2"].forEach(it=>{if(chosen.includes(it)){const fr=plans.length?rate(plans[0],dur,it):gRate(it);out.push({id:it,label:ITEM_LABEL[it],qty:keepQ(it,days),rate:keepR(it,fr),food:true});}});
   if(chosen.includes("seafood"))out.push({id:"seafood",label:"Seafood add-on",qty:keepQ("seafood",days),rate:keepR("seafood",gRate("seafood")),food:true});
-  // custom lines preserved as-is
   Object.values(prev).filter(l=>l.custom).forEach(l=>out.push(l));
-  // delivery is fully derived: qty = days x slots, rate = km x delivery-rate
   const km=parseFloat(el("n_km").value)||0;
   out.push({id:"delivery",label:"Delivery",qty:days*nSlots(),rate:km*gRate("delivery"),food:false});
   return out;
 }
-function refreshNewRates(){ // re-apply sheet rates on plan/duration change (keeps qty)
-  const prev=domLines("n_lines");const plan=el("n_plan").value,dur=el("n_dur").value;const chosen=nChosen();
-  const both=chosen.includes("lunch")&&chosen.includes("dinner");
+function refreshNewRates(){
+  const plans=nPlans(),dur=el("n_dur").value,chosen=nChosen();const both=chosen.includes("lunch")&&chosen.includes("dinner");
   const lines=readLines("n_lines");
   lines.forEach(l=>{
-    if(l.id==="main")l.rate=both?rate(plan,dur,"combo"):rate(plan,dur,"lunch");
-    else if(["breakfast","snack","juice1","juice2"].includes(l.id))l.rate=rate(plan,dur,l.id);
+    if(l.id&&l.id.indexOf("main_")===0){const p=l.id.slice(5);l.rate=both?rate(p,dur,"combo"):rate(p,dur,"lunch");}
+    else if(["breakfast","snack","juice1","juice2"].includes(l.id))l.rate=plans.length?rate(plans[0],dur,l.id):gRate(l.id);
     else if(l.id==="seafood")l.rate=gRate("seafood");
     else if(l.id==="delivery")l.rate=(parseFloat(el("n_km").value)||0)*gRate("delivery");
   });
@@ -505,16 +487,10 @@ function refreshNewRates(){ // re-apply sheet rates on plan/duration change (kee
 function nRender(resetQty){renderLines("n_lines",buildNewLines(resetQty));recalcNew();}
 function recalcNew(){renderTotals("n_totals",computeTotals(readLines("n_lines"),parseFloat(el("n_disc").value)||0,parseFloat(el("n_gst").value)||0,0));}
 function newDatesFromStart(){const s=readDate("n_start");const days=nDays();if(s){const f=nextServiceDates(addDays(s,-1),days);setDate("n_end",f[f.length-1]);}}
-function applyDuration(){
-  const dur=el("n_dur").value;
-  if(dur==="custom"){el("n_days").removeAttribute("readonly");}
-  else{el("n_days").value=DUR_DAYS[dur];el("n_days").setAttribute("readonly","readonly");}
-  nRender(true); refreshNewRates(); newDatesFromStart();
-}
+function applyDuration(){const dur=el("n_dur").value;if(dur==="custom")el("n_days").removeAttribute("readonly");else{el("n_days").value=DUR_DAYS[dur];el("n_days").setAttribute("readonly","readonly");}nRender(true);refreshNewRates();newDatesFromStart();}
+function updatePlanHead(){const p=nPlans();el("n_planHead").textContent=p.length?p.map(x=>PLAN_LABEL[x]).join(", "):"Select plan(s)";}
 
-/* =====================================================================
-   RENEW / RECONCILE
-   ===================================================================== */
+/* ===================== RENEW ===================== */
 let renewCtx=null;
 function billHeaderIndex(rows){const h=rows[0].map(x=>String(x).trim());const idx={};h.forEach((n,i)=>idx[n]=i);return idx;}
 function lastBillForClient(rows,name){
@@ -522,7 +498,11 @@ function lastBillForClient(rows,name){
   const key=normName(name);let last=null;for(let i=1;i<rows.length;i++){if(normName(rows[i][ci])===key)last=rows[i];}
   if(!last)return null;const get=k=>{const j=idx[k];return (j===undefined||j>=last.length)?"":last[j];};
   let lines=[];try{lines=JSON.parse(get("LinesJSON")||"[]");}catch(e){}
-  return {raw:last,idx,billNo:get("BillNo"),plan:get("Plan"),duration:get("Duration"),style:get("Style"),slots:get("Slots"),start:toDt(get("Start")),end:toDt(get("End")),grandTotal:parseFloat(get("GrandTotal"))||0,discPct:parseFloat(get("Discount"))||0,gstPct:parseFloat(get("GST"))||0,lines};
+  return {raw:last,idx,billNo:get("BillNo"),plan:get("Plan"),duration:get("Duration"),slots:get("Slots"),start:toDt(get("Start")),end:toDt(get("End")),grandTotal:parseFloat(get("GrandTotal"))||0,discPct:parseFloat(get("Discount"))||0,gstPct:parseFloat(get("GST"))||5,lines};
+}
+function prevRate(prev,id,fallback){
+  if(prev.lines){let l=prev.lines.find(x=>x.id===id);if(!l&&id==="main")l=prev.lines.find(x=>String(x.id).indexOf("main")===0);if(l)return l.rate;}
+  return fallback;
 }
 async function runRenew(force){
   const name=el("r_client").value.trim();
@@ -534,34 +514,30 @@ async function runRenew(force){
     if(!prev){setStatus("r_status",`No previous bill found for "${name}" in Bills.`,"err");return;}
     if(!prev.start||!prev.end){setStatus("r_status","Previous bill has no readable Start/End dates.","err");return;}
     const orders=await fetchOrders(force);
-    const usage=computeFromRange(orders,name,prev.start,prev.end);
-    renewCtx={prev,usage};renderRenew(prev,usage);
-    setStatus("r_status",`Loaded bill ${prev.billNo}. Review reconciliation below.`,"ok");
+    renewCtx={prev,usage:computeFromRange(orders,name,prev.start,prev.end)};
+    renderRenew(renewCtx.prev,renewCtx.usage);
+    setStatus("r_status",`Loaded bill ${prev.billNo}. Review reconciliation.`,"ok");
   }catch(err){setStatus("r_status","Error: "+err.message,"err");}
 }
 function renderRenew(prev,u){
   const t=u.totals;
   el("r_usageCard").classList.remove("hidden");
-  el("r_prevline").innerHTML=`Previous cycle <b>${dtstr(prev.start)} → ${dtstr(prev.end)}</b> · ${PLAN_LABEL[prev.plan]||prev.plan||"—"}${u.stillActive?` · still active, counted to today (${dtstr(u.today)})`:""}`;
+  el("r_prevline").innerHTML=`Previous cycle <b>${dtstr(prev.start)} → ${dtstr(prev.end)}</b> · ${prev.plan||"—"}${u.stillActive?` · still active, counted to today (${dtstr(u.today)})`:""}`;
   el("r_stats").innerHTML=statBox(t.meals_total,"Meals")+statBox(u.activeDays,"Active days")+statBox(u.pausedDays,"Paused days")+statBox(u.deliveries,"Deliveries");
   let kv="";if(t.seafood>0)kv+=kvRow("Seafood",t.seafood);if(t.brk>0)kv+=kvRow("Breakfast",t.brk);if(t.snack>0)kv+=kvRow("Snack",t.snack);if(t.juices_total>0)kv+=kvRow("Juices",`${t.juices_total} (J1 ${t.j1}, J2 ${t.j2})`);kv+=kvRow("Total service days",u.totalDays);
   el("r_usageKV").innerHTML=kv;
   el("r_pauseWarn").innerHTML=(u.lastActiveDate&&u.lastActiveDate<prev.end)?`<div class="note pause">Last meal on <b>${dtstr(u.lastActiveDate)}</b>; paused since <b>${dtstr(addDays(u.lastActiveDate,1))}</b>.</div>`:"";
   el("r_paused").textContent=u.pausedDates.length?u.pausedDates.map(dtstr).join(", "):"None";
-
-  const plan=prev.plan,dur=prev.duration,style=prev.style;
-  const single=style!=="combo";
   const actual=[
-    {id:"main",label:single?"Meals":"Combo meals",qty:t.meals_total,rate:single?rate(plan,dur,"lunch"):rate(plan,dur,"combo"),food:true},
-    {id:"breakfast",label:"Breakfast",qty:t.brk,rate:rate(plan,dur,"breakfast"),food:true},
-    {id:"snack",label:"Snack",qty:t.snack,rate:rate(plan,dur,"snack"),food:true},
-    {id:"juice1",label:"Juice 1",qty:t.j1,rate:rate(plan,dur,"juice1"),food:true},
-    {id:"juice2",label:"Juice 2",qty:t.j2,rate:rate(plan,dur,"juice2"),food:true},
-    {id:"seafood",label:"Seafood add-on",qty:t.seafood,rate:gRate("seafood"),food:true},
-    {id:"delivery",label:"Delivery",qty:u.deliveries,rate:gRate("delivery"),food:false}
+    {id:"main",label:"Meals",qty:t.meals_total,rate:prevRate(prev,"main",0),food:true},
+    {id:"breakfast",label:"Breakfast",qty:t.brk,rate:prevRate(prev,"breakfast",0),food:true},
+    {id:"snack",label:"Snack",qty:t.snack,rate:prevRate(prev,"snack",0),food:true},
+    {id:"juice1",label:"Juice 1",qty:t.j1,rate:prevRate(prev,"juice1",0),food:true},
+    {id:"juice2",label:"Juice 2",qty:t.j2,rate:prevRate(prev,"juice2",0),food:true},
+    {id:"seafood",label:"Seafood add-on",qty:t.seafood,rate:prevRate(prev,"seafood",gRate("seafood")),food:true},
+    {id:"delivery",label:"Delivery",qty:u.deliveries,rate:prevRate(prev,"delivery",gRate("delivery")),food:false}
   ];
   el("r_reconCard").classList.remove("hidden");renderLines("r_lines",actual);recalcRenewActual();
-
   el("r_nextCard").classList.remove("hidden");
   setDate("r_start",u.nextStart);setDate("r_end",u.nextEnd);el("r_days").value=26;el("r_disc").value=prev.discPct||0;el("r_gst").value=prev.gstPct||5;el("r_billdate").value=keyOf(dateOnly(new Date()));
   const nextLines=(prev.lines&&prev.lines.length)?prev.lines.map(l=>({id:l.id,label:l.label,qty:l.qty,rate:l.rate,food:l.food!==false,custom:!!l.custom})):actual.map(l=>({...l}));
@@ -569,8 +545,7 @@ function renderRenew(prev,u){
 }
 function recalcRenewActual(){
   if(!renewCtx)return;
-  const t=computeTotals(readLines("r_lines"),renewCtx.prev.discPct||0,renewCtx.prev.gstPct||0,0);
-  renderTotals("r_actualTotals",t);
+  const t=computeTotals(readLines("r_lines"),renewCtx.prev.discPct||0,renewCtx.prev.gstPct||0,0);renderTotals("r_actualTotals",t);
   const paid=renewCtx.prev.grandTotal;const adj=(Math.round(t.grand*100)/100)-paid;renewCtx.adjustment=adj;
   el("r_paid").textContent="₹"+money(paid);
   el("r_adj").innerHTML=adj===0?"₹0":`<span class="${adj<0?'credit':'debit'}">${adj<0?'−':'+'}₹${money(Math.abs(adj))} ${adj<0?'(credit to client)':'(client owes)'}</span>`;
@@ -578,7 +553,7 @@ function recalcRenewActual(){
 }
 function recalcRenewNext(){if(!renewCtx)return;renderTotals("r_nextTotals",computeTotals(readLines("r_nextlines"),parseFloat(el("r_disc").value)||0,parseFloat(el("r_gst").value)||0,renewCtx.adjustment||0));}
 
-/* ---------- bill number ---------- */
+/* bill number */
 function suggestBillNo(billnoId,billdateId){
   const bd=readDate(billdateId)||dateOnly(new Date());const month=bd.getMonth()+1;const prefix=month*100;let maxSeq=0;
   if(billsCache&&billsCache.length>1){const idx=billHeaderIndex(billsCache);const bi=idx["BillNo"];
@@ -586,7 +561,7 @@ function suggestBillNo(billnoId,billdateId){
   el(billnoId).value=prefix+(maxSeq+1);
 }
 
-/* ---------- invoice ---------- */
+/* invoice */
 function buildInvoice(meta,lines,t){
   const food=lines.filter(l=>(l.id!=="delivery"&&l.food!==false)&&l.qty>0);
   let rows="";
@@ -596,26 +571,19 @@ function buildInvoice(meta,lines,t){
   if(t.delivery>0){const dl=lines.find(l=>l.id==="delivery");rows+=`<tr><td>Delivery</td><td>${dl?dl.qty:""}</td><td>${dl&&dl.rate?money(dl.rate):""}</td><td>${money(t.delivery)}</td></tr>`;}
   if(t.adjustment)rows+=`<tr class="sub"><td>Prev-cycle adjustment</td><td></td><td></td><td>${t.adjustment<0?'−':'+'}${money(Math.abs(t.adjustment))}</td></tr>`;
   el("invoice").innerHTML=`
-    <div class="ihead">
-      <img src="${BIZ.logo}" onerror="this.style.display='none'">
-      <div><h2>${BIZ.name}</h2><div class="tg">${BIZ.tagline}</div>
-        <div class="reg">${BIZ.address}<br>GST ${BIZ.gst} · FSSAI ${BIZ.fssai}</div></div>
-      <div class="invno"><div class="lab">Invoice</div><div class="no">${meta.billNo||""}</div></div>
-    </div>
+    <div class="ihead"><img src="${BIZ.logo}" onerror="this.style.display='none'">
+      <div><h2>${BIZ.name}</h2><div class="tg">${BIZ.tagline}</div><div class="reg">${BIZ.address}<br>GST ${BIZ.gst} · FSSAI ${BIZ.fssai}</div></div>
+      <div class="invno"><div class="lab">Invoice</div><div class="no">${meta.billNo||""}</div></div></div>
     <div class="meta">
       <div class="cell"><div class="lab">Client</div><div class="val big">${meta.client||""}</div></div>
+      <div class="cell"><div class="lab">Plan</div><div class="val">${meta.plan||""}</div></div>
       <div class="cell"><div class="lab">Bill date</div><div class="val">${dtstr(meta.billDate)}</div></div>
-      <div class="cell"><div class="lab">Days</div><div class="val">${meta.days}</div></div>
       <div class="cell"><div class="lab">Cycle start</div><div class="val">${dtstr(meta.start)}</div></div>
       <div class="cell"><div class="lab">Cycle end</div><div class="val">${dtstr(meta.end)}</div></div>
-      <div class="cell"><div class="lab">Status</div><div class="val">${meta.paidStatus||"Unpaid"}</div></div>
-    </div>
+      <div class="cell"><div class="lab">Days</div><div class="val">${meta.days}</div></div></div>
     <table class="itab"><thead><tr><th>Description</th><th>Qty</th><th>Rate</th><th>Price</th></tr></thead><tbody>${rows}</tbody></table>
     <div class="grand"><span class="gl">${meta.paidStatus==="Paid"?"Paid":"Total payable"}</span><span class="gv">₹${money(t.grand)}</span></div>
-    <div class="bank">
-      <div style="flex:1"><div class="upi">UPI : ${BIZ.upi}</div>${BIZ.acHolder}<br>A/C ${BIZ.acNumber} · ${BIZ.acType}</div>
-      <div style="flex:1">IFSC ${BIZ.ifsc}<br>${BIZ.branch}</div>
-    </div>
+    <div class="bank"><div style="flex:1"><div class="upi">UPI : ${BIZ.upi}</div>${BIZ.acHolder}<br>A/C ${BIZ.acNumber} · ${BIZ.acType}</div><div style="flex:1">IFSC ${BIZ.ifsc}<br>${BIZ.branch}</div></div>
     <div class="footnote">*Please read all Terms &amp; Conditions on delivery timings, meal storage &amp; shelf life — refunds, substitutions &amp; cancellation policy on our website.</div>`;
 }
 async function exportInvoicePDF(filename){
@@ -625,21 +593,20 @@ async function exportInvoicePDF(filename){
   pdf.addImage(img,"PNG",margin,margin,w,h);pdf.save(filename);
 }
 
-/* ---------- meta + save ---------- */
+/* meta + save */
 function gatherNewMeta(){
-  const chosen=nChosen();const both=chosen.includes("lunch")&&chosen.includes("dinner");
   return {billNo:el("n_billno").value.trim(),billDate:readDate("n_billdate")||dateOnly(new Date()),
     client:el("n_client").value.trim(),phone:el("n_phone").value.trim(),
-    plan:el("n_plan").value,duration:el("n_dur").value,style:both?"combo":(chosen.includes("lunch")||chosen.includes("dinner")?"single":""),
+    plan:nPlans().map(p=>PLAN_LABEL[p]).join(", "),duration:DUR_LABEL[el("n_dur").value]||el("n_dur").value,
     days:nDays(),start:readDate("n_start"),end:readDate("n_end"),
     slots:Array.from(el("n_slots").querySelectorAll("input:checked")).map(c=>c.value).join(", "),
     discPct:parseFloat(el("n_disc").value)||0,gstPct:parseFloat(el("n_gst").value)||5,paidStatus:"Unpaid"};
 }
 function billObject(meta,lines,t){
   return {BillNo:meta.billNo,Date:keyOf(meta.billDate),Client:meta.client,Phone:meta.phone,
-    Plan:meta.plan,Duration:meta.duration,Style:meta.style,Slots:meta.slots,
+    Plan:meta.plan,Duration:meta.duration,Slots:meta.slots,
     Start:meta.start?keyOf(meta.start):"",End:meta.end?keyOf(meta.end):"",
-    Food:money(t.food),Discount:meta.discPct,GST:meta.gstPct,Delivery:money(t.delivery),
+    Items:itemsReadable(lines),Food:money(t.food),Discount:meta.discPct,Delivery:money(t.delivery),
     Adjustment:money(t.adjustment),GrandTotal:money(t.grand),PaidStatus:meta.paidStatus,
     LinesJSON:JSON.stringify(lines.map(l=>({id:l.id,label:l.label,qty:l.qty,rate:l.rate,food:l.food!==false,custom:!!l.custom})))};
 }
@@ -650,14 +617,8 @@ async function saveBill(obj,statusId){
   throw new Error(res&&res.message?res.message:"Save returned no confirmation");
 }
 
-/* =====================================================================
-   DASHBOARD
-   ===================================================================== */
-async function loadDashboard(force){
-  setStatus("d_status","Loading bills…","info");
-  try{const bills=await fetchBills(force);renderDashboard(bills);setStatus("d_status",`${Math.max(0,bills.length-1)} bills.`,"ok");}
-  catch(err){setStatus("d_status","Error: "+err.message,"err");el("d_followups").innerHTML="";}
-}
+/* ===================== DASHBOARD ===================== */
+async function loadDashboard(force){setStatus("d_status","Loading bills…","info");try{const bills=await fetchBills(force);renderDashboard(bills);setStatus("d_status",`${Math.max(0,bills.length-1)} bills.`,"ok");}catch(err){setStatus("d_status","Error: "+err.message,"err");el("d_followups").innerHTML="";}}
 function dashRows(){
   if(!billsCache||billsCache.length<2)return [];
   const idx=billHeaderIndex(billsCache);const out=[];
@@ -667,16 +628,12 @@ function dashRows(){
 }
 function pillHtml(r){const cls=r.paid.toLowerCase()==="paid"?"paid":"unpaid";return `<span class="pill ${cls}" data-bill="${r.billNo}" data-status="${r.paid}">${r.paid.toLowerCase()==="paid"?"Paid":"Unpaid"}</span>`;}
 function bindPills(scopeId){
-  el(scopeId).querySelectorAll(".pill").forEach(p=>{
-    p.onclick=async()=>{
-      const billNo=p.dataset.bill;const next=p.dataset.status.toLowerCase()==="paid"?"Unpaid":"Paid";p.textContent="…";
-      try{const res=await apiCall("updateBillStatus",{billNo,status:next});
-        if(res&&res.ok){const idx=billHeaderIndex(billsCache);const bi=idx["BillNo"],si=idx["PaidStatus"];
-          for(let i=1;i<billsCache.length;i++){if(String(billsCache[i][bi])===String(billNo)){billsCache[i][si]=next;break;}}renderDashboard();}
-        else p.textContent="!";
-      }catch(e){p.textContent="!";}
-    };
-  });
+  el(scopeId).querySelectorAll(".pill").forEach(p=>{p.onclick=async()=>{
+    const billNo=p.dataset.bill;const next=p.dataset.status.toLowerCase()==="paid"?"Unpaid":"Paid";p.textContent="…";
+    try{const res=await apiCall("updateBillStatus",{billNo,status:next});
+      if(res&&res.ok){const idx=billHeaderIndex(billsCache);const bi=idx["BillNo"],si=idx["PaidStatus"];for(let i=1;i<billsCache.length;i++){if(String(billsCache[i][bi])===String(billNo)){billsCache[i][si]=next;break;}}renderDashboard();}
+      else p.textContent="!";
+    }catch(e){p.textContent="!";}};});
 }
 function renderDashboard(){
   const today=dateOnly(new Date());const rows=dashRows();
@@ -687,8 +644,7 @@ function renderDashboard(){
   else{el("d_followups").innerHTML=`<div style="overflow-x:auto"><table class="dtable"><tbody>`+follow.map(r=>{
     const expired=r.end<today,isToday=keyOf(r.end)===keyOf(today);
     const tag=expired?`<span class="rowtag exp">expired</span>`:(isToday?`<span class="rowtag">today</span>`:`<span class="rowtag">${Math.round((r.end-today)/86400000)}d</span>`);
-    return `<tr><td><b>${r.client}</b>${tag}</td><td>${dtstr(r.end)}</td><td>${r.billNo}</td><td>${pillHtml(r)}</td></tr>`;
-  }).join("")+`</tbody></table></div>`;bindPills("d_followups");}
+    return `<tr><td><b>${r.client}</b>${tag}</td><td>${dtstr(r.end)}</td><td>${r.billNo}</td><td>${pillHtml(r)}</td></tr>`;}).join("")+`</tbody></table></div>`;bindPills("d_followups");}
   applyDashFilter();
 }
 function applyDashFilter(){
@@ -697,34 +653,50 @@ function applyDashFilter(){
   if(q)rows=rows.filter(r=>normName(r.client).includes(q)||String(r.billNo).includes(q));
   rows.sort((a,b)=>(b.start&&a.start)?b.start-a.start:0);
   el("d_table").innerHTML=`<thead><tr><th>Bill</th><th>Client</th><th>Plan</th><th>Start</th><th>End</th><th>Total</th><th>Status</th></tr></thead><tbody>`+
-    rows.map(r=>`<tr><td>${r.billNo}</td><td>${r.client}</td><td>${PLAN_LABEL[r.plan]||r.plan||""}</td><td>${dtstr(r.start)}</td><td>${dtstr(r.end)}</td><td>₹${money(r.grand)}</td><td>${pillHtml(r)}</td></tr>`).join("")+`</tbody>`;
+    rows.map(r=>`<tr><td>${r.billNo}</td><td>${r.client}</td><td>${r.plan||""}</td><td>${dtstr(r.start)}</td><td>${dtstr(r.end)}</td><td>₹${money(r.grand)}</td><td>${pillHtml(r)}</td></tr>`).join("")+`</tbody>`;
   bindPills("d_table");
 }
 
-/* =====================================================================
-   NAME → PHONE
-   ===================================================================== */
-async function loadClientNames(){
-  try{const cl=await fetchMaster(false);
-    el("n_clientNames").innerHTML=cl.map(c=>`<option value="${(c.name||"").replace(/"/g,"&quot;")}">`).join("");
-  }catch(e){/* non-fatal */}
+/* ===================== USAGE CHECK ===================== */
+async function runUsageCheck(force){
+  const name=el("u_client").value.trim();const start=readDate("u_start"),end=readDate("u_end");
+  if(!name){setStatus("u_status","Enter a client name.","err");return;}
+  if(!start||!end){setStatus("u_status","Enter both dates.","err");return;}
+  if(start>end){setStatus("u_status","Start date is after end date.","err");return;}
+  setStatus("u_status","Computing…","info");
+  try{const orders=await fetchOrders(force);renderUsageReport(countUsage(orders,start,end,name),start,end);setStatus("u_status",`Done — scanned ${orders.length} rows.`,"ok");}
+  catch(e){setStatus("u_status","Error: "+e.message,"err");}
 }
-function onClientNameChange(){
-  if(!masterCache)return;
-  const matches=masterCache.filter(c=>normName(c.name)===normName(el("n_client").value));
-  const sel=el("n_phoneSel");
-  if(matches.length<=1){sel.classList.add("hidden");el("n_phone").value=matches.length?matches[0].phone:el("n_phone").value;}
-  else{
-    sel.classList.remove("hidden");
-    sel.innerHTML=matches.map(c=>`<option value="${c.phone}">${c.phone}</option>`).join("");
-    el("n_phone").value=matches[0].phone;
-    sel.onchange=()=>{el("n_phone").value=sel.value;};
-  }
+function renderUsageReport(u,start,end){
+  const t=u.totals;el("u_card").classList.remove("hidden");
+  el("u_range").innerHTML=`Usage for <b>${dtstr(start)} → ${dtstr(end)}</b> (Sundays excluded)`;
+  el("u_stats").innerHTML=statBox(t.meals_total,"Meals")+statBox(u.activeDays,"Active days")+statBox(u.pausedDays,"Paused days")+statBox(u.totalDays,"Total days")+statBox(u.deliveries,"Deliveries");
+  let kv=kvRow("Lunch (option 1)",t.meal1)+kvRow("Dinner (option 2)",t.meal2);
+  if(t.seafood>0)kv+=kvRow("Seafood",t.seafood);if(t.brk>0)kv+=kvRow("Breakfast",t.brk);if(t.snack>0)kv+=kvRow("Snack",t.snack);if(t.juices_total>0)kv+=kvRow("Juices",`${t.juices_total} (J1 ${t.j1}, J2 ${t.j2})`);
+  el("u_kv").innerHTML=kv;
+  const slots=Object.keys(u.slotCounts).sort();
+  el("u_slots").innerHTML=slots.length?`<div class="subtle" style="font-weight:600;margin-bottom:4px">Slot deliveries</div><div class="chips">`+slots.map(s=>`<span class="chip" style="border:1.5px solid var(--line);border-radius:999px;padding:4px 12px">${s}: <b>${u.slotCounts[s]}</b></span>`).join("")+`</div>`:"";
+  el("u_pauseWarn").innerHTML=(u.lastActiveDate&&u.lastActiveDate<end)?`<div class="note pause">Last meal on <b>${dtstr(u.lastActiveDate)}</b>; no meals after that in this range.</div>`:"";
+  el("u_paused").textContent=u.pausedDates.length?u.pausedDates.map(dtstr).join(", "):"None";
 }
 
-/* =====================================================================
-   WIRING
-   ===================================================================== */
+/* ===================== NAME → PHONE ===================== */
+function populateClientList(q){
+  const dl=el("n_clientNames");
+  if(!masterCache||q.trim().length<2){dl.innerHTML="";return;}
+  const nq=normName(q);
+  dl.innerHTML=masterCache.filter(c=>normName(c.name).includes(nq)).slice(0,20).map(c=>`<option value="${(c.name||"").replace(/"/g,"&quot;")}">`).join("");
+}
+function onClientNameChange(){
+  const sel=el("n_phoneSel");
+  if(!masterCache){return;}
+  const matches=masterCache.filter(c=>normName(c.name)===normName(el("n_client").value));
+  if(matches.length===0){sel.classList.add("hidden");el("n_phone").value="";}        // clear stale phone
+  else if(matches.length===1){sel.classList.add("hidden");el("n_phone").value=matches[0].phone;}
+  else{sel.classList.remove("hidden");sel.innerHTML=matches.map(c=>`<option value="${c.phone}">${c.phone}</option>`).join("");el("n_phone").value=matches[0].phone;sel.onchange=()=>{el("n_phone").value=sel.value;};}
+}
+
+/* ===================== WIRING ===================== */
 function switchTab(name){
   document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("active",t.dataset.tab===name));
   el("tab-new").classList.toggle("hidden",name!=="new");
@@ -735,10 +707,14 @@ function switchTab(name){
 }
 document.querySelectorAll(".tab").forEach(t=>t.addEventListener("click",()=>switchTab(t.dataset.tab)));
 
+// plan multiselect
+el("n_planHead").addEventListener("click",e=>{e.stopPropagation();el("n_planPanel").classList.toggle("hidden");});
+el("n_planPanel").addEventListener("change",()=>{updatePlanHead();nRender(false);refreshNewRates();});
+document.addEventListener("click",e=>{if(!el("n_planSel").contains(e.target))el("n_planPanel").classList.add("hidden");});
+
 // new bill
-el("n_client").addEventListener("input",onClientNameChange);
+el("n_client").addEventListener("input",e=>{populateClientList(e.target.value);onClientNameChange();});
 el("n_client").addEventListener("change",onClientNameChange);
-el("n_plan").addEventListener("change",refreshNewRates);
 el("n_dur").addEventListener("change",applyDuration);
 el("n_days").addEventListener("input",()=>{nRender(true);newDatesFromStart();});
 el("n_start").addEventListener("change",newDatesFromStart);
@@ -749,28 +725,22 @@ el("n_disc").addEventListener("input",recalcNew);
 el("n_gst").addEventListener("input",recalcNew);
 bindLivePrice("n_lines",recalcNew);
 el("n_addline").addEventListener("click",()=>{el("n_lines").insertAdjacentHTML("beforeend",lineRowHtml({id:"custom_"+Date.now(),label:"Custom item",qty:0,rate:0,food:true,custom:true}));recalcNew();});
-el("n_suggestno").addEventListener("click",async()=>{try{await fetchBills(false);suggestBillNo("n_billno","n_billdate");}catch(e){setStatus("n_status","Couldn't load Bills: "+e.message,"err");}});
+el("n_suggestno").addEventListener("click",async()=>{try{await fetchBills(true);suggestBillNo("n_billno","n_billdate");}catch(e){setStatus("n_status","Couldn't load Bills: "+e.message,"err");}});
 el("n_billdate").addEventListener("change",()=>{if(billsCache)suggestBillNo("n_billno","n_billdate");});
-el("n_preview").addEventListener("click",async()=>{
-  try{const meta=gatherNewMeta();const lines=readLines("n_lines");const t=computeTotals(lines,meta.discPct,meta.gstPct,0);
-    buildInvoice(meta,lines,t);await exportInvoicePDF(`Invoice_${(meta.client||"Client").replace(/\s+/g,"_")}_${meta.billNo||"draft"}.pdf`);
-    setStatus("n_status","Preview PDF downloaded.","ok");
-  }catch(e){setStatus("n_status","Preview error: "+e.message,"err");}
-});
-el("n_save").addEventListener("click",async()=>{
-  try{
-    const meta=gatherNewMeta();
-    if(!meta.client){setStatus("n_status","Enter client name.","err");return;}
-    if(!meta.billNo){setStatus("n_status","Set a bill number.","err");return;}
-    const lines=readLines("n_lines");const t=computeTotals(lines,meta.discPct,meta.gstPct,0);
-    await saveBill(billObject(meta,lines,t),"n_status");
-    buildInvoice(meta,lines,t);await exportInvoicePDF(`Invoice_${meta.client.replace(/\s+/g,"_")}_${meta.billNo}.pdf`);
-  }catch(e){setStatus("n_status","Save error: "+e.message,"err");}
-});
+el("n_preview").addEventListener("click",async()=>{try{const meta=gatherNewMeta();const lines=readLines("n_lines");const t=computeTotals(lines,meta.discPct,meta.gstPct,0);buildInvoice(meta,lines,t);await exportInvoicePDF(`Invoice_${(meta.client||"Client").replace(/\s+/g,"_")}_${meta.billNo||"draft"}.pdf`);setStatus("n_status","Preview PDF downloaded.","ok");}catch(e){setStatus("n_status","Preview error: "+e.message,"err");}});
+el("n_save").addEventListener("click",async()=>{try{
+  const meta=gatherNewMeta();
+  if(!meta.client){setStatus("n_status","Enter client name.","err");return;}
+  if(!meta.billNo){setStatus("n_status","Set a bill number.","err");return;}
+  const lines=readLines("n_lines");const t=computeTotals(lines,meta.discPct,meta.gstPct,0);
+  await saveBill(billObject(meta,lines,t),"n_status");
+  buildInvoice(meta,lines,t);await exportInvoicePDF(`Invoice_${meta.client.replace(/\s+/g,"_")}_${meta.billNo}.pdf`);
+}catch(e){setStatus("n_status","Save error: "+e.message,"err");}});
 
 // renew
 el("r_fetch").addEventListener("click",()=>runRenew(false));
 el("r_reload").addEventListener("click",()=>runRenew(true));
+el("r_client").addEventListener("input",e=>populateClientList(e.target.value));
 el("r_client").addEventListener("keydown",e=>{if(e.key==="Enter")runRenew(false);});
 bindLivePrice("r_lines",recalcRenewActual);
 bindLivePrice("r_nextlines",recalcRenewNext);
@@ -778,59 +748,24 @@ el("r_disc").addEventListener("input",recalcRenewNext);
 el("r_gst").addEventListener("input",recalcRenewNext);
 el("r_addline").addEventListener("click",()=>{el("r_nextlines").insertAdjacentHTML("beforeend",lineRowHtml({id:"custom_"+Date.now(),label:"Custom item",qty:0,rate:0,food:true,custom:true}));recalcRenewNext();});
 el("r_billdate").addEventListener("change",()=>{if(billsCache)suggestBillNo("r_billno","r_billdate");});
-el("r_preview").addEventListener("click",async()=>{
-  try{if(!renewCtx)return;const meta=gatherRenewMeta();const lines=readLines("r_nextlines");const t=computeTotals(lines,meta.discPct,meta.gstPct,renewCtx.adjustment||0);
-    buildInvoice(meta,lines,t);await exportInvoicePDF(`Invoice_${(meta.client||"Client").replace(/\s+/g,"_")}_${meta.billNo||"draft"}.pdf`);
-  }catch(e){setStatus("r_status","Preview error: "+e.message,"err");}
-});
-el("r_save").addEventListener("click",async()=>{
-  try{if(!renewCtx)return;const meta=gatherRenewMeta();
-    if(!meta.billNo){setStatus("r_status","Set a bill number.","err");return;}
-    const lines=readLines("r_nextlines");const t=computeTotals(lines,meta.discPct,meta.gstPct,renewCtx.adjustment||0);
-    await saveBill(billObject(meta,lines,t),"r_status");
-    buildInvoice(meta,lines,t);await exportInvoicePDF(`Invoice_${meta.client.replace(/\s+/g,"_")}_${meta.billNo}.pdf`);
-  }catch(e){setStatus("r_status","Save error: "+e.message,"err");}
-});
+el("r_preview").addEventListener("click",async()=>{try{if(!renewCtx)return;const meta=gatherRenewMeta();const lines=readLines("r_nextlines");const t=computeTotals(lines,meta.discPct,meta.gstPct,renewCtx.adjustment||0);buildInvoice(meta,lines,t);await exportInvoicePDF(`Invoice_${(meta.client||"Client").replace(/\s+/g,"_")}_${meta.billNo||"draft"}.pdf`);}catch(e){setStatus("r_status","Preview error: "+e.message,"err");}});
+el("r_save").addEventListener("click",async()=>{try{if(!renewCtx)return;const meta=gatherRenewMeta();
+  if(!meta.billNo){setStatus("r_status","Set a bill number.","err");return;}
+  const lines=readLines("r_nextlines");const t=computeTotals(lines,meta.discPct,meta.gstPct,renewCtx.adjustment||0);
+  await saveBill(billObject(meta,lines,t),"r_status");
+  buildInvoice(meta,lines,t);await exportInvoicePDF(`Invoice_${meta.client.replace(/\s+/g,"_")}_${meta.billNo}.pdf`);
+}catch(e){setStatus("r_status","Save error: "+e.message,"err");}});
 function gatherRenewMeta(){const p=renewCtx.prev;
   return {billNo:el("r_billno").value.trim(),billDate:readDate("r_billdate")||dateOnly(new Date()),
     client:p.raw[p.idx["Client"]],phone:p.idx["Phone"]!==undefined?p.raw[p.idx["Phone"]]:"",
-    plan:p.plan,duration:p.duration,style:p.style,slots:p.slots,
+    plan:p.plan,duration:p.duration,slots:p.slots,
     days:parseInt(el("r_days").value)||26,start:readDate("r_start"),end:readDate("r_end"),
     discPct:parseFloat(el("r_disc").value)||0,gstPct:parseFloat(el("r_gst").value)||5,paidStatus:"Unpaid"};}
 
-// usage check
-async function runUsageCheck(force){
-  const name=el("u_client").value.trim();
-  const start=readDate("u_start"),end=readDate("u_end");
-  if(!name){setStatus("u_status","Enter a client name.","err");return;}
-  if(!start||!end){setStatus("u_status","Enter both dates.","err");return;}
-  if(start>end){setStatus("u_status","Start date is after end date.","err");return;}
-  setStatus("u_status","Computing…","info");
-  try{
-    const orders=await fetchOrders(force);
-    const u=countUsage(orders,start,end,name);
-    renderUsageReport(u,start,end);
-    setStatus("u_status",`Done — scanned ${orders.length} rows.`,"ok");
-  }catch(e){setStatus("u_status","Error: "+e.message,"err");}
-}
-function renderUsageReport(u,start,end){
-  const t=u.totals;
-  el("u_card").classList.remove("hidden");
-  el("u_range").innerHTML=`Usage for <b>${dtstr(start)} → ${dtstr(end)}</b> (Sundays excluded)`;
-  el("u_stats").innerHTML=statBox(t.meals_total,"Meals")+statBox(u.activeDays,"Active days")+statBox(u.pausedDays,"Paused days")+statBox(u.totalDays,"Total days")+statBox(u.deliveries,"Deliveries");
-  let kv=kvRow("Lunch (option 1)",t.meal1)+kvRow("Dinner (option 2)",t.meal2);
-  if(t.seafood>0)kv+=kvRow("Seafood",t.seafood);
-  if(t.brk>0)kv+=kvRow("Breakfast",t.brk);
-  if(t.snack>0)kv+=kvRow("Snack",t.snack);
-  if(t.juices_total>0)kv+=kvRow("Juices",`${t.juices_total} (J1 ${t.j1}, J2 ${t.j2})`);
-  el("u_kv").innerHTML=kv;
-  const slots=Object.keys(u.slotCounts).sort();
-  el("u_slots").innerHTML=slots.length?`<div class="subtle" style="font-weight:600;margin-bottom:4px">Slot deliveries</div><div class="chips">`+slots.map(s=>`<span class="chip">${s}: <b>${u.slotCounts[s]}</b></span>`).join("")+`</div>`:"";
-  el("u_pauseWarn").innerHTML=(u.lastActiveDate&&u.lastActiveDate<end)?`<div class="note pause">Last meal on <b>${dtstr(u.lastActiveDate)}</b>; no meals after that in this range.</div>`:"";
-  el("u_paused").textContent=u.pausedDates.length?u.pausedDates.map(dtstr).join(", "):"None";
-}
+// usage tab
 el("u_fetch").addEventListener("click",()=>runUsageCheck(false));
 el("u_reload").addEventListener("click",()=>runUsageCheck(true));
+el("u_client").addEventListener("input",e=>populateClientList(e.target.value));
 el("u_client").addEventListener("keydown",e=>{if(e.key==="Enter")runUsageCheck(false);});
 
 // dashboard
@@ -840,7 +775,13 @@ el("d_reload").addEventListener("click",()=>loadDashboard(true));
 
 // init
 el("n_billdate").value=keyOf(dateOnly(new Date()));
-(async()=>{ try{await fetchPrices(false);}catch(e){setStatus("n_status","Couldn't load Prices: "+e.message,"err");} nRender(true); loadClientNames(); })();
+updatePlanHead();
+(async()=>{
+  try{await fetchPrices(false);}catch(e){setStatus("n_status","Couldn't load Prices: "+e.message,"err");}
+  nRender(true);
+  try{await fetchMaster(false);}catch(e){}
+  try{await fetchBills(false);suggestBillNo("n_billno","n_billdate");}catch(e){}
+})();
 </script>
 </body>
 </html>
