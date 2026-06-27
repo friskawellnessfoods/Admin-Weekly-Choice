@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-<html>
 <head>
   <base target="_top">
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -16,12 +15,12 @@
     --navy-deep:#08155a;
     --accent:#10b981;
     --accent-soft:#e7f7f1;
-    --bg:#f4f7fc;
+    --bg:#eef2f9;
     --ink:#16213e;
     --muted:#6b7596;
     --line:#e2e7f1;
     --radius:18px;
-    --shadow:0 14px 40px rgba(20,33,62,0.08);
+    --shadow:0 14px 40px rgba(20,33,62,0.12);
   }
 
   * { box-sizing: border-box; }
@@ -39,68 +38,90 @@
     color: var(--ink);
   }
 
-  /* soft blurred color blobs */
-  body::before, body::after{
-    content:"";
-    position:fixed;
-    border-radius:50%;
-    filter:blur(70px);
-    z-index:-1;
-    pointer-events:none;
+  /* your photo, dimmed under a light wash */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(238,242,249,0.86), rgba(238,242,249,0.92)),
+      url("bg.webp");
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    z-index: -2;
   }
-  body::before{
-    width:340px; height:340px;
-    background:rgba(16,185,129,0.16);
-    top:-120px; left:-120px;
+  /* mint glow accent */
+  body::after {
+    content: "";
+    position: fixed;
+    width: 360px; height: 360px;
+    border-radius: 50%;
+    background: rgba(16,185,129,0.12);
+    filter: blur(70px);
+    bottom: -160px; right: -120px;
+    z-index: -1;
+    pointer-events: none;
   }
-  body::after{
-    width:380px; height:380px;
-    background:rgba(10,26,110,0.10);
-    bottom:-160px; right:-140px;
-  }
 
-  .app { width: 100%; max-width: 100%; padding: 12px; position:relative; z-index:1; }
+  .app { width: 100%; max-width: 100%; padding: 0 0 16px; position: relative; z-index: 1; }
+  .wrapper { width: 100%; max-width: 620px; margin: 0 auto; }
 
-  .wrapper { width: 94%; max-width: 620px; margin: 0 auto; }
-
-  /* HEADER */
-  .topbar { text-align: center; margin: 8px 0 4px; }
-  .logo { max-width: 140px; height: auto; }
-
-  h2 {
-    font-size: 22px;
-    font-weight: 700;
-    margin: 6px 0 18px;
+  /* NAVY HEADER BANNER */
+  .hero {
+    background: linear-gradient(135deg, var(--navy), #13278f);
+    padding: 22px 16px 48px;
     text-align: center;
-    color: var(--navy);
+    position: relative;
+    overflow: hidden;
   }
+  .hero::before {
+    content: "";
+    position: absolute;
+    width: 180px; height: 180px;
+    border-radius: 50%;
+    background: rgba(16,185,129,0.22);
+    filter: blur(50px);
+    bottom: -70px; left: -40px;
+  }
+  .hero::after {
+    content: "";
+    position: absolute;
+    width: 160px; height: 160px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.10);
+    filter: blur(44px);
+    top: -50px; right: -30px;
+  }
+  .hero-inner { position: relative; z-index: 1; }
+  .hero .logo { max-width: 130px; height: auto; margin-bottom: 6px; }
+  .hero h2 { font-size: 18px; font-weight: 700; color: #fff; margin: 4px 0 0; letter-spacing: .2px; }
+
+  /* content pulled up over the banner */
+  .content { padding: 0 14px; margin-top: -28px; position: relative; z-index: 2; }
+
+  h2 { font-size: 20px; font-weight: 700; margin: 0; text-align: center; color: var(--navy); }
   h3 { font-size: 18px; margin-bottom: 14px; }
-  h4 { font-size: 16px; font-weight:700; margin: 0; color: var(--navy); }
+  h4 { font-size: 15px; font-weight: 700; margin: 0; color: var(--navy); }
 
   /* CARD */
   .box {
     background: #fff;
     border-radius: var(--radius);
-    padding: 20px;
-    margin-bottom: 16px;
+    padding: 18px 16px;
+    margin-bottom: 14px;
     box-shadow: var(--shadow);
     border: 1px solid rgba(226,231,241,0.7);
   }
 
   /* FORM */
-  label {
-    font-size: 13px;
-    margin-bottom: 6px;
-    display: block;
-    font-weight: 600;
-    color: #445;
-  }
+  label { font-size: 12px; margin-bottom: 6px; display: block; font-weight: 600; color: #445; }
 
   input[type="text"],
   input#phone,
   select {
     width: 100%;
-    padding: 13px 14px;
+    padding: 12px 14px;
     font-size: 16px;
     border-radius: 12px;
     border: 1.5px solid var(--line);
@@ -118,36 +139,32 @@
     background: #fff;
     box-shadow: 0 0 0 3px rgba(16,185,129,0.12);
   }
-  #phone { font-size: 17px; padding: 13px 14px; letter-spacing: .3px; }
+  #phone { font-size: 17px; letter-spacing: .3px; }
   input[readonly] { background: #f4f6fa; color: #555; }
-
-  label + input { margin-top: 0; }
   .box label:not(:first-child) { margin-top: 16px; }
 
   /* BUTTONS */
   .btn {
     width: 100%;
-    padding: 14px;
+    padding: 13px;
     font-size: 15px;
     border-radius: 13px;
     border: none;
     background: var(--navy);
     color: #fff;
-    margin-top: 14px;
+    margin-top: 12px;
     font-weight: 700;
     cursor: pointer;
     font-family: inherit;
     box-shadow: 0 6px 16px rgba(10,26,110,0.18);
-    transition: transform .08s ease, background .15s, box-shadow .2s;
+    transition: transform .08s ease, background .15s;
   }
   .btn:active { transform: scale(0.98); background: var(--navy-deep); }
-  .btn.secondary {
-    background: #fff;
-    color: var(--navy);
-    border: 1.5px solid var(--line);
-    box-shadow: none;
-  }
+  .btn.secondary { background: #fff; color: var(--navy); border: 1.5px solid var(--line); box-shadow: none; }
   .btn.secondary:active { background: #f1f4fb; }
+  /* Submit = emerald primary */
+  .btn.submit { background: var(--accent); box-shadow: 0 6px 16px rgba(16,185,129,0.25); }
+  .btn.submit:active { background: #0e9e6e; }
 
   .menu-btn{
     background:var(--navy); color:white; border:none;
@@ -155,55 +172,47 @@
     cursor:pointer; margin-top:10px; border-radius:12px;
   }
 
+  /* SECTION PANEL (tinted wrapper around each section) */
+  .sec-panel {
+    background: #f5f8fc;
+    border: 1px solid #eef2f8;
+    border-radius: 14px;
+    padding: 12px;
+    margin-bottom: 12px;
+  }
+
   /* SECTION HEADER */
   .section-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    margin: 18px 0 10px;
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 8px; margin: 0 0 10px;
   }
   .section-header h4 {
-    font-size: 16px;
-    white-space: nowrap;
-    flex-shrink: 0;
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
+    font-size: 15px; white-space: nowrap; flex-shrink: 0;
+    display: inline-flex; align-items: center; gap: 8px;
   }
   .section-controls { display: flex; gap: 6px; }
   .section-controls select {
-    width: 116px !important;
-    padding: 9px 10px !important;
-    font-size: 13px !important;
-    border-radius: 10px;
+    width: 108px !important; padding: 8px 9px !important;
+    font-size: 12.5px !important; border-radius: 10px; background: #fff;
   }
   @media (max-width: 480px) {
-    .section-controls select { width: 104px !important; font-size: 12.5px !important; }
+    .section-controls select { width: 100px !important; font-size: 12px !important; }
   }
+
+  /* lone h4 (no slot control) still needs spacing inside panel */
+  .sec-panel > h4 { margin-bottom: 10px; }
 
   /* SWAP ARROW PILL */
   .swap-arrow {
-    border: 1.5px solid var(--line);
-    background: #fff;
-    color: var(--navy);
-    width: 28px; height: 28px;
-    border-radius: 50%;
-    font-size: 14px;
-    line-height: 1;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    transition: all .15s ease;
-    flex: none;
-    padding: 0;
+    border: 1.5px solid #d8deea; background: #fff; color: var(--navy);
+    width: 26px; height: 26px; border-radius: 50%;
+    font-size: 13px; line-height: 1; cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center;
+    transition: all .15s ease; flex: none; padding: 0;
   }
   .swap-arrow:active { transform: scale(0.9); }
   .swap-arrow.active {
-    background: var(--accent);
-    border-color: var(--accent);
-    color: #fff;
+    background: var(--accent); border-color: var(--accent); color: #fff;
     box-shadow: 0 3px 10px rgba(16,185,129,0.3);
   }
 
@@ -225,43 +234,40 @@
 
   /* DISH */
   .dish {
-    background: #f7f9fc;
-    border: 1px solid #eef2f8;
-    border-radius: 12px;
+    background: #fff;
+    border: 1px solid #edf1f7;
+    border-radius: 11px;
     padding: 9px 12px;
     margin-bottom: 6px;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    transition: border-color .15s;
   }
-  .dish-name { font-size: 14.5px; line-height: 1.3; flex: 1; padding-right: 10px; }
+  .dish:last-child { margin-bottom: 0; }
+  .dish-name { font-size: 14px; line-height: 1.3; flex: 1; padding-right: 10px; }
 
-  /* QTY CONTROL */
+  /* QTY */
   .qty { display: flex; align-items: center; gap: 8px; }
   .qty button {
-    width: 30px; height: 30px; font-size: 18px;
+    width: 29px; height: 29px; font-size: 17px;
     border-radius: 50%; border: none;
     background: var(--navy); color: #fff; font-weight: 700;
     display: flex; align-items: center; justify-content: center;
     transition: all 0.15s ease; cursor: pointer;
   }
   .qty button:active { transform: scale(0.9); background: var(--navy-deep); }
-  .qty span { min-width: 22px; text-align: center; font-size: 15px; font-weight: 700; color: var(--navy); }
+  .qty span { min-width: 18px; text-align: center; font-size: 15px; font-weight: 700; color: var(--navy); }
 
-  input[type="checkbox"] { transform: scale(1.25); margin-right: 8px; accent-color: var(--accent); }
+  input[type="checkbox"] { transform: scale(1.2); margin-right: 6px; accent-color: var(--accent); }
 
-  .section { margin-bottom: 16px; }
-  .card { padding: 16px !important; }
   html, body { height: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; }
 
   /* DAY HEADER */
-  .day-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; }
+  .day-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
   .day-text { flex: 1; text-align: center; }
   .day-name {
-    font-size: 20px; font-weight: 700; cursor: pointer;
-    position: relative; display: inline-flex; align-items: center; gap: 6px;
-    color: var(--navy);
+    font-size: 19px; font-weight: 700; cursor: pointer;
+    position: relative; display: inline-flex; align-items: center; gap: 6px; color: var(--navy);
   }
   .day-arrow { font-size: 11px; color: var(--accent); }
   .day-dropdown {
@@ -272,14 +278,14 @@
   }
   .day-dropdown div { padding: 11px 18px; font-size: 14px; cursor: pointer; }
   .day-dropdown div:hover { background: var(--accent-soft); color: var(--navy); }
-  .day-date { font-size: 13px; color: var(--muted); margin-top: 4px; font-weight: 500; }
+  .day-date { font-size: 12px; color: var(--muted); margin-top: 3px; font-weight: 500; }
 
   .cancel-wrap {
-    display: flex; align-items: center; gap: 6px;
-    font-size: 13px; white-space: nowrap; font-weight: 600; color: var(--muted);
+    display: flex; align-items: center; gap: 5px;
+    font-size: 12px; white-space: nowrap; font-weight: 600; color: var(--muted);
   }
 
-  .nav-row { display: flex; gap: 10px; margin-top: 16px; }
+  .nav-row { display: flex; gap: 10px; margin-top: 0; }
   .nav-row .btn { flex: 1; margin-top: 0; }
 
   /* protein colors */
@@ -306,7 +312,6 @@
     font-size: 13px; color: var(--accent); font-weight: 700;
     margin: 8px 0 4px; text-transform: uppercase; letter-spacing: .4px;
   }
-  .summary-day > div:not(.summary-slot):not(.summary-day) { font-size: 14.5px; padding: 2px 0; }
 
   .loader {
     display: none; position: fixed; inset: 0;
@@ -349,13 +354,15 @@
 </head>
 
 <body>
-  <div class="wrapper">
 <div class="app">
-<div class="topbar">
-  <img src="logo.png" class="logo" alt="Friska Logo">
-</div>
+  <div class="hero">
+    <div class="hero-inner">
+      <img src="logo.png" class="logo" alt="Friska Logo">
+      <h2>Weekly Meal Selection</h2>
+    </div>
+  </div>
 
-<h2>Weekly Meal Selection</h2>
+  <div class="content wrapper">
 
 <div class="box">
   <label>Phone</label>
@@ -420,7 +427,8 @@
   <button id="nextBtn" class="btn secondary" onclick="nextDay(event)">Next Day</button>
 </div>
   
-<button class="btn" onclick="handleSubmit(event)">Submit & Exit</button>
+<button class="btn submit" onclick="handleSubmit(event)">Submit & Exit</button>
+  </div>
 </div>
 
 <script>
@@ -937,7 +945,7 @@ function renderBlock(date, slot, title) {
   // span ID keyed by the CARD slot + view, so swapped opt1 and real opt2 never collide
   const idTag = slot + (showingOther ? '_alt' : '');
 
-  return headerHTML +
+ return `<div class="sec-panel">` + headerHTML +
     Object.keys(renderItems).map(label => `
       <div class="dish ${isLocked ? 'dish-locked' : ''}">
         <div class="dish-name ${getProteinClass(slot, renderItems[label])}">
@@ -949,9 +957,8 @@ function renderBlock(date, slot, title) {
           <button onclick="${isLocked ? 'openUpgradeModal()' : `changeQty('${date}','${slot}','${label}',1,${showingOther})`}">+</button>
         </div>
       </div>
-    `).join('');
+    `).join('') + `</div>`;
 }
-
 
 
 
