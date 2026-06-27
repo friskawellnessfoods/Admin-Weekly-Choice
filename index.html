@@ -659,7 +659,8 @@ async function fetchClient() {
   CLIENT_LOCATION_2 = client.location2 || '';
   CLIENT_DELIVERY = client.delivery || {};
 
-  MENU = data.menu || {};
+  const menuRes = await fetch(`${API_URL}?action=getGlideMenu`);
+  MENU = await menuRes.json() || {};
   DATES = Object.keys(MENU).sort();
   applyCutoff();
   initState();
