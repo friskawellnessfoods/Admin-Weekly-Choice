@@ -659,7 +659,7 @@ async function fetchClient() {
   CLIENT_LOCATION_2 = client.location2 || '';
   CLIENT_DELIVERY = client.delivery || {};
 
-  const menuRes = await fetch(`${API_URL}?action=getGlideMenu`);
+  const menuRes = await fetch(`${API_URL}?action=getGlideMenu&t=${Date.now()}`, { cache: "no-store" });
   MENU = await menuRes.json() || {};
   DATES = Object.keys(MENU).sort();
   applyCutoff();
