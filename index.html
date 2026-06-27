@@ -728,8 +728,8 @@ function initState(){
     STATE[date] = {
       sections: {
         breakfast: { items: {}, slot: 'Morning', location: '' },
-        option1:   { items: {}, slot: 'Afternoon', location: '' },
-        option2:   { items: {}, slot: 'Evening', location: '' },
+        option1:   { items: {}, slot: 'Afternoon', location: '', view: 'option1' },
+        option2:   { items: {}, slot: 'Evening', location: '', view: 'option2' },
         snack:     { items: {}, slot: 'Afternoon', location: '' },
         juice1:    { items: {}, slot: 'Afternoon', location: '' },
         juice2:    { items: {}, slot: 'Evening', location: '' }
@@ -780,11 +780,12 @@ function initState(){
     // Populate items
     ['option1','option2','breakfast'].forEach(sec => {
       if (!MENU[date][sec]) return;
-      
+
       MENU[date][sec].forEach(item => {
         STATE[date].sections[sec].items[item.label] = {
           qty: 0,
-          protein: item.protein
+          protein: item.protein,
+          optNo: sec === 'option1' ? 1 : (sec === 'option2' ? 2 : undefined)
         };
       });
     });
@@ -1056,28 +1057,59 @@ function renderBlock(date, slot, title) {
     isMorningOnlyClient() &&
     (slot === 'option1' || slot === 'option2' || slot === 'snack');
 
+  // For option cards, render whichever option-set this card is currently viewing.
+  const isOptionCard = (slot === 'option1' || slot === 'option2');
+  const viewSec = isOptionCard ? (section.view || slot) : slot;
+  const renderItems = STATE[date].sections[viewSec].items;
+
+  // arrow toggle (only on option cards, only for multi-slot clients)
+  let arrowHTML = '';
+  if (isOptionCard && hasAfternoonEveningSlots()) {
+    const showingOther = viewSec !== slot;
+    arrowHTML = `
+      <button class="swap-arrow ${showingOther ? 'active' : ''}"
+        onclick="toggleOptionView('${date}','${slot}')"
+        title="Show the other option's dishes">⇅</button>`;
+  }
+
+  // header: inject arrow next to the title
+  headerHTML = headerHTML.replace(
+    /<h4 class="section-title">([^<]*)<\/h4>/,
+    `<h4 class="section-title">$1 ${arrowHTML}</h4>`
+  );
+  // if header had no section-title (plain <h4>), inject there too
+  if (arrowHTML && !headerHTML.includes('swap-arrow')) {
+    headerHTML = headerHTML.replace(/<h4>([^<]*)<\/h4>/, `<h4>$1 ${arrowHTML}</h4>`);
+  }
+
   return headerHTML +
-    Object.keys(items).map(label => `
+    Object.keys(renderItems).map(label => `
       <div class="dish ${isLocked ? 'dish-locked' : ''}">
-        <div class="dish-name ${getProteinClass(slot, section.items[label])}">
+        <div class="dish-name ${getProteinClass(slot, renderItems[label])}">
           ${label}
         </div>
         <div class="qty">
-          <button onclick="${isLocked ? 'openUpgradeModal()' : `changeQty('${date}','${slot}','${label}',-1)`}">−</button>
-          <span id="${btoa(date+slot+label)}">${section.items[label].qty}</span>
-          <button onclick="${isLocked ? 'openUpgradeModal()' : `changeQty('${date}','${slot}','${label}',1)`}">+</button>
+          <button onclick="${isLocked ? 'openUpgradeModal()' : `changeQty('${date}','${viewSec}','${label}',-1,'${slot}')`}">−</button>
+          <span id="${btoa(date+viewSec+label)}">${renderItems[label].qty}</span>
+          <button onclick="${isLocked ? 'openUpgradeModal()' : `changeQty('${date}','${viewSec}','${label}',1,'${slot}')`}">+</button>
         </div>
       </div>
     `).join('');
-}
 
 
 
 
-function changeQty(d,s,l,delta){
+function changeQty(d,s,l,delta,cardSlot){
   const obj = STATE[d].sections[s].items[l];
   obj.qty = Math.max(0, obj.qty + delta);
-  document.getElementById(btoa(d+s+l)).innerText = obj.qty;
+  // if picked via a swapped card, remember which card(slot) it belongs to
+  if (cardSlot && cardSlot !== s) {
+    obj.slotFrom = cardSlot;      // e.g. item is option2-native but picked in option1 card
+  } else if (cardSlot && cardSlot === s) {
+    delete obj.slotFrom;          // picked in its own card → clear any override
+  }
+  const span = document.getElementById(btoa(d+s+l));
+  if (span) span.innerText = obj.qty;
 }
 function updateSectionSlot(date, section, value) {
   STATE[date].sections[section].slot = value;
@@ -1097,6 +1129,14 @@ function nextDay(){
       daySection.scrollIntoView({ behavior: "smooth", block: "start" });
     }
   }
+}
+
+function toggleOptionView(date, cardSlot){
+  const sec = STATE[date].sections[cardSlot];
+  sec.view = (sec.view === cardSlot)
+    ? (cardSlot === 'option1' ? 'option2' : 'option1')
+    : cardSlot;
+  renderCurrentDay();
 }
 
 function prevDay(){
