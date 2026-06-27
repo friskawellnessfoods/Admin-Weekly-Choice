@@ -790,6 +790,19 @@ function initState(){
       });
     });
 
+    // Each option card also holds an independent copy of the OTHER option's dishes
+    // (used when the card is swapped). These carry the other option's native optNo.
+    STATE[date].sections.option1.altItems = {};
+    STATE[date].sections.option2.altItems = {};
+    (MENU[date].option2 || []).forEach(item => {
+      STATE[date].sections.option1.altItems[item.label] =
+        { qty: 0, protein: item.protein, optNo: 2 };
+    });
+    (MENU[date].option1 || []).forEach(item => {
+      STATE[date].sections.option2.altItems[item.label] =
+        { qty: 0, protein: item.protein, optNo: 1 };
+    });
+
     if (MENU[date].snack) {
       MENU[date].snack.forEach(item => {
         STATE[date].sections.snack.items[item.label] = {
@@ -1057,30 +1070,40 @@ function renderBlock(date, slot, title) {
     isMorningOnlyClient() &&
     (slot === 'option1' || slot === 'option2' || slot === 'snack');
 
-  // For option cards, render whichever option-set this card is currently viewing.
   const isOptionCard = (slot === 'option1' || slot === 'option2');
-  const viewSec = isOptionCard ? (section.view || slot) : slot;
-  const renderItems = STATE[date].sections[viewSec].items;
+  const showingOther = isOptionCard && (section.view && section.view !== slot);
 
-  // arrow toggle (only on option cards, only for multi-slot clients)
+  // render from THIS card's own store: items (own) or altItems (swapped) — never the other card's state
+  const renderItems = showingOther ? section.altItems : section.items;
+
+  // heading reflects what's shown
+  if (isOptionCard) {
+    const shownTitle = showingOther
+      ? (slot === 'option1' ? 'Option 2' : 'Option 1')
+      : (slot === 'option1' ? 'Option 1' : 'Option 2');
+    headerHTML = headerHTML
+      .replace(/<h4 class="section-title">[^<]*<\/h4>/, `<h4 class="section-title">${shownTitle}</h4>`)
+      .replace(/<h4>[^<]*<\/h4>/, `<h4>${shownTitle}</h4>`);
+  }
+
+  // arrow toggle (option cards, multi-slot only)
   let arrowHTML = '';
   if (isOptionCard && hasAfternoonEveningSlots()) {
-    const showingOther = viewSec !== slot;
     arrowHTML = `
       <button class="swap-arrow ${showingOther ? 'active' : ''}"
         onclick="toggleOptionView('${date}','${slot}')"
         title="Show the other option's dishes">⇅</button>`;
   }
-
-  // header: inject arrow next to the title
   headerHTML = headerHTML.replace(
     /<h4 class="section-title">([^<]*)<\/h4>/,
     `<h4 class="section-title">$1 ${arrowHTML}</h4>`
   );
-  // if header had no section-title (plain <h4>), inject there too
   if (arrowHTML && !headerHTML.includes('swap-arrow')) {
     headerHTML = headerHTML.replace(/<h4>([^<]*)<\/h4>/, `<h4>$1 ${arrowHTML}</h4>`);
   }
+
+  // span ID keyed by the CARD slot + view, so swapped opt1 and real opt2 never collide
+  const idTag = slot + (showingOther ? '_alt' : '');
 
   return headerHTML +
     Object.keys(renderItems).map(label => `
@@ -1089,9 +1112,9 @@ function renderBlock(date, slot, title) {
           ${label}
         </div>
         <div class="qty">
-          <button onclick="${isLocked ? 'openUpgradeModal()' : `changeQty('${date}','${viewSec}','${label}',-1,'${slot}')`}">−</button>
-          <span id="${btoa(date+viewSec+label)}">${renderItems[label].qty}</span>
-          <button onclick="${isLocked ? 'openUpgradeModal()' : `changeQty('${date}','${viewSec}','${label}',1,'${slot}')`}">+</button>
+          <button onclick="${isLocked ? 'openUpgradeModal()' : `changeQty('${date}','${slot}','${label}',-1,${showingOther})`}">−</button>
+          <span id="${btoa(date+idTag+label)}">${renderItems[label].qty}</span>
+          <button onclick="${isLocked ? 'openUpgradeModal()' : `changeQty('${date}','${slot}','${label}',1,${showingOther})`}">+</button>
         </div>
       </div>
     `).join('');
@@ -1100,16 +1123,17 @@ function renderBlock(date, slot, title) {
 
 
 
-function changeQty(d,s,l,delta,cardSlot){
-  const obj = STATE[d].sections[s].items[l];
+function changeQty(d, cardSlot, label, delta, isAlt){
+  const section = STATE[d].sections[cardSlot];
+  const store = isAlt ? section.altItems : section.items;
+  const obj = store[label];
   obj.qty = Math.max(0, obj.qty + delta);
-  // if picked via a swapped card, remember which card(slot) it belongs to
-  if (cardSlot && cardSlot !== s) {
-    obj.slotFrom = cardSlot;      // e.g. item is option2-native but picked in option1 card
-  } else if (cardSlot && cardSlot === s) {
-    delete obj.slotFrom;          // picked in its own card → clear any override
-  }
-  const span = document.getElementById(btoa(d+s+l));
+
+  // this card's slot drives the row's slot for everything picked in it
+  obj.slotFrom = section.slot;
+
+  const idTag = cardSlot + (isAlt ? '_alt' : '');
+  const span = document.getElementById(btoa(d + idTag + label));
   if (span) span.innerText = obj.qty;
 }
 function updateSectionSlot(date, section, value) {
