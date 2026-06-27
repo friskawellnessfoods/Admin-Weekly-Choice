@@ -1187,9 +1187,11 @@ function hasSelectionForDate(date) {
   const sections = day.sections;
 
   for (let sec in sections) {
-    const items = sections[sec].items || {};
-    for (let key in items) {
-      if (items[key].qty > 0) return true;
+    const stores = [sections[sec].items || {}, sections[sec].altItems || {}];
+    for (const items of stores) {
+      for (let key in items) {
+        if (items[key].qty > 0) return true;
+      }
     }
   }
 
@@ -1388,9 +1390,10 @@ function generateSummary() {
     // 🔹 GROUP BY SLOT + LOCATION
     const grouped = {};
 
-    Object.values(dayState.sections).forEach(sec => {
+   Object.values(dayState.sections).forEach(sec => {
 
-      const selectedItems = Object.entries(sec.items || {})
+      const merged = Object.assign({}, sec.items || {}, sec.altItems || {});
+      const selectedItems = Object.entries(merged)
         .filter(([_, item]) => item.qty > 0);
 
       if (!selectedItems.length) return;
