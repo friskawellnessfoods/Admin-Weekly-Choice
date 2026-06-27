@@ -75,6 +75,7 @@
   .dtable td{padding:9px 8px;border-bottom:1px solid #f0f2f7}
   .pill{padding:3px 10px;border-radius:99px;font-size:.74rem;font-weight:700;cursor:pointer;border:1.5px solid transparent;white-space:nowrap}
   .pill.paid{background:var(--accent-soft);color:var(--credit);border-color:#bfe8d6}.pill.unpaid{background:#fdecec;color:var(--debit);border-color:#f3c9c5}
+  .paidchk{display:inline-flex;align-items:center;gap:6px;font-size:.8rem;font-weight:700;color:var(--muted);cursor:pointer}.paidchk input{width:17px;height:17px;accent-color:var(--accent);cursor:pointer}
   .rowtag{font-size:.68rem;font-weight:700;padding:2px 8px;border-radius:99px;background:var(--warn-bg);color:var(--warn-ink);margin-left:6px}.rowtag.exp{background:var(--pause-bg);color:var(--pause-ink)}
   #invoiceWrap{position:fixed;left:-9999px;top:0}
   #invoice{width:760px;background:#fff;color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Arial,sans-serif;border-radius:18px;overflow:hidden;box-shadow:0 0 0 1px #e6e9f2}
@@ -365,7 +366,8 @@ function countUsage(data,start,end,clientName){
   for(const d of service){if(!activeSet.has(keyOf(d)))paused.push(dateOnly(d));}
   totals.meals_total=totals.meal1+totals.meal2;totals.juices_total=totals.j1+totals.j2;
   let deliveries=0;for(const s in slotCounts)deliveries+=slotCounts[s];
-  return {totals,activeDays:activeSet.size,pausedDays:paused.length,totalDays:service.length,pausedDates:paused,lastActiveDate:lastActive,slotCounts,deliveries};
+  const activeDatesSorted=Array.from(activeSet).sort().map(k=>{const [y,m,da]=k.split("-").map(Number);return dateOnly(new Date(y,m-1,da,12));});
+  return {totals,activeDays:activeSet.size,activeDatesSorted,pausedDays:paused.length,totalDays:service.length,pausedDates:paused,lastActiveDate:lastActive,slotCounts,deliveries};
 }
 function hasActivityAfter(data,name,date){
   const key=normName(name);
@@ -373,26 +375,21 @@ function hasActivityAfter(data,name,date){
     for(const i of[7,8,9,10,11,12]){if(i<row.length){const v=String(row[i]).trim();if(v&&v!=="N/A")return true;}}}
   return false;
 }
-function findResumeDate(data,name,after,maxDays){maxDays=maxDays||90;const key=normName(name);const lim=addDays(after,maxDays);
-  for(const row of data){if(!row||row.length<2)continue;const dt=toDt(row[COL.date]);if(!dt)continue;const d=dateOnly(dt);
-    if(!(after<d&&d<=lim))continue;if(normName(row[COL.name])!==key)continue;
-    for(const i of[7,8,9,10,11,12]){if(i<row.length){const v=String(row[i]).trim();if(v&&v!=="N/A")return d;}}}return null;}
-function findNextActiveDates(data,name,startDate,needed){const key=normName(name);const seen=new Set();
-  for(const row of data){if(!row||row.length<2)continue;const dt=toDt(row[COL.date]);if(!dt)continue;const d=dateOnly(dt);
-    if(d<startDate)continue;if(normName(row[COL.name])!==key)continue;
-    for(const i of[7,8,9,10,11,12]){if(i<row.length){const v=String(row[i]).trim();if(v&&v!=="N/A"){seen.add(keyOf(d));break;}}}}
-  return Array.from(seen).sort().map(k=>{const [y,m,da]=k.split("-").map(Number);return dateOnly(new Date(y,m-1,da,12));}).slice(0,needed);}
-function computeFromRange(data,name,prevStart,prevEnd){
-  const today=dateOnly(new Date());let calcEnd=prevEnd>today?today:prevEnd,stillActive=prevEnd>today;
-  const u=countUsage(data,prevStart,calcEnd,name);const needAdj=u.pausedDays;
-  let resume=prevEnd>=today?addDays(prevEnd,1):(findResumeDate(data,name,prevEnd)||addDays(prevEnd,1));
-  let adjustDates=[],nextStart=null,nextEnd=null,neverResumed=false;
-  if(needAdj===0){const f=nextServiceDates(addDays(resume,-1),26);nextStart=f[0];nextEnd=f[f.length-1];}
-  else{adjustDates=findNextActiveDates(data,name,resume,needAdj);
-    if(adjustDates.length===0&&u.lastActiveDate&&u.lastActiveDate<prevEnd){neverResumed=true;}
-    else{if(adjustDates.length<needAdj){const rem=needAdj-adjustDates.length;const from=adjustDates.length?adjustDates[adjustDates.length-1]:resume;adjustDates=adjustDates.concat(nextServiceDates(from,rem));}
-      const ae=adjustDates.length?adjustDates[adjustDates.length-1]:resume;const f=nextServiceDates(ae,26);nextStart=f[0];nextEnd=f[f.length-1];}}
-  return Object.assign({},u,{prevStart,prevEnd,calcEnd,stillActive,today,needAdj,adjustDates,nextStart,nextEnd,neverResumed});
+// Roll forward from the bill start, counting actual active service days up to today (never beyond).
+// The cycle completes when optedDays active days are reached; new bill is due only then.
+function computeRenew(data,name,prev){
+  const today=dateOnly(new Date());
+  const optedDays=prevDaysOf(prev);
+  const scan=countUsage(data,prev.start,today,name);
+  const activeDates=scan.activeDatesSorted;
+  const complete=activeDates.length>=optedDays;
+  const completionDate=complete?activeDates[optedDays-1]:null;
+  const billingEnd=complete?completionDate:today;
+  const billing=countUsage(data,prev.start,billingEnd,name);
+  const pending=complete?0:(optedDays-activeDates.length);
+  const base=complete?completionDate:today;
+  const f=nextServiceDates(base,optedDays);
+  return {today,optedDays,activeDates,complete,completionDate,billingEnd,billing,pending,nextStart:f[0],nextEnd:f[f.length-1],scan};
 }
 
 /* line table */
@@ -517,41 +514,35 @@ async function runRenew(force){
     if(!prev){setStatus("r_status",`No previous bill found for "${name}".`,"err");return;}
     if(!prev.start||!prev.end){setStatus("r_status","Previous bill has no readable Start/End.","err");return;}
     const orders=await fetchOrders(force);
-    const cf=computeFromRange(orders,name,prev.start,prev.end);
-    const today=dateOnly(new Date());
-    const lastAdj=cf.adjustDates.length?cf.adjustDates[cf.adjustDates.length-1]:null;
-    const actualEnd=lastAdj?lastAdj:(prev.end>today?today:prev.end);
-    const billing=countUsage(orders,prev.start,actualEnd,name);
-    const continued=cf.adjustDates.length>0;
-    renewCtx={prev,usage:cf,billing,actualEnd,continued};
+    const rc=computeRenew(orders,name,prev);
+    renewCtx={prev,rc};
     renderRenew();
     setStatus("r_status",`Loaded bill ${prev.billNo}.`,"ok");
   }catch(err){setStatus("r_status","Error: "+err.message,"err");}
 }
 function renderRenew(){
-  const prev=renewCtx.prev,u=renewCtx.usage,b=renewCtx.billing,plans=planCodesOf(prev),dur=durCodeOf(prev),op=parseItems(prev.items,prevDaysOf(prev));
-  const t=u.totals;
-  el("r_usageCard").classList.remove("hidden");
-  el("r_prevline").innerHTML=`Previous cycle <b>${dtstr(prev.start)} → ${dtstr(prev.end)}</b> · ${prev.plan||"—"}`;
-  el("r_stats").innerHTML=statBox(t.meals_total,"Meals")+statBox(u.activeDays,"Active days")+statBox(u.pausedDays,"Paused days")+statBox(u.deliveries,"Deliveries");
-  let kv="";if(t.brk>0)kv+=kvRow("Breakfast",t.brk);if(t.snack>0)kv+=kvRow("Snack",t.snack);if(t.juices_total>0)kv+=kvRow("Juices",t.juices_total);if(t.seafood>0)kv+=kvRow("Seafood",t.seafood);kv+=kvRow("Total service days",u.totalDays);
-  el("r_usageKV").innerHTML=kv;
-  if(renewCtx.continued)el("r_pauseWarn").innerHTML=`<div class="note info">Client kept ordering past the cycle end — the ${u.pausedDays} paused day(s) are made up by later orders. Actuals counted through <b>${dtstr(renewCtx.actualEnd)}</b>.</div>`;
-  else if(u.lastActiveDate&&u.lastActiveDate<prev.end)el("r_pauseWarn").innerHTML=`<div class="note pause">Last meal on <b>${dtstr(u.lastActiveDate)}</b>; not resumed yet.</div>`;
-  else el("r_pauseWarn").innerHTML="";
-  el("r_paused").textContent=u.pausedDates.length?u.pausedDates.map(dtstr).join(", "):"None";
-
- // actual usage — driven by REAL orders (b.totals), not by what the old bill text said was opted
-  const p0=plans[0]||"nb";const actual=[];const at=b.totals;
-  if(at.meal1>0||at.meal2>0){
-    const both=at.meal1>0&&at.meal2>0;
-    const label=both?"Lunch + Dinner":(at.meal1>0?"Lunch":"Dinner");
-    actual.push({id:"main",label,qty:at.meals_total,rate:both?rate(p0,dur,"combo"):rate(p0,dur,"lunch"),food:true});
+  const prev=renewCtx.prev,rc=renewCtx.rc,b=rc.billing,plans=planCodesOf(prev),dur=durCodeOf(prev),p0=plans[0]||"nb";
+  let op=parseItems(prev.items,prevDaysOf(prev));
+  if(!(op.main||op.breakfast||op.snack||op.juices||op.seafood)){ // old bill without Items column: infer opted from usage
+    op.main=b.totals.meal2>0?"both":(b.totals.meal1>0?"lunch":null);
+    op.breakfast=b.totals.brk>0;op.snack=b.totals.snack>0;op.juices=b.totals.juices_total>0?1:0;op.seafood=b.totals.seafood>0;
   }
-  if(at.brk>0)actual.push({id:"breakfast",label:"Breakfast",qty:at.brk,rate:rate(p0,dur,"breakfast"),food:true});
-  if(at.snack>0)actual.push({id:"snack",label:"Snack",qty:at.snack,rate:rate(p0,dur,"snack"),food:true});
-  if(at.juices_total>0)actual.push({id:"juices",label:"Juices",qty:at.juices_total,rate:rate(p0,dur,"juice1"),food:true});
-  if(at.seafood>0)actual.push({id:"seafood",label:"Seafood add-on",qty:at.seafood,rate:gRate("seafood"),food:true});
+  el("r_usageCard").classList.remove("hidden");
+  el("r_prevline").innerHTML=`Started <b>${dtstr(prev.start)}</b> · ${prev.plan||"—"} · ${rc.optedDays} opted days`;
+  el("r_stats").innerHTML=statBox(b.totals.meals_total,"Meals")+statBox(rc.activeDates.length,"Active days")+statBox(rc.pending,"Pending days")+statBox(b.deliveries,"Deliveries");
+  let kv="";if(b.totals.brk>0)kv+=kvRow("Breakfast",b.totals.brk);if(b.totals.snack>0)kv+=kvRow("Snack",b.totals.snack);if(b.totals.juices_total>0)kv+=kvRow("Juices",b.totals.juices_total);if(b.totals.seafood>0)kv+=kvRow("Seafood",b.totals.seafood);
+  el("r_usageKV").innerHTML=kv;
+  if(!rc.complete)el("r_pauseWarn").innerHTML=`<div class="note pause"><b>Previous plan still pending.</b> ${rc.activeDates.length} of ${rc.optedDays} opted days completed as of today — ${rc.pending} pending. A new bill is usually generated once the cycle completes.</div>`;
+  else el("r_pauseWarn").innerHTML=`<div class="note info">Cycle completed on <b>${dtstr(rc.completionDate)}</b> after ${rc.optedDays} active days.</div>`;
+  el("r_paused").textContent=b.pausedDates.length?b.pausedDates.map(dtstr).join(", "):"None";
+
+  // actual usage — only opted items, priced from sheet, juices combined
+  const actual=[];
+  if(op.main){const both=op.main==="both";actual.push({id:"main",label:both?"Lunch + Dinner":"Meals",qty:b.totals.meals_total,rate:both?rate(p0,dur,"combo"):rate(p0,dur,"lunch"),food:true});}
+  if(op.breakfast)actual.push({id:"breakfast",label:"Breakfast",qty:b.totals.brk,rate:rate(p0,dur,"breakfast"),food:true});
+  if(op.snack)actual.push({id:"snack",label:"Snack",qty:b.totals.snack,rate:rate(p0,dur,"snack"),food:true});
+  if(op.juices)actual.push({id:"juices",label:"Juices",qty:b.totals.juices_total,rate:rate(p0,dur,"juice1"),food:true});
+  if(op.seafood)actual.push({id:"seafood",label:"Seafood add-on",qty:b.totals.seafood,rate:gRate("seafood"),food:true});
   actual.push({id:"delivery",label:"Delivery",qty:b.deliveries,rate:prevDeliveryUnit(prev),food:false});
   el("r_reconCard").classList.remove("hidden");renderLines("r_lines",actual);recalcRenewActual();
 
@@ -559,9 +550,9 @@ function renderRenew(){
   el("r_nextCard").classList.remove("hidden");
   const newDays=prevDaysOf(prev),slots=Math.max(1,prevSlotCount(prev));
   el("r_days").value=newDays;el("r_disc").value=prev.discPct||0;el("r_gst").value=5;el("r_billdate").value=keyOf(dateOnly(new Date()));
-  setDate("r_start",u.nextStart);setDate("r_end",u.nextEnd);
+  setDate("r_start",rc.nextStart);setDate("r_end",rc.nextEnd);
   renderLines("r_nextlines",reconstructNextLines(prev,newDays,slots));
-  suggestBillNo("r_billno","r_billdate");recalcRenewNext();
+  suggestBillNo("r_billno","r_start");recalcRenewNext();
 }
 function reconstructNextLines(prev,days,slots){
   const plans=planCodesOf(prev),dur=durCodeOf(prev),op=parseItems(prev.items,prevDaysOf(prev));const p0=plans[0]||"nb";const out=[];
@@ -585,8 +576,8 @@ function recalcRenewNext(){if(!renewCtx)return;renderTotals("r_nextTotals",compu
 function renewDatesFromStart(){const s=readDate("r_start");const days=parseInt(el("r_days").value)||26;if(s){const f=nextServiceDates(addDays(s,-1),days);setDate("r_end",f[f.length-1]);}}
 
 /* bill number */
-function suggestBillNo(billnoId,billdateId){
-  const bd=readDate(billdateId)||dateOnly(new Date());const month=bd.getMonth()+1;const prefix=month*100;let maxSeq=0;
+function suggestBillNo(billnoId,startId){
+  const sd=readDate(startId)||dateOnly(new Date());const month=sd.getMonth()+1;const prefix=month*100;let maxSeq=0;
   if(billsCache&&billsCache.length>1){const idx=billHeaderIndex(billsCache);const bi=idx["BillNo"];
     if(bi!==undefined)for(let i=1;i<billsCache.length;i++){const n=parseInt(String(billsCache[i][bi]).replace(/\D/g,""));if(!isNaN(n)&&Math.floor(n/100)===month)maxSeq=Math.max(maxSeq,n-prefix);}}
   el(billnoId).value=prefix+(maxSeq+1);
@@ -619,9 +610,10 @@ function invoiceBlob(){return new Promise((resolve,reject)=>{html2canvas(el("inv
 async function sendWhatsApp(meta,t){
   const blob=await invoiceBlob();const file=new File([blob],`Bill_${meta.billNo}.png`,{type:"image/png"});
   const phone="91"+String(meta.phone||"").replace(/\D/g,"").slice(-10);
-  if(navigator.canShare&&navigator.canShare({files:[file]})){try{await navigator.share({files:[file]});return;}catch(e){if(e&&e.name==="AbortError")return;}}
+  const text=`Hi ${meta.client}, here is your Friska Wellness bill ${meta.billNo} for ₹${money(t.grand)}. Thank you!`;
+  if(navigator.canShare&&navigator.canShare({files:[file]})){try{await navigator.share({files:[file],text});return;}catch(e){if(e&&e.name==="AbortError")return;}}
   const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=file.name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1500);
-  window.open(`https://wa.me/${phone}`,"_blank");
+  window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`,"_blank");
 }
 
 /* meta + save */
@@ -651,13 +643,24 @@ function dashRows(){
     out.push({billNo:g("BillNo"),client:g("Client"),plan:g("Plan"),start:toDt(g("Start")),end:toDt(g("End")),grand:g("GrandTotal"),paid:String(g("PaidStatus")||"Unpaid")});}
   return out;
 }
-function pillHtml(r){const cls=r.paid.toLowerCase()==="paid"?"paid":"unpaid";return `<span class="pill ${cls}" data-bill="${r.billNo}" data-status="${r.paid}">${r.paid.toLowerCase()==="paid"?"Paid":"Unpaid"}</span>`;}
+function pillHtml(r){return `<label class="paidchk"><input type="checkbox" data-bill="${r.billNo}" ${r.paid.toLowerCase()==="paid"?"checked":""}><span>Paid</span></label>`;}
 function bindPills(scopeId){
-  el(scopeId).querySelectorAll(".pill").forEach(p=>{p.onclick=async()=>{
-    const billNo=p.dataset.bill;const next=p.dataset.status.toLowerCase()==="paid"?"Unpaid":"Paid";p.textContent="…";
-    try{const res=await apiCall("updateBillStatus",{billNo,status:next});
-      if(res&&res.ok){const idx=billHeaderIndex(billsCache);const bi=idx["BillNo"],si=idx["PaidStatus"];for(let i=1;i<billsCache.length;i++){if(String(billsCache[i][bi])===String(billNo)){billsCache[i][si]=next;break;}}renderDashboard();}else p.textContent="!";
-    }catch(e){p.textContent="!";}};});
+  el(scopeId).querySelectorAll('input[type="checkbox"][data-bill]').forEach(cb=>{cb.onchange=async()=>{
+    const billNo=cb.dataset.bill;const next=cb.checked?"Paid":"Unpaid";
+    const idx=billHeaderIndex(billsCache);const bi=idx["BillNo"],si=idx["PaidStatus"];
+    const setLocal=v=>{for(let i=1;i<billsCache.length;i++){if(String(billsCache[i][bi])===String(billNo)){billsCache[i][si]=v;break;}}};
+    setLocal(next);cb.disabled=true;                       // optimistic, no re-render → instant
+    try{const res=await apiCall("updateBillStatus",{billNo,status:next});if(!res||!res.ok)throw 0;}
+    catch(e){cb.checked=!cb.checked;setLocal(cb.checked?"Paid":"Unpaid");}
+    finally{cb.disabled=false;}
+  };});
+}
+function followupNames(){
+  const today=dateOnly(new Date());const rows=dashRows();
+  const latestEnd={};rows.forEach(r=>{if(r.end){const k=normName(r.client);if(!latestEnd[k]||r.end>latestEnd[k])latestEnd[k]=r.end;}});
+  const set=new Set();
+  rows.forEach(r=>{if(r.end&&r.end<=addDays(today,3)&&latestEnd[normName(r.client)]&&keyOf(latestEnd[normName(r.client)])===keyOf(r.end))set.add(r.client);});
+  return Array.from(set);
 }
 function renderDashboard(){
   const today=dateOnly(new Date());const rows=dashRows();
@@ -714,6 +717,7 @@ function fillDatalist(listId,names,q){
   dl.innerHTML=names.filter(n=>{const nn=normName(n);return nn.includes(nq)&&nn!==nq;}).slice(0,20).map(n=>`<option value="${n.replace(/"/g,"&quot;")}">`).join("");
 }
 function masterNames(){return masterCache?masterCache.map(c=>c.name):[];}
+function fillDatalistAll(listId,names){el(listId).innerHTML=names.slice(0,60).map(n=>`<option value="${n.replace(/"/g,"&quot;")}">`).join("");}
 function billsNames(){if(!billsCache||billsCache.length<2)return [];const idx=billHeaderIndex(billsCache);const ci=idx["Client"];if(ci===undefined)return [];const set=new Set();for(let i=1;i<billsCache.length;i++){const n=String(billsCache[i][ci]||"").trim();if(n)set.add(n);}return Array.from(set);}
 function onClientNameChange(){
   const sel=el("n_phoneSel");if(!masterCache)return;
@@ -742,7 +746,7 @@ el("n_client").addEventListener("input",e=>{fillDatalist("n_clientNames",masterN
 el("n_client").addEventListener("change",onClientNameChange);
 el("n_dur").addEventListener("change",applyDuration);
 el("n_days").addEventListener("input",()=>{nRender(true);newDatesFromStart();});
-el("n_start").addEventListener("change",newDatesFromStart);
+el("n_start").addEventListener("change",()=>{newDatesFromStart();if(billsCache)suggestBillNo("n_billno","n_start");});
 el("n_items").addEventListener("change",e=>{
   const v=e.target.value;
   if(v==="juice2x"&&e.target.checked){const o=el("n_items").querySelector('input[value="juice1x"]');o.checked=false;o.closest(".chk").classList.remove("on");}
@@ -754,22 +758,23 @@ el("n_km").addEventListener("input",()=>nRender(false));
 el("n_disc").addEventListener("input",recalcNew);el("n_gst").addEventListener("input",recalcNew);
 bindLivePrice("n_lines",recalcNew);
 el("n_addline").addEventListener("click",()=>{el("n_lines").insertAdjacentHTML("beforeend",lineRowHtml({id:"custom_"+Date.now(),label:"Custom item",qty:0,rate:0,food:true,custom:true}));recalcNew();});
-el("n_suggestno").addEventListener("click",async()=>{try{await fetchBills(true);suggestBillNo("n_billno","n_billdate");}catch(e){setStatus("n_status","Couldn't load Bills: "+e.message,"err");}});
-el("n_billdate").addEventListener("change",()=>{if(billsCache)suggestBillNo("n_billno","n_billdate");});
+el("n_suggestno").addEventListener("click",async()=>{try{await fetchBills(true);suggestBillNo("n_billno","n_start");}catch(e){setStatus("n_status","Couldn't load Bills: "+e.message,"err");}});
+el("n_billdate").addEventListener("change",()=>{if(billsCache)suggestBillNo("n_billno","n_start");});
 el("n_save").addEventListener("click",async()=>{try{const meta=gatherNewMeta();const lines=readLines("n_lines");const t=computeTotals(lines,meta.discPct,meta.gstPct,0);await validateAndSave(meta,lines,t,"n_status");}catch(e){setStatus("n_status","Error: "+e.message,"err");}});
 el("n_wa").addEventListener("click",async()=>{try{const meta=gatherNewMeta();const lines=readLines("n_lines");const t=computeTotals(lines,meta.discPct,meta.gstPct,0);if(!await validateAndSave(meta,lines,t,"n_status"))return;buildInvoice(meta,lines,t);await sendWhatsApp(meta,t);}catch(e){setStatus("n_status","Error: "+e.message,"err");}});
 
 el("r_fetch").addEventListener("click",()=>runRenew(false));
 el("r_reload").addEventListener("click",()=>runRenew(true));
-el("r_client").addEventListener("input",e=>fillDatalist("r_clientNames",billsNames(),e.target.value));
+el("r_client").addEventListener("focus",async()=>{try{await fetchBills(false);}catch(e){}fillDatalistAll("r_clientNames",followupNames());});
+el("r_client").addEventListener("input",e=>fillDatalist("r_clientNames",followupNames(),e.target.value));
 el("r_client").addEventListener("keydown",e=>{if(e.key==="Enter")runRenew(false);});
 bindLivePrice("r_lines",recalcRenewActual);
 bindLivePrice("r_nextlines",recalcRenewNext);
 el("r_disc").addEventListener("input",recalcRenewNext);el("r_gst").addEventListener("input",recalcRenewNext);
-el("r_start").addEventListener("change",renewDatesFromStart);
+el("r_start").addEventListener("change",()=>{renewDatesFromStart();if(billsCache)suggestBillNo("r_billno","r_start");});
 el("r_days").addEventListener("input",renewDatesFromStart);
 el("r_addline").addEventListener("click",()=>{el("r_nextlines").insertAdjacentHTML("beforeend",lineRowHtml({id:"custom_"+Date.now(),label:"Custom item",qty:0,rate:0,food:true,custom:true}));recalcRenewNext();});
-el("r_billdate").addEventListener("change",()=>{if(billsCache)suggestBillNo("r_billno","r_billdate");});
+el("r_billdate").addEventListener("change",()=>{if(billsCache)suggestBillNo("r_billno","r_start");});
 function gatherRenewMeta(){const p=renewCtx.prev;return {billNo:el("r_billno").value.trim(),billDate:readDate("r_billdate")||dateOnly(new Date()),client:p.raw[p.idx["Client"]],phone:p.idx["Phone"]!==undefined?p.raw[p.idx["Phone"]]:"",plan:p.plan,duration:p.duration,slots:p.slots,days:parseInt(el("r_days").value)||26,start:readDate("r_start"),end:readDate("r_end"),discPct:parseFloat(el("r_disc").value)||0,gstPct:parseFloat(el("r_gst").value)||5,paidStatus:"Unpaid"};}
 el("r_save").addEventListener("click",async()=>{try{if(!renewCtx)return;const meta=gatherRenewMeta();const lines=readLines("r_nextlines");const t=computeTotals(lines,meta.discPct,meta.gstPct,renewCtx.adjustment||0);await validateAndSave(meta,lines,t,"r_status2");}catch(e){setStatus("r_status2","Error: "+e.message,"err");}});
 el("r_wa").addEventListener("click",async()=>{try{if(!renewCtx)return;const meta=gatherRenewMeta();const lines=readLines("r_nextlines");const t=computeTotals(lines,meta.discPct,meta.gstPct,renewCtx.adjustment||0);if(!await validateAndSave(meta,lines,t,"r_status2"))return;buildInvoice(meta,lines,t);await sendWhatsApp(meta,t);}catch(e){setStatus("r_status2","Error: "+e.message,"err");}});
@@ -790,7 +795,7 @@ updatePlanHead();
   try{await fetchPrices(false);}catch(e){setStatus("n_status","Couldn't load Prices: "+e.message,"err");}
   nRender(true);
   try{await fetchMaster(false);}catch(e){}
-  try{await fetchBills(false);suggestBillNo("n_billno","n_billdate");}catch(e){}
+  try{await fetchBills(false);suggestBillNo("n_billno","n_start");}catch(e){}
 })();
 </script>
 </body>
