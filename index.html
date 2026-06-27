@@ -757,15 +757,24 @@ function initState(){
     }
     // 🔵 FIX: Pre-assign location for dual-slot clients
     if (hasAfternoonEveningSlots()) {
-    
-      if (CLIENT_LOCATION_1) {
-        STATE[date].sections.option1.location = CLIENT_LOCATION_1;
-      }
-    
-      if (CLIENT_LOCATION_2) {
-        STATE[date].sections.option2.location = CLIENT_LOCATION_2;
-      }
-    
+      STATE[date].sections.option1.location = CLIENT_LOCATION_1 || CLIENT_LOCATION_2 || '';
+      STATE[date].sections.option2.location = CLIENT_LOCATION_2 || CLIENT_LOCATION_1 || '';
+      STATE[date].sections.breakfast.location = CLIENT_LOCATION_1 || CLIENT_LOCATION_2 || '';
+    }
+
+    // 🔵 FIX: ensure EVERY section has a location default (covers untouched dropdowns)
+    {
+      const defLoc = CLIENT_LOCATION_1 || CLIENT_LOCATION_2 || '';
+      ['breakfast','snack','juice1','juice2'].forEach(sec => {
+        if (!STATE[date].sections[sec].location) {
+          STATE[date].sections[sec].location = defLoc;
+        }
+      });
+      // single-slot already set option1/2 above; guarantee non-empty
+      if (!STATE[date].sections.option1.location)
+        STATE[date].sections.option1.location = defLoc;
+      if (!STATE[date].sections.option2.location)
+        STATE[date].sections.option2.location = defLoc;
     }
 
     // Populate items
@@ -941,7 +950,7 @@ function renderBlock(date, slot, title) {
 
   const showLocationControl =
     hasAfternoonEveningSlots() &&
-    (slot === 'option1' || slot === 'option2');
+    (slot === 'option1' || slot === 'option2' || slot === 'breakfast');
 
   // ✅ Set default location safely BEFORE rendering
   if (hasAfternoonEveningSlots() && !section.location) {
@@ -1027,7 +1036,7 @@ function renderBlock(date, slot, title) {
               ${CLIENT_LOCATION_1 ? `
                 <option value="${CLIENT_LOCATION_1}"
                   ${section.location === CLIENT_LOCATION_1 ||
-                    (!section.location && slot === 'option1') ? 'selected' : ''}>
+                    (!section.location && (slot === 'option1' || slot === 'breakfast')) ? 'selected' : ''}>
                   ${CLIENT_LOCATION_1}
                 </option>` : ''}
               ${CLIENT_LOCATION_2 ? `
@@ -1071,26 +1080,7 @@ function changeQty(d,s,l,delta){
   document.getElementById(btoa(d+s+l)).innerText = obj.qty;
 }
 function updateSectionSlot(date, section, value) {
-
-  const sec = STATE[date].sections;
-
-  sec[section].slot = value;
-
-  if (section === 'option1') {
-    const otherSlot = value === 'Afternoon' ? 'Evening' : 'Afternoon';
-    sec.option2.slot = otherSlot;
-
-    const otherSelect = document.getElementById(`slot_${date}_option2`);
-    if (otherSelect) otherSelect.value = otherSlot;
-  }
-
-  if (section === 'option2') {
-    const otherSlot = value === 'Afternoon' ? 'Evening' : 'Afternoon';
-    sec.option1.slot = otherSlot;
-
-    const otherSelect = document.getElementById(`slot_${date}_option1`);
-    if (otherSelect) otherSelect.value = otherSlot;
-  }
+  STATE[date].sections[section].slot = value;
 }
 
 function updateSectionLocation(date, section, value) {
@@ -1108,9 +1098,6 @@ function nextDay(){
     }
   }
 }
-
-
-
 
 function prevDay(){
 
