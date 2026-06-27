@@ -962,10 +962,12 @@ function renderBlock(date, slot, title) {
     CLIENT_DELIVERY?.afternoon ? 'Afternoon' :
     CLIENT_DELIVERY?.evening ? 'Evening' : '';
 
-  const showLocationControl =
-    hasAfternoonEveningSlots() &&
-    (slot === 'option1' || slot === 'option2' || slot === 'breakfast');
+ const hasTwoLocations = !!(CLIENT_LOCATION_1 && CLIENT_LOCATION_2);
 
+  const showLocationControl =
+    (hasAfternoonEveningSlots() &&
+      (slot === 'option1' || slot === 'option2' || slot === 'breakfast'))
+    || (slot === 'breakfast' && hasTwoLocations);
   // ✅ Set default location safely BEFORE rendering
   if (hasAfternoonEveningSlots() && !section.location) {
     if (slot === 'option1' && CLIENT_LOCATION_1) {
@@ -1371,7 +1373,8 @@ function generateSummary() {
     const hasSelection =
       dayState.cancel ||
       Object.values(dayState.sections).some(sec =>
-        Object.values(sec.items || {}).some(i => i.qty > 0)
+        Object.values(sec.items || {}).some(i => i.qty > 0) ||
+        Object.values(sec.altItems || {}).some(i => i.qty > 0)
       );
 
     if (!hasSelection) return;
