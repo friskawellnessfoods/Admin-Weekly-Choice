@@ -14,6 +14,7 @@
     --muted: #6b7280;
     --border: #e5e7eb;
     --accent: #16a34a;
+    --wa: #25D366;
     --radius: 12px;
   }
 
@@ -161,6 +162,12 @@
     margin-top: 2px;
   }
 
+  .route-check {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+  }
+
   select.stop-select {
     width: 60px;
     padding: 8px 4px;
@@ -233,6 +240,34 @@
     color: var(--muted);
   }
 
+  /* Add-clients panel */
+  .add-panel {
+    background: #f0f4ff;
+    border: 1px dashed var(--primary);
+    border-radius: var(--radius);
+    padding: 10px;
+    margin-bottom: 12px;
+  }
+
+  .add-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .add-row:last-child { border-bottom: none; }
+
+  .add-row .info { flex: 1; }
+  .add-row .info .name { font-weight: 600; font-size: 14px; }
+  .add-row .info .meta { font-size: 12px; color: var(--muted); }
+
+  .add-row button {
+    padding: 6px 12px;
+    font-size: 13px;
+    background: var(--accent);
+  }
+
   /* Message output */
   .message-box {
     background: var(--card);
@@ -251,6 +286,9 @@
     gap: 8px;
     margin-top: 10px;
   }
+  .action-row button { flex: 1; }
+  .action-row .wa-btn { background: var(--wa); }
+  .action-row .wa-btn:active { background: #1da851; }
 
   .toast {
     position: fixed;
@@ -309,10 +347,11 @@ let slotGroups = {};      // slot -> { route -> [clients] }
 let currentSlot = null;
 let currentView = null;   // null | route name | "NEW"
 let stopAssignments = {}; // phone -> stop number (per current view)
+let currentClients = [];  // working list for active view (extendable)
+let checkedClients = {};  // phone -> true (New Route checkbox)
 
 const content = document.getElementById('content');
 
-// Set default date to today
 document.getElementById('dateInput').valueAsDate = new Date();
 
 function showToast(msg) {
@@ -324,11 +363,7 @@ function showToast(msg) {
 
 async function apiPost(action, params = {}) {
   const body = new URLSearchParams({ action, ...params });
-  const res = await fetch(API_URL, {
-    method: 'POST',
-    body,
-    redirect: 'follow'
-  });
+  const res = await fetch(API_URL, { method: 'POST', body, redirect: 'follow' });
   return res.json();
 }
 
@@ -340,47 +375,30 @@ async function loadOrders() {
 
   try {
     const ordersRes = await apiPost('getOrdersForDate', { date });
-    console.log('ordersRes:', ordersRes);
 
     if (!ordersRes.success || !ordersRes.clients.length) {
       content.innerHTML = '<div class="empty-state">No active clients found for this date.</div>';
-      allClients = [];
-      slotGroups = {};
+      allClients = []; slotGroups = {};
       return;
     }
 
-    allClients = [];
-    slotGroups = {};
+    allClients = []; slotGroups = {};
 
     ordersRes.clients.forEach(c => {
       const slot = String(c.slot || 'Unspecified').trim() || 'Unspecified';
       const route = String(c.route || '').trim() || 'No Route';
-
-      const clientObj = {
-        phone: c.phone,
-        name: c.name,
-        location: c.location,
-        slot,
-        route
-      };
-
+      const clientObj = { phone: c.phone, name: c.name, location: c.location, slot, route };
       allClients.push(clientObj);
-
       if (!slotGroups[slot]) slotGroups[slot] = {};
       if (!slotGroups[slot][route]) slotGroups[slot][route] = [];
       slotGroups[slot][route].push(clientObj);
     });
 
-    // Sort clients within each route by name
     Object.values(slotGroups).forEach(routes => {
-      Object.values(routes).forEach(arr =>
-        arr.sort((a, b) => a.name.localeCompare(b.name))
-      );
+      Object.values(routes).forEach(arr => arr.sort((a, b) => a.name.localeCompare(b.name)));
     });
 
-    currentSlot = null;
-    currentView = null;
-    stopAssignments = {};
+    currentSlot = null; currentView = null; stopAssignments = {};
     renderSummary();
 
   } catch (err) {
@@ -393,8 +411,7 @@ const SLOT_ORDER = ['Morning', 'Afternoon', 'Evening'];
 
 function sortedSlots() {
   return Object.keys(slotGroups).sort((a, b) => {
-    const ai = SLOT_ORDER.indexOf(a);
-    const bi = SLOT_ORDER.indexOf(b);
+    const ai = SLOT_ORDER.indexOf(a), bi = SLOT_ORDER.indexOf(b);
     if (ai === -1 && bi === -1) return a.localeCompare(b);
     if (ai === -1) return 1;
     if (bi === -1) return -1;
@@ -403,35 +420,23 @@ function sortedSlots() {
 }
 
 function renderSummary() {
-  currentSlot = null;
-  currentView = null;
-  stopAssignments = {};
-
+  currentSlot = null; currentView = null; stopAssignments = {};
   const slots = sortedSlots();
-
-  let html = '<div class="section-title">Select Slot</div>';
-  html += '<div class="tiles">';
-
+  let html = '<div class="section-title">Select Slot</div><div class="tiles">';
   slots.forEach(slot => {
-    const totalCount = Object.values(slotGroups[slot])
-      .reduce((sum, arr) => sum + arr.length, 0);
-
+    const totalCount = Object.values(slotGroups[slot]).reduce((s, arr) => s + arr.length, 0);
     html += `
       <div class="tile" onclick="openSlot('${escapeAttr(slot)}')">
         <div class="route-name">${escapeHtml(slot)}</div>
         <div class="route-count">${totalCount} client(s)</div>
       </div>`;
   });
-
   html += '</div>';
   content.innerHTML = html;
 }
 
 function openSlot(slot) {
-  currentSlot = slot;
-  currentView = null;
-  stopAssignments = {};
-
+  currentSlot = slot; currentView = null; stopAssignments = {};
   const routes = Object.keys(slotGroups[slot]).sort((a, b) => {
     if (a === 'No Route') return 1;
     if (b === 'No Route') return -1;
@@ -439,9 +444,7 @@ function openSlot(slot) {
   });
 
   let html = `<span class="back-link" onclick="renderSummary()">← Back to slots</span>`;
-  html += `<div class="section-title">${escapeHtml(slot)}</div>`;
-  html += '<div class="tiles">';
-
+  html += `<div class="section-title">${escapeHtml(slot)}</div><div class="tiles">`;
   routes.forEach(route => {
     html += `
       <div class="tile" onclick="openRoute('${escapeAttr(slot)}','${escapeAttr(route)}')">
@@ -449,34 +452,28 @@ function openSlot(slot) {
         <div class="route-count">${slotGroups[slot][route].length} client(s)</div>
       </div>`;
   });
-
-  html += `
-    <div class="tile new-route" onclick="openNewRoute('${escapeAttr(slot)}')">
-      ➕ New Route
-    </div>`;
-
+  html += `<div class="tile new-route" onclick="openNewRoute('${escapeAttr(slot)}')">➕ New Route</div>`;
   html += '</div>';
   content.innerHTML = html;
 }
 
 function openRoute(slot, route) {
-  currentSlot = slot;
-  currentView = route;
-  stopAssignments = {};
-  renderClientView(slotGroups[slot][route], `${slot} — ${route}`);
+  currentSlot = slot; currentView = route;
+  stopAssignments = {}; checkedClients = {};
+  currentClients = [...slotGroups[slot][route]];
+  renderClientView(`${slot} — ${route}`);
 }
 
 function openNewRoute(slot) {
-  currentSlot = slot;
-  currentView = 'NEW';
-  stopAssignments = {};
-
-  // All clients within this slot, across all routes
-  const clients = Object.values(slotGroups[slot]).flat();
-  renderClientView(clients, `${slot} — New Route`);
+  currentSlot = slot; currentView = 'NEW';
+  stopAssignments = {}; checkedClients = {};
+  currentClients = Object.values(slotGroups[slot]).flat();
+  renderClientView(`${slot} — New Route`);
 }
 
-function renderClientView(clients, title) {
+function renderClientView(title) {
+  const isNew = currentView === 'NEW';
+
   let html = `<span class="back-link" onclick="openSlot('${escapeAttr(currentSlot)}')">← Back to ${escapeHtml(currentSlot)}</span>`;
   html += `<div class="section-title">${escapeHtml(title)}</div>`;
 
@@ -484,45 +481,46 @@ function renderClientView(clients, title) {
     style="width:100%; padding:10px; border-radius:var(--radius); border:1px solid var(--border); font-size:15px; margin-bottom:10px; background:var(--card);"
     oninput="filterClients()">`;
 
+  // (1) Add-clients button for existing routes
+  if (!isNew) {
+    html += `<button class="secondary full" style="margin-bottom:10px;" onclick="toggleAddPanel()">➕ Add clients to this route</button>`;
+    html += `<div id="addPanel"></div>`;
+  }
+
   html += `<div id="clientListContainer">`;
-  html += renderClientList(clients, true, clients.length);
+  html += renderClientList(currentClients, true);
   html += `</div>`;
 
   html += `
-    <button class="full" style="margin-top:14px;" onclick="generateMessage()">
-      Generate WhatsApp Message
-    </button>
-    <div id="messageOutput"></div>
-  `;
+    <button class="full" style="margin-top:14px;" onclick="generateMessage()">Generate WhatsApp Message</button>
+    <div id="messageOutput"></div>`;
 
   content.innerHTML = html;
 }
 
+function getViewClients() { return currentClients; }
+
 function filterClients() {
   const query = document.getElementById('searchInput').value.toLowerCase().trim();
-
-  const clients = currentView === 'NEW'
-    ? Object.values(slotGroups[currentSlot]).flat()
-    : slotGroups[currentSlot][currentView];
-
-  const filtered = query
-    ? clients.filter(c => c.name.toLowerCase().includes(query))
-    : clients;
-
-  document.getElementById('clientListContainer').innerHTML = renderClientList(filtered, true, clients.length);
+  const filtered = query ? currentClients.filter(c => c.name.toLowerCase().includes(query)) : currentClients;
+  document.getElementById('clientListContainer').innerHTML = renderClientList(filtered, true);
   refreshStopOptions();
 }
 
-function renderClientList(clients, withStopSelect, totalOverride) {
-  if (!clients.length) {
-    return '<div class="empty-state">No clients here.</div>';
-  }
-
-  const total = totalOverride || clients.length;
+function renderClientList(clients, withStopSelect) {
+  if (!clients.length) return '<div class="empty-state">No clients here.</div>';
+  const isNew = currentView === 'NEW';
 
   let html = '';
   clients.forEach(c => {
     html += `<div class="client-card">`;
+
+    // (2) checkbox only in New Route
+    if (withStopSelect && isNew) {
+      const chk = checkedClients[c.phone] ? 'checked' : '';
+      html += `<input type="checkbox" class="route-check" ${chk} onchange="toggleCheck('${escapeAttr(c.phone)}', this.checked)">`;
+    }
+
     html += `<div class="client-info">
       <div class="name">${escapeHtml(c.name)}</div>
       <div class="meta">${escapeHtml(c.phone)} · ${escapeHtml(c.location)}</div>
@@ -537,24 +535,65 @@ function renderClientList(clients, withStopSelect, totalOverride) {
 
     html += `</div>`;
   });
-
   return html;
 }
 
+/* ---- (2) checkbox handler ---- */
+function toggleCheck(phone, val) {
+  if (val) checkedClients[phone] = true;
+  else delete checkedClients[phone];
+}
+
+/* ---- (1) Add clients to existing route ---- */
+function toggleAddPanel() {
+  const panel = document.getElementById('addPanel');
+  if (panel.innerHTML.trim()) { panel.innerHTML = ''; return; }
+  renderAddPanel();
+}
+
+function renderAddPanel() {
+  const panel = document.getElementById('addPanel');
+  const all = Object.values(slotGroups[currentSlot]).flat();
+  const existing = new Set(currentClients.map(c => c.phone));
+  const avail = all.filter(c => !existing.has(c.phone));
+
+  if (!avail.length) { panel.innerHTML = `<div class="add-panel"><div class="empty-state">All slot clients already in this route.</div></div>`; return; }
+
+  let html = `<div class="add-panel">`;
+  avail.forEach(c => {
+    html += `<div class="add-row">
+      <div class="info">
+        <div class="name">${escapeHtml(c.name)}</div>
+        <div class="meta">${escapeHtml(c.phone)} · ${escapeHtml(c.route)}</div>
+      </div>
+      <button onclick="addClientToRoute('${escapeAttr(c.phone)}')">Add</button>
+    </div>`;
+  });
+  html += `</div>`;
+  panel.innerHTML = html;
+}
+
+function addClientToRoute(phone) {
+  const all = Object.values(slotGroups[currentSlot]).flat();
+  const c = all.find(x => x.phone === phone);
+  if (c && !currentClients.some(x => x.phone === phone)) {
+    currentClients.push(c);
+    currentClients.sort((a, b) => a.name.localeCompare(b.name));
+  }
+  renderAddPanel();
+  document.getElementById('clientListContainer').innerHTML = renderClientList(currentClients, true);
+  refreshStopOptions();
+  showToast('Added');
+}
+
+/* ---- stop number dropdown ---- */
 function toggleStopMenu(btnEl, event) {
   if (event) event.stopPropagation();
-
-  // Close any existing open menu
   closeStopMenus();
 
   const wrapper = btnEl.parentElement;
   const phone = wrapper.dataset.phone;
-
-  const clients = currentView === 'NEW'
-    ? Object.values(slotGroups[currentSlot]).flat()
-    : slotGroups[currentSlot][currentView];
-
-  const total = clients.length;
+  const total = currentClients.length;
   const currentVal = stopAssignments[phone] || '';
 
   const menu = document.createElement('div');
@@ -566,11 +605,8 @@ function toggleStopMenu(btnEl, event) {
   menu.appendChild(noneOpt);
 
   for (let i = 1; i <= total; i++) {
-    const taken = Object.entries(stopAssignments).some(
-      ([p, v]) => v === String(i) && p !== phone
-    );
+    const taken = Object.entries(stopAssignments).some(([p, v]) => v === String(i) && p !== phone);
     if (taken) continue;
-
     const opt = document.createElement('div');
     opt.textContent = i;
     if (String(i) === currentVal) opt.style.fontWeight = '700';
@@ -579,36 +615,20 @@ function toggleStopMenu(btnEl, event) {
   }
 
   menu.onclick = (e) => e.stopPropagation();
-
   wrapper.appendChild(menu);
-
-  // Close on outside click
-  setTimeout(() => {
-    document.addEventListener('click', closeStopMenusOnce);
-  }, 0);
+  setTimeout(() => document.addEventListener('click', closeStopMenusOnce), 0);
 }
 
-function closeStopMenusOnce(e) {
-  closeStopMenus();
-  document.removeEventListener('click', closeStopMenusOnce);
-}
-
-function closeStopMenus() {
-  document.querySelectorAll('.stop-dropdown-menu').forEach(m => m.remove());
-}
+function closeStopMenusOnce() { closeStopMenus(); document.removeEventListener('click', closeStopMenusOnce); }
+function closeStopMenus() { document.querySelectorAll('.stop-dropdown-menu').forEach(m => m.remove()); }
 
 function selectStop(phone, val) {
   if (val === '') {
     delete stopAssignments[phone];
   } else {
-    for (const p in stopAssignments) {
-      if (stopAssignments[p] === val && p !== phone) {
-        delete stopAssignments[p];
-      }
-    }
+    for (const p in stopAssignments) if (stopAssignments[p] === val && p !== phone) delete stopAssignments[p];
     stopAssignments[phone] = val;
   }
-
   closeStopMenus();
   refreshStopOptions();
 }
@@ -621,95 +641,73 @@ function refreshStopOptions() {
   });
 }
 
+/* ---- message generation ---- */
 function generateMessage() {
-  const clients = currentView === 'NEW'
-    ? Object.values(slotGroups[currentSlot]).flat()
-    : slotGroups[currentSlot][currentView];
-
+  const clients = currentClients;
   let ordered = [];
 
   if (currentView === 'NEW') {
-    // Only include clients with an assigned stop number
-    Object.entries(stopAssignments).forEach(([phone, stopNum]) => {
-      const client = clients.find(c => c.phone === phone);
-      if (client) ordered.push({ ...client, stop: parseInt(stopNum) });
+    // (2) include numbered (sorted) + checked-but-unnumbered. Independent.
+    const numbered = [], checkedUnnum = [];
+    clients.forEach(c => {
+      if (stopAssignments[c.phone]) numbered.push({ ...c, stop: parseInt(stopAssignments[c.phone]) });
+      else if (checkedClients[c.phone]) checkedUnnum.push({ ...c, stop: null });
     });
+    numbered.sort((a, b) => a.stop - b.stop);
+    ordered = numbered.concat(checkedUnnum);
 
-    ordered.sort((a, b) => a.stop - b.stop);
-
-    if (!ordered.length) {
-      showToast('Assign stop numbers first');
-      return;
-    }
+    if (!ordered.length) { showToast('Assign numbers or check clients first'); return; }
 
   } else {
-    // Include ALL clients: numbered first (sorted), then unnumbered
-    const numbered = [];
-    const unnumbered = [];
-
+    // existing route: include all, numbered first then unnumbered
+    const numbered = [], unnumbered = [];
     clients.forEach(c => {
-      if (stopAssignments[c.phone]) {
-        numbered.push({ ...c, stop: parseInt(stopAssignments[c.phone]) });
-      } else {
-        unnumbered.push({ ...c, stop: null });
-      }
+      if (stopAssignments[c.phone]) numbered.push({ ...c, stop: parseInt(stopAssignments[c.phone]) });
+      else unnumbered.push({ ...c, stop: null });
     });
-
     numbered.sort((a, b) => a.stop - b.stop);
     ordered = numbered.concat(unnumbered);
   }
 
   let message = '';
   ordered.forEach(c => {
-    if (c.stop !== null) {
-      message += `${c.stop}. ${c.name}\n${c.phone}\n${c.location}\n\n`;
-    } else {
-      message += `${c.name}\n${c.phone}\n${c.location}\n\n`;
-    }
+    if (c.stop !== null) message += `${c.stop}. ${c.name}\n${c.phone}\n${c.location}\n\n`;
+    else message += `${c.name}\n${c.phone}\n${c.location}\n\n`;
   });
-
   message = message.trim();
 
   const out = document.getElementById('messageOutput');
   out.innerHTML = `
     <div class="message-box" id="msgText">${escapeHtml(message)}</div>
     <div class="action-row">
-      <button class="full" onclick="copyMessage()">📋 Copy Message</button>
-    </div>
-  `;
-
-  // store raw text for copying
+      <button onclick="copyMessage()">📋 Copy Message</button>
+      <button class="wa-btn" onclick="sendWhatsApp()">Send on WhatsApp</button>
+    </div>`;
   out.dataset.raw = message;
 }
 
 function copyMessage() {
-  const out = document.getElementById('messageOutput');
-  const text = out.dataset.raw || '';
-
-  navigator.clipboard.writeText(text).then(() => {
-    showToast('Copied to clipboard!');
-  }).catch(() => {
-    // fallback
+  const text = document.getElementById('messageOutput').dataset.raw || '';
+  navigator.clipboard.writeText(text).then(() => showToast('Copied to clipboard!')).catch(() => {
     const ta = document.createElement('textarea');
-    ta.value = text;
-    document.body.appendChild(ta);
-    ta.select();
-    document.execCommand('copy');
-    document.body.removeChild(ta);
+    ta.value = text; document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta);
     showToast('Copied to clipboard!');
   });
 }
 
-function escapeHtml(str) {
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
+/* (3) open WhatsApp with text, user picks recipient */
+function sendWhatsApp() {
+  const text = document.getElementById('messageOutput').dataset.raw || '';
+  if (!text) { showToast('Generate message first'); return; }
+  const url = 'https://wa.me/?text=' + encodeURIComponent(text);
+  window.open(url, '_blank');
 }
 
-function escapeAttr(str) {
-  return String(str).replace(/'/g, "\\'");
+function escapeHtml(str) {
+  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
+function escapeAttr(str) { return String(str).replace(/'/g, "\\'"); }
 
 </script>
 </body>
