@@ -1,1 +1,1 @@
-const API_URL = "https://script.google.com/macros/s/AKfycbx2tZ5vuIOUytbDs--mRefKFi08UHyJka9i-KIOmTBai8ivtuRHyxh9HlRSUn20PmBy/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbzLtqUu_UmsOgRV1YZFaUOgEULJWfNhwac_OjB6Nup578ws9okitz1ATn_43aSL3brr/exec";
