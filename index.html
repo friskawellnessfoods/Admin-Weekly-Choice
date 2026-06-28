@@ -385,6 +385,18 @@
   <div class="content wrapper">
 
 <div class="box">
+  <div id="adminSearchWrap" style="display:none; position:relative;">
+    <label>Search Client (Admin)</label>
+    <input type="text" id="adminSearch" autocomplete="off"
+           placeholder="Type 2+ letters of name"
+           oninput="onAdminSearch(this.value)">
+    <div id="adminResults" style="
+      display:none; position:absolute; left:0; right:0; top:100%;
+      background:#fff; border:1px solid var(--line); border-radius:12px;
+      box-shadow:0 8px 22px rgba(20,33,62,0.12); margin-top:4px; z-index:30;
+      max-height:260px; overflow-y:auto; padding:4px 0;"></div>
+  </div>
+
   <label>Phone</label>
   <input id="phone" inputmode="numeric"
          onkeydown="if(event.key==='Enter'){fetchClient()}">
@@ -457,8 +469,11 @@ let CLIENT_LOCATION_1 = '';
 let CLIENT_LOCATION_2 = '';
 let CLIENT_DELIVERY = {};
 /* ========= CONFIG ========= */
-const CUTOFF_HOUR = 00;
-const CUTOFF_ENABLED = false;
+const ADMIN_MODE = true;              // admin repo = true, client repo = false
+const CUTOFF_HOUR = 0;                // cutoff time (only used when cutoff is active)
+const CUTOFF_ENABLED = !ADMIN_MODE;   // admin = no cutoff, client = cutoff on
+
+let MASTER_CLIENTS = [];              // admin name search cache
 
 let MENU = {};
 let DATES = [];
@@ -1525,6 +1540,62 @@ function openOrdersPage(){
   window.open(url, "_blank");
 
 }
+
+/* ========= ADMIN NAME SEARCH ========= */
+(function initAdminSearch(){
+  if (!ADMIN_MODE) return;
+  const wrap = document.getElementById('adminSearchWrap');
+  if (wrap) wrap.style.display = 'block';
+  // preload master clients once
+  fetch(`${API_URL}?action=getMasterClientsAll&t=${Date.now()}`, { cache: "no-store" })
+    .then(r => r.json())
+    .then(d => { MASTER_CLIENTS = (d && d.clients) ? d.clients : []; })
+    .catch(() => { MASTER_CLIENTS = []; });
+})();
+
+function onAdminSearch(q){
+  const box = document.getElementById('adminResults');
+  q = (q || '').trim().toLowerCase();
+
+  if (q.length < 2) { box.style.display = 'none'; box.innerHTML = ''; return; }
+
+  const matches = MASTER_CLIENTS
+    .filter(c => c.phone && c.name && c.name.toLowerCase().includes(q))
+    .slice(0, 8);
+
+  if (!matches.length) {
+    box.innerHTML = `<div style="padding:11px 16px; font-size:13px; color:var(--muted);">No matches</div>`;
+    box.style.display = 'block';
+    return;
+  }
+
+  box.innerHTML = matches.map(c => `
+    <div onclick="pickAdminClient('${c.phone}', ${JSON.stringify(c.name).replace(/"/g,'&quot;')})"
+         style="padding:11px 16px; font-size:14px; cursor:pointer; display:flex; justify-content:space-between; gap:10px;"
+         onmouseover="this.style.background='var(--accent-soft)'"
+         onmouseout="this.style.background='#fff'">
+      <span style="font-weight:600; color:var(--navy);">${c.name}</span>
+      <span style="color:var(--muted); font-size:13px;">${c.phone}</span>
+    </div>
+  `).join('');
+  box.style.display = 'block';
+}
+
+function pickAdminClient(phone, name){
+  document.getElementById('phone').value = phone;
+  const cn = document.getElementById('clientName');
+  if (cn) cn.value = name || '';
+  document.getElementById('adminSearch').value = name || '';
+  document.getElementById('adminResults').style.display = 'none';
+  // no auto-login — user presses Login (spinner works on click)
+}
+
+// close the results dropdown when clicking elsewhere
+document.addEventListener('click', function(e){
+  const wrap = document.getElementById('adminSearchWrap');
+  const box = document.getElementById('adminResults');
+  if (wrap && box && !wrap.contains(e.target)) box.style.display = 'none';
+});
 </script>
   </div>
   <div id="summaryModal" class="modal">
