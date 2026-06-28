@@ -1546,8 +1546,10 @@ function openOrdersPage(){
   if (!ADMIN_MODE) return;
   const wrap = document.getElementById('adminSearchWrap');
   if (wrap) wrap.style.display = 'block';
-  // preload master clients once
-  fetch(`${API_URL}?action=getMasterClientsAll&t=${Date.now()}`, { cache: "no-store" })
+  // preload master clients once (POST → doPost, where getMasterClientsAll lives)
+  const _mp = new URLSearchParams();
+  _mp.append("action", "getMasterClientsAll");
+  fetch(API_URL, { method: "POST", body: _mp })
     .then(r => r.json())
     .then(d => { MASTER_CLIENTS = (d && d.clients) ? d.clients : []; })
     .catch(() => { MASTER_CLIENTS = []; });
