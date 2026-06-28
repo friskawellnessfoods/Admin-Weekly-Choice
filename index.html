@@ -1646,7 +1646,7 @@ document.addEventListener('click', function(e){
 /* ========= REMARKS (this-day / permanent) ========= */
 function currentDate(){ return VISIBLE_DATES[currentIndex]; }
 
-function toggleRemarkMode(mode, cb){
+async function toggleRemarkMode(mode, cb){
   const box = document.getElementById('clientRemarks');
   const day = STATE[currentDate()];
   const other = mode === 'day' ? document.getElementById('rmPerm')
@@ -1663,7 +1663,7 @@ function toggleRemarkMode(mode, cb){
   if (other) other.checked = false;
 
   if (mode === 'permanent') {
-    const ok = confirm("This will permanently change the remark saved in your profile (Master Client List). Continue?");
+    const ok = await askPermConfirm();
     if (!ok) { cb.checked = false; box.readOnly = true; return; }
   }
 
@@ -1703,6 +1703,18 @@ function savePermanentRemark(val){
   }, 800);   // wait until typing pauses, then save once
 }
 
+let _permResolve = null;
+function askPermConfirm(){
+  return new Promise(resolve => {
+    _permResolve = resolve;
+    document.getElementById('permModal').style.display = 'flex';
+  });
+}
+function resolvePermModal(ok){
+  document.getElementById('permModal').style.display = 'none';
+  if (_permResolve) { _permResolve(ok); _permResolve = null; }
+}
+
 </script>
   </div>
   <div id="summaryModal" class="modal">
@@ -1717,6 +1729,19 @@ function savePermanentRemark(val){
     <div class="modal-foot">
       <button class="btn secondary" onclick="shareSummary()">Share</button>
       <button class="btn" onclick="closeSummary()">Make Changes</button>
+    </div>
+  </div>
+</div>
+<div id="permModal" class="modal">
+  <div class="modal-content" style="text-align:center; padding:28px 24px 22px; max-width:380px;">
+    <div style="font-size:34px; margin-bottom:10px;">📝</div>
+    <h3 style="margin:0 0 8px;">Permanent Change</h3>
+    <p style="font-size:14.5px; color:#445; line-height:1.55; margin:0 0 22px;">
+      This will permanently update the remark saved in the client's profile (Master Client List).
+    </p>
+    <div style="display:flex; gap:10px;">
+      <button class="btn secondary" style="margin-top:0;" onclick="resolvePermModal(false)">Cancel</button>
+      <button class="btn" style="margin-top:0;" onclick="resolvePermModal(true)">Confirm</button>
     </div>
   </div>
 </div>
