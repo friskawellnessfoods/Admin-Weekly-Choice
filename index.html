@@ -417,7 +417,16 @@
   <input type="text" id="clientType" readonly>
 
   <label>Remarks</label>
-  <input type="text" id="clientRemarks">
+  <input type="text" id="clientRemarks" readonly
+         oninput="onRemarkInput(this.value)">
+  <div style="display:flex; gap:16px; margin-top:8px; align-items:center;">
+    <label style="display:flex; align-items:center; gap:6px; font-size:13px; margin:0; cursor:pointer;">
+      <input type="checkbox" id="rmDay" onchange="toggleRemarkMode('day', this)"> This Day Remark
+    </label>
+    <label style="display:flex; align-items:center; gap:6px; font-size:13px; margin:0; cursor:pointer;">
+      <input type="checkbox" id="rmPerm" onchange="toggleRemarkMode('permanent', this)"> Permanent Change
+    </label>
+  </div>
 </div>
 
 <div class="box" id="presetBox">
@@ -468,6 +477,7 @@
 let CLIENT_LOCATION_1 = '';
 let CLIENT_LOCATION_2 = '';
 let CLIENT_DELIVERY = {};
+let MASTER_REMARK = '';
 /* ========= CONFIG ========= */
 const ADMIN_MODE = true;              // admin repo = true, client repo = false
 const CUTOFF_HOUR = 0;                // cutoff time (only used when cutoff is active)
@@ -522,6 +532,8 @@ async function fetchClient() {
   clientType.value = cleanedType;
   
   clientRemarks.value = client.remarks || '';
+  MASTER_REMARK = client.remarks || '';
+  clientRemarks.readOnly = true;   // locked until a checkbox is ticked
    
   // store original for backend
   clientType.dataset.original = originalType,
@@ -606,9 +618,10 @@ function initState(){
         juice1:    { items: {}, slot: 'Afternoon', location: '' },
         juice2:    { items: {}, slot: 'Evening', location: '' }
       },
-      cancel: false
+      cancel: false,
+      remark: MASTER_REMARK,        // per-day remark, defaults to master
+      remarkMode: null              // null | 'day' | 'permanent'
     };
-
     // 🔵 FIX: Apply single-slot slot + location correction immediately
     if (!hasAfternoonEveningSlots()) {
 
@@ -812,6 +825,29 @@ function renderCurrentDay(){
 
   backBtn.style.display = currentIndex > 0 ? 'block' : 'none';
   nextBtn.style.display = currentIndex < VISIBLE_DATES.length - 1 ? 'block' : 'none';
+
+  // sync remarks box to this day's remark + lock state
+  const rb = document.getElementById('clientRemarks');
+  const dstate = STATE[date];
+  if (rb && dstate) {
+    rb.value = dstate.remark != null ? dstate.remark : MASTER_REMARK;
+    const dayCb = document.getElementById('rmDay');
+    const permCb = document.getElementById('rmPerm');
+    // a permanent change stays unlocked across days; a this-day edit is per-day
+    if (dstate.remarkMode === 'day') {
+      rb.readOnly = false;
+      if (dayCb) dayCb.checked = true;
+      if (permCb) permCb.checked = false;
+    } else if (dstate.remarkMode === 'permanent') {
+      rb.readOnly = false;
+      if (permCb) permCb.checked = true;
+      if (dayCb) dayCb.checked = false;
+    } else {
+      rb.readOnly = true;
+      if (dayCb) dayCb.checked = false;
+      if (permCb) permCb.checked = false;
+    }
+  }
 }
 
 
@@ -1153,7 +1189,8 @@ async function saveCurrentDay(btn) {
     allDays.push({
       date,
       sections: STATE[date].sections,
-      cancel: STATE[date].cancel
+      cancel: STATE[date].cancel,
+      remark: STATE[date].remark != null ? STATE[date].remark : MASTER_REMARK
     });
   });
 
@@ -1605,6 +1642,67 @@ document.addEventListener('click', function(e){
   const box = document.getElementById('adminResults');
   if (wrap && box && !wrap.contains(e.target)) box.style.display = 'none';
 });
+
+/* ========= REMARKS (this-day / permanent) ========= */
+function currentDate(){ return VISIBLE_DATES[currentIndex]; }
+
+function toggleRemarkMode(mode, cb){
+  const box = document.getElementById('clientRemarks');
+  const day = STATE[currentDate()];
+  const other = mode === 'day' ? document.getElementById('rmPerm')
+                               : document.getElementById('rmDay');
+
+  if (!cb.checked) {
+    // unticking → re-lock, keep whatever text is there
+    box.readOnly = true;
+    if (day) day.remarkMode = null;
+    return;
+  }
+
+  // ticking one unticks the other (mutually exclusive)
+  if (other) other.checked = false;
+
+  if (mode === 'permanent') {
+    const ok = confirm("This will permanently change the remark saved in your profile (Master Client List). Continue?");
+    if (!ok) { cb.checked = false; box.readOnly = true; return; }
+  }
+
+  box.readOnly = false;
+  box.focus();
+  if (day) day.remarkMode = mode;
+}
+
+function onRemarkInput(val){
+  const day = STATE[currentDate()];
+  if (!day) return;
+
+  if (day.remarkMode === 'day') {
+    day.remark = val;                       // this day only
+  } else if (day.remarkMode === 'permanent') {
+    // apply to all days that don't have their own this-day remark, + master default
+    MASTER_REMARK = val;
+    VISIBLE_DATES.forEach(d => {
+      const s = STATE[d];
+      if (s && s.remarkMode !== 'day') s.remark = val;
+    });
+    savePermanentRemark(val);               // debounced write to Master
+  }
+}
+
+let _permTimer = null;
+function savePermanentRemark(val){
+  clearTimeout(_permTimer);
+  _permTimer = setTimeout(() => {
+    const phone = document.getElementById('phone').value.trim();
+    if (!phone) return;
+    const p = new URLSearchParams();
+    p.append("action", "updateClientRemark");
+    p.append("phone", phone);
+    p.append("remark", val);
+    fetch(API_URL, { method: "POST", body: p }).catch(()=>{});
+  }, 800);   // wait until typing pauses, then save once
+}
+
 </script>
   </div>
   <div id="summaryModal" class="modal">
