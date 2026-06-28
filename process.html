@@ -187,7 +187,7 @@ async function runProcess() {
 
   try {
     const params = new URLSearchParams();
-    params.append('action', 'processLogByDate');
+    params.append('action', 'processLogByEntryDate');
     params.append('date', single);
 
     const res = await fetch(API_URL, { method: 'POST', body: params });
