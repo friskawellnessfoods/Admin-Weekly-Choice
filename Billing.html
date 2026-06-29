@@ -605,6 +605,7 @@ function suggestBillNo(billnoId,startId){
     if(bi!==undefined)for(let i=1;i<billsCache.length;i++){const n=parseInt(String(billsCache[i][bi]).replace(/\D/g,""));if(!isNaN(n)&&Math.floor(n/100)===month)maxSeq=Math.max(maxSeq,n-prefix);}}
   el(billnoId).value=prefix+(maxSeq+1);
 }
+async function refreshNum(billnoId,startId){try{await fetchBills(false);}catch(e){}suggestBillNo(billnoId,startId);}
 
 /* invoice */
 function buildInvoice(meta,lines,t){
@@ -649,11 +650,19 @@ function billObject(meta,lines,t){
 async function validateAndSave(meta,lines,t,statusId){
   if(!meta.client){setStatus(statusId,"Enter client name.","err");return false;}
   if(!meta.billNo){setStatus(statusId,"Set a bill number.","err");return false;}
-  await fetchBills(false);
+  setStatus(statusId,"Checking…","info");
+  await fetchBills(true);                                   // always validate against the live sheet
   if(billNoExists(meta.billNo)){setStatus(statusId,`Bill no ${meta.billNo} already exists — choose another.`,"err");return false;}
   setStatus(statusId,"Saving…","info");
-  const res=await apiCall("appendBill",{payload:JSON.stringify(billObject(meta,lines,t))});
-  if(res&&res.ok){billsCache=null;setStatus(statusId,`Saved bill ${meta.billNo}.`,"ok");return true;}
+  const obj=billObject(meta,lines,t);
+  const res=await apiCall("appendBill",{payload:JSON.stringify(obj)});
+  if(res&&res.ok){
+    if(billsCache&&billsCache.length){const headers=billsCache[0].map(h=>String(h).trim());billsCache.push(headers.map(h=>(h in obj)?obj[h]:""));} // keep cache live so the next number advances
+    setStatus(statusId,`Saved bill ${meta.billNo}.`,"ok");
+    if(statusId==="n_status")suggestBillNo("n_billno","n_start");
+    else if(statusId==="r_status2")suggestBillNo("r_billno","r_start");
+    return true;
+  }
   setStatus(statusId,"Save failed: "+(res&&res.message||"unknown"),"err");return false;
 }
 
@@ -779,7 +788,7 @@ el("n_client").addEventListener("input",e=>{fillDatalist("n_clientNames",masterN
 el("n_client").addEventListener("change",onClientNameChange);
 el("n_dur").addEventListener("change",applyDuration);
 el("n_days").addEventListener("input",()=>{nRender(true);newDatesFromStart();});
-el("n_start").addEventListener("change",()=>{newDatesFromStart();if(billsCache)suggestBillNo("n_billno","n_start");});
+el("n_start").addEventListener("change",()=>{newDatesFromStart();refreshNum("n_billno","n_start");});
 el("n_items").addEventListener("change",e=>{
   const v=e.target.value;
   if(v==="juice2x"&&e.target.checked){const o=el("n_items").querySelector('input[value="juice1x"]');o.checked=false;o.closest(".chk").classList.remove("on");}
@@ -792,7 +801,7 @@ el("n_disc").addEventListener("input",recalcNew);el("n_gst").addEventListener("i
 bindLivePrice("n_lines",recalcNew);
 el("n_addline").addEventListener("click",()=>{el("n_lines").insertAdjacentHTML("beforeend",lineRowHtml({id:"custom_"+Date.now(),label:"Custom item",qty:0,rate:0,food:true,custom:true}));recalcNew();});
 el("n_suggestno").addEventListener("click",async()=>{try{await fetchBills(true);suggestBillNo("n_billno","n_start");}catch(e){setStatus("n_status","Couldn't load Bills: "+e.message,"err");}});
-el("n_billdate").addEventListener("change",()=>{if(billsCache)suggestBillNo("n_billno","n_start");});
+el("n_billdate").addEventListener("change",()=>refreshNum("n_billno","n_start"));
 el("n_save").addEventListener("click",async()=>{try{const meta=gatherNewMeta();const lines=readLines("n_lines");const t=computeTotals(lines,meta.discPct,meta.gstPct,0);await validateAndSave(meta,lines,t,"n_status");}catch(e){setStatus("n_status","Error: "+e.message,"err");}});
 el("n_wa").addEventListener("click",async()=>{try{const meta=gatherNewMeta();const lines=readLines("n_lines");const t=computeTotals(lines,meta.discPct,meta.gstPct,0);if(!await validateAndSave(meta,lines,t,"n_status"))return;buildInvoice(meta,lines,t);await sendWhatsApp(meta,t);}catch(e){setStatus("n_status","Error: "+e.message,"err");}});
 
@@ -803,10 +812,10 @@ el("r_client").addEventListener("keydown",e=>{if(e.key==="Enter")runRenew(false)
 bindLivePrice("r_lines",recalcRenewActual);
 bindLivePrice("r_nextlines",recalcRenewNext);
 el("r_disc").addEventListener("input",recalcRenewNext);el("r_gst").addEventListener("input",recalcRenewNext);
-el("r_start").addEventListener("change",()=>{renewDatesFromStart();if(billsCache)suggestBillNo("r_billno","r_start");});
+el("r_start").addEventListener("change",()=>{renewDatesFromStart();refreshNum("r_billno","r_start");});
 el("r_days").addEventListener("input",renewDatesFromStart);
 el("r_addline").addEventListener("click",()=>{el("r_nextlines").insertAdjacentHTML("beforeend",lineRowHtml({id:"custom_"+Date.now(),label:"Custom item",qty:0,rate:0,food:true,custom:true}));recalcRenewNext();});
-el("r_billdate").addEventListener("change",()=>{if(billsCache)suggestBillNo("r_billno","r_start");});
+el("r_billdate").addEventListener("change",()=>refreshNum("r_billno","r_start"));
 function gatherRenewMeta(){const p=renewCtx.prev;return {billNo:el("r_billno").value.trim(),billDate:readDate("r_billdate")||dateOnly(new Date()),client:p.client||"",phone:p.phone||"",plan:p.plan,duration:p.duration,slots:p.slots,days:parseInt(el("r_days").value)||26,start:readDate("r_start"),end:readDate("r_end"),discPct:parseFloat(el("r_disc").value)||0,gstPct:parseFloat(el("r_gst").value)||5,paidStatus:"Unpaid"};}
 el("r_save").addEventListener("click",async()=>{try{if(!renewCtx)return;const meta=gatherRenewMeta();const lines=readLines("r_nextlines");const t=computeTotals(lines,meta.discPct,meta.gstPct,renewCtx.adjustment||0);await validateAndSave(meta,lines,t,"r_status2");}catch(e){setStatus("r_status2","Error: "+e.message,"err");}});
 el("r_wa").addEventListener("click",async()=>{try{if(!renewCtx)return;const meta=gatherRenewMeta();const lines=readLines("r_nextlines");const t=computeTotals(lines,meta.discPct,meta.gstPct,renewCtx.adjustment||0);if(!await validateAndSave(meta,lines,t,"r_status2"))return;buildInvoice(meta,lines,t);await sendWhatsApp(meta,t);}catch(e){setStatus("r_status2","Error: "+e.message,"err");}});
