@@ -700,28 +700,40 @@ function renderDashboard(){
 }
 function monthKey_(d){return d?(d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")):"0000-00";}
 function monthLabel_(k){if(k==="0000-00")return "No start date";const p=k.split("-");return ["January","February","March","April","May","June","July","August","September","October","November","December"][(+p[1])-1]+" "+p[0];}
-let dashMonthOpen=null;
+let dashMonthOpen=null,dashSort={col:"start",dir:"asc"};
+function cmpRows_(a,b,col,dir){
+  let av,bv;
+  if(col==="billNo"){av=parseFloat(String(a.billNo).replace(/\D/g,""))||0;bv=parseFloat(String(b.billNo).replace(/\D/g,""))||0;}
+  else if(col==="grand"){av=parseFloat(a.grand)||0;bv=parseFloat(b.grand)||0;}
+  else if(col==="start"){av=a.start?a.start.getTime():0;bv=b.start?b.start.getTime():0;}
+  else if(col==="end"){av=a.end?a.end.getTime():0;bv=b.end?b.end.getTime():0;}
+  else{av=String(a[col]||"").toLowerCase();bv=String(b[col]||"").toLowerCase();}
+  if(av<bv)return dir==="asc"?-1:1;if(av>bv)return dir==="asc"?1:-1;return 0;
+}
+function thSort_(col,label){const on=dashSort.col===col;return `<th class="sortth" data-col="${col}" style="cursor:pointer;white-space:nowrap">${label}${on?(dashSort.dir==="asc"?" ▲":" ▼"):""}</th>`;}
 function applyDashFilter(){
   const q=normName(el("d_search").value);const f=el("d_filter").value;let rows=dashRows();
   if(f!=="all")rows=rows.filter(r=>r.paid.toLowerCase()===f);
   if(q)rows=rows.filter(r=>normName(r.client).includes(q)||String(r.billNo).includes(q));
   var groups={};rows.forEach(function(r){var mk=monthKey_(r.start);(groups[mk]=groups[mk]||[]).push(r);});
   var keys=Object.keys(groups).sort().reverse();                       // latest month on top
-  keys.forEach(function(k){groups[k].sort(function(a,b){return (a.start&&b.start)?a.start-b.start:0;});}); // by start date within month
+  keys.forEach(function(k){groups[k].sort(function(a,b){return cmpRows_(a,b,dashSort.col,dashSort.dir);});});
   if(dashMonthOpen===null){dashMonthOpen={};if(keys.length)dashMonthOpen[keys[0]]=true;}
   var searching=!!q||f!=="all";
   if(!keys.length){el("d_table").innerHTML=`<div class="subtle">No bills.</div>`;return;}
+  var head=`<thead><tr>${thSort_("billNo","Bill")}${thSort_("client","Client")}${thSort_("plan","Plan")}${thSort_("start","Start")}${thSort_("end","End")}${thSort_("grand","Total")}${thSort_("paid","Status")}</tr></thead>`;
   var html="";
   keys.forEach(function(k){
     var open=searching?true:!!dashMonthOpen[k];
     html+=`<div style="margin-top:8px"><div class="oldhead" data-mk="${k}">${open?"▾":"▸"} ${monthLabel_(k)} (${groups[k].length})</div>`+
-      `<div class="monthwrap ${open?"":"hidden"}" data-mw="${k}"><div style="overflow-x:auto"><table class="dtable"><thead><tr><th>Bill</th><th>Client</th><th>Plan</th><th>Start</th><th>End</th><th>Total</th><th>Status</th></tr></thead><tbody>`+
+      `<div class="monthwrap ${open?"":"hidden"}" data-mw="${k}"><div style="overflow-x:auto"><table class="dtable">${head}<tbody>`+
       groups[k].map(r=>`<tr><td>${r.billNo}</td><td>${r.client}</td><td>${r.plan||""}</td><td>${dtstr(r.start)}</td><td>${dtstr(r.end)}</td><td>₹${money(r.grand)}</td><td>${pillHtml(r)}</td></tr>`).join("")+
       `</tbody></table></div></div></div>`;
   });
   el("d_table").innerHTML=html;
   bindPills("d_table");
   el("d_table").querySelectorAll(".oldhead[data-mk]").forEach(function(h){h.onclick=function(){var k=h.dataset.mk;dashMonthOpen[k]=!(searching?true:dashMonthOpen[k]);applyDashFilter();};});
+  el("d_table").querySelectorAll(".sortth").forEach(function(th){th.onclick=function(){var c=th.dataset.col;if(dashSort.col===c)dashSort.dir=dashSort.dir==="asc"?"desc":"asc";else dashSort={col:c,dir:"asc"};applyDashFilter();};});
 }
 
 /* ===================== USAGE CHECK ===================== */
@@ -751,10 +763,10 @@ function renderUsageReport(u,start,end,continued){
 
 /* ===================== NAME AUTOCOMPLETE ===================== */
 function fillDatalist(listId,names,q){
-  const dl=el(listId);
-  if(q.trim().length<2){dl.innerHTML="";return;}
-  const nq=normName(q);
-  const matches=names.filter(n=>{const nn=normName(n);return nn.includes(nq)&&nn!==nq;});
+  const dl=el(listId);const nq=normName(q);
+  if(nq.length<2){dl.innerHTML="";return;}
+  if(names.some(n=>normName(n)===nq)){dl.innerHTML="";return;} // full name chosen → close the dropdown
+  const matches=names.filter(n=>normName(n).includes(nq));
   matches.sort((a,b)=>{const ai=normName(a).startsWith(nq)?0:1,bi=normName(b).startsWith(nq)?0:1;return ai-bi||a.localeCompare(b);}); // best (startsWith) on top
   dl.innerHTML=matches.slice(0,20).map(n=>`<option value="${n.replace(/"/g,"&quot;")}">`).join("");
 }
