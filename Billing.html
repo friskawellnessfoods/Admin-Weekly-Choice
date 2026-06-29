@@ -76,6 +76,7 @@
   .pill{padding:3px 10px;border-radius:99px;font-size:.74rem;font-weight:700;cursor:pointer;border:1.5px solid transparent;white-space:nowrap}
   .pill.paid{background:var(--accent-soft);color:var(--credit);border-color:#bfe8d6}.pill.unpaid{background:#fdecec;color:var(--debit);border-color:#f3c9c5}
   .paidchk{display:inline-flex;align-items:center;gap:6px;font-size:.8rem;font-weight:700;color:var(--muted);cursor:pointer}.paidchk input{width:17px;height:17px;accent-color:var(--accent);cursor:pointer}
+  .oldhead{cursor:pointer;font-weight:700;color:var(--navy);padding:9px 2px;font-size:.92rem;user-select:none}
   .rowtag{font-size:.68rem;font-weight:700;padding:2px 8px;border-radius:99px;background:var(--warn-bg);color:var(--warn-ink);margin-left:6px}.rowtag.exp{background:var(--pause-bg);color:var(--pause-ink)}
   #invoiceWrap{position:fixed;left:-9999px;top:0}
   #invoice{width:760px;background:#fff;color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Arial,sans-serif;border-radius:18px;overflow:hidden;box-shadow:0 0 0 1px #e6e9f2}
@@ -192,7 +193,12 @@
         <button class="btn btn-primary" id="r_fetch" style="flex:0 0 auto">Fetch &amp; reconcile</button>
         <button class="btn btn-ghost" id="r_reload" style="flex:0 0 auto">Reload</button>
       </div>
-      <div class="status info" id="r_status">Enter a name (from existing bills) to pull their last bill.</div>
+      <div class="status info" id="r_status">Enter a name (from expiring/expired list) to see their bills.</div>
+    </div>
+    <div class="card hidden" id="r_historyCard">
+      <h2 class="sec">Bills for this client</h2>
+      <div style="overflow-x:auto"><table class="dtable" id="r_history"><tbody></tbody></table></div>
+      <div class="subtle">Latest on top. Tap a bill to reconcile / renew from it.</div>
     </div>
     <div class="card hidden" id="r_usageCard">
       <h2 class="sec">Previous cycle usage</h2>
@@ -438,14 +444,14 @@ function nSlots(){return el("n_slots").querySelectorAll("input:checked").length;
 function nDays(){return parseInt(el("n_days").value)||0;}
 function mealLabel(plan,both,onlyLunch){return `${PLAN_LABEL[plan]} · `+(both?"Lunch + Dinner":(onlyLunch?"Lunch":"Dinner"));}
 function domLines(tbodyId){const m={};readLines(tbodyId).forEach(l=>m[l.id]=l);return m;}
-function buildNewLines(resetQty){
+function buildNewLines(resetQty,freshMains){
   const prev=domLines("n_lines");
   const plans=nPlans(),chosen=nChosen(),dur=el("n_dur").value,days=nDays();
   const hasLunch=chosen.includes("lunch"),hasDinner=chosen.includes("dinner"),both=hasLunch&&hasDinner;
   const keepQ=(id,def)=>(prev[id]&&!resetQty)?prev[id].qty:def;
   const keepR=(id,def)=>prev[id]?prev[id].rate:def;
   const out=[];
-  if(hasLunch||hasDinner)plans.forEach(p=>{const id="main_"+p;out.push({id,label:mealLabel(p,both,hasLunch),qty:keepQ(id,both?days*2:days),rate:keepR(id,both?rate(p,dur,"combo"):rate(p,dur,"lunch")),food:true});});
+  if(hasLunch||hasDinner)plans.forEach(p=>{const id="main_"+p;const def=both?days*2:days;out.push({id,label:mealLabel(p,both,hasLunch),qty:freshMains?def:keepQ(id,def),rate:keepR(id,both?rate(p,dur,"combo"):rate(p,dur,"lunch")),food:true});});
   if(chosen.includes("breakfast"))out.push({id:"breakfast",label:"Breakfast",qty:keepQ("breakfast",days),rate:keepR("breakfast",plans.length?rate(plans[0],dur,"breakfast"):gRate("breakfast")),food:true});
   if(chosen.includes("snack"))out.push({id:"snack",label:"Snack",qty:keepQ("snack",days),rate:keepR("snack",plans.length?rate(plans[0],dur,"snack"):gRate("snack")),food:true});
   const jx=chosen.includes("juice2x")?2:(chosen.includes("juice1x")?1:0);
@@ -469,7 +475,7 @@ function refreshNewRates(){
   });
   renderLines("n_lines",lines);recalcNew();
 }
-function nRender(resetQty){renderLines("n_lines",buildNewLines(resetQty));recalcNew();}
+function nRender(resetQty,freshMains){renderLines("n_lines",buildNewLines(resetQty,freshMains));recalcNew();}
 function recalcNew(){renderTotals("n_totals",computeTotals(readLines("n_lines"),parseFloat(el("n_disc").value)||0,parseFloat(el("n_gst").value)||0,0));}
 function newDatesFromStart(){const s=readDate("n_start");const days=nDays();if(s){const f=nextServiceDates(addDays(s,-1),days);setDate("n_end",f[f.length-1]);}}
 function applyDuration(){const dur=el("n_dur").value;if(dur==="custom")el("n_days").removeAttribute("readonly");else{el("n_days").value=DUR_DAYS[dur];el("n_days").setAttribute("readonly","readonly");}nRender(true);refreshNewRates();newDatesFromStart();}
@@ -498,27 +504,44 @@ function parseItems(text,days){
   });
   return op;
 }
-function lastBillForClient(rows,name){
-  if(!rows||rows.length<2)return null;const idx=billHeaderIndex(rows);const ci=idx["Client"];if(ci===undefined)return null;
-  const key=normName(name);let last=null;for(let i=1;i<rows.length;i++){if(normName(rows[i][ci])===key)last=rows[i];}
-  if(!last)return null;const get=k=>{const j=idx[k];return (j===undefined||j>=last.length)?"":last[j];};
-  return {raw:last,idx,billNo:get("BillNo"),plan:get("Plan"),duration:get("Duration"),slots:get("Slots"),items:get("Items"),start:toDt(get("Start")),end:toDt(get("End")),grandTotal:parseFloat(get("GrandTotal"))||0,deliveryTotal:parseFloat(get("Delivery"))||0,discPct:parseFloat(get("Discount"))||0,gstPct:5};
+function parseBillRow(row,idx){
+  const get=k=>{const j=idx[k];return (j===undefined||j>=row.length)?"":row[j];};
+  return {raw:row,idx,billNo:get("BillNo"),plan:get("Plan"),duration:get("Duration"),slots:get("Slots"),items:get("Items"),client:get("Client"),phone:get("Phone"),start:toDt(get("Start")),end:toDt(get("End")),grandTotal:parseFloat(get("GrandTotal"))||0,deliveryTotal:parseFloat(get("Delivery"))||0,discPct:parseFloat(get("Discount"))||0,gstPct:5,paid:String(get("PaidStatus")||"Unpaid")};
 }
+function allBillsForClient(rows,name){
+  if(!rows||rows.length<2)return [];const idx=billHeaderIndex(rows);const ci=idx["Client"];if(ci===undefined)return [];
+  const key=normName(name);const out=[];
+  for(let i=1;i<rows.length;i++){if(normName(rows[i][ci])===key)out.push(parseBillRow(rows[i],idx));}
+  out.sort((a,b)=>{const av=a.start?a.start.getTime():0,bv=b.start?b.start.getTime():0;return bv-av;}); // latest first
+  return out;
+}
+function lastBillForClient(rows,name){const l=allBillsForClient(rows,name);return l.length?l[0]:null;}
+let renewList=null,renewOrders=null,renewName="";
 async function runRenew(force){
   const name=el("r_client").value.trim();
   if(!name){setStatus("r_status","Enter a client name.","err");return;}
   setStatus("r_status","Loading…","info");
   try{
     const [bills]=await Promise.all([fetchBills(force),fetchPrices(force)]);
-    const prev=lastBillForClient(bills,name);
-    if(!prev){setStatus("r_status",`No previous bill found for "${name}".`,"err");return;}
-    if(!prev.start||!prev.end){setStatus("r_status","Previous bill has no readable Start/End.","err");return;}
-    const orders=await fetchOrders(force);
-    const rc=computeRenew(orders,name,prev);
-    renewCtx={prev,rc};
-    renderRenew();
-    setStatus("r_status",`Loaded bill ${prev.billNo}.`,"ok");
+    const list=allBillsForClient(bills,name);
+    if(!list.length){setStatus("r_status",`No bills found for "${name}".`,"err");return;}
+    renewOrders=await fetchOrders(force);renewList=list;renewName=name;
+    renderHistory(0);
+    selectRenewBill(0);
+    setStatus("r_status",`${list.length} bill(s) found.`,"ok");
   }catch(err){setStatus("r_status","Error: "+err.message,"err");}
+}
+function renderHistory(sel){
+  el("r_historyCard").classList.remove("hidden");
+  el("r_history").innerHTML=`<thead><tr><th>Bill</th><th>Start</th><th>End</th><th>Total</th><th>Status</th></tr></thead><tbody>`+
+    renewList.map((bl,i)=>`<tr data-i="${i}" style="cursor:pointer;${i===sel?"background:var(--accent-soft)":""}"><td><b>${bl.billNo}</b></td><td>${dtstr(bl.start)}</td><td>${dtstr(bl.end)}</td><td>₹${money(bl.grandTotal)}</td><td>${bl.paid}</td></tr>`).join("")+`</tbody>`;
+  el("r_history").querySelectorAll("tr[data-i]").forEach(tr=>tr.onclick=()=>{const i=parseInt(tr.dataset.i);renderHistory(i);selectRenewBill(i);});
+}
+function selectRenewBill(i){
+  const prev=renewList[i];
+  if(!prev.start||!prev.end){setStatus("r_status","That bill has no readable Start/End.","err");["r_usageCard","r_reconCard","r_nextCard"].forEach(id=>el(id).classList.add("hidden"));return;}
+  renewCtx={prev,rc:computeRenew(renewOrders,renewName,prev)};
+  renderRenew();
 }
 function renderRenew(){
   const prev=renewCtx.prev,rc=renewCtx.rc,b=rc.billing,plans=planCodesOf(prev),dur=durCodeOf(prev),p0=plans[0]||"nb";
@@ -536,14 +559,14 @@ function renderRenew(){
   else el("r_pauseWarn").innerHTML=`<div class="note info">Cycle completed on <b>${dtstr(rc.completionDate)}</b> after ${rc.optedDays} active days.</div>`;
   el("r_paused").textContent=b.pausedDates.length?b.pausedDates.map(dtstr).join(", "):"None";
 
-  // actual usage — only opted items, priced from sheet, juices combined
-  const actual=[];
-  if(op.main){const both=op.main==="both";actual.push({id:"main",label:both?"Lunch + Dinner":"Meals",qty:b.totals.meals_total,rate:both?rate(p0,dur,"combo"):rate(p0,dur,"lunch"),food:true});}
-  if(op.breakfast)actual.push({id:"breakfast",label:"Breakfast",qty:b.totals.brk,rate:rate(p0,dur,"breakfast"),food:true});
-  if(op.snack)actual.push({id:"snack",label:"Snack",qty:b.totals.snack,rate:rate(p0,dur,"snack"),food:true});
-  if(op.juices)actual.push({id:"juices",label:"Juices",qty:b.totals.juices_total,rate:rate(p0,dur,"juice1"),food:true});
-  if(op.seafood)actual.push({id:"seafood",label:"Seafood add-on",qty:b.totals.seafood,rate:gRate("seafood"),food:true});
-  actual.push({id:"delivery",label:"Delivery",qty:b.deliveries,rate:prevDeliveryUnit(prev),food:false});
+  // actual usage — every item the client actually took (qty>0), priced from sheet, juices combined
+  const comboActual=b.totals.meal2>0, actual=[];
+  if(b.totals.meals_total>0)actual.push({id:"main",label:comboActual?"Lunch + Dinner":"Meals",qty:b.totals.meals_total,rate:comboActual?rate(p0,dur,"combo"):rate(p0,dur,"lunch"),food:true});
+  if(b.totals.brk>0)actual.push({id:"breakfast",label:"Breakfast",qty:b.totals.brk,rate:rate(p0,dur,"breakfast"),food:true});
+  if(b.totals.snack>0)actual.push({id:"snack",label:"Snack",qty:b.totals.snack,rate:rate(p0,dur,"snack"),food:true});
+  if(b.totals.juices_total>0)actual.push({id:"juices",label:"Juices",qty:b.totals.juices_total,rate:rate(p0,dur,"juice1"),food:true});
+  if(b.totals.seafood>0)actual.push({id:"seafood",label:"Seafood add-on",qty:b.totals.seafood,rate:gRate("seafood"),food:true});
+  if(b.deliveries>0)actual.push({id:"delivery",label:"Delivery",qty:b.deliveries,rate:prevDeliveryUnit(prev),food:false});
   el("r_reconCard").classList.remove("hidden");renderLines("r_lines",actual);recalcRenewActual();
 
   // next bill — rebuilt from opted items + plans + sheet rates
@@ -551,11 +574,11 @@ function renderRenew(){
   const newDays=prevDaysOf(prev),slots=Math.max(1,prevSlotCount(prev));
   el("r_days").value=newDays;el("r_disc").value=prev.discPct||0;el("r_gst").value=5;el("r_billdate").value=keyOf(dateOnly(new Date()));
   setDate("r_start",rc.nextStart);setDate("r_end",rc.nextEnd);
-  renderLines("r_nextlines",reconstructNextLines(prev,newDays,slots));
+  renderLines("r_nextlines",reconstructNextLines(prev,newDays,slots,op));
   suggestBillNo("r_billno","r_start");recalcRenewNext();
 }
-function reconstructNextLines(prev,days,slots){
-  const plans=planCodesOf(prev),dur=durCodeOf(prev),op=parseItems(prev.items,prevDaysOf(prev));const p0=plans[0]||"nb";const out=[];
+function reconstructNextLines(prev,days,slots,op){
+  const plans=planCodesOf(prev),dur=durCodeOf(prev),p0=plans[0]||"nb";const out=[];
   if(op.main){const both=op.main==="both";(plans.length?plans:["nb"]).forEach(p=>out.push({id:"main_"+p,label:mealLabel(p,both,op.main==="lunch"),qty:both?days*2:days,rate:both?rate(p,dur,"combo"):rate(p,dur,"lunch"),food:true}));}
   if(op.breakfast)out.push({id:"breakfast",label:"Breakfast",qty:days,rate:rate(p0,dur,"breakfast"),food:true});
   if(op.snack)out.push({id:"snack",label:"Snack",qty:days,rate:rate(p0,dur,"snack"),food:true});
@@ -621,7 +644,7 @@ function gatherNewMeta(){
   return {billNo:el("n_billno").value.trim(),billDate:readDate("n_billdate")||dateOnly(new Date()),client:el("n_client").value.trim(),phone:el("n_phone").value.trim(),plan:nPlans().map(p=>PLAN_LABEL[p]).join(", "),duration:DUR_LABEL[el("n_dur").value]||el("n_dur").value,days:nDays(),start:readDate("n_start"),end:readDate("n_end"),slots:Array.from(el("n_slots").querySelectorAll("input:checked")).map(c=>c.value).join(", "),discPct:parseFloat(el("n_disc").value)||0,gstPct:parseFloat(el("n_gst").value)||5,paidStatus:"Unpaid"};
 }
 function billObject(meta,lines,t){
-  return {BillNo:meta.billNo,Date:keyOf(meta.billDate),Client:meta.client,Phone:meta.phone,Plan:meta.plan,Duration:meta.duration,Slots:meta.slots,Start:meta.start?keyOf(meta.start):"",End:meta.end?keyOf(meta.end):"",Items:itemsReadable(lines),Food:money(t.food),Discount:meta.discPct,Delivery:money(t.delivery),Adjustment:money(t.adjustment),GrandTotal:money(t.grand),PaidStatus:meta.paidStatus};
+  return {BillNo:meta.billNo,Date:keyOf(meta.billDate),Client:meta.client,Phone:meta.phone,Plan:meta.plan,Duration:meta.duration,Slots:meta.slots,Start:meta.start?keyOf(meta.start):"",End:meta.end?keyOf(meta.end):"",Items:itemsReadable(lines),Food:money(t.food),Discount:meta.discPct,Gst:money(t.gst),Delivery:money(t.delivery),Adjustment:money(t.adjustment),GrandTotal:money(t.grand),PaidStatus:meta.paidStatus};
 }
 async function validateAndSave(meta,lines,t,statusId){
   if(!meta.client){setStatus(statusId,"Enter client name.","err");return false;}
@@ -662,16 +685,31 @@ function followupNames(){
   rows.forEach(r=>{if(r.end&&r.end<=addDays(today,3)&&latestEnd[normName(r.client)]&&keyOf(latestEnd[normName(r.client)])===keyOf(r.end))set.add(r.client);});
   return Array.from(set);
 }
+/* "Old bills" archive — bills marked Made move into a collapsible section. Persisted per-device. */
+let archiveMem=null,oldOpen=false;
+function getArchive(){if(archiveMem)return archiveMem;try{archiveMem=new Set(JSON.parse(localStorage.getItem("friska_oldbills")||"[]"));}catch(e){archiveMem=new Set();}return archiveMem;}
+function toggleArchive(billNo,on){const s=getArchive();if(on)s.add(String(billNo));else s.delete(String(billNo));try{localStorage.setItem("friska_oldbills",JSON.stringify(Array.from(s)));}catch(e){}}
+function madeHtml(r){return `<label class="paidchk"><input type="checkbox" data-made="${r.billNo}" ${getArchive().has(String(r.billNo))?"checked":""}><span>Made</span></label>`;}
+function bindMade(scopeId){el(scopeId).querySelectorAll('input[data-made]').forEach(cb=>{cb.onchange=()=>{toggleArchive(cb.dataset.made,cb.checked);renderDashboard();};});}
+function followRow(r,tag){return `<tr><td><b>${r.client}</b>${tag}</td><td>${dtstr(r.end)}</td><td>${r.billNo}</td><td>${pillHtml(r)}</td><td>${madeHtml(r)}</td></tr>`;}
+function followTag(r,today){const expired=r.end<today,isToday=keyOf(r.end)===keyOf(today);return expired?`<span class="rowtag exp">expired</span>`:(isToday?`<span class="rowtag">today</span>`:`<span class="rowtag">${Math.round((r.end-today)/86400000)}d</span>`);}
 function renderDashboard(){
-  const today=dateOnly(new Date());const rows=dashRows();
+  const today=dateOnly(new Date());const rows=dashRows();const arch=getArchive();
   const latestEnd={};rows.forEach(r=>{if(r.end){const k=normName(r.client);if(!latestEnd[k]||r.end>latestEnd[k])latestEnd[k]=r.end;}});
   const follow=rows.filter(r=>r.end&&r.end<=addDays(today,3)&&r.end>=addDays(today,-365)&&latestEnd[normName(r.client)]&&keyOf(latestEnd[normName(r.client)])===keyOf(r.end));
   follow.sort((a,b)=>a.end-b.end);
-  if(!follow.length)el("d_followups").innerHTML=`<div class="subtle">Nothing expiring in the next 3 days.</div>`;
-  else{el("d_followups").innerHTML=`<div style="overflow-x:auto"><table class="dtable"><tbody>`+follow.map(r=>{
-    const expired=r.end<today,isToday=keyOf(r.end)===keyOf(today);
-    const tag=expired?`<span class="rowtag exp">expired</span>`:(isToday?`<span class="rowtag">today</span>`:`<span class="rowtag">${Math.round((r.end-today)/86400000)}d</span>`);
-    return `<tr><td><b>${r.client}</b>${tag}</td><td>${dtstr(r.end)}</td><td>${r.billNo}</td><td>${pillHtml(r)}</td></tr>`;}).join("")+`</tbody></table></div>`;bindPills("d_followups");}
+  const active=follow.filter(r=>!arch.has(String(r.billNo)));
+  const old=rows.filter(r=>arch.has(String(r.billNo))).sort((a,b)=>(b.end&&a.end)?b.end-a.end:0);
+  const head=`<thead><tr><th>Client</th><th>Ends</th><th>Bill</th><th>Paid</th><th>Made</th></tr></thead>`;
+  let html="";
+  if(!active.length)html+=`<div class="subtle">Nothing expiring in the next 3 days.</div>`;
+  else html+=`<div style="overflow-x:auto"><table class="dtable">${head}<tbody>`+active.map(r=>followRow(r,followTag(r,today))).join("")+`</tbody></table></div>`;
+  html+=`<div style="margin-top:14px"><div class="oldhead" id="d_oldhead">${oldOpen?"▾":"▸"} Old bills (${old.length})</div>`+
+        `<div id="d_oldwrap" class="${oldOpen?"":"hidden"}"><div style="overflow-x:auto"><table class="dtable">${head}<tbody>`+
+        (old.length?old.map(r=>followRow(r,"")).join(""):`<tr><td colspan="5" class="subtle">No bills marked “Made” yet.</td></tr>`)+`</tbody></table></div></div></div>`;
+  el("d_followups").innerHTML=html;
+  bindPills("d_followups");bindMade("d_followups");
+  el("d_oldhead").onclick=()=>{oldOpen=!oldOpen;el("d_oldwrap").classList.toggle("hidden",!oldOpen);el("d_oldhead").textContent=(oldOpen?"▾":"▸")+" Old bills ("+old.length+")";};
   applyDashFilter();
 }
 function applyDashFilter(){
@@ -751,7 +789,7 @@ el("n_items").addEventListener("change",e=>{
   const v=e.target.value;
   if(v==="juice2x"&&e.target.checked){const o=el("n_items").querySelector('input[value="juice1x"]');o.checked=false;o.closest(".chk").classList.remove("on");}
   if(v==="juice1x"&&e.target.checked){const o=el("n_items").querySelector('input[value="juice2x"]');o.checked=false;o.closest(".chk").classList.remove("on");}
-  e.target.closest(".chk").classList.toggle("on",e.target.checked);nRender(false);
+  e.target.closest(".chk").classList.toggle("on",e.target.checked);nRender(false,(v==="lunch"||v==="dinner"));
 });
 el("n_slots").addEventListener("change",e=>{e.target.closest(".chk").classList.toggle("on",e.target.checked);nRender(false);});
 el("n_km").addEventListener("input",()=>nRender(false));
@@ -775,7 +813,7 @@ el("r_start").addEventListener("change",()=>{renewDatesFromStart();if(billsCache
 el("r_days").addEventListener("input",renewDatesFromStart);
 el("r_addline").addEventListener("click",()=>{el("r_nextlines").insertAdjacentHTML("beforeend",lineRowHtml({id:"custom_"+Date.now(),label:"Custom item",qty:0,rate:0,food:true,custom:true}));recalcRenewNext();});
 el("r_billdate").addEventListener("change",()=>{if(billsCache)suggestBillNo("r_billno","r_start");});
-function gatherRenewMeta(){const p=renewCtx.prev;return {billNo:el("r_billno").value.trim(),billDate:readDate("r_billdate")||dateOnly(new Date()),client:p.raw[p.idx["Client"]],phone:p.idx["Phone"]!==undefined?p.raw[p.idx["Phone"]]:"",plan:p.plan,duration:p.duration,slots:p.slots,days:parseInt(el("r_days").value)||26,start:readDate("r_start"),end:readDate("r_end"),discPct:parseFloat(el("r_disc").value)||0,gstPct:parseFloat(el("r_gst").value)||5,paidStatus:"Unpaid"};}
+function gatherRenewMeta(){const p=renewCtx.prev;return {billNo:el("r_billno").value.trim(),billDate:readDate("r_billdate")||dateOnly(new Date()),client:p.client||"",phone:p.phone||"",plan:p.plan,duration:p.duration,slots:p.slots,days:parseInt(el("r_days").value)||26,start:readDate("r_start"),end:readDate("r_end"),discPct:parseFloat(el("r_disc").value)||0,gstPct:parseFloat(el("r_gst").value)||5,paidStatus:"Unpaid"};}
 el("r_save").addEventListener("click",async()=>{try{if(!renewCtx)return;const meta=gatherRenewMeta();const lines=readLines("r_nextlines");const t=computeTotals(lines,meta.discPct,meta.gstPct,renewCtx.adjustment||0);await validateAndSave(meta,lines,t,"r_status2");}catch(e){setStatus("r_status2","Error: "+e.message,"err");}});
 el("r_wa").addEventListener("click",async()=>{try{if(!renewCtx)return;const meta=gatherRenewMeta();const lines=readLines("r_nextlines");const t=computeTotals(lines,meta.discPct,meta.gstPct,renewCtx.adjustment||0);if(!await validateAndSave(meta,lines,t,"r_status2"))return;buildInvoice(meta,lines,t);await sendWhatsApp(meta,t);}catch(e){setStatus("r_status2","Error: "+e.message,"err");}});
 
