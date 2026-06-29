@@ -252,7 +252,7 @@
         <select id="d_filter" style="flex:0 0 140px"><option value="all">All</option><option value="unpaid">Unpaid</option><option value="paid">Paid</option></select>
         <button class="btn btn-ghost" id="d_reload" style="flex:0 0 auto">Reload</button>
       </div>
-      <div style="overflow-x:auto"><table class="dtable" id="d_table"><tbody></tbody></table></div>
+      <div id="d_table"></div>
       <div class="status info" id="d_status"></div>
     </div>
   </section>
@@ -678,47 +678,41 @@ function bindPills(scopeId){
     finally{cb.disabled=false;}
   };});
 }
-function followupNames(){
-  const today=dateOnly(new Date());const rows=dashRows();
-  const latestEnd={};rows.forEach(r=>{if(r.end){const k=normName(r.client);if(!latestEnd[k]||r.end>latestEnd[k])latestEnd[k]=r.end;}});
-  const set=new Set();
-  rows.forEach(r=>{if(r.end&&r.end<=addDays(today,3)&&latestEnd[normName(r.client)]&&keyOf(latestEnd[normName(r.client)])===keyOf(r.end))set.add(r.client);});
-  return Array.from(set);
-}
-/* "Old bills" archive — bills marked Made move into a collapsible section. Persisted per-device. */
-let archiveMem=null,oldOpen=false;
-function getArchive(){if(archiveMem)return archiveMem;try{archiveMem=new Set(JSON.parse(localStorage.getItem("friska_oldbills")||"[]"));}catch(e){archiveMem=new Set();}return archiveMem;}
-function toggleArchive(billNo,on){const s=getArchive();if(on)s.add(String(billNo));else s.delete(String(billNo));try{localStorage.setItem("friska_oldbills",JSON.stringify(Array.from(s)));}catch(e){}}
-function madeHtml(r){return `<label class="paidchk"><input type="checkbox" data-made="${r.billNo}" ${getArchive().has(String(r.billNo))?"checked":""}><span>Made</span></label>`;}
-function bindMade(scopeId){el(scopeId).querySelectorAll('input[data-made]').forEach(cb=>{cb.onchange=()=>{toggleArchive(cb.dataset.made,cb.checked);renderDashboard();};});}
-function followRow(r,tag){return `<tr><td><b>${r.client}</b>${tag}</td><td>${dtstr(r.end)}</td><td>${r.billNo}</td><td>${pillHtml(r)}</td><td>${madeHtml(r)}</td></tr>`;}
 function followTag(r,today){const expired=r.end<today,isToday=keyOf(r.end)===keyOf(today);return expired?`<span class="rowtag exp">expired</span>`:(isToday?`<span class="rowtag">today</span>`:`<span class="rowtag">${Math.round((r.end-today)/86400000)}d</span>`);}
 function renderDashboard(){
-  const today=dateOnly(new Date());const rows=dashRows();const arch=getArchive();
+  const today=dateOnly(new Date());const rows=dashRows();
   const latestEnd={};rows.forEach(r=>{if(r.end){const k=normName(r.client);if(!latestEnd[k]||r.end>latestEnd[k])latestEnd[k]=r.end;}});
   const follow=rows.filter(r=>r.end&&r.end<=addDays(today,3)&&r.end>=addDays(today,-365)&&latestEnd[normName(r.client)]&&keyOf(latestEnd[normName(r.client)])===keyOf(r.end));
   follow.sort((a,b)=>a.end-b.end);
-  const active=follow.filter(r=>!arch.has(String(r.billNo)));
-  const old=rows.filter(r=>arch.has(String(r.billNo))).sort((a,b)=>(b.end&&a.end)?b.end-a.end:0);
-  const head=`<thead><tr><th>Client</th><th>Ends</th><th>Bill</th><th>Paid</th><th>Made</th></tr></thead>`;
-  let html="";
-  if(!active.length)html+=`<div class="subtle">Nothing expiring in the next 3 days.</div>`;
-  else html+=`<div style="overflow-x:auto"><table class="dtable">${head}<tbody>`+active.map(r=>followRow(r,followTag(r,today))).join("")+`</tbody></table></div>`;
-  html+=`<div style="margin-top:14px"><div class="oldhead" id="d_oldhead">${oldOpen?"▾":"▸"} Old bills (${old.length})</div>`+
-        `<div id="d_oldwrap" class="${oldOpen?"":"hidden"}"><div style="overflow-x:auto"><table class="dtable">${head}<tbody>`+
-        (old.length?old.map(r=>followRow(r,"")).join(""):`<tr><td colspan="5" class="subtle">No bills marked “Made” yet.</td></tr>`)+`</tbody></table></div></div></div>`;
-  el("d_followups").innerHTML=html;
-  bindPills("d_followups");bindMade("d_followups");
-  el("d_oldhead").onclick=()=>{oldOpen=!oldOpen;el("d_oldwrap").classList.toggle("hidden",!oldOpen);el("d_oldhead").textContent=(oldOpen?"▾":"▸")+" Old bills ("+old.length+")";};
+  if(!follow.length)el("d_followups").innerHTML=`<div class="subtle">Nothing expiring in the next 3 days.</div>`;
+  else{el("d_followups").innerHTML=`<div style="overflow-x:auto"><table class="dtable"><thead><tr><th>Client</th><th>Ends</th><th>Bill</th><th>Paid</th></tr></thead><tbody>`+
+    follow.map(r=>`<tr><td><b>${r.client}</b>${followTag(r,today)}</td><td>${dtstr(r.end)}</td><td>${r.billNo}</td><td>${pillHtml(r)}</td></tr>`).join("")+`</tbody></table></div>`;bindPills("d_followups");}
   applyDashFilter();
 }
+function monthKey_(d){return d?(d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")):"0000-00";}
+function monthLabel_(k){if(k==="0000-00")return "No start date";const p=k.split("-");return ["January","February","March","April","May","June","July","August","September","October","November","December"][(+p[1])-1]+" "+p[0];}
+let dashMonthOpen=null;
 function applyDashFilter(){
   const q=normName(el("d_search").value);const f=el("d_filter").value;let rows=dashRows();
   if(f!=="all")rows=rows.filter(r=>r.paid.toLowerCase()===f);
   if(q)rows=rows.filter(r=>normName(r.client).includes(q)||String(r.billNo).includes(q));
-  rows.sort((a,b)=>(b.start&&a.start)?b.start-a.start:0);
-  el("d_table").innerHTML=`<thead><tr><th>Bill</th><th>Client</th><th>Plan</th><th>Start</th><th>End</th><th>Total</th><th>Status</th></tr></thead><tbody>`+rows.map(r=>`<tr><td>${r.billNo}</td><td>${r.client}</td><td>${r.plan||""}</td><td>${dtstr(r.start)}</td><td>${dtstr(r.end)}</td><td>₹${money(r.grand)}</td><td>${pillHtml(r)}</td></tr>`).join("")+`</tbody>`;
+  var groups={};rows.forEach(function(r){var mk=monthKey_(r.start);(groups[mk]=groups[mk]||[]).push(r);});
+  var keys=Object.keys(groups).sort().reverse();                       // latest month on top
+  keys.forEach(function(k){groups[k].sort(function(a,b){return (a.start&&b.start)?a.start-b.start:0;});}); // by start date within month
+  if(dashMonthOpen===null){dashMonthOpen={};if(keys.length)dashMonthOpen[keys[0]]=true;}
+  var searching=!!q||f!=="all";
+  if(!keys.length){el("d_table").innerHTML=`<div class="subtle">No bills.</div>`;return;}
+  var html="";
+  keys.forEach(function(k){
+    var open=searching?true:!!dashMonthOpen[k];
+    html+=`<div style="margin-top:8px"><div class="oldhead" data-mk="${k}">${open?"▾":"▸"} ${monthLabel_(k)} (${groups[k].length})</div>`+
+      `<div class="monthwrap ${open?"":"hidden"}" data-mw="${k}"><div style="overflow-x:auto"><table class="dtable"><thead><tr><th>Bill</th><th>Client</th><th>Plan</th><th>Start</th><th>End</th><th>Total</th><th>Status</th></tr></thead><tbody>`+
+      groups[k].map(r=>`<tr><td>${r.billNo}</td><td>${r.client}</td><td>${r.plan||""}</td><td>${dtstr(r.start)}</td><td>${dtstr(r.end)}</td><td>₹${money(r.grand)}</td><td>${pillHtml(r)}</td></tr>`).join("")+
+      `</tbody></table></div></div></div>`;
+  });
+  el("d_table").innerHTML=html;
   bindPills("d_table");
+  el("d_table").querySelectorAll(".oldhead[data-mk]").forEach(function(h){h.onclick=function(){var k=h.dataset.mk;dashMonthOpen[k]=!(searching?true:dashMonthOpen[k]);applyDashFilter();};});
 }
 
 /* ===================== USAGE CHECK ===================== */
@@ -751,8 +745,9 @@ function fillDatalist(listId,names,q){
   const dl=el(listId);
   if(q.trim().length<2){dl.innerHTML="";return;}
   const nq=normName(q);
-  // exclude exact match so the dropdown closes after selection
-  dl.innerHTML=names.filter(n=>{const nn=normName(n);return nn.includes(nq)&&nn!==nq;}).slice(0,20).map(n=>`<option value="${n.replace(/"/g,"&quot;")}">`).join("");
+  const matches=names.filter(n=>{const nn=normName(n);return nn.includes(nq)&&nn!==nq;});
+  matches.sort((a,b)=>{const ai=normName(a).startsWith(nq)?0:1,bi=normName(b).startsWith(nq)?0:1;return ai-bi||a.localeCompare(b);}); // best (startsWith) on top
+  dl.innerHTML=matches.slice(0,20).map(n=>`<option value="${n.replace(/"/g,"&quot;")}">`).join("");
 }
 function masterNames(){return masterCache?masterCache.map(c=>c.name):[];}
 function fillDatalistAll(listId,names){el(listId).innerHTML=names.slice(0,60).map(n=>`<option value="${n.replace(/"/g,"&quot;")}">`).join("");}
@@ -803,8 +798,7 @@ el("n_wa").addEventListener("click",async()=>{try{const meta=gatherNewMeta();con
 
 el("r_fetch").addEventListener("click",()=>runRenew(false));
 el("r_reload").addEventListener("click",()=>runRenew(true));
-el("r_client").addEventListener("focus",async()=>{try{await fetchBills(false);}catch(e){}fillDatalistAll("r_clientNames",followupNames());});
-el("r_client").addEventListener("input",e=>fillDatalist("r_clientNames",followupNames(),e.target.value));
+el("r_client").addEventListener("input",e=>fillDatalist("r_clientNames",masterNames(),e.target.value));
 el("r_client").addEventListener("keydown",e=>{if(e.key==="Enter")runRenew(false);});
 bindLivePrice("r_lines",recalcRenewActual);
 bindLivePrice("r_nextlines",recalcRenewNext);
