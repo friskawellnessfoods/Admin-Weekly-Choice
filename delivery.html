@@ -339,13 +339,14 @@ function refreshStopOptions() {
 
 /* ---- AUTO-ORDER BY DISTANCE FROM KITCHEN ---- */
 async function ensureGeo() {
-  if (geoMap) return geoMap;
+  if (geoMap && Object.keys(geoMap).length) return geoMap;
   showToast('Loading client map locations…');
   try {
     const res = await apiPost('getClientGeo');
-    geoMap = (res && res.ok && res.geo) ? res.geo : {};
-  } catch (e) { geoMap = {}; }
-  return geoMap;
+    const g = (res && res.ok && res.geo) ? res.geo : {};
+    if (Object.keys(g).length) geoMap = g;   // memoize only on a real result
+    return g;
+  } catch (e) { return {}; }
 }
 
 function coordForClient(c, g) {
@@ -358,11 +359,11 @@ async function autoOrderByDistance() {
   if (!window.google || !google.maps || !google.maps.DistanceMatrixService) {
     showToast('Maps still loading — try again in a moment'); return;
   }
-  await ensureGeo();
+  const geo = await ensureGeo();
 
   const located = [], unlocated = [];
   currentClients.forEach(c => {
-    const coord = coordForClient(c, geoMap[c.phone]);
+    const coord = coordForClient(c, geo[c.phone]);
     if (coord && coord.lat != null) located.push({ c, coord });
     else unlocated.push(c);
   });
