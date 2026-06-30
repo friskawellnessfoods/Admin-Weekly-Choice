@@ -350,7 +350,7 @@ function gRate(item){return priceMap&&(item in priceMap)?priceMap[item]:0;}
 /* usage computation */
 function countUsage(data,start,end,clientName){
   const key=normName(clientName);const totals={meal1:0,meal2:0,snack:0,j1:0,j2:0,brk:0,seafood:0};
-  const activeSet=new Set();const slotCounts={};let lastActive=null;const paused=[];
+  const activeSet=new Set();const slotDates={};let lastActive=null;const paused=[];
   const service=[];let cur=dateOnly(start);
   while(cur<=end){if(!isSunday(cur))service.push(dateOnly(cur));cur=addDays(cur,1);}
   for(const row of data){
@@ -367,11 +367,11 @@ function countUsage(data,start,end,clientName){
     if(snk&&snk!=="N/A"){totals.snack++;mc++;}
     if(j1&&j1!=="N/A"){totals.j1++;mc++;}
     if(j2&&j2!=="N/A"){totals.j2++;mc++;}
-    if(mc>0){activeSet.add(keyOf(rd));let slot=(row.length>COL.slot?String(row[COL.slot]).trim():"")||"No slot";slotCounts[slot]=(slotCounts[slot]||0)+1;if(!lastActive||rd>lastActive)lastActive=rd;}
+    if(mc>0){activeSet.add(keyOf(rd));let slot=(row.length>COL.slot?String(row[COL.slot]).trim():"")||"No slot";(slotDates[slot]=slotDates[slot]||new Set()).add(keyOf(rd));if(!lastActive||rd>lastActive)lastActive=rd;}
   }
   for(const d of service){if(!activeSet.has(keyOf(d)))paused.push(dateOnly(d));}
   totals.meals_total=totals.meal1+totals.meal2;totals.juices_total=totals.j1+totals.j2;
-  let deliveries=0;for(const s in slotCounts)deliveries+=slotCounts[s];
+  const slotCounts={};let deliveries=0;for(const s in slotDates){slotCounts[s]=slotDates[s].size;deliveries+=slotCounts[s];}
   const activeDatesSorted=Array.from(activeSet).sort().map(k=>{const [y,m,da]=k.split("-").map(Number);return dateOnly(new Date(y,m-1,da,12));});
   return {totals,activeDays:activeSet.size,activeDatesSorted,pausedDays:paused.length,totalDays:service.length,pausedDates:paused,lastActiveDate:lastActive,slotCounts,deliveries};
 }
