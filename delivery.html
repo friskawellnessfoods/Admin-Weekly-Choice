@@ -17,304 +17,55 @@
     --wa: #25D366;
     --radius: 12px;
   }
-
   * { box-sizing: border-box; }
-
-  body {
-    margin: 0;
-    font-family: -apple-system, Roboto, Helvetica, Arial, sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    padding-bottom: 40px;
-  }
-
-  header {
-    background: var(--primary);
-    color: #fff;
-    padding: 12px 16px;
-    text-align: center;
-    font-size: 18px;
-    font-weight: 600;
-    position: sticky;
-    top: 0;
-    z-index: 10;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-  }
-
-  header .logo {
-    height: 32px;
-    width: 32px;
-    object-fit: contain;
-    border-radius: 6px;
-  }
-
-  .container {
-    padding: 12px;
-    max-width: 600px;
-    margin: 0 auto;
-  }
-
-  .date-row {
-    display: flex;
-    gap: 8px;
-    margin-bottom: 12px;
-  }
-
-  input[type="date"] {
-    flex: 1;
-    padding: 10px;
-    border-radius: var(--radius);
-    border: 1px solid var(--border);
-    font-size: 16px;
-    background: var(--card);
-  }
-
-  button {
-    background: var(--primary);
-    color: #fff;
-    border: none;
-    padding: 10px 16px;
-    border-radius: var(--radius);
-    font-size: 15px;
-    font-weight: 600;
-    cursor: pointer;
-  }
-
+  body { margin: 0; font-family: -apple-system, Roboto, Helvetica, Arial, sans-serif; background: var(--bg); color: var(--text); padding-bottom: 40px; }
+  header { background: var(--primary); color: #fff; padding: 12px 16px; text-align: center; font-size: 18px; font-weight: 600; position: sticky; top: 0; z-index: 10; display: flex; align-items: center; justify-content: center; gap: 10px; }
+  header .logo { height: 32px; width: 32px; object-fit: contain; border-radius: 6px; }
+  .container { padding: 12px; max-width: 600px; margin: 0 auto; }
+  .date-row { display: flex; gap: 8px; margin-bottom: 12px; }
+  input[type="date"] { flex: 1; padding: 10px; border-radius: var(--radius); border: 1px solid var(--border); font-size: 16px; background: var(--card); }
+  button { background: var(--primary); color: #fff; border: none; padding: 10px 16px; border-radius: var(--radius); font-size: 15px; font-weight: 600; cursor: pointer; }
   button:active { background: var(--primary-dark); }
-
-  button.secondary {
-    background: var(--card);
-    color: var(--primary);
-    border: 1px solid var(--primary);
-  }
-
+  button.secondary { background: var(--card); color: var(--primary); border: 1px solid var(--primary); }
   button.full { width: 100%; }
-
-  /* Tiles */
-  .tiles {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 10px;
-    margin-bottom: 14px;
-  }
-
-  .tile {
-    background: var(--card);
-    border: 2px solid var(--border);
-    border-radius: var(--radius);
-    padding: 14px;
-    text-align: center;
-    cursor: pointer;
-    transition: border-color .15s, transform .1s;
-  }
-
+  button.distance-btn { background: var(--accent); }
+  button.distance-btn:active { background: #128a3e; }
+  .tiles { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 14px; }
+  .tile { background: var(--card); border: 2px solid var(--border); border-radius: var(--radius); padding: 14px; text-align: center; cursor: pointer; transition: border-color .15s, transform .1s; }
   .tile:active { transform: scale(0.97); }
-
-  .tile.active {
-    border-color: var(--primary);
-    background: #eff4ff;
-  }
-
-  .tile .route-name {
-    font-weight: 700;
-    font-size: 15px;
-    margin-bottom: 4px;
-  }
-
-  .tile .route-count {
-    font-size: 13px;
-    color: var(--muted);
-  }
-
-  .tile.new-route {
-    border-style: dashed;
-    color: var(--primary);
-    font-weight: 700;
-  }
-
-  /* Client cards */
-  .client-card {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 12px;
-    margin-bottom: 8px;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
-
-  .client-info {
-    flex: 1;
-  }
-
-  .client-info .name {
-    font-weight: 600;
-    font-size: 15px;
-  }
-
-  .client-info .meta {
-    font-size: 13px;
-    color: var(--muted);
-    margin-top: 2px;
-  }
-
-  .route-check {
-    width: 20px;
-    height: 20px;
-    flex-shrink: 0;
-  }
-
-  select.stop-select {
-    width: 60px;
-    padding: 8px 4px;
-    border-radius: 8px;
-    border: 1px solid var(--border);
-    font-size: 15px;
-    text-align: center;
-    background: #fff;
-  }
-
-  .stop-dropdown {
-    position: relative;
-    width: 60px;
-  }
-
-  .stop-dropdown-btn {
-    width: 100%;
-    padding: 8px 4px;
-    border-radius: 8px;
-    border: 1px solid var(--border);
-    font-size: 15px;
-    text-align: center;
-    background: #fff;
-    cursor: pointer;
-    color: var(--text);
-  }
-
-  .stop-dropdown-menu {
-    position: absolute;
-    top: calc(100% + 4px);
-    right: 0;
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    max-height: 180px;
-    overflow-y: auto;
-    z-index: 50;
-    min-width: 60px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-  }
-
-  .stop-dropdown-menu div {
-    padding: 8px 12px;
-    text-align: center;
-    font-size: 15px;
-    cursor: pointer;
-  }
-
-  .stop-dropdown-menu div:active,
-  .stop-dropdown-menu div:hover {
-    background: var(--bg);
-  }
-
-  .section-title {
-    font-size: 16px;
-    font-weight: 700;
-    margin: 16px 0 8px;
-  }
-
-  .empty-state {
-    text-align: center;
-    color: var(--muted);
-    padding: 30px 12px;
-    font-size: 14px;
-  }
-
-  .loading {
-    text-align: center;
-    padding: 30px;
-    color: var(--muted);
-  }
-
-  /* Add-clients panel */
-  .add-panel {
-    background: #f0f4ff;
-    border: 1px dashed var(--primary);
-    border-radius: var(--radius);
-    padding: 10px;
-    margin-bottom: 12px;
-  }
-
-  .add-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 8px;
-    border-bottom: 1px solid var(--border);
-  }
+  .tile.active { border-color: var(--primary); background: #eff4ff; }
+  .tile .route-name { font-weight: 700; font-size: 15px; margin-bottom: 4px; }
+  .tile .route-count { font-size: 13px; color: var(--muted); }
+  .tile.new-route { border-style: dashed; color: var(--primary); font-weight: 700; }
+  .client-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; margin-bottom: 8px; display: flex; align-items: center; gap: 12px; }
+  .client-info { flex: 1; }
+  .client-info .name { font-weight: 600; font-size: 15px; }
+  .client-info .meta { font-size: 13px; color: var(--muted); margin-top: 2px; }
+  .client-info .dist { font-size: 12px; color: var(--accent); margin-top: 2px; font-weight: 600; }
+  .route-check { width: 20px; height: 20px; flex-shrink: 0; }
+  .stop-dropdown { position: relative; width: 60px; }
+  .stop-dropdown-btn { width: 100%; padding: 8px 4px; border-radius: 8px; border: 1px solid var(--border); font-size: 15px; text-align: center; background: #fff; cursor: pointer; color: var(--text); }
+  .stop-dropdown-menu { position: absolute; top: calc(100% + 4px); right: 0; background: var(--card); border: 1px solid var(--border); border-radius: 8px; max-height: 180px; overflow-y: auto; z-index: 50; min-width: 60px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+  .stop-dropdown-menu div { padding: 8px 12px; text-align: center; font-size: 15px; cursor: pointer; }
+  .stop-dropdown-menu div:active, .stop-dropdown-menu div:hover { background: var(--bg); }
+  .section-title { font-size: 16px; font-weight: 700; margin: 16px 0 8px; }
+  .empty-state { text-align: center; color: var(--muted); padding: 30px 12px; font-size: 14px; }
+  .loading { text-align: center; padding: 30px; color: var(--muted); }
+  .add-panel { background: #f0f4ff; border: 1px dashed var(--primary); border-radius: var(--radius); padding: 10px; margin-bottom: 12px; }
+  .add-row { display: flex; align-items: center; gap: 10px; padding: 8px; border-bottom: 1px solid var(--border); }
   .add-row:last-child { border-bottom: none; }
-
   .add-row .info { flex: 1; }
   .add-row .info .name { font-weight: 600; font-size: 14px; }
   .add-row .info .meta { font-size: 12px; color: var(--muted); }
-
-  .add-row button {
-    padding: 6px 12px;
-    font-size: 13px;
-    background: var(--accent);
-  }
-
-  /* Message output */
-  .message-box {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 12px;
-    margin-top: 12px;
-    white-space: pre-wrap;
-    font-size: 14px;
-    line-height: 1.5;
-    font-family: monospace;
-  }
-
-  .action-row {
-    display: flex;
-    gap: 8px;
-    margin-top: 10px;
-  }
+  .add-row button { padding: 6px 12px; font-size: 13px; background: var(--accent); }
+  .message-box { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; margin-top: 12px; white-space: pre-wrap; font-size: 14px; line-height: 1.5; font-family: monospace; }
+  .action-row { display: flex; gap: 8px; margin-top: 10px; }
   .action-row button { flex: 1; }
   .action-row .wa-btn { background: var(--wa); }
   .action-row .wa-btn:active { background: #1da851; }
-
-  .toast {
-    position: fixed;
-    bottom: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: var(--accent);
-    color: #fff;
-    padding: 10px 20px;
-    border-radius: 8px;
-    font-size: 14px;
-    opacity: 0;
-    transition: opacity .3s;
-    pointer-events: none;
-  }
-
+  .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--accent); color: #fff; padding: 10px 20px; border-radius: 8px; font-size: 14px; opacity: 0; transition: opacity .3s; pointer-events: none; z-index: 100; max-width: 90%; text-align: center; }
   .toast.show { opacity: 1; }
-
-  .back-link {
-    display: inline-block;
-    margin-bottom: 10px;
-    color: var(--primary);
-    font-weight: 600;
-    cursor: pointer;
-    font-size: 14px;
-  }
+  .back-link { display: inline-block; margin-bottom: 10px; color: var(--primary); font-weight: 600; cursor: pointer; font-size: 14px; }
 </style>
 </head>
 <body>
@@ -325,16 +76,13 @@
 </header>
 
 <div class="container">
-
   <div class="date-row">
     <input type="date" id="dateInput">
     <button onclick="loadOrders()">Go</button>
   </div>
-
   <div id="content">
     <div class="empty-state">Select a date and tap Go to load active clients.</div>
   </div>
-
 </div>
 
 <div class="toast" id="toast"></div>
@@ -342,16 +90,20 @@
 <script src="config.js"></script>
 <script>
 
-let allClients = [];      // full client list
-let slotGroups = {};      // slot -> { route -> [clients] }
+let allClients = [];
+let slotGroups = {};
 let currentSlot = null;
-let currentView = null;   // null | route name | "NEW"
-let stopAssignments = {}; // phone -> stop number (per current view)
-let currentClients = [];  // working list for active view (extendable)
-let checkedClients = {};  // phone -> true (New Route checkbox)
+let currentView = null;
+let stopAssignments = {};
+let currentClients = [];
+let checkedClients = {};
+
+/* ---- distance/geo additions ---- */
+const KITCHEN = { lat: 17.452623115758335, lng: 78.41967516576499 };
+let geoMap = null;        // phone -> { loc1:{lat,lng}|null, loc2:{lat,lng}|null }
+let lastDistance = {};    // phone -> meters (for display in current view)
 
 const content = document.getElementById('content');
-
 document.getElementById('dateInput').valueAsDate = new Date();
 
 function showToast(msg) {
@@ -370,37 +122,32 @@ async function apiPost(action, params = {}) {
 async function loadOrders() {
   const date = document.getElementById('dateInput').value;
   if (!date) { showToast('Pick a date first'); return; }
-
   content.innerHTML = '<div class="loading">Loading active clients…</div>';
-
   try {
     const ordersRes = await apiPost('getOrdersForDate', { date });
-
     if (!ordersRes.success || !ordersRes.clients.length) {
       content.innerHTML = '<div class="empty-state">No active clients found for this date.</div>';
       allClients = []; slotGroups = {};
       return;
     }
-
     allClients = []; slotGroups = {};
-
     ordersRes.clients.forEach(c => {
       const slot = String(c.slot || 'Unspecified').trim() || 'Unspecified';
       const route = String(c.route || '').trim() || 'No Route';
-      const clientObj = { phone: c.phone, name: c.name, location: c.location, slot, route };
+      const clientObj = {
+        phone: c.phone, name: c.name, location: c.location, slot, route,
+        location1: c.location1 || '', location2: c.location2 || ''
+      };
       allClients.push(clientObj);
       if (!slotGroups[slot]) slotGroups[slot] = {};
       if (!slotGroups[slot][route]) slotGroups[slot][route] = [];
       slotGroups[slot][route].push(clientObj);
     });
-
     Object.values(slotGroups).forEach(routes => {
       Object.values(routes).forEach(arr => arr.sort((a, b) => a.name.localeCompare(b.name)));
     });
-
     currentSlot = null; currentView = null; stopAssignments = {};
     renderSummary();
-
   } catch (err) {
     content.innerHTML = '<div class="empty-state">Error loading data. Please try again.</div>';
     console.error(err);
@@ -408,14 +155,11 @@ async function loadOrders() {
 }
 
 const SLOT_ORDER = ['Morning', 'Afternoon', 'Evening'];
-
 function sortedSlots() {
   return Object.keys(slotGroups).sort((a, b) => {
     const ai = SLOT_ORDER.indexOf(a), bi = SLOT_ORDER.indexOf(b);
     if (ai === -1 && bi === -1) return a.localeCompare(b);
-    if (ai === -1) return 1;
-    if (bi === -1) return -1;
-    return ai - bi;
+    if (ai === -1) return 1; if (bi === -1) return -1; return ai - bi;
   });
 }
 
@@ -425,11 +169,7 @@ function renderSummary() {
   let html = '<div class="section-title">Select Slot</div><div class="tiles">';
   slots.forEach(slot => {
     const totalCount = Object.values(slotGroups[slot]).reduce((s, arr) => s + arr.length, 0);
-    html += `
-      <div class="tile" onclick="openSlot('${escapeAttr(slot)}')">
-        <div class="route-name">${escapeHtml(slot)}</div>
-        <div class="route-count">${totalCount} client(s)</div>
-      </div>`;
+    html += `<div class="tile" onclick="openSlot('${escapeAttr(slot)}')"><div class="route-name">${escapeHtml(slot)}</div><div class="route-count">${totalCount} client(s)</div></div>`;
   });
   html += '</div>';
   content.innerHTML = html;
@@ -438,19 +178,13 @@ function renderSummary() {
 function openSlot(slot) {
   currentSlot = slot; currentView = null; stopAssignments = {};
   const routes = Object.keys(slotGroups[slot]).sort((a, b) => {
-    if (a === 'No Route') return 1;
-    if (b === 'No Route') return -1;
+    if (a === 'No Route') return 1; if (b === 'No Route') return -1;
     return a.localeCompare(b, undefined, { numeric: true });
   });
-
   let html = `<span class="back-link" onclick="renderSummary()">← Back to slots</span>`;
   html += `<div class="section-title">${escapeHtml(slot)}</div><div class="tiles">`;
   routes.forEach(route => {
-    html += `
-      <div class="tile" onclick="openRoute('${escapeAttr(slot)}','${escapeAttr(route)}')">
-        <div class="route-name">${escapeHtml(route)}</div>
-        <div class="route-count">${slotGroups[slot][route].length} client(s)</div>
-      </div>`;
+    html += `<div class="tile" onclick="openRoute('${escapeAttr(slot)}','${escapeAttr(route)}')"><div class="route-name">${escapeHtml(route)}</div><div class="route-count">${slotGroups[slot][route].length} client(s)</div></div>`;
   });
   html += `<div class="tile new-route" onclick="openNewRoute('${escapeAttr(slot)}')">➕ New Route</div>`;
   html += '</div>';
@@ -459,42 +193,35 @@ function openSlot(slot) {
 
 function openRoute(slot, route) {
   currentSlot = slot; currentView = route;
-  stopAssignments = {}; checkedClients = {};
+  stopAssignments = {}; checkedClients = {}; lastDistance = {};
   currentClients = [...slotGroups[slot][route]];
   renderClientView(`${slot} — ${route}`);
 }
 
 function openNewRoute(slot) {
   currentSlot = slot; currentView = 'NEW';
-  stopAssignments = {}; checkedClients = {};
+  stopAssignments = {}; checkedClients = {}; lastDistance = {};
   currentClients = Object.values(slotGroups[slot]).flat();
   renderClientView(`${slot} — New Route`);
 }
 
 function renderClientView(title) {
   const isNew = currentView === 'NEW';
-
   let html = `<span class="back-link" onclick="openSlot('${escapeAttr(currentSlot)}')">← Back to ${escapeHtml(currentSlot)}</span>`;
   html += `<div class="section-title">${escapeHtml(title)}</div>`;
+  html += `<input type="text" id="searchInput" placeholder="Search client name..." style="width:100%; padding:10px; border-radius:var(--radius); border:1px solid var(--border); font-size:15px; margin-bottom:10px; background:var(--card);" oninput="filterClients()">`;
 
-  html += `<input type="text" id="searchInput" placeholder="Search client name..."
-    style="width:100%; padding:10px; border-radius:var(--radius); border:1px solid var(--border); font-size:15px; margin-bottom:10px; background:var(--card);"
-    oninput="filterClients()">`;
+  // auto-order by distance (nearest first)
+  html += `<button class="distance-btn full" style="margin-bottom:10px;" onclick="autoOrderByDistance()">📍 Auto-order by distance (nearest first)</button>`;
 
-  // (1) Add-clients button for existing routes
   if (!isNew) {
     html += `<button class="secondary full" style="margin-bottom:10px;" onclick="toggleAddPanel()">➕ Add clients to this route</button>`;
     html += `<div id="addPanel"></div>`;
   }
-
   html += `<div id="clientListContainer">`;
   html += renderClientList(currentClients, true);
   html += `</div>`;
-
-  html += `
-    <button class="full" style="margin-top:14px;" onclick="generateMessage()">Generate WhatsApp Message</button>
-    <div id="messageOutput"></div>`;
-
+  html += `<button class="full" style="margin-top:14px;" onclick="generateMessage()">Generate WhatsApp Message</button><div id="messageOutput"></div>`;
   content.innerHTML = html;
 }
 
@@ -510,69 +237,50 @@ function filterClients() {
 function renderClientList(clients, withStopSelect) {
   if (!clients.length) return '<div class="empty-state">No clients here.</div>';
   const isNew = currentView === 'NEW';
-
   let html = '';
   clients.forEach(c => {
     html += `<div class="client-card">`;
-
-    // (2) checkbox only in New Route
     if (withStopSelect && isNew) {
       const chk = checkedClients[c.phone] ? 'checked' : '';
       html += `<input type="checkbox" class="route-check" ${chk} onchange="toggleCheck('${escapeAttr(c.phone)}', this.checked)">`;
     }
-
+    const distLine = (lastDistance[c.phone] != null && isFinite(lastDistance[c.phone]))
+      ? `<div class="dist">${(lastDistance[c.phone] / 1000).toFixed(1)} km from previous stop</div>` : '';
     html += `<div class="client-info">
       <div class="name">${escapeHtml(c.name)}</div>
       <div class="meta">${escapeHtml(c.phone)} · ${escapeHtml(c.location)}</div>
+      ${distLine}
     </div>`;
-
     if (withStopSelect) {
       const currentVal = stopAssignments[c.phone] || '-';
-      html += `<div class="stop-dropdown" data-phone="${escapeAttr(c.phone)}">
-        <div class="stop-dropdown-btn" onclick="toggleStopMenu(this, event)">${currentVal}</div>
-      </div>`;
+      html += `<div class="stop-dropdown" data-phone="${escapeAttr(c.phone)}"><div class="stop-dropdown-btn" onclick="toggleStopMenu(this, event)">${currentVal}</div></div>`;
     }
-
     html += `</div>`;
   });
   return html;
 }
 
-/* ---- (2) checkbox handler ---- */
-function toggleCheck(phone, val) {
-  if (val) checkedClients[phone] = true;
-  else delete checkedClients[phone];
-}
+function toggleCheck(phone, val) { if (val) checkedClients[phone] = true; else delete checkedClients[phone]; }
 
-/* ---- (1) Add clients to existing route ---- */
+/* ---- Add clients to existing route ---- */
 function toggleAddPanel() {
   const panel = document.getElementById('addPanel');
   if (panel.innerHTML.trim()) { panel.innerHTML = ''; return; }
   renderAddPanel();
 }
-
 function renderAddPanel() {
   const panel = document.getElementById('addPanel');
   const all = Object.values(slotGroups[currentSlot]).flat();
   const existing = new Set(currentClients.map(c => c.phone));
   const avail = all.filter(c => !existing.has(c.phone));
-
   if (!avail.length) { panel.innerHTML = `<div class="add-panel"><div class="empty-state">All slot clients already in this route.</div></div>`; return; }
-
   let html = `<div class="add-panel">`;
   avail.forEach(c => {
-    html += `<div class="add-row">
-      <div class="info">
-        <div class="name">${escapeHtml(c.name)}</div>
-        <div class="meta">${escapeHtml(c.phone)} · ${escapeHtml(c.route)}</div>
-      </div>
-      <button onclick="addClientToRoute('${escapeAttr(c.phone)}')">Add</button>
-    </div>`;
+    html += `<div class="add-row"><div class="info"><div class="name">${escapeHtml(c.name)}</div><div class="meta">${escapeHtml(c.phone)} · ${escapeHtml(c.route)}</div></div><button onclick="addClientToRoute('${escapeAttr(c.phone)}')">Add</button></div>`;
   });
   html += `</div>`;
   panel.innerHTML = html;
 }
-
 function addClientToRoute(phone) {
   const all = Object.values(slotGroups[currentSlot]).flat();
   const c = all.find(x => x.phone === phone);
@@ -590,20 +298,16 @@ function addClientToRoute(phone) {
 function toggleStopMenu(btnEl, event) {
   if (event) event.stopPropagation();
   closeStopMenus();
-
   const wrapper = btnEl.parentElement;
   const phone = wrapper.dataset.phone;
   const total = currentClients.length;
   const currentVal = stopAssignments[phone] || '';
-
   const menu = document.createElement('div');
   menu.className = 'stop-dropdown-menu';
-
   const noneOpt = document.createElement('div');
   noneOpt.textContent = '-';
   noneOpt.onclick = () => selectStop(phone, '');
   menu.appendChild(noneOpt);
-
   for (let i = 1; i <= total; i++) {
     const taken = Object.entries(stopAssignments).some(([p, v]) => v === String(i) && p !== phone);
     if (taken) continue;
@@ -613,26 +317,18 @@ function toggleStopMenu(btnEl, event) {
     opt.onclick = () => selectStop(phone, String(i));
     menu.appendChild(opt);
   }
-
   menu.onclick = (e) => e.stopPropagation();
   wrapper.appendChild(menu);
   setTimeout(() => document.addEventListener('click', closeStopMenusOnce), 0);
 }
-
 function closeStopMenusOnce() { closeStopMenus(); document.removeEventListener('click', closeStopMenusOnce); }
 function closeStopMenus() { document.querySelectorAll('.stop-dropdown-menu').forEach(m => m.remove()); }
-
 function selectStop(phone, val) {
-  if (val === '') {
-    delete stopAssignments[phone];
-  } else {
-    for (const p in stopAssignments) if (stopAssignments[p] === val && p !== phone) delete stopAssignments[p];
-    stopAssignments[phone] = val;
-  }
+  if (val === '') { delete stopAssignments[phone]; }
+  else { for (const p in stopAssignments) if (stopAssignments[p] === val && p !== phone) delete stopAssignments[p]; stopAssignments[phone] = val; }
   closeStopMenus();
   refreshStopOptions();
 }
-
 function refreshStopOptions() {
   document.querySelectorAll('.stop-dropdown').forEach(wrapper => {
     const phone = wrapper.dataset.phone;
@@ -641,13 +337,93 @@ function refreshStopOptions() {
   });
 }
 
+/* ---- AUTO-ORDER BY DISTANCE FROM KITCHEN ---- */
+async function ensureGeo() {
+  if (geoMap) return geoMap;
+  showToast('Loading client map locations…');
+  try {
+    const res = await apiPost('getClientGeo');
+    geoMap = (res && res.ok && res.geo) ? res.geo : {};
+  } catch (e) { geoMap = {}; }
+  return geoMap;
+}
+
+function coordForClient(c, g) {
+  if (!g) return null;
+  if (c.location && c.location2 && c.location === c.location2) return g.loc2 || g.loc1;
+  return g.loc1 || g.loc2;
+}
+
+async function autoOrderByDistance() {
+  if (!window.google || !google.maps || !google.maps.DistanceMatrixService) {
+    showToast('Maps still loading — try again in a moment'); return;
+  }
+  await ensureGeo();
+
+  const located = [], unlocated = [];
+  currentClients.forEach(c => {
+    const coord = coordForClient(c, geoMap[c.phone]);
+    if (coord && coord.lat != null) located.push({ c, coord });
+    else unlocated.push(c);
+  });
+  if (!located.length) { showToast('No saved map locations for these clients'); return; }
+
+  showToast('Building route…');
+
+  // Greedy nearest-neighbour: kitchen -> nearest -> nearest-from-there -> ...
+  const remaining = located.slice();
+  const order = [];
+  let current = KITCHEN;
+  while (remaining.length) {
+    const dists = await distancesFrom(current, remaining.map(x => x.coord));
+    let best = -1, bestD = Infinity;
+    for (let i = 0; i < dists.length; i++) { if (dists[i] < bestD) { bestD = dists[i]; best = i; } }
+    if (best === -1) break;                     // remaining are unreachable
+    const chosen = remaining.splice(best, 1)[0];
+    chosen.leg = bestD;                          // distance from previous stop
+    order.push(chosen);
+    current = chosen.coord;
+  }
+  remaining.forEach(x => unlocated.push(x.c));   // unreachable -> unnumbered
+
+  stopAssignments = {}; lastDistance = {};
+  order.forEach((x, i) => { stopAssignments[x.c.phone] = String(i + 1); lastDistance[x.c.phone] = x.leg; });
+
+  document.getElementById('clientListContainer').innerHTML = renderClientList(currentClients, true);
+  refreshStopOptions();
+
+  showToast(unlocated.length
+    ? `Routed ${order.length} stops; ${unlocated.length} without location left blank`
+    : `Routed ${order.length} stops, nearest-neighbour order`);
+}
+
+// distances from one origin to a list of destinations (driving), chunked at 25
+function distancesFrom(origin, dests) {
+  return new Promise(resolve => {
+    const svc = new google.maps.DistanceMatrixService();
+    const out = new Array(dests.length).fill(Infinity);
+    let pending = 0, started = false;
+    for (let i = 0; i < dests.length; i += 25) {
+      const chunk = dests.slice(i, i + 25);
+      pending++; started = true;
+      svc.getDistanceMatrix({
+        origins: [origin], destinations: chunk, travelMode: google.maps.TravelMode.DRIVING
+      }, (res, status) => {
+        if (status === 'OK' && res.rows[0]) {
+          res.rows[0].elements.forEach((el, j) => { out[i + j] = (el.status === 'OK') ? el.distance.value : Infinity; });
+        }
+        if (--pending === 0) resolve(out);
+      });
+    }
+    if (!started) resolve(out);
+  });
+}
+
 /* ---- message generation ---- */
 function generateMessage() {
   const clients = currentClients;
   let ordered = [];
-
   if (currentView === 'NEW') {
-    // (2) include numbered (sorted) + checked-but-unnumbered. Independent.
     const numbered = [], checkedUnnum = [];
     clients.forEach(c => {
       if (stopAssignments[c.phone]) numbered.push({ ...c, stop: parseInt(stopAssignments[c.phone]) });
@@ -655,11 +431,8 @@ function generateMessage() {
     });
     numbered.sort((a, b) => a.stop - b.stop);
     ordered = numbered.concat(checkedUnnum);
-
     if (!ordered.length) { showToast('Assign numbers or check clients first'); return; }
-
   } else {
-    // existing route: include all, numbered first then unnumbered
     const numbered = [], unnumbered = [];
     clients.forEach(c => {
       if (stopAssignments[c.phone]) numbered.push({ ...c, stop: parseInt(stopAssignments[c.phone]) });
@@ -668,21 +441,14 @@ function generateMessage() {
     numbered.sort((a, b) => a.stop - b.stop);
     ordered = numbered.concat(unnumbered);
   }
-
   let message = '';
   ordered.forEach(c => {
     if (c.stop !== null) message += `${c.stop}. ${c.name}\n${c.phone}\n${c.location}\n\n`;
     else message += `${c.name}\n${c.phone}\n${c.location}\n\n`;
   });
   message = message.trim();
-
   const out = document.getElementById('messageOutput');
-  out.innerHTML = `
-    <div class="message-box" id="msgText">${escapeHtml(message)}</div>
-    <div class="action-row">
-      <button onclick="copyMessage()">📋 Copy Message</button>
-      <button class="wa-btn" onclick="sendWhatsApp()">Send on WhatsApp</button>
-    </div>`;
+  out.innerHTML = `<div class="message-box" id="msgText">${escapeHtml(message)}</div><div class="action-row"><button onclick="copyMessage()">📋 Copy Message</button><button class="wa-btn" onclick="sendWhatsApp()">Send on WhatsApp</button></div>`;
   out.dataset.raw = message;
 }
 
@@ -695,20 +461,19 @@ function copyMessage() {
     showToast('Copied to clipboard!');
   });
 }
-
-/* (3) open WhatsApp with text, user picks recipient */
 function sendWhatsApp() {
   const text = document.getElementById('messageOutput').dataset.raw || '';
   if (!text) { showToast('Generate message first'); return; }
-  const url = 'https://wa.me/?text=' + encodeURIComponent(text);
-  window.open(url, '_blank');
+  window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank');
 }
 
-function escapeHtml(str) {
-  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
+function escapeHtml(str) { return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
 function escapeAttr(str) { return String(str).replace(/'/g, "\\'"); }
 
 </script>
+
+<!-- Google Maps (Distance Matrix). Same key as quote.html. -->
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCqVJgCfV0C1KBF0u1Jc02p_RHE7K7g1V8" async defer></script>
+
 </body>
 </html>
