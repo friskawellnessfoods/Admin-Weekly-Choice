@@ -179,8 +179,6 @@
     ac.setBounds(new google.maps.LatLngBounds(
       { lat: 17.2, lng: 78.2 }, { lat: 17.65, lng: 78.7 }
     ));
-    // typing again without picking a new suggestion invalidates the stored link
-    el.addEventListener('input', () => { setter(''); });
     ac.addListener('place_changed', () => {
       const p = ac.getPlace();
       if (p && p.geometry && p.geometry.location) {
