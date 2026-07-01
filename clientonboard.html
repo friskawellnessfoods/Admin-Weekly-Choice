@@ -115,12 +115,18 @@
       <input id="mapInput1" placeholder="Search address / landmark and pick">
       <div class="hint">Type and select from the list — saves a tappable map link.</div>
 
+      <label class="fld">Location 1 — route</label>
+      <select id="route1"><option value="">— No route —</option></select>
+
       <label class="fld">Location 2 (description)</label>
       <input id="location2" placeholder="Optional second address">
 
       <label class="fld">Location 2 — map pin</label>
       <input id="mapInput2" placeholder="Search address / landmark and pick">
       <div class="hint">Optional second location pin.</div>
+
+      <label class="fld">Location 2 — route</label>
+      <select id="route2"><option value="">— No route —</option></select>
 
       <label class="fld">Delivery price</label>
       <input id="deliveryPrice" placeholder="Per-delivery charge" inputmode="numeric">
@@ -161,7 +167,26 @@
       const cb = document.getElementById(id);
       cb.addEventListener('change', () => cb.closest('.slot-chip').classList.toggle('on', cb.checked));
     });
+
+    loadRoutes();
   });
+
+  // pull the routes already used in the sheet (Master Client List cols L & M) into both dropdowns
+  async function loadRoutes() {
+    try {
+      const res = await fetch(API + '?action=getRoutes');
+      const data = await res.json();
+      if (data && data.ok && Array.isArray(data.routes)) {
+        data.routes.forEach(r => {
+          ['route1', 'route2'].forEach(id => {
+            const o = document.createElement('option');
+            o.value = r; o.textContent = r;
+            document.getElementById(id).appendChild(o);
+          });
+        });
+      }
+    } catch (e) { /* leave dropdowns with just "No route" */ }
+  }
 
   // called by the Google Maps script once Places is ready
   function initMaps() {
@@ -222,6 +247,8 @@
       location2: document.getElementById('location2').value.trim(),
       mapLink1: mapLink1,
       mapLink2: mapLink2,
+      route1: document.getElementById('route1').value,
+      route2: document.getElementById('route2').value,
       deliveryPrice: document.getElementById('deliveryPrice').value.trim(),
       morning: document.getElementById('morning').checked,
       afternoon: document.getElementById('afternoon').checked,
@@ -254,6 +281,7 @@
 
   function clearForm() {
     document.querySelectorAll('.card input').forEach(i => { if (i.type === 'checkbox') i.checked = false; else i.value = ''; });
+    document.querySelectorAll('.card select').forEach(s => s.value = '');
     document.querySelectorAll('.slot-chip').forEach(c => c.classList.remove('on'));
     mapLink1 = ''; mapLink2 = '';
     updateMealTypeDisplay();
