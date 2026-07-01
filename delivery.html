@@ -99,6 +99,12 @@
   .search-item .rt.none{ background:#94a3b8; }
   .search-empty{ padding:12px 14px; color:var(--c-muted); font-size:14px; }
 
+  /* half search + half clear on New Route */
+  .filter-row{ display:flex; gap:8px; margin-bottom:10px; }
+  .filter-row input{ flex:1; min-width:0; padding:12px 14px; border:1.5px solid var(--c-line); border-radius:var(--radius); font-size:15px; background:var(--c-surface); color:var(--c-ink); }
+  .filter-row input:focus{ outline:none; border-color:var(--c-primary); box-shadow:0 0 0 3px rgba(14,165,163,.16); }
+  .filter-row .btn{ flex:1; }
+
   /* client cards */
   .client-card{ background:var(--c-surface); border:1px solid var(--c-line); border-radius:var(--radius); padding:12px; margin-bottom:8px;
     display:flex; align-items:center; gap:12px; box-shadow:0 2px 8px rgba(20,40,70,.05); }
@@ -334,7 +340,10 @@ function renderClientView(title) {
   html += `<div class="section-title">${escapeHtml(title)}</div>`;
   html += `<button class="btn distance-btn full" style="margin-bottom:10px;" onclick="autoOrderByDistance()">📍 Auto-order by distance (nearest first)</button>`;
   if (isNew) {
-    html += `<button class="btn secondary full" style="margin-bottom:10px;" onclick="clearSelection()">✕ Clear selection</button>`;
+    html += `<div class="filter-row">
+      <input type="text" id="newSearch" placeholder="Search client…" oninput="filterNewList()" autocomplete="off">
+      <button class="btn secondary" onclick="clearSelection()">✕ Clear selection</button>
+    </div>`;
   }
   if (!isNew) {
     html += `<button class="btn secondary full" style="margin-bottom:10px;" onclick="toggleAddPanel()">➕ Add clients to this route</button>`;
@@ -371,10 +380,19 @@ function toggleCheck(phone, val) { if (val) checkedClients[phone] = true; else d
 
 function clearSelection() {
   checkedClients = {}; stopAssignments = {}; lastDistance = {}; routeTotalMeters = null;
+  const s = document.getElementById('newSearch'); if (s) s.value = '';
   document.getElementById('clientListContainer').innerHTML = renderClientList(currentClients, true);
   refreshStopOptions();
   maybeRenderMessage();
   showToast('Selection cleared');
+}
+
+// filter the New Route list by name (checked state + numbering are preserved)
+function filterNewList() {
+  const q = (document.getElementById('newSearch').value || '').trim().toLowerCase();
+  const subset = q ? currentClients.filter(c => (c.name || '').toLowerCase().includes(q)) : currentClients;
+  document.getElementById('clientListContainer').innerHTML = renderClientList(subset, true);
+  refreshStopOptions();
 }
 
 function toggleAddPanel() {
