@@ -1,0 +1,291 @@
+cat > /mnt/user-data/outputs/onboarding.html << 'ENDOFFILE'
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Friska — Client Onboarding</title>
+<script src="config.js"></script>
+<style>
+  :root{
+    --c-bg:#eef2f6; --c-surface:#ffffff; --c-ink:#1f2a37; --c-muted:#5b6b7b; --c-line:#d7e0ea;
+    --grad-a:#0ea5a3; --grad-b:#2563eb; --c-primary:#0ea5a3; --c-primary-d:#0b8482;
+    --radius:12px; --shadow:0 6px 24px rgba(20,40,70,.10);
+  }
+  *{ box-sizing:border-box; }
+  body{ font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif; margin:0; color:var(--c-ink);
+    background:
+      radial-gradient(1200px 500px at 50% -10%, rgba(37,99,235,.08), transparent 60%),
+      radial-gradient(900px 500px at 50% 110%, rgba(14,165,163,.10), transparent 60%),
+      var(--c-bg);
+    min-height:100vh; -webkit-text-size-adjust:100%; }
+
+  .bar{ background:var(--c-surface); border-bottom:1px solid var(--c-line); box-shadow:0 1px 0 rgba(0,0,0,.02);
+    padding:12px 16px; display:flex; align-items:center; justify-content:center; gap:12px; }
+  .bar img{ height:34px; width:auto; }
+  .bar span{ font-size:17px; font-weight:800; letter-spacing:.2px;
+    background:linear-gradient(90deg,var(--grad-a),var(--grad-b)); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
+
+  .wrap{ max-width:480px; margin:22px auto; padding:0 16px 60px; }
+  .card{ background:var(--c-surface); border:1px solid var(--c-line); border-radius:16px; padding:20px; box-shadow:var(--shadow); }
+
+  label.fld{ display:block; font-size:13px; font-weight:700; color:var(--c-muted); margin:0 0 6px 2px; }
+  .hint{ font-size:12px; color:var(--c-muted); margin:-6px 0 12px 2px; }
+
+  input, select{ width:100%; padding:12px 14px; margin-bottom:14px; border-radius:var(--radius); border:1.5px solid var(--c-line);
+    font-size:15px; background:var(--c-surface); color:var(--c-ink); transition:border-color .15s, box-shadow .15s; }
+  input:focus, select:focus{ outline:none; border-color:var(--c-primary); box-shadow:0 0 0 3px rgba(14,165,163,.16); }
+
+  .dropdown-wrap{ position:relative; margin-bottom:14px; }
+  .dropdown-btn{ width:100%; padding:12px 14px; border-radius:var(--radius); border:1.5px solid var(--c-line); font-size:15px;
+    background:var(--c-surface); color:var(--c-ink); text-align:left; cursor:pointer; display:flex; justify-content:space-between; align-items:center; }
+  .dropdown-btn:hover{ border-color:#b9c6d6; }
+  .dropdown-btn .ph{ color:var(--c-muted); }
+  .dropdown-menu{ display:none; position:absolute; top:calc(100% + 6px); left:0; right:0; background:var(--c-surface);
+    border:1px solid var(--c-line); border-radius:var(--radius); box-shadow:var(--shadow); z-index:100; max-height:280px; overflow-y:auto; }
+  .dropdown-menu.active{ display:block; }
+  .dropdown-menu label{ display:flex; align-items:center; gap:9px; padding:11px 14px; font-size:14px; cursor:pointer;
+    border-bottom:1px solid var(--c-line); margin:0; color:var(--c-ink); font-weight:500; }
+  .dropdown-menu label:last-child{ border-bottom:none; }
+  .dropdown-menu label:hover{ background:var(--c-bg); }
+  .dropdown-menu input[type=checkbox]{ width:auto; margin:0; padding:0; border:none; accent-color:var(--c-primary); }
+
+  .slot-row{ display:flex; gap:8px; margin-bottom:16px; }
+  .slot-chip{ flex:1; display:flex; align-items:center; justify-content:center; gap:7px; padding:11px 6px; border:1.5px solid var(--c-line);
+    border-radius:var(--radius); font-size:14px; cursor:pointer; user-select:none; color:var(--c-ink); background:var(--c-surface); font-weight:600; }
+  .slot-chip input{ width:auto; margin:0; padding:0; border:none; accent-color:var(--c-primary); }
+  .slot-chip.on{ border-color:var(--c-primary); background:#e9fbfa; }
+
+  .btn{ width:100%; padding:14px; border:0; border-radius:var(--radius); font-size:15px; font-weight:800; cursor:pointer; color:#fff;
+    background:linear-gradient(90deg,var(--grad-a),var(--grad-b)); box-shadow:0 4px 14px rgba(37,99,235,.25);
+    display:flex; align-items:center; justify-content:center; gap:9px; transition:filter .15s, transform .08s; }
+  .btn:hover:not(:disabled){ filter:brightness(1.05); }
+  .btn:active:not(:disabled){ transform:translateY(1px); }
+  .btn:disabled{ opacity:.55; cursor:default; box-shadow:none; }
+
+  .spinner{ width:16px; height:16px; border:2.5px solid rgba(255,255,255,.5); border-top-color:#fff; border-radius:50%; animation:spin .7s linear infinite; }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+
+  .message{ margin-top:14px; text-align:center; font-weight:700; font-size:14px; min-height:18px; }
+  .message.ok{ color:#0b8482; } .message.err{ color:#c62828; }
+
+  /* Google Places dropdown above our card */
+  .pac-container{ z-index:9999; border-radius:10px; margin-top:2px; box-shadow:var(--shadow); font-family:inherit; }
+</style>
+</head>
+<body>
+
+  <div class="bar">
+    <img src="logo.png" alt="Friska Wellness Foods">
+    <span>Client Onboarding</span>
+  </div>
+
+  <div class="wrap">
+    <div class="card">
+      <label class="fld">Client name</label>
+      <input id="name" placeholder="Full name">
+
+      <label class="fld">Phone number</label>
+      <input id="phone" placeholder="10-digit mobile" inputmode="numeric">
+
+      <label class="fld">Meal types</label>
+      <div class="dropdown-wrap">
+        <button type="button" class="dropdown-btn" id="mealTypeBtn">
+          <span id="mealTypeText" class="ph">Select meal types</span><span>▼</span>
+        </button>
+        <div class="dropdown-menu" id="mealTypeDropdown">
+          <label><input type="checkbox" class="mealType" value="1 Morning deliver"> 1 Morning deliver</label>
+          <label><input type="checkbox" class="mealType" value="2 Nutri Balance"> 2 Nutri Balance</label>
+          <label><input type="checkbox" class="mealType" value="3 High Protein"> 3 High Protein</label>
+          <label><input type="checkbox" class="mealType" value="4 High Carb"> 4 High Carb</label>
+          <label><input type="checkbox" class="mealType" value="5 Low Carb"> 5 Low Carb</label>
+          <label><input type="checkbox" class="mealType" value="6 No Carb"> 6 No Carb</label>
+          <label><input type="checkbox" class="mealType" value="7 High Fiber"> 7 High Fiber</label>
+          <label><input type="checkbox" class="mealType" value="8 Multi-Category"> 8 Multi-Category</label>
+          <label><input type="checkbox" class="mealType" value="9 Evening Delivery"> 9 Evening Delivery</label>
+        </div>
+      </div>
+
+      <label class="fld">Remarks</label>
+      <input id="remarks" placeholder="Any notes">
+
+      <label class="fld">Location 1 (description)</label>
+      <input id="location1" placeholder="e.g. Flat 302, Green Meadows">
+
+      <label class="fld">Location 1 — map pin</label>
+      <input id="mapInput1" placeholder="Search address / landmark and pick">
+      <div class="hint">Type and select from the list — saves a tappable map link.</div>
+
+      <label class="fld">Location 2 (description)</label>
+      <input id="location2" placeholder="Optional second address">
+
+      <label class="fld">Location 2 — map pin</label>
+      <input id="mapInput2" placeholder="Search address / landmark and pick">
+      <div class="hint">Optional second location pin.</div>
+
+      <label class="fld">Delivery price</label>
+      <input id="deliveryPrice" placeholder="Per-delivery charge" inputmode="numeric">
+
+      <label class="fld">Delivery slots</label>
+      <div class="slot-row">
+        <label class="slot-chip"><input type="checkbox" id="morning"> Morning</label>
+        <label class="slot-chip"><input type="checkbox" id="afternoon"> Afternoon</label>
+        <label class="slot-chip"><input type="checkbox" id="evening"> Evening</label>
+      </div>
+
+      <button id="saveBtn" class="btn">Save Client</button>
+      <div id="message" class="message"></div>
+    </div>
+  </div>
+
+<script>
+  const API = (typeof API_URL !== 'undefined') ? API_URL : '';
+  let isSubmitting = false;
+  let mapLink1 = '', mapLink2 = '';
+
+  document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('saveBtn').addEventListener('click', addClient);
+
+    document.getElementById('mealTypeBtn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      document.getElementById('mealTypeDropdown').classList.toggle('active');
+    });
+    document.querySelectorAll('.mealType').forEach(cb => cb.addEventListener('change', updateMealTypeDisplay));
+    document.addEventListener('click', (e) => {
+      const btn = document.getElementById('mealTypeBtn');
+      const dd = document.getElementById('mealTypeDropdown');
+      if (!btn.contains(e.target) && !dd.contains(e.target)) dd.classList.remove('active');
+    });
+
+    // slot chip highlight
+    ['morning','afternoon','evening'].forEach(id => {
+      const cb = document.getElementById(id);
+      cb.addEventListener('change', () => cb.closest('.slot-chip').classList.toggle('on', cb.checked));
+    });
+  });
+
+  // called by the Google Maps script once Places is ready
+  function initMaps() {
+    attachAutocomplete('mapInput1', v => mapLink1 = v);
+    attachAutocomplete('mapInput2', v => mapLink2 = v);
+  }
+  function attachAutocomplete(id, setter) {
+    const el = document.getElementById(id);
+    if (!el || !window.google || !google.maps.places) return;
+    const ac = new google.maps.places.Autocomplete(el, {
+      fields: ['geometry', 'name', 'formatted_address'],
+      componentRestrictions: { country: 'in' }
+    });
+    // bias suggestions toward Hyderabad
+    ac.setBounds(new google.maps.LatLngBounds(
+      { lat: 17.2, lng: 78.2 }, { lat: 17.65, lng: 78.7 }
+    ));
+    // typing again without picking a new suggestion invalidates the stored link
+    el.addEventListener('input', () => { setter(''); });
+    ac.addListener('place_changed', () => {
+      const p = ac.getPlace();
+      if (p && p.geometry && p.geometry.location) {
+        const lat = p.geometry.location.lat(), lng = p.geometry.location.lng();
+        setter('https://www.google.com/maps?q=' + lat + ',' + lng);
+      } else {
+        setter('');
+      }
+    });
+  }
+
+  function updateMealTypeDisplay() {
+    const selected = Array.from(document.querySelectorAll('.mealType:checked')).map(c => c.value);
+    const t = document.getElementById('mealTypeText');
+    t.classList.toggle('ph', selected.length === 0);
+    if (selected.length === 0) t.innerText = 'Select meal types';
+    else if (selected.length === 1) t.innerText = selected[0];
+    else t.innerText = selected.length + ' meal types selected';
+  }
+
+  function showMessage(text, error = false) {
+    const m = document.getElementById('message');
+    m.className = 'message ' + (error ? 'err' : 'ok');
+    m.innerText = text;
+  }
+
+  async function addClient() {
+    if (isSubmitting) return;
+    const saveBtn = document.getElementById('saveBtn');
+
+    const selectedMealTypes = Array.from(document.querySelectorAll('.mealType:checked')).map(c => c.value).join(' ');
+    const data = {
+      name: document.getElementById('name').value.trim(),
+      phone: document.getElementById('phone').value.trim(),
+      type: selectedMealTypes,
+      remarks: document.getElementById('remarks').value.trim(),
+      location1: document.getElementById('location1').value.trim(),
+      location2: document.getElementById('location2').value.trim(),
+      mapLink1: mapLink1,
+      mapLink2: mapLink2,
+      deliveryPrice: document.getElementById('deliveryPrice').value.trim(),
+      morning: document.getElementById('morning').checked,
+      afternoon: document.getElementById('afternoon').checked,
+      evening: document.getElementById('evening').checked
+    };
+
+    if (!data.name || !data.phone) { showMessage('Name & phone are required', true); return; }
+
+    isSubmitting = true;
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = '<span class="spinner"></span> Saving…';
+
+    try {
+      const res = await fetch(API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ action: 'addClient', payload: JSON.stringify(data) })
+      });
+      const result = await res.json();
+      if (result.success) { showMessage('Client added ✅'); clearForm(); }
+      else showMessage(result.message || 'Error saving client', true);
+    } catch (err) {
+      showMessage('Server error', true);
+    }
+
+    isSubmitting = false;
+    saveBtn.disabled = false;
+    saveBtn.innerHTML = 'Save Client';
+  }
+
+  function clearForm() {
+    document.querySelectorAll('.card input').forEach(i => { if (i.type === 'checkbox') i.checked = false; else i.value = ''; });
+    document.querySelectorAll('.slot-chip').forEach(c => c.classList.remove('on'));
+    mapLink1 = ''; mapLink2 = '';
+    updateMealTypeDisplay();
+  }
+</script>
+
+<!-- Google Maps + Places (same key as quote.html / delivery.html) -->
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCqVJgCfV0C1KBF0u1Jc02p_RHE7K7g1V8&libraries=places&callback=initMaps" async defer></script>
+
+</body>
+</html>
+ENDOFFILE
+echo "written"
+python3 - <<'PY'
+import re
+html=open('/mnt/user-data/outputs/onboarding.html').read()
+b=[x for x in re.findall(r'<script>(.*?)</script>', html, re.S) if 'addClient' in x][0]
+open('/tmp/onb.js','w').write(b)
+print("inline chars:", len(b))
+PY
+node --check /tmp/onb.js && echo "JS OK"
+Output
+
+written
+inline chars: 4883
+JS OK
+Done
+
+You're out of usage credits. Buy more to keep going now, or wait until 7:20 PM when your plan usage resets.
+Buy more
+
+
+
+
+Claude is AI and can make mistakes. Pleas
