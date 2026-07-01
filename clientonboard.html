@@ -1,4 +1,3 @@
-cat > /mnt/user-data/outputs/onboarding.html << 'ENDOFFILE'
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -265,27 +264,3 @@ cat > /mnt/user-data/outputs/onboarding.html << 'ENDOFFILE'
 
 </body>
 </html>
-ENDOFFILE
-echo "written"
-python3 - <<'PY'
-import re
-html=open('/mnt/user-data/outputs/onboarding.html').read()
-b=[x for x in re.findall(r'<script>(.*?)</script>', html, re.S) if 'addClient' in x][0]
-open('/tmp/onb.js','w').write(b)
-print("inline chars:", len(b))
-PY
-node --check /tmp/onb.js && echo "JS OK"
-Output
-
-written
-inline chars: 4883
-JS OK
-Done
-
-You're out of usage credits. Buy more to keep going now, or wait until 7:20 PM when your plan usage resets.
-Buy more
-
-
-
-
-Claude is AI and can make mistakes. Pleas
