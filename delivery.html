@@ -616,7 +616,7 @@ function maybeRenderMessage() {
   message = message.trim();
 
   if (routeTotalMeters != null && routeTotalMeters > 0) {
-    message += '\n\nTotal distance: ' + (routeTotalMeters / 1000).toFixed(1) + ' km (kitchen \u2192 last stop)';
+    message += '\n\nTotal distance: ' + (routeTotalMeters / 1000).toFixed(1) + ' km ';
   }
 
   out.innerHTML = `<div class="message-box" id="msgText">${escapeHtml(message)}</div>
