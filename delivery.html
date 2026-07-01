@@ -101,7 +101,8 @@ let checkedClients = {};
 /* ---- distance/geo additions ---- */
 const KITCHEN = { lat: 17.452623115758335, lng: 78.41967516576499 };
 let geoMap = null;        // phone -> { loc1:{lat,lng}|null, loc2:{lat,lng}|null }
-let lastDistance = {};    // phone -> meters (for display in current view)
+let lastDistance = {};    // phone -> meters (leg from previous stop)
+let routeTotalMeters = null; // total kitchen -> ... -> last stop
 
 const content = document.getElementById('content');
 document.getElementById('dateInput').valueAsDate = new Date();
@@ -193,14 +194,14 @@ function openSlot(slot) {
 
 function openRoute(slot, route) {
   currentSlot = slot; currentView = route;
-  stopAssignments = {}; checkedClients = {}; lastDistance = {};
+  stopAssignments = {}; checkedClients = {}; lastDistance = {}; routeTotalMeters = null;
   currentClients = [...slotGroups[slot][route]];
   renderClientView(`${slot} — ${route}`);
 }
 
 function openNewRoute(slot) {
   currentSlot = slot; currentView = 'NEW';
-  stopAssignments = {}; checkedClients = {}; lastDistance = {};
+  stopAssignments = {}; checkedClients = {}; lastDistance = {}; routeTotalMeters = null;
   currentClients = Object.values(slotGroups[slot]).flat();
   renderClientView(`${slot} — New Route`);
 }
@@ -329,6 +330,25 @@ function selectStop(phone, val) {
   closeStopMenus();
   refreshStopOptions();
   maybeRenderMessage();
+  computeRouteTotal().then(() => maybeRenderMessage());   // refresh total for the new order
+}
+
+// walk the current numbered order (kitchen -> s1 -> ... -> last) and sum driving legs
+async function computeRouteTotal() {
+  if (!window.google || !google.maps || !google.maps.DistanceMatrixService) return;
+  const numbered = currentClients
+    .filter(c => stopAssignments[c.phone])
+    .map(c => ({ stop: parseInt(stopAssignments[c.phone]), coord: coordForClient(c, geoMap && geoMap[c.phone]) }))
+    .filter(x => x.coord && x.coord.lat != null)
+    .sort((a, b) => a.stop - b.stop);
+  if (!numbered.length) { routeTotalMeters = null; return; }
+  let total = 0, prev = KITCHEN;
+  for (const x of numbered) {
+    const d = await distancesFrom(prev, [x.coord]);
+    if (isFinite(d[0])) total += d[0];
+    prev = x.coord;
+  }
+  routeTotalMeters = total;
 }
 function refreshStopOptions() {
   document.querySelectorAll('.stop-dropdown').forEach(wrapper => {
@@ -376,6 +396,7 @@ async function autoOrderByDistance() {
 
   if (!located.length) {
     showToast('No saved map locations — number manually if needed');
+    routeTotalMeters = null;
     maybeRenderMessage();
     return;
   }
@@ -400,6 +421,7 @@ async function autoOrderByDistance() {
 
   stopAssignments = {}; lastDistance = {};
   order.forEach((x, i) => { stopAssignments[x.c.phone] = String(i + 1); lastDistance[x.c.phone] = x.leg; });
+  routeTotalMeters = order.reduce((s, x) => s + (isFinite(x.leg) ? x.leg : 0), 0);
 
   // reorder the on-screen list: stop 1 on top ... last at bottom, rest after
   const orderedPhones = order.map(x => x.c.phone);
@@ -479,6 +501,10 @@ function maybeRenderMessage() {
     message += block + '\n\n';
   });
   message = message.trim();
+
+  if (routeTotalMeters != null && routeTotalMeters > 0) {
+    message += '\n\nTotal distance: ' + (routeTotalMeters / 1000).toFixed(1) + ' km (kitchen \u2192 last stop)';
+  }
 
   out.innerHTML = `<div class="message-box" id="msgText">${escapeHtml(message)}</div>
     <div class="action-row">
