@@ -610,7 +610,7 @@ function maybeRenderMessage() {
   ordered.forEach(c => {
     const link = linkForClient(c);
     let block = (c.stop !== null ? (c.stop + '. ') : '') + c.name + '\n' + c.phone + '\n' + c.location;
-    if (link) block += '\n' + link;
+    if (link) block += '\n' + link.replace(/,/g, '%2C');
     message += block + '\n\n';
   });
   message = message.trim();
