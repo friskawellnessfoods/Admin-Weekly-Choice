@@ -3,332 +3,147 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Friska — Kitchen List</title>
+<title>Friska — Delivery Routes</title>
 <script src="config.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <style>
-  /* ===== TWEAKABLE ===== */
   :root{
-    --tag-border: 1mm;
-    --tag-border-color: #222;
-    --pad-x: 9mm;
-    --pad-y: 8mm;
-
-    /* modern palette */
-    --c-bg:        #eef2f6;
-    --c-surface:   #ffffff;
-    --c-ink:       #1f2a37;
-    --c-muted:     #5b6b7b;
-    --c-line:      #d7e0ea;
-    --grad-a:      #0ea5a3;   /* teal */
-    --grad-b:      #2563eb;   /* blue */
-    --c-accent:    #f6b100;   /* bright yellow accent */
-    --c-accent-ink:#3a2e00;
-    --c-primary:   #0ea5a3;
-    --c-primary-d: #0b8482;
-    --radius:      12px;
-    --shadow:      0 6px 24px rgba(20,40,70,.10);
+    --c-bg:#eef2f6; --c-surface:#ffffff; --c-ink:#1f2a37; --c-muted:#5b6b7b; --c-line:#d7e0ea;
+    --grad-a:#0ea5a3; --grad-b:#2563eb; --c-primary:#0ea5a3; --c-primary-d:#0b8482;
+    --wa:#25D366; --radius:12px; --shadow:0 6px 24px rgba(20,40,70,.10);
   }
-  /* ===================== */
+  *{ box-sizing:border-box; }
+  body{ font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif; margin:0; background:var(--c-bg); color:var(--c-ink); -webkit-text-size-adjust:100%; }
 
-  * { box-sizing: border-box; }
-  body{ font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
-        margin:0; background:var(--c-bg); color:var(--c-ink); -webkit-text-size-adjust:100%; }
-
-  /* ===== LANDING (hero) vs WORKING states ===== */
-  /* landing: controls centered on screen; working: compact sticky top bar */
+  /* landing vs working */
   .bar{ background:var(--c-surface); }
-
   body.landing .bar{
-    position:static; min-height:100vh; display:flex; flex-direction:column;
-    align-items:center; justify-content:center; gap:18px; padding:32px 20px;
+    position:static; min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:18px; padding:32px 20px;
     background:
       radial-gradient(1200px 500px at 50% -10%, rgba(37,99,235,.10), transparent 60%),
       radial-gradient(900px 500px at 50% 110%, rgba(14,165,163,.12), transparent 60%),
       var(--c-bg);
-    border-bottom:0;
   }
-  body.landing .tabs, body.landing .view{ display:none; }
-  body.landing #pdf, body.landing #refresh{ display:none; }   /* only show after Generate */
-
+  body.landing .content{ display:none; }
   body.working .bar{
-    position:sticky; top:0; z-index:10; flex-direction:row; min-height:auto;
-    padding:10px 16px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;
-    justify-content:flex-start; background:var(--c-surface);
-    border-bottom:1px solid var(--c-line); box-shadow:0 1px 0 rgba(0,0,0,.02);
+    position:sticky; top:0; z-index:10; flex-direction:row; min-height:auto; padding:10px 16px;
+    display:flex; gap:10px; align-items:center; flex-wrap:wrap; justify-content:flex-start;
+    background:var(--c-surface); border-bottom:1px solid var(--c-line); box-shadow:0 1px 0 rgba(0,0,0,.02);
   }
 
-  /* brand */
-  .bar .brand{ display:flex; align-items:center; gap:12px; }
-  .bar .brand img{ height:36px; width:auto; }
-  .bar .brand span{ font-size:16px; font-weight:800; letter-spacing:.2px;
-    background:linear-gradient(90deg,var(--grad-a),var(--grad-b));
-    -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
+  .brand{ display:flex; align-items:center; gap:12px; }
+  .brand img{ height:36px; width:auto; }
+  .brand span{ font-size:16px; font-weight:800; letter-spacing:.2px;
+    background:linear-gradient(90deg,var(--grad-a),var(--grad-b)); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
+  body.landing .brand{ flex-direction:column; gap:10px; margin-bottom:4px; }
   body.landing .brand img{ height:64px; }
   body.landing .brand span{ font-size:26px; }
-  body.landing .brand{ flex-direction:column; gap:10px; margin-bottom:4px; }
 
-  /* hero subtitle only on landing */
   .hero-sub{ display:none; }
   body.landing .hero-sub{ display:block; color:var(--c-muted); font-size:14px; margin-top:-6px; text-align:center; }
 
-  /* controls cluster */
   .controls{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; justify-content:center; }
   body.landing .controls{ flex-direction:column; width:100%; max-width:340px; }
   body.landing .controls > *{ width:100%; }
-  body.landing .controls .field{ width:100%; }
-
   .field{ position:relative; display:flex; align-items:center; }
-  .field input[type=date]{
-    padding:12px 14px; border:1.5px solid var(--c-line); border-radius:var(--radius);
-    font-size:15px; cursor:pointer; background:var(--c-surface); color:var(--c-ink);
-    width:100%; transition:border-color .15s, box-shadow .15s; }
-  .field input[type=date]:focus{ outline:none; border-color:var(--c-primary);
-    box-shadow:0 0 0 3px rgba(14,165,163,.16); }
+  body.landing .field{ width:100%; }
+  .field input[type=date]{ padding:12px 14px; border:1.5px solid var(--c-line); border-radius:var(--radius); font-size:15px;
+    cursor:pointer; background:var(--c-surface); color:var(--c-ink); width:100%; transition:border-color .15s, box-shadow .15s; }
+  .field input[type=date]:focus{ outline:none; border-color:var(--c-primary); box-shadow:0 0 0 3px rgba(14,165,163,.16); }
 
-  .proc-toggle{ display:inline-flex; align-items:center; gap:7px; font-size:14px; color:var(--c-muted);
-                cursor:pointer; white-space:nowrap; user-select:none; }
-  .proc-toggle input{ width:17px; height:17px; cursor:pointer; accent-color:var(--c-primary); }
-  body.landing .proc-toggle{ justify-content:center; }
-
-  .btn{ padding:12px 18px; border:0; border-radius:var(--radius); font-size:15px; font-weight:700;
-        cursor:pointer; color:#fff; transition:transform .08s, filter .15s, box-shadow .15s;
-        background:linear-gradient(90deg,var(--grad-a),var(--grad-b)); box-shadow:0 4px 14px rgba(37,99,235,.25); }
+  .btn{ padding:12px 18px; border:0; border-radius:var(--radius); font-size:15px; font-weight:700; cursor:pointer; color:#fff;
+    transition:transform .08s, filter .15s, box-shadow .15s; background:linear-gradient(90deg,var(--grad-a),var(--grad-b)); box-shadow:0 4px 14px rgba(37,99,235,.25); }
   .btn:hover:not(:disabled){ filter:brightness(1.05); }
   .btn:active:not(:disabled){ transform:translateY(1px); }
-  .btn.alt{ background:var(--c-surface); color:var(--c-primary-d); border:1.5px solid var(--c-line);
-            box-shadow:none; }
+  .btn.alt{ background:var(--c-surface); color:var(--c-primary-d); border:1.5px solid var(--c-line); box-shadow:none; }
   .btn.alt:hover:not(:disabled){ border-color:var(--c-primary); }
   .btn:disabled{ opacity:.45; cursor:default; box-shadow:none; }
   body.landing .btn{ padding:14px 18px; font-size:16px; }
 
-  /* status + spinner */
   .status{ font-size:13px; color:var(--c-muted); display:inline-flex; align-items:center; gap:8px; }
   body.working .status{ margin-left:auto; }
   body.landing .status{ margin-top:4px; }
-  .spinner{ width:15px; height:15px; border:2.5px solid var(--c-line); border-top-color:var(--c-primary);
-            border-radius:50%; animation:spin .7s linear infinite; display:none; flex:0 0 auto; }
+  .spinner{ width:15px; height:15px; border:2.5px solid var(--c-line); border-top-color:var(--c-primary); border-radius:50%; animation:spin .7s linear infinite; display:none; }
   .status.busy .spinner{ display:inline-block; }
   @keyframes spin{ to{ transform:rotate(360deg); } }
 
-  /* loading overlay for PDF build */
-  .overlay{ position:fixed; inset:0; z-index:9999; display:none; align-items:center; justify-content:center;
-            background:rgba(20,30,45,.42); backdrop-filter:blur(2px); }
-  .overlay.show{ display:flex; }
-  .overlay .card{ background:var(--c-surface); border-radius:16px; padding:26px 30px; text-align:center;
-                  box-shadow:var(--shadow); min-width:240px; }
-  .overlay .ringwrap{ position:relative; width:56px; height:56px; margin:0 auto 14px; }
-  .overlay .ring{ width:56px; height:56px; border:4px solid var(--c-line); border-top-color:var(--c-primary);
-                  border-radius:50%; animation:spin .7s linear infinite; }
-  .overlay .timer{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
-                   font-size:14px; font-weight:700; color:var(--c-primary-d); }
-  .overlay .msg{ font-size:14px; color:var(--c-ink); font-weight:600; }
+  /* content */
+  .content{ max-width:640px; margin:0 auto; padding:14px 14px 60px; }
+  .section-title{ font-size:16px; font-weight:800; margin:14px 0 10px; color:var(--c-ink); }
+  .back-link{ display:inline-block; margin-bottom:10px; color:var(--c-primary-d); font-weight:700; cursor:pointer; font-size:14px; }
+  .empty-state{ text-align:center; color:var(--c-muted); padding:40px 12px; font-size:14px; }
+  .loading{ text-align:center; padding:36px; color:var(--c-muted); }
 
-  .tabs{ position:sticky; top:57px; z-index:9; background:var(--c-surface); border-bottom:1px solid var(--c-line);
-         padding:8px 12px; display:flex; gap:6px; overflow-x:auto; -webkit-overflow-scrolling:touch;
-         scrollbar-width:thin; }
-  .tabs::-webkit-scrollbar{ height:5px; }
-  .tabs::-webkit-scrollbar-thumb{ background:var(--c-line); border-radius:3px; }
-  .tabs button{ border:1.5px solid transparent; background:#f1f5f9; padding:9px 14px; font-size:13.5px;
-                cursor:pointer; color:var(--c-muted); border-radius:999px; white-space:nowrap; flex:0 0 auto;
-                display:inline-flex; align-items:center; transition:background .15s, color .15s, border-color .15s; }
-  .tabs button:hover{ background:#e6edf5; }
-  .tabs button.active{ color:#fff; font-weight:700;
-    background:linear-gradient(90deg,var(--grad-a),var(--grad-b)); border-color:transparent; }
-  .tabs .tabchk{ margin-right:7px; vertical-align:middle; width:15px; height:15px; cursor:pointer;
-                 accent-color:var(--c-primary); flex:0 0 auto; }
-  .tabs button.active .tabchk{ accent-color:#fff; }
+  .tiles{ display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-bottom:14px; }
+  .tile{ background:var(--c-surface); border:2px solid var(--c-line); border-radius:var(--radius); padding:16px; text-align:center;
+    cursor:pointer; transition:border-color .15s, transform .1s, box-shadow .15s; box-shadow:var(--shadow); }
+  .tile:active{ transform:scale(.97); }
+  .tile:hover{ border-color:#b9c6d6; }
+  .tile.active{ border-color:var(--c-primary); background:#e9fbfa; }
+  .tile .route-name{ font-weight:800; font-size:15px; margin-bottom:4px; }
+  .tile .route-count{ font-size:13px; color:var(--c-muted); }
+  .tile.new-route{ border-style:dashed; color:var(--c-primary-d); font-weight:800; display:flex; align-items:center; justify-content:center; }
 
-  .view{ display:none; }
-  .view.active{ display:block; }
+  /* search on routes page */
+  .search-wrap{ position:relative; margin-bottom:14px; }
+  .search-wrap input{ width:100%; padding:12px 14px; border:1.5px solid var(--c-line); border-radius:var(--radius); font-size:15px; background:var(--c-surface); color:var(--c-ink); }
+  .search-wrap input:focus{ outline:none; border-color:var(--c-primary); box-shadow:0 0 0 3px rgba(14,165,163,.16); }
+  .search-drop{ position:absolute; top:calc(100% + 6px); left:0; right:0; background:var(--c-surface); border:1px solid var(--c-line);
+    border-radius:var(--radius); box-shadow:var(--shadow); max-height:300px; overflow-y:auto; z-index:20; display:none; }
+  .search-drop.show{ display:block; }
+  .search-item{ padding:11px 14px; cursor:pointer; display:flex; justify-content:space-between; gap:10px; align-items:center; border-bottom:1px solid var(--c-line); }
+  .search-item:last-child{ border-bottom:none; }
+  .search-item:hover{ background:var(--c-bg); }
+  .search-item .nm{ font-weight:600; color:var(--c-ink); }
+  .search-item .rt{ font-size:12px; font-weight:700; color:#fff; background:linear-gradient(90deg,var(--grad-a),var(--grad-b)); padding:3px 11px; border-radius:999px; white-space:nowrap; }
+  .search-item .rt.none{ background:#94a3b8; }
+  .search-empty{ padding:12px 14px; color:var(--c-muted); font-size:14px; }
 
-  /* ---------- TAGS ---------- */
-  .pages{ padding:18px; display:flex; flex-direction:column; align-items:center; gap:18px; }
-  .page{
-    width:210mm; height:297mm; background:#fff;
-    box-shadow:0 2px 10px rgba(0,0,0,.18);
-    display:grid; grid-template-columns:1fr 1fr; grid-template-rows:repeat(5,1fr);
-  }
-  .tag{
-    position:relative; overflow:hidden;
-    border:var(--tag-border) solid var(--tag-border-color);
-    background-image:url('tag_template.png');
-    background-size:100% 100%; background-repeat:no-repeat; background-position:center;
-  }
-  .tag.carry{ background-image:url('carrybag_tags.png'); }
-  .inner{
-    position:absolute; top:var(--pad-y); bottom:var(--pad-y); left:var(--pad-x); right:var(--pad-x);
-    display:flex; flex-direction:column; align-items:center; justify-content:center;
-    text-align:center; overflow:hidden; line-height:1.18;
-  }
-  .dish{ font-weight:400; font-size:1.45em; }
-  .type{ font-weight:600; font-size:1em; margin-top:.28em; }
-  .remark{ font-size:.95em; font-style:italic; margin-top:.45em; }
-  .cname{ font-size:.85em; font-weight:600; margin-top:.15em; }
-  .cb-name{ font-weight:700; font-size:1.3em; }
-  .cb-code{ font-weight:700; font-size:1.3em; }
-  .cb-type{ font-size:1em; margin-top:.22em; }
-  .cb-remark{ font-size:.95em; font-style:italic; margin-top:.35em; }
-  .cb-slot{ font-weight:600; font-size:.95em; margin-top:.15em; text-transform:uppercase; letter-spacing:.5px; }
+  /* client cards */
+  .client-card{ background:var(--c-surface); border:1px solid var(--c-line); border-radius:var(--radius); padding:12px; margin-bottom:8px;
+    display:flex; align-items:center; gap:12px; box-shadow:0 2px 8px rgba(20,40,70,.05); }
+  .client-info{ flex:1; min-width:0; }
+  .client-info .name{ font-weight:600; font-size:15px; }
+  .client-info .meta{ font-size:13px; color:var(--c-muted); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .client-info .dist{ font-size:12px; color:var(--c-primary-d); margin-top:2px; font-weight:600; }
+  .route-check{ width:20px; height:20px; flex-shrink:0; accent-color:var(--c-primary); }
+  .stop-dropdown{ position:relative; width:60px; flex:none; }
+  .stop-dropdown-btn{ width:100%; padding:8px 4px; border-radius:8px; border:1px solid var(--c-line); font-size:15px; text-align:center; background:#fff; cursor:pointer; color:var(--c-ink); }
+  .stop-dropdown-menu{ position:absolute; top:calc(100% + 4px); right:0; background:var(--c-surface); border:1px solid var(--c-line); border-radius:8px;
+    max-height:180px; overflow-y:auto; z-index:50; min-width:60px; box-shadow:var(--shadow); }
+  .stop-dropdown-menu div{ padding:8px 12px; text-align:center; font-size:15px; cursor:pointer; }
+  .stop-dropdown-menu div:hover{ background:var(--c-bg); }
 
-  /* ---------- LISTS (client etc.) ---------- */
-  .listwrap{ padding:18px; overflow-x:auto; -webkit-overflow-scrolling:touch; }
-  .pages{ overflow-x:auto; -webkit-overflow-scrolling:touch; }
-  .sheet{ background:#fff; box-shadow:0 2px 10px rgba(0,0,0,.18); margin:0 auto; padding:14px; overflow-x:auto; }
-  .sheet h2{ text-align:center; font-size:14px; margin:0 0 4px; }
-  table.client{ border-collapse:collapse; width:100%; font-size:11px; color:#000; line-height:1.1; }
-  table.client th, table.client td{ border:1px solid #999; padding:1px 5px; text-align:left; white-space:nowrap; }
-  table.client th{ background:#f0f0f0; font-weight:700; text-align:center; }
-  table.client td.num{ text-align:center; width:24px; color:#666; }
-  table.client tr.slotsep td{ border-top:2px solid #555; }
-  table.client tr.totals td{ font-weight:700; border:none; border-top:2px solid #555; padding-top:3px; }
+  .full{ width:100%; }
+  .secondary{ background:var(--c-surface); color:var(--c-primary-d); border:1.5px solid var(--c-line); box-shadow:none; }
+  .secondary:hover:not(:disabled){ border-color:var(--c-primary); }
+  .distance-btn{ background:linear-gradient(90deg,var(--grad-a),var(--grad-b)); }
 
-  /* ---------- MEAL LIST ---------- */
-  .mealsheet{ --mscale:1; background:#fff; box-shadow:0 2px 10px rgba(0,0,0,.18); margin:0 auto; padding:18px;
-              width:794px; max-width:100%; box-sizing:border-box; display:flex; flex-direction:column; }
-  .mealsheet h2{ text-align:center; font-size:17px; margin:2px 0 14px; }
-  .mealgrid{ flex:1; display:grid; grid-template-columns:repeat(4,1fr); gap:16px; min-height:760px;
-    grid-template-rows:auto auto auto auto;
-    grid-template-areas:
-      "c1 v1 v2 c2"
-      "s1 e1 e2 s2"
-      "bf sn j1 j2"
-      "mid mid mid mid"; }
-  .mbox{ border:1px solid #555; background:#fff; display:flex; flex-direction:column; overflow:hidden; }
-  .mbox .mh{ text-align:center; font-weight:700; padding:4px 2px; background:#b7b7b7; color:#000;
-             font-size:calc(13px * var(--mscale)); }
-  .mbox.veg .mh{ background:#93c47d; }
-  .mbox .mh.dual{ display:flex; padding:0; }
-  .mbox .mh.dual span{ flex:1; padding:4px 2px; }
-  .mbox .mh.dual span:first-child{ border-right:1px solid #555; }
-  .mbox .mb{ flex:1; }
-  .mbox table{ width:100%; border-collapse:collapse; font-size:calc(10px * var(--mscale)); color:#000; table-layout:fixed; }
-  .mbox td{ border:1px solid #ccc; padding:2px 6px; }
-  .mbox td:first-child{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .mbox td:last-child{ width:46%; white-space:normal; overflow-wrap:normal; word-break:normal; }
-  .mbox table.single td{ width:auto; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .mbox table.dualt td{ width:50%; }
-  .mbox .mf{ display:flex; justify-content:space-between; align-items:center; background:#9fc5e8; color:#000;
-             font-weight:700; padding:5px 8px; font-size:calc(15px * var(--mscale)); }
-  .mbox .mf .val{ font-size:calc(17px * var(--mscale)); }
-  .mbox .mf.dual span{ flex:1; text-align:center; font-size:calc(15px * var(--mscale)); }
-  .mbox .mf.dual span:first-child{ border-right:1px solid #555; }
-  .mbox.mid{ border:none; background:none; overflow:visible; }
-  .midwrap{ display:flex; align-items:stretch; justify-content:space-between; height:100%; gap:8px; }
-  .midcard{ flex:1; border:1px solid #555; background:#fff; display:flex; flex-direction:column;
-            align-items:center; justify-content:center; padding:6px; gap:4px; }
-  .midlbl{ font-weight:700; text-align:center; font-size:calc(16px * var(--mscale)); line-height:1.1; }
-  .midnum{ font-weight:800; font-size:calc(40px * var(--mscale)); line-height:1; }
+  .add-panel{ background:#f0f7f7; border:1px dashed var(--c-primary); border-radius:var(--radius); padding:10px; margin-bottom:12px; }
+  .add-row{ display:flex; align-items:center; gap:10px; padding:8px; border-bottom:1px solid var(--c-line); }
+  .add-row:last-child{ border-bottom:none; }
+  .add-row .info{ flex:1; min-width:0; }
+  .add-row .info .name{ font-weight:600; font-size:14px; }
+  .add-row .info .meta{ font-size:12px; color:var(--c-muted); }
+  .add-row button{ padding:6px 12px; font-size:13px; background:var(--c-primary); }
 
-  /* ---------- MISE LIST ---------- */
-  .misesheet{ --msc:1; background:#fff; box-shadow:0 2px 10px rgba(0,0,0,.18); margin:0 auto; padding:18px;
-              width:760px; max-width:100%; box-sizing:border-box; }
-  table.mise{ border-collapse:collapse; width:100%; font-size:calc(15px * var(--msc)); color:#000; table-layout:fixed; }
-  table.mise td{ border:1px solid #555; padding:3px 6px; text-align:center; white-space:nowrap;
-                 overflow:hidden; text-overflow:ellipsis; height:calc(20px * var(--msc)); line-height:calc(14px * var(--msc)); box-sizing:border-box; }
-  table.mise td.banner{ font-weight:700; border:none; padding:3px; height:auto; line-height:1.2; }
+  .message-box{ background:var(--c-surface); border:1px solid var(--c-line); border-radius:var(--radius); padding:12px; margin-top:12px;
+    white-space:pre-wrap; font-size:14px; line-height:1.5; font-family:ui-monospace,Menlo,Consolas,monospace; box-shadow:var(--shadow); }
+  .action-row{ display:flex; gap:8px; margin-top:10px; }
+  .action-row button{ flex:1; }
+  .action-row .wa-btn{ background:var(--wa); }
+  .action-row .wa-btn:active{ background:#1da851; }
 
-  /* ---------- DELIVERY LIST ---------- */
-  .delsheet{ background:#fff; box-shadow:0 2px 10px rgba(0,0,0,.18); margin:0 auto; padding:14px; }
-  .delsheet h2{ text-align:center; font-size:14px; margin:0 0 6px; }
-  table.delivery{ border-collapse:collapse; width:100%; font-size:calc(13px * var(--dsc, 1)); color:#000; table-layout:fixed; }
-  table.delivery th, table.delivery td{ border:1px solid #999; padding:3px 8px; text-align:left;
-                                        white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  table.delivery th{ background:#f0f0f0; font-weight:700; text-align:center; }
-  table.delivery td.num, table.delivery th.num{ text-align:center; width:34px; color:#666; }
-  table.delivery col.c-name{ width:24%; }
-  table.delivery col.c-loc{ width:44%; }
-  table.delivery col.c-slot{ width:14%; }
-  table.delivery col.c-route{ width:14%; }
-  table.delivery tr.slotsep td{ border-top:3px solid #222; }
-  table.delivery tr.routesep td{ border-top:2px solid #777; }
+  .toast{ position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--c-primary-d); color:#fff; padding:10px 20px;
+    border-radius:8px; font-size:14px; opacity:0; transition:opacity .3s; pointer-events:none; z-index:100; max-width:90%; text-align:center; }
+  .toast.show{ opacity:1; }
 
-  /* ---------- PAUSE LIST ---------- */
-  .pausesheet{ background:#fff; box-shadow:0 2px 10px rgba(0,0,0,.18); margin:0 auto; padding:18px;
-               width:520px; max-width:100%; box-sizing:border-box; }
-  .pausesheet h2{ text-align:center; font-size:16px; margin:0 0 6px; }
-  .pause-toggle{ display:flex; align-items:center; justify-content:center; gap:8px; margin:0 0 12px; font-size:13px; color:#455a64; }
-  .pause-toggle input{ width:16px; height:16px; cursor:pointer; }
-  table.pause{ border-collapse:collapse; width:100%; font-size:14px; color:#000; }
-  table.pause td{ border:1px solid #999; padding:4px 10px; }
-  table.pause td.num{ text-align:center; width:36px; color:#666; }
-  table.pause tr.subhead td{ background:#eceff1; font-weight:700; text-align:center; }
-  table.pause td.wa-cell{ width:104px; text-align:center; padding:2px 6px; }
-  a.wa-btn{ display:inline-block; background:#25d366; color:#fff; text-decoration:none;
-            font-size:12px; font-weight:600; padding:4px 10px; border-radius:6px; white-space:nowrap; }
-  a.wa-btn:hover{ background:#1da851; }
-
-  /* ---------- MEAL OVERVIEW ---------- */
-  .ovsheet{ background:#fff; box-shadow:0 2px 10px rgba(0,0,0,.18); margin:0 auto; padding:20px; width:680px; max-width:100%; box-sizing:border-box; }
-  .ovsheet h2{ text-align:center; font-size:17px; margin:0 0 16px; }
-  .ovgrid{ display:grid; grid-template-columns:1fr 1fr; gap:16px; align-items:start; }
-  table.ov{ border-collapse:collapse; width:100%; font-size:14px; color:#000; }
-  table.ov th, table.ov td{ border:1px solid #cfd8dc; padding:6px 10px; text-align:center; }
-  table.ov th.cap{ background:linear-gradient(90deg,var(--grad-a),var(--grad-b)); color:#fff; font-size:14px; }
-  table.ov thead th{ background:#f1f5f9; font-weight:700; font-size:12.5px; }
-  table.ov td.lbl{ text-align:left; font-weight:600; }
-  table.ov td.rt{ font-weight:700; }
-  table.ov tfoot td{ background:#f7fafc; font-weight:700; border-top:2px solid #90a4ae; }
-  .ov-actions{ margin-top:16px; display:flex; align-items:center; gap:12px; justify-content:center; flex-wrap:wrap; }
-  .ov-note{ font-size:13px; color:var(--c-muted); }
-  .ov-note.ok{ color:#2e7d32; font-weight:600; }
-  .ov-note.warn{ color:#c62828; font-weight:600; }
-
-  /* ===== MOBILE (screen only — never affects print or the off-screen PDF staging) ===== */
   @media screen and (max-width:640px){
     body.working .bar{ padding:8px 10px; gap:8px; }
-    .bar .brand span{ font-size:14px; }
-    .bar .brand img{ height:30px; }
-    .controls{ width:100%; gap:8px; }
-    .controls .field{ flex:1 1 auto; }
-    .btn{ padding:11px 14px; font-size:14px; }
-    #pdf{ flex:1 1 100%; }                 /* full-width download on small screens */
-    .status{ width:100%; margin:2px 0 0; }
-    body.working .status{ margin-left:0; }
-    .tabs{ top:auto; position:sticky; }
-    .listwrap{ padding:12px; }
-    body.landing .controls{ max-width:300px; }
-    /* keep wide sheets at full desktop width on mobile and scroll, instead of squeezing text */
-    .mealsheet, .ovsheet{ max-width:none; }
-    .listwrap{ overflow-x:auto; -webkit-overflow-scrolling:touch; }
+    .brand span{ font-size:14px; } .brand img{ height:30px; }
+    .field{ flex:1 1 auto; }
+    .status{ width:100%; margin:2px 0 0; } body.working .status{ margin-left:0; }
   }
-
-  @media print{
-    /* override today's hero/working body-state rules with higher specificity */
-    body.landing .bar, body.working .bar, .bar, .tabs, .overlay{ display:none !important; }
-    body.landing .tabs, body.landing .view{ display:none !important; }
-    body.landing .view.active, body.working .view.active{ display:block !important; }
-    body.landing, body.working{ min-height:0 !important; }
-    .view:not(.active){ display:none; }
-    body{ background:#fff; }
-    .pages{ padding:0; gap:0; overflow:visible !important; }
-    .page{ box-shadow:none; margin:0; width:100%; height:100vh; page-break-after:always; page:tagPage; }
-    .page:last-of-type{ page-break-after:auto; }
-    .tag{ -webkit-print-color-adjust:exact; print-color-adjust:exact; }
-    .listwrap{ padding:0; overflow:visible !important; }
-    .sheet{ box-shadow:none; padding:0; margin:0; overflow:visible; page:landscapeList; }
-    .sheet h2{ margin:0 0 6px; }
-    .mealsheet{ box-shadow:none; padding:0; margin:0; width:auto; page:portraitList; }
-    .misesheet{ box-shadow:none; padding:0; margin:0; width:auto; page:portraitList; }
-    .delsheet{ box-shadow:none; padding:0; margin:0; page:portraitList; }
-    .pausesheet{ box-shadow:none; padding:0; margin:0; width:auto; page:portraitList; }
-    .ovsheet{ box-shadow:none; padding:0; margin:0; width:auto; page:portraitList; }
-    .ov-actions{ display:none !important; }
-    .pause-toggle{ display:none; }
-    a.wa-btn, td.wa-cell{ display:none; }
-    table.client{ -webkit-print-color-adjust:exact; print-color-adjust:exact; }
-    table.client tr{ page-break-inside:avoid; }
-    table.client thead{ display:table-header-group; }   /* repeat header on page 2+ */
-    table.delivery tr{ page-break-inside:avoid; }
-    table.delivery thead{ display:table-header-group; }
-    .mealgrid, .mbox{ -webkit-print-color-adjust:exact; print-color-adjust:exact; }
-  }
-  /* portrait by default; named pages pin exact size + margins */
-  @page{ size:A4 portrait; margin:0; }
-  @page tagPage{ size:A4 portrait; margin:0; }
-  @page landscapeList{ size:A4 landscape; margin:6mm; }
-  @page portraitList{ size:A4 portrait; margin:8mm; }
 </style>
 </head>
 <body class="landing">
@@ -336,1502 +151,471 @@
   <div class="bar">
     <div class="brand">
       <img src="logo.png" alt="Friska Wellness Foods">
-      <span>Kitchen List</span>
+      <span>Delivery Routes</span>
     </div>
-    <div class="hero-sub">Pick a date and generate the day's kitchen lists.</div>
-
+    <div class="hero-sub">Pick a date to plan the day's delivery routes.</div>
     <div class="controls">
-      <div class="field">
-        <input type="date" id="date">
-      </div>
-      <label class="proc-toggle"><input type="checkbox" id="procChk">Process orders first</label>
-      <label class="proc-toggle"><input type="checkbox" id="miseChk">Write totals to MiseList</label>
+      <div class="field"><input type="date" id="date"></div>
       <button id="go" class="btn">Generate</button>
-      <button id="refresh" class="btn alt" disabled>Refresh</button>
-      <button id="pdf" class="btn alt" disabled>Download Kitchen List PDF</button>
       <span class="status" id="status"><span class="spinner"></span><span id="statusText">Pick a date to begin.</span></span>
     </div>
   </div>
 
-  <div class="overlay" id="overlay">
-    <div class="card">
-      <div class="ringwrap">
-        <div class="ring"></div>
-        <div class="timer" id="overlayTimer">0s</div>
-      </div>
-      <div class="msg" id="overlayMsg">Working…</div>
-    </div>
-  </div>
+  <div id="content" class="content"></div>
 
-  <div class="tabs">
-    <button data-tab="client" class="active"><input type="checkbox" class="tabchk" data-sec="client" checked onclick="event.stopPropagation()">Client List</button>
-    <button data-tab="meal"><input type="checkbox" class="tabchk" data-sec="meal" checked onclick="event.stopPropagation()">Meal List</button>
-    <button data-tab="mise"><input type="checkbox" class="tabchk" data-sec="mise" checked onclick="event.stopPropagation()">Mise List</button>
-    <button data-tab="delivery"><input type="checkbox" class="tabchk" data-sec="delivery" checked onclick="event.stopPropagation()">Delivery List</button>
-    <button data-tab="overview"><input type="checkbox" class="tabchk" data-sec="overview" onclick="event.stopPropagation()">Meal Overview</button>
-    <button data-tab="pause"><input type="checkbox" class="tabchk" data-sec="pause" onclick="event.stopPropagation()">Pause List</button>
-    <button data-tab="tags"><input type="checkbox" class="tabchk" data-sec="tags" checked onclick="event.stopPropagation()">Tags</button>
-  </div>
-
-  <div id="view-tags" class="view">
-    <div id="pages" class="pages"></div>
-  </div>
-
-  <div id="view-client" class="view active">
-    <div id="clientWrap" class="listwrap"></div>
-  </div>
-
-  <div id="view-meal" class="view">
-    <div id="mealWrap" class="listwrap"></div>
-  </div>
-
-  <div id="view-overview" class="view">
-    <div id="overviewWrap" class="listwrap"></div>
-  </div>
-
-  <div id="view-mise" class="view">
-    <div id="miseWrap" class="listwrap"></div>
-  </div>
-
-  <div id="view-delivery" class="view">
-    <div id="deliveryWrap" class="listwrap"></div>
-  </div>
-
-  <div id="view-pause" class="view">
-    <div id="pauseWrap" class="listwrap"></div>
-  </div>
+  <div class="toast" id="toast"></div>
 
 <script>
-  const API = (typeof API_URL !== 'undefined') ? API_URL : '';
+const API = (typeof API_URL !== 'undefined') ? API_URL : '';
 
-  // PDF snapshot scale — higher = sharper print + bigger file + slower render
-  const PDF_SCALE = 3;
+let allClients = [];
+let slotGroups = {};
+let currentSlot = null;
+let currentView = null;
+let stopAssignments = {};
+let currentClients = [];
+let checkedClients = {};
 
-  const dateEl     = document.getElementById('date');
-  const statusEl   = document.getElementById('status');
-  const pagesEl    = document.getElementById('pages');
-  const clientWrap = document.getElementById('clientWrap');
-  const mealWrap   = document.getElementById('mealWrap');
-  const overviewWrap = document.getElementById('overviewWrap');
-  const miseWrap   = document.getElementById('miseWrap');
-  const deliveryWrap = document.getElementById('deliveryWrap');
-  const pauseWrap  = document.getElementById('pauseWrap');
-  const goBtn      = document.getElementById('go');
-  const refreshBtn = document.getElementById('refresh');
-  const printBtn   = { disabled:false };   // Print button removed; stub keeps refs harmless
-  const pdfBtn     = document.getElementById('pdf');
-  const statusText = document.getElementById('statusText');
-  const overlay    = document.getElementById('overlay');
-  const overlayMsg = document.getElementById('overlayMsg');
-  const overlayTimer = document.getElementById('overlayTimer');
-  let overlayTick = null;
+const KITCHEN = { lat: 17.452623115758335, lng: 78.41967516576499 };
+let geoMap = null;
+let lastDistance = {};
+let routeTotalMeters = null;
+let hasGenerated = false;
 
-  let activeTab = 'client';
-  const loadedView = { tags:false, client:false, meal:false, overview:false, mise:false, delivery:false, pause:false };
-  let cache = { date:null, tags:null, client:null, mise:null, delivery:null, pause:null };  // raw data per date
-  let showInactive = false;   // pause-list toggle
-  let hasGenerated = false;   // becomes true after first Generate (controls landing→working)
+const content    = document.getElementById('content');
+const dateEl     = document.getElementById('date');
+const goBtn      = document.getElementById('go');
+const statusEl   = document.getElementById('status');
+const statusText = document.getElementById('statusText');
 
-  // ---- status helpers (preserve the spinner span; only swap the text) ----
-  function setStatus(msg, busyState){
-    if(statusText) statusText.textContent = msg;
-    if(statusEl) statusEl.classList.toggle('busy', !!busyState);
-  }
-  function showOverlay(msg){
-    if(overlayMsg) overlayMsg.textContent = msg || 'Working…';
-    overlay.classList.add('show');
-    const start = Date.now();
-    if(overlayTimer) overlayTimer.textContent = '0s';
-    clearInterval(overlayTick);
-    overlayTick = setInterval(() => {
-      if(overlayTimer) overlayTimer.textContent = Math.floor((Date.now() - start) / 1000) + 's';
-    }, 1000);
-  }
-  function setOverlay(msg){ if(overlayMsg) overlayMsg.textContent = msg; }
-  function hideOverlay(){ overlay.classList.remove('show'); clearInterval(overlayTick); overlayTick = null; }
+dateEl.valueAsDate = new Date();
 
-  // which sections are ticked for the Kitchen List PDF
-  function sectionOn(sec){
-    const cb = document.querySelector('.tabchk[data-sec="' + sec + '"]');
-    return cb ? cb.checked : true;
-  }
+function setStatus(msg, busy){ statusText.textContent = msg; statusEl.classList.toggle('busy', !!busy); }
+function showToast(msg){ const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 1800); }
 
-  // ---- date input: click opens native calendar; picking a date does NOT auto-run ----
-  dateEl.addEventListener('click', () => { try{ dateEl.showPicker(); }catch(e){} });
-  dateEl.addEventListener('change', () => {
-    invalidate();
-    pdfBtn.disabled = !dateEl.value;
-    setStatus(dateEl.value ? 'Press Generate to build the lists.' : 'Pick a date to begin.', false);
-  });
+// date: click opens calendar; changing it doesn't auto-run
+dateEl.addEventListener('click', () => { try{ dateEl.showPicker(); }catch(e){} });
+dateEl.addEventListener('change', () => setStatus(dateEl.value ? 'Press Generate to load the day.' : 'Pick a date to begin.', false));
 
-  // ---- tabs ----
-  document.querySelectorAll('.tabs button').forEach(btn => {
-    btn.addEventListener('click', () => switchTab(btn.dataset.tab));
-  });
-  function switchTab(tab){
-    activeTab = tab;
-    document.querySelectorAll('.tabs button').forEach(b =>
-      b.classList.toggle('active', b.dataset.tab === tab));
-    ['tags','client','meal','overview','mise','delivery','pause'].forEach(t =>
-      document.getElementById('view-' + t).classList.toggle('active', t === tab));
-    printBtn.disabled = !loadedView[tab];
-    if(hasGenerated && dateEl.value && !loadedView[tab]) load(tab);
-  }
+goBtn.addEventListener('click', () => {
+  if(!dateEl.value){ setStatus('Pick a date first.', false); return; }
+  if(!hasGenerated){ hasGenerated = true; document.body.classList.remove('landing'); document.body.classList.add('working'); }
+  loadOrders();
+});
 
-  // ---- Generate: the single explicit trigger ----
-  goBtn.addEventListener('click', async () => {
-    if(!dateEl.value){ setStatus('Pick a date first.', false); return; }
-    // shift from landing hero to working layout on first generate
-    if(!hasGenerated){
-      hasGenerated = true;
-      document.body.classList.remove('landing');
-      document.body.classList.add('working');
-    }
+async function apiPost(action, params = {}) {
+  const body = new URLSearchParams({ action, ...params });
+  const res = await fetch(API, { method: 'POST', body, redirect: 'follow' });
+  return res.json();
+}
 
-    const date = dateEl.value;
-    const procChk = document.getElementById('procChk');
-
-    // optional: process Orders_Log -> Orders_Output first (same call as process.html)
-    if(procChk && procChk.checked){
-      goBtn.disabled = true;
-      showOverlay('Processing orders for ' + date + '…');
-      let result;
-      try{
-        result = await runProcess(date);
-      }catch(e){
-        hideOverlay(); goBtn.disabled = false;
-        setStatus('Process error: ' + e.message + ' — lists not generated.', false);
-        return;
-      }
-      hideOverlay();
-      // processing erases & rewrites Orders_Output, so it MUST complete cleanly.
-      // If it didn't, stop — do not render lists off a half-processed/stale sheet.
-      if(!result || !result.success){
-        goBtn.disabled = false;
-        setStatus('Processing did not complete' + (result && result.message ? ' (' + result.message + ')' : '') + ' — lists not generated.', false);
-        return;
-      }
-      // success: drop any cached/prefetched data so lists fetch the fresh output
-      invalidate();
-      pdfBtn.disabled = false;
-      setStatus(result.message || 'Processing done.', false);
-    }
-
-    // optional: write the meal totals into MiseList FIRST — before any tab (esp. the
-    // mise list) is fetched, so the mise list reads the freshly-written numbers, not zeros.
-    const miseChk = document.getElementById('miseChk');
-    if(miseChk && miseChk.checked){
-      try{
-        goBtn.disabled = true;
-        setStatus('Writing totals to MiseList…', true);
-        const rows = await ensureClient(date);          // client data (cached after process)
-        const counts = computeMealCounts(rows);
-        const res = await writeMiseTotals(date, counts);
-        setStatus(res && res.success ? '✓ ' + (res.message || 'Totals written to MiseList.')
-                                     : '⚠ MiseList write: ' + (res && res.message ? res.message : 'failed'), false);
-        if(res && res.success){
-          invalidate();                                 // drop pre-write cached data so it re-fetches fresh
-          await new Promise(r => setTimeout(r, 1200));  // let the sheet's dependent formulas recalculate
-        }
-      }catch(e){ setStatus('⚠ MiseList write error: ' + e.message, false); }
-    }
-
-    loadedView[activeTab] = false;
-    await load(activeTab);          // render the visible tab first
-    refreshBtn.disabled = false;    // refresh available once something is loaded
-    await preloadData();            // warm the rest in the background (mise now reads written numbers)
-  });
-  pdfBtn.addEventListener('click', downloadKitchenPdf);
-
-  // Refresh: re-fetch fresh data for the open tab first, then warm the rest in the background.
-  // Does NOT re-run processing or the mise write — purely reloads list data from the sheet.
-  refreshBtn.addEventListener('click', async () => {
-    if(!dateEl.value){ setStatus('Pick a date first.', false); return; }
-    refreshBtn.disabled = true;
-    invalidate();                   // drop all cached data + clear rendered tabs
-    loadedView[activeTab] = false;
-    try{
-      await load(activeTab);        // re-render the visible tab from fresh data
-      await preloadData();          // re-warm the others in the background
-    }catch(e){ setStatus('Refresh error: ' + e.message, false); }
-    refreshBtn.disabled = false;
-  });
-
-  // run the Orders_Log -> Orders_Output processing (POST processLogByDate), same as process.html.
-  // The actual erase/rewrite logic lives server-side in Apps Script; this only triggers it.
-  async function runProcess(date){
-    const params = new URLSearchParams();
-    params.append('action', 'processLogByDate');
-    params.append('date', date);
-    const res = await fetch(API, { method:'POST', body:params });
-    return await res.json();   // caller hard-stops generation unless this returns success:true
-  }
-
-  // Prefetch every list's DATA in tab order so switching tabs and building the
-  // PDF are instant. Data only (no render) — rendering needs a visible layout,
-  // and the slow part is the network fetch, which this removes from the path.
-  let preloading = false;
-  async function preloadData(){
-    if(preloading) return;
-    preloading = true;
-    const date = dateEl.value;
-    const tasks = [
-      () => ensureClient(date),
-      () => ensureMise(date),
-      () => ensureDelivery(date),
-      () => ensurePause(date),
-      () => ensureTags(date),
-    ];
-    setStatus('Preparing all lists in background…', true);
-    for(const fn of tasks){
-      if(dateEl.value !== date) break;   // date changed mid-preload → stop
-      try{ await fn(); }catch(e){ /* optional lists may be absent */ }
-    }
-    preloading = false;
-    if(dateEl.value === date) setStatus('All lists ready for ' + date + '. Open any tab or download the PDF.', false);
-  }
-
-  function invalidate(){
-    cache = { date:null, tags:null, client:null, mise:null, delivery:null, pause:null };
-    loadedView.tags = loadedView.client = loadedView.meal = loadedView.overview = loadedView.mise = loadedView.delivery = loadedView.pause = false;
-    pagesEl.innerHTML = ''; clientWrap.innerHTML = ''; mealWrap.innerHTML = '';
-    overviewWrap.innerHTML = '';
-    miseWrap.innerHTML = ''; deliveryWrap.innerHTML = ''; pauseWrap.innerHTML = '';
-    printBtn.disabled = true;
-  }
-
-  function load(tab){
-    if(tab === 'tags')     return loadTags();
-    if(tab === 'client')   return loadClient();
-    if(tab === 'meal')     return loadMeal();
-    if(tab === 'overview') return loadOverview();
-    if(tab === 'mise')     return loadMise();
-    if(tab === 'delivery') return loadDelivery();
-    if(tab === 'pause')    return loadPause();
-  }
-
-  // ---- pause fetch + cache (master clients with no order for the date) ----
-  async function ensurePause(date){
-    if(cache.pause && cache.date === date) return cache.pause;
-    const res = await fetch(API + '?action=getPausedForDate&date=' + encodeURIComponent(date));
-    const data = await res.json();
-    if(!data.success) throw new Error(data.message || 'No pause data returned');
-    cache.date = date; cache.pause = data;
-    return cache.pause;
-  }
-
-  // ---- mise fetch + cache (read-only values from the MiseList sheet) ----
-  async function ensureMise(date){
-    if(cache.mise && cache.date === date) return cache.mise;
-    const res = await fetch(API + '?action=getMiseListByDate&start=' + encodeURIComponent(date) + '&end=' + encodeURIComponent(date));
-    const data = await res.json();
-    if(!data.success) throw new Error(data.message || 'No mise data returned');
-    cache.date = date; cache.mise = data;
-    return cache.mise;
-  }
-
-  // ---- delivery fetch + cache (getOrdersForDate via POST: name/location/slot/route, deduped phone+slot) ----
-  async function ensureDelivery(date){
-    if(cache.delivery && cache.date === date) return cache.delivery;
-    const res = await fetch(API, {
-      method: 'POST',
-      body: new URLSearchParams({ action: 'getOrdersForDate', date: date })
-    });
-    const data = await res.json();
-    if(!data.success) throw new Error(data.message || 'No delivery data returned');
-    cache.date = date; cache.delivery = data;
-    return cache.delivery;
-  }
-
-  // ---- data fetch + cache ----
-  // (meal list is derived from the same client rows — no separate fetch)
-
-  // ---- data fetch + cache ----
-  async function ensureTags(date){
-    if(cache.tags && cache.date === date) return cache.tags;
-    const res = await fetch(API + '?action=getTagsForDate&date=' + encodeURIComponent(date));
-    const data = await res.json();
-    if(!data.success || !data.tags) throw new Error('No tag data returned');
-    cache.date = date; cache.tags = data.tags;
-    return cache.tags;
-  }
-  async function ensureClient(date){
-    if(cache.client && cache.date === date) return cache.client;
-    const res = await fetch(API + '?action=getClientListForDate&date=' + encodeURIComponent(date));
-    const data = await res.json();
-    if(!data.success || !data.rows) throw new Error('No client data returned');
-    cache.date = date; cache.client = data.rows;
-    return cache.client;
-  }
-
-  // ============================================================
-  //  COLOR ENGINE — mirrors the sheet's text-based CF, with
-  //  dual/multi colour split when more than one rule matches.
-  //  Order = stripe order, first match on the left.
-  // ============================================================
-  const CF_RULES = [
-    { test: t => t.includes('high protein'),  color: '#cc4125' },
-    { test: t => t.includes('no carb'),       color: '#3d85c6' },
-    { test: t => t.includes('allergies'),     color: '#595959' },
-    { test: t => t.includes('evening'),       color: '#ffff00' },
-    { test: t => t.includes('high carb'),     color: '#cfe2f3' },
-    { test: t => t.includes('low carb'),      color: '#6d9eeb' },
-    { test: t => t.includes('multi'),         color: '#434343' },
-    { test: t => t.trim() === 'chicken high', color: '#ff0000' },
-    { test: t => t.startsWith('veg '),        color: '#93c47d' },
-  ];
-
-  function cellBackground(text){
-    const t = String(text || '').toLowerCase();
-    const hits = CF_RULES.filter(r => r.test(t)).map(r => r.color);
-    if(hits.length === 0) return '';
-    if(hits.length === 1) return hits[0];
-    const n = hits.length;
-    const stops = hits.map((c,i) => {
-      const s = (i*100/n).toFixed(2), e = ((i+1)*100/n).toFixed(2);
-      return c + ' ' + s + '%, ' + c + ' ' + e + '%';
-    }).join(', ');
-    return 'linear-gradient(90deg, ' + stops + ')';
-  }
-  function applyCell(td, text){
-    const bg = cellBackground(text);
-    if(bg) td.style.background = bg;   // text stays black
-  }
-
-  // ============================================================
-  //  CLIENT LIST
-  // ============================================================
-  async function loadClient(){
-    if(!guard()) return;
-    const date = dateEl.value;
-    busy('Loading client list for ' + date + '…');
-    try{
-      const rows = await ensureClient(date);
-      clientWrap.innerHTML = '';
-      const sheet = buildClientSheet(rows, date);
-      clientWrap.appendChild(sheet);
-      fitClientSheet(sheet, rows.length);
-      loadedView.client = true;
-      done(rows.length + ' client rows for ' + date, 'client');
-    }catch(e){ fail(e); }
-  }
-
-  function typeNum(t){
-    const m = String(t || '').match(/\d+/);
-    return m ? parseInt(m[0], 10) : 999;
-  }
-
-  // "3 High Protein, 5 Low Carb" -> "High Protein, Low Carb"
-  function stripTypeNumbers(t){
-    return String(t || '')
-      .split(',')
-      .map(s => s.trim().replace(/^\d+\s*/, ''))
-      .filter(Boolean)
-      .join(', ');
-  }
-
-  // render the type cell: each value kept on its own line (nowrap span),
-  // the comma is the only place a break can happen
-  function fillTypeCell(td, raw){
-    const parts = String(raw || '')
-      .split(',')
-      .map(s => s.trim().replace(/^\d+\s*/, ''))
-      .filter(Boolean);
-    parts.forEach((p, i) => {
-      const span = document.createElement('span');
-      span.style.whiteSpace = 'nowrap';
-      span.textContent = (i > 0 ? ', ' : '') + p;
-      td.appendChild(span);
-    });
-  }
-
-  // Scale the table font so up to ~60 rows fit one landscape A4 page.
-  // Landscape A4 printable height at 6mm margins ~= 285mm. We target that.
-  function fitClientSheet(sheet, rowCount, target){
-    const table = sheet.querySelector('table.client');
-    if(!table) return;
-    const TARGET = target || 744;
-    const ROWS_PER_PAGE = 60;
-    if(rowCount > ROWS_PER_PAGE){
-      table.style.fontSize = (TARGET > 900 ? '12px' : '9.5px');
+async function loadOrders() {
+  const date = dateEl.value;
+  content.innerHTML = '<div class="loading">Loading active clients…</div>';
+  setStatus('Loading ' + date + '…', true);
+  try {
+    const ordersRes = await apiPost('getOrdersForDate', { date });
+    if (!ordersRes.success || !ordersRes.clients.length) {
+      content.innerHTML = '<div class="empty-state">No active clients found for this date.</div>';
+      allClients = []; slotGroups = {};
+      setStatus('No clients for ' + date + '.', false);
       return;
     }
-    let size = (TARGET > 900 ? 15 : 12);
-    table.style.fontSize = size + 'px';
-    let guard = 0;
-    while(size > 7 && sheet.scrollHeight > TARGET && guard < 60){
-      size -= 0.25; table.style.fontSize = size + 'px'; guard++;
+    allClients = []; slotGroups = {};
+    ordersRes.clients.forEach(c => {
+      const slot = String(c.slot || 'Unspecified').trim() || 'Unspecified';
+      const route = String(c.route || '').trim() || 'No Route';
+      const clientObj = { phone:c.phone, name:c.name, location:c.location, slot, route, location1:c.location1 || '', location2:c.location2 || '' };
+      allClients.push(clientObj);
+      if (!slotGroups[slot]) slotGroups[slot] = {};
+      if (!slotGroups[slot][route]) slotGroups[slot][route] = [];
+      slotGroups[slot][route].push(clientObj);
+    });
+    Object.values(slotGroups).forEach(routes => Object.values(routes).forEach(arr => arr.sort((a, b) => a.name.localeCompare(b.name))));
+    currentSlot = null; currentView = null; stopAssignments = {};
+    setStatus(allClients.length + ' clients loaded for ' + date + '.', false);
+    renderSummary();
+  } catch (err) {
+    content.innerHTML = '<div class="empty-state">Error loading data. Please try again.</div>';
+    setStatus('Error loading data.', false);
+    console.error(err);
+  }
+}
+
+const SLOT_ORDER = ['Morning', 'Afternoon', 'Evening'];
+function sortedSlots() {
+  return Object.keys(slotGroups).sort((a, b) => {
+    const ai = SLOT_ORDER.indexOf(a), bi = SLOT_ORDER.indexOf(b);
+    if (ai === -1 && bi === -1) return a.localeCompare(b);
+    if (ai === -1) return 1; if (bi === -1) return -1; return ai - bi;
+  });
+}
+
+function renderSummary() {
+  currentSlot = null; currentView = null; stopAssignments = {};
+  const slots = sortedSlots();
+  let html = '<div class="section-title">Select Slot</div><div class="tiles">';
+  slots.forEach(slot => {
+    const totalCount = Object.values(slotGroups[slot]).reduce((s, arr) => s + arr.length, 0);
+    html += `<div class="tile" onclick="openSlot('${escapeAttr(slot)}')"><div class="route-name">${escapeHtml(slot)}</div><div class="route-count">${totalCount} client(s)</div></div>`;
+  });
+  html += '</div>';
+  content.innerHTML = html;
+}
+
+function openSlot(slot) {
+  currentSlot = slot; currentView = null; stopAssignments = {};
+  const routes = Object.keys(slotGroups[slot]).sort((a, b) => {
+    if (a === 'No Route') return 1; if (b === 'No Route') return -1;
+    return a.localeCompare(b, undefined, { numeric: true });
+  });
+  let html = `<span class="back-link" onclick="renderSummary()">← Back to slots</span>`;
+  html += `<div class="section-title">${escapeHtml(slot)}</div>`;
+  html += `<div class="search-wrap">
+    <input type="text" id="routeSearch" placeholder="Search a client in ${escapeHtml(slot)}…" oninput="searchClients()" autocomplete="off">
+    <div class="search-drop" id="searchDrop"></div>
+  </div>`;
+  html += `<div class="tiles">`;
+  routes.forEach(route => {
+    html += `<div class="tile" onclick="openRoute('${escapeAttr(slot)}','${escapeAttr(route)}')"><div class="route-name">${escapeHtml(route)}</div><div class="route-count">${slotGroups[slot][route].length} client(s)</div></div>`;
+  });
+  html += `<div class="tile new-route" onclick="openNewRoute('${escapeAttr(slot)}')">➕ New Route</div>`;
+  html += `</div>`;
+  content.innerHTML = html;
+}
+
+// search clients within the current slot; show name + their route; tap to open that route
+function searchClients() {
+  const inp = document.getElementById('routeSearch');
+  const drop = document.getElementById('searchDrop');
+  if (!inp || !drop) return;
+  const q = inp.value.trim().toLowerCase();
+  if (!q) { drop.classList.remove('show'); drop.innerHTML = ''; return; }
+
+  const flat = [];
+  Object.keys(slotGroups[currentSlot]).forEach(route => {
+    slotGroups[currentSlot][route].forEach(c => flat.push({ name: c.name, route }));
+  });
+  const matches = flat.filter(c => (c.name || '').toLowerCase().includes(q)).slice(0, 40);
+
+  if (!matches.length) { drop.innerHTML = `<div class="search-empty">No client found in ${escapeHtml(currentSlot)}</div>`; drop.classList.add('show'); return; }
+
+  drop.innerHTML = matches.map(c => {
+    const none = c.route === 'No Route';
+    return `<div class="search-item" onclick="openRoute('${escapeAttr(currentSlot)}','${escapeAttr(c.route)}')">
+      <span class="nm">${escapeHtml(c.name)}</span>
+      <span class="rt${none ? ' none' : ''}">${escapeHtml(c.route)}</span>
+    </div>`;
+  }).join('');
+  drop.classList.add('show');
+}
+// close the search dropdown when tapping outside it
+document.addEventListener('click', (e) => {
+  const drop = document.getElementById('searchDrop');
+  if (drop && !e.target.closest('.search-wrap')) drop.classList.remove('show');
+});
+
+function openRoute(slot, route) {
+  currentSlot = slot; currentView = route;
+  stopAssignments = {}; checkedClients = {}; lastDistance = {}; routeTotalMeters = null;
+  currentClients = [...slotGroups[slot][route]];
+  renderClientView(`${slot} — ${route}`);
+}
+function openNewRoute(slot) {
+  currentSlot = slot; currentView = 'NEW';
+  stopAssignments = {}; checkedClients = {}; lastDistance = {}; routeTotalMeters = null;
+  currentClients = Object.values(slotGroups[slot]).flat();
+  renderClientView(`${slot} — New Route`);
+}
+
+function renderClientView(title) {
+  const isNew = currentView === 'NEW';
+  let html = `<span class="back-link" onclick="openSlot('${escapeAttr(currentSlot)}')">← Back to ${escapeHtml(currentSlot)}</span>`;
+  html += `<div class="section-title">${escapeHtml(title)}</div>`;
+  html += `<button class="btn distance-btn full" style="margin-bottom:10px;" onclick="autoOrderByDistance()">📍 Auto-order by distance (nearest first)</button>`;
+  if (!isNew) {
+    html += `<button class="btn secondary full" style="margin-bottom:10px;" onclick="toggleAddPanel()">➕ Add clients to this route</button>`;
+    html += `<div id="addPanel"></div>`;
+  }
+  html += `<div id="clientListContainer">` + renderClientList(currentClients, true) + `</div>`;
+  html += `<div id="messageOutput"></div>`;
+  content.innerHTML = html;
+}
+
+function renderClientList(clients, withStopSelect) {
+  if (!clients.length) return '<div class="empty-state">No clients here.</div>';
+  const isNew = currentView === 'NEW';
+  let html = '';
+  clients.forEach(c => {
+    html += `<div class="client-card">`;
+    if (withStopSelect && isNew) {
+      const chk = checkedClients[c.phone] ? 'checked' : '';
+      html += `<input type="checkbox" class="route-check" ${chk} onchange="toggleCheck('${escapeAttr(c.phone)}', this.checked)">`;
     }
-    guard = 0;
-    while(size < (TARGET > 900 ? 17 : 13) && sheet.scrollHeight < TARGET - 50 && guard < 14){
-      size += 0.5; table.style.fontSize = size + 'px';
-      if(sheet.scrollHeight > TARGET){ size -= 0.5; table.style.fontSize = size + 'px'; break; }
-      guard++;
+    const distLine = (lastDistance[c.phone] != null && isFinite(lastDistance[c.phone]))
+      ? `<div class="dist">${(lastDistance[c.phone] / 1000).toFixed(1)} km from previous stop</div>` : '';
+    html += `<div class="client-info"><div class="name">${escapeHtml(c.name)}</div><div class="meta">${escapeHtml(c.phone)} · ${escapeHtml(c.location)}</div>${distLine}</div>`;
+    if (withStopSelect) {
+      const currentVal = stopAssignments[c.phone] || '-';
+      html += `<div class="stop-dropdown" data-phone="${escapeAttr(c.phone)}"><div class="stop-dropdown-btn" onclick="toggleStopMenu(this, event)">${currentVal}</div></div>`;
     }
+    html += `</div>`;
+  });
+  return html;
+}
+
+function toggleCheck(phone, val) { if (val) checkedClients[phone] = true; else delete checkedClients[phone]; }
+
+function toggleAddPanel() {
+  const panel = document.getElementById('addPanel');
+  if (panel.innerHTML.trim()) { panel.innerHTML = ''; return; }
+  renderAddPanel();
+}
+function renderAddPanel() {
+  const panel = document.getElementById('addPanel');
+  const all = Object.values(slotGroups[currentSlot]).flat();
+  const existing = new Set(currentClients.map(c => c.phone));
+  const avail = all.filter(c => !existing.has(c.phone));
+  if (!avail.length) { panel.innerHTML = `<div class="add-panel"><div class="empty-state">All slot clients already in this route.</div></div>`; return; }
+  let html = `<div class="add-panel">`;
+  avail.forEach(c => {
+    html += `<div class="add-row"><div class="info"><div class="name">${escapeHtml(c.name)}</div><div class="meta">${escapeHtml(c.phone)} · ${escapeHtml(c.route)}</div></div><button class="btn" onclick="addClientToRoute('${escapeAttr(c.phone)}')">Add</button></div>`;
+  });
+  html += `</div>`;
+  panel.innerHTML = html;
+}
+function addClientToRoute(phone) {
+  const all = Object.values(slotGroups[currentSlot]).flat();
+  const c = all.find(x => x.phone === phone);
+  if (c && !currentClients.some(x => x.phone === phone)) {
+    currentClients.push(c);
+    currentClients.sort((a, b) => a.name.localeCompare(b.name));
   }
+  renderAddPanel();
+  document.getElementById('clientListContainer').innerHTML = renderClientList(currentClients, true);
+  refreshStopOptions();
+  showToast('Added');
+}
 
-  function buildClientSheet(rows, date){
-    // 2nd-level sort: slot, then meal type (by leading number), stable
-    const slotOrder = { Morning:1, Afternoon:2, Evening:3 };
-    const sorted = rows.map((r,i) => ({ ...r, _i:i })).sort((a,b) =>
-      ((slotOrder[a.slot]||99) - (slotOrder[b.slot]||99)) ||
-      (typeNum(a.type) - typeNum(b.type)) ||
-      String(a.type).localeCompare(String(b.type)) ||
-      (a._i - b._i)
-    );
-
-    const wrap = document.createElement('div'); wrap.className = 'sheet';
-    const h = document.createElement('h2');
-    h.textContent = new Date(date + 'T00:00:00')
-      .toLocaleDateString(undefined, { weekday:'long', year:'numeric', month:'long', day:'numeric' });
-    wrap.appendChild(h);
-
-    const table = document.createElement('table'); table.className = 'client';
-    const cols = [
-      { key:'_num',      label:'#'         },
-      { key:'name',      label:'Name'      },
-      { key:'breakfast', label:'Breakfast' },
-      { key:'option1',   label:'Option 1'  },
-      { key:'option2',   label:'Option 2'  },
-      { key:'snack',     label:'Snack'     },
-      { key:'juice1',    label:'Juice 1'   },
-      { key:'juice2',    label:'Juice 2'   },
-      { key:'remarks',   label:'Remarks'   },
-      { key:'type',      label:'Type'      },
-      { key:'slot',      label:'Slot'      },
-    ];
-
-    const thead = document.createElement('thead');
-    const htr = document.createElement('tr');
-    cols.forEach(c => { const th = document.createElement('th'); th.textContent = c.label; htr.appendChild(th); });
-    thead.appendChild(htr); table.appendChild(thead);
-
-    const tbody = document.createElement('tbody');
-    const mealCols = ['breakfast','option1','option2','snack','juice1','juice2'];
-    const totals = { breakfast:0, option1:0, option2:0, snack:0, juice1:0, juice2:0 };
-
-    let prevSlot = null, slotNum = 0;
-    sorted.forEach((r) => {
-      const tr = document.createElement('tr');
-      if(prevSlot !== null && r.slot !== prevSlot) tr.className = 'slotsep';  // line between slot groups
-      if(r.slot !== prevSlot) slotNum = 0;   // restart numbering each slot
-      prevSlot = r.slot;
-      slotNum++;
-
-      // tally non-empty meal cells for the totals row
-      mealCols.forEach(k => {
-        const v = String(r[k] || '').trim();
-        if(v && v !== 'N/A') totals[k]++;
-      });
-
-      cols.forEach(c => {
-        const td = document.createElement('td');
-        if(c.key === '_num'){ td.className = 'num'; td.textContent = slotNum; }
-        else if(c.key === 'type'){
-          fillTypeCell(td, r.type);        // shows "High Protein" (numbers stripped)
-          applyCell(td, r.type);           // colour still keys off the raw value
-        }
-        else {
-          const val = r[c.key] || '';
-          td.textContent = val;
-          applyCell(td, val);
-        }
-        tr.appendChild(td);
-      });
-      tbody.appendChild(tr);
-    });
-
-    // ---- totals row: plain counts under Name + each meal column; Remarks/Type/Slot blank ----
-    const totalTr = document.createElement('tr'); totalTr.className = 'totals';
-    cols.forEach(c => {
-      const td = document.createElement('td');
-      if(c.key === 'name') td.textContent = sorted.length;          // total clients
-      else if(mealCols.includes(c.key)) td.textContent = totals[c.key] || '';
-      totalTr.appendChild(td);
-    });
-    tbody.appendChild(totalTr);
-
-    table.appendChild(tbody);
-    wrap.appendChild(table);
-    return wrap;
+function toggleStopMenu(btnEl, event) {
+  if (event) event.stopPropagation();
+  closeStopMenus();
+  const wrapper = btnEl.parentElement;
+  const phone = wrapper.dataset.phone;
+  const total = currentClients.length;
+  const currentVal = stopAssignments[phone] || '';
+  const menu = document.createElement('div');
+  menu.className = 'stop-dropdown-menu';
+  const noneOpt = document.createElement('div');
+  noneOpt.textContent = '-';
+  noneOpt.onclick = () => selectStop(phone, '');
+  menu.appendChild(noneOpt);
+  for (let i = 1; i <= total; i++) {
+    const taken = Object.entries(stopAssignments).some(([p, v]) => v === String(i) && p !== phone);
+    if (taken) continue;
+    const opt = document.createElement('div');
+    opt.textContent = i;
+    if (String(i) === currentVal) opt.style.fontWeight = '700';
+    opt.onclick = () => selectStop(phone, String(i));
+    menu.appendChild(opt);
   }
+  menu.onclick = (e) => e.stopPropagation();
+  wrapper.appendChild(menu);
+  setTimeout(() => document.addEventListener('click', closeStopMenusOnce), 0);
+}
+function closeStopMenusOnce() { closeStopMenus(); document.removeEventListener('click', closeStopMenusOnce); }
+function closeStopMenus() { document.querySelectorAll('.stop-dropdown-menu').forEach(m => m.remove()); }
+function selectStop(phone, val) {
+  if (val === '') { delete stopAssignments[phone]; }
+  else { for (const p in stopAssignments) if (stopAssignments[p] === val && p !== phone) delete stopAssignments[p]; stopAssignments[phone] = val; }
+  closeStopMenus();
+  refreshStopOptions();
+  maybeRenderMessage();
+  computeRouteTotal().then(() => maybeRenderMessage());
+}
+function refreshStopOptions() {
+  document.querySelectorAll('.stop-dropdown').forEach(wrapper => {
+    const phone = wrapper.dataset.phone;
+    const btn = wrapper.querySelector('.stop-dropdown-btn');
+    if (btn) btn.textContent = stopAssignments[phone] || '-';
+  });
+}
 
-  // ============================================================
-  //  MEAL LIST
-  // ============================================================
-  async function loadMeal(){
-    if(!guard()) return;
-    const date = dateEl.value;
-    busy('Building meal list for ' + date + '…');
-    try{
-      const rows = await ensureClient(date);     // reuse the client-list rows
-      const meal = groupMeal(rows);
-      mealWrap.innerHTML = '';
-      const sheet = buildMealSheet(meal, date);
-      mealWrap.appendChild(sheet);
-      fitMealSheet(sheet);
-      loadedView.meal = true;
-      done('Meal list ready for ' + date, 'meal');
-    }catch(e){ fail(e); }
+/* ---- geo + distance ---- */
+async function ensureGeo() {
+  if (geoMap && Object.keys(geoMap).length) return geoMap;
+  showToast('Loading client map locations…');
+  try {
+    const res = await apiPost('getClientGeo');
+    const g = (res && res.ok && res.geo) ? res.geo : {};
+    if (Object.keys(g).length) geoMap = g;
+    return g;
+  } catch (e) { return {}; }
+}
+function coordForClient(c, g) {
+  if (!g) return null;
+  if (c.location && c.location2 && c.location === c.location2) return g.loc2 || g.loc1;
+  return g.loc1 || g.loc2;
+}
+
+async function autoOrderByDistance() {
+  if (!window.google || !google.maps || !google.maps.DistanceMatrixService) { showToast('Maps still loading — try again in a moment'); return; }
+  const geo = await ensureGeo();
+  const isNew = currentView === 'NEW';
+
+  const pool = isNew ? currentClients.filter(c => checkedClients[c.phone]) : currentClients;
+  if (isNew && !pool.length) { showToast('Tick the clients for this route first'); return; }
+
+  const located = [], unlocated = [];
+  pool.forEach(c => {
+    const coord = coordForClient(c, geo[c.phone]);
+    if (coord && coord.lat != null) located.push({ c, coord });
+    else unlocated.push(c);
+  });
+
+  if (!located.length) { showToast('No saved map locations — number manually if needed'); routeTotalMeters = null; maybeRenderMessage(); return; }
+
+  showToast('Building route…');
+  const remaining = located.slice();
+  const order = [];
+  let current = KITCHEN;
+  while (remaining.length) {
+    const dists = await distancesFrom(current, remaining.map(x => x.coord));
+    let best = -1, bestD = Infinity;
+    for (let i = 0; i < dists.length; i++) { if (dists[i] < bestD) { bestD = dists[i]; best = i; } }
+    if (best === -1) break;
+    const chosen = remaining.splice(best, 1)[0];
+    chosen.leg = bestD;
+    order.push(chosen);
+    current = chosen.coord;
   }
+  remaining.forEach(x => unlocated.push(x.c));
 
-  // ============================================================
-  //  MEAL OVERVIEW  (protein × type counts, breakfast/snack/juice splits)
-  // ============================================================
-  async function loadOverview(){
-    if(!guard()) return;
-    const date = dateEl.value;
-    busy('Building meal overview for ' + date + '…');
-    try{
-      const rows = await ensureClient(date);     // same client rows
-      const counts = computeMealCounts(rows);
-      overviewWrap.innerHTML = '';
-      overviewWrap.appendChild(buildOverviewSheet(counts, date));
-      loadedView.overview = true;
-      done('Meal overview ready for ' + date, 'overview');
-    }catch(e){ fail(e); }
-  }
+  stopAssignments = {}; lastDistance = {};
+  order.forEach((x, i) => { stopAssignments[x.c.phone] = String(i + 1); lastDistance[x.c.phone] = x.leg; });
+  routeTotalMeters = order.reduce((s, x) => s + (isFinite(x.leg) ? x.leg : 0), 0);
 
-  function buildOverviewSheet(c, date){
-    const wrap = document.createElement('div'); wrap.className = 'ovsheet';
-    const h = document.createElement('h2');
-    h.textContent = 'Meal Overview — ' + new Date(date + 'T00:00:00')
-      .toLocaleDateString(undefined, { weekday:'long', year:'numeric', month:'long', day:'numeric' });
-    wrap.appendChild(h);
+  const orderedPhones = order.map(x => x.c.phone);
+  const numberedClients = order.map(x => x.c);
+  const restClients = currentClients.filter(c => orderedPhones.indexOf(c.phone) === -1);
+  currentClients = numberedClients.concat(restClients);
 
-    const proteinTable = (title, opt) => {
-      const rows = ['Chicken','Veg','Seafood','Egg'].map(p =>
-        `<tr><td class="lbl">${p}</td><td>${opt[p].nb}</td><td>${opt[p].hp}</td><td class="rt">${opt[p].nb + opt[p].hp}</td></tr>`
-      ).join('');
-      return `
-        <table class="ov">
-          <thead>
-            <tr><th colspan="4" class="cap">${title}</th></tr>
-            <tr><th>Protein</th><th>Nutri Balance</th><th>High Protein</th><th>Total</th></tr>
-          </thead>
-          <tbody>${rows}</tbody>
-          <tfoot><tr><td class="lbl">Total ${title}</td><td></td><td></td><td class="rt">${opt.total}</td></tr></tfoot>
-        </table>`;
-    };
+  document.getElementById('clientListContainer').innerHTML = renderClientList(currentClients, true);
+  refreshStopOptions();
+  maybeRenderMessage();
 
-    const splitTable = (title, obj, regLbl, vegLbl) => `
-      <table class="ov">
-        <thead><tr><th colspan="2" class="cap">${title}</th></tr></thead>
-        <tbody>
-          <tr><td class="lbl">${regLbl}</td><td class="rt">${obj.reg}</td></tr>
-          <tr><td class="lbl">${vegLbl}</td><td class="rt">${obj.veg}</td></tr>
-        </tbody>
-        <tfoot><tr><td class="lbl">Total ${title}</td><td class="rt">${obj.total}</td></tr></tfoot>
-      </table>`;
+  showToast(unlocated.length ? `Routed ${order.length} stops; ${unlocated.length} without location` : `Routed ${order.length} stops, nearest first`);
+}
 
-    const juiceTable = `
-      <table class="ov">
-        <thead><tr><th colspan="2" class="cap">Juices</th></tr></thead>
-        <tbody>
-          <tr><td class="lbl">Juice 1</td><td class="rt">${c.juice1}</td></tr>
-          <tr><td class="lbl">Juice 2</td><td class="rt">${c.juice2}</td></tr>
-        </tbody>
-      </table>`;
-
-    const grid = document.createElement('div'); grid.className = 'ovgrid';
-    grid.innerHTML =
-      proteinTable('Option 1', c.option1) +
-      proteinTable('Option 2', c.option2) +
-      splitTable('Breakfast', c.breakfast, 'Breakfast', 'Veg Breakfast') +
-      splitTable('Snack', c.snack, 'Snack', 'Veg Snack') +
-      juiceTable;
-    wrap.appendChild(grid);
-
-    const actions = document.createElement('div'); actions.className = 'ov-actions';
-    const writeBtn = document.createElement('button'); writeBtn.className = 'btn'; writeBtn.textContent = 'Write totals to MiseList';
-    const note = document.createElement('span'); note.className = 'ov-note';
-    writeBtn.addEventListener('click', async () => {
-      writeBtn.disabled = true; note.textContent = 'Writing…'; note.className = 'ov-note';
-      try{
-        // recompute fresh from current client rows at click time (avoids any stale/zero counts)
-        const freshRows = await ensureClient(date);
-        const freshCounts = computeMealCounts(freshRows);
-        const res = await writeMiseTotals(date, freshCounts);
-        if(res && res.success){ note.textContent = '✓ ' + (res.message || 'Written'); note.className = 'ov-note ok'; }
-        else { note.textContent = '⚠ ' + (res && res.message ? res.message : 'Write failed'); note.className = 'ov-note warn'; }
-      }catch(e){ note.textContent = '⚠ ' + e.message; note.className = 'ov-note warn'; }
-      writeBtn.disabled = false;
-    });
-    actions.appendChild(writeBtn); actions.appendChild(note);
-    wrap.appendChild(actions);
-    return wrap;
-  }
-
-  // POST the computed counts to the MiseList write-back (writeMiseTotals)
-  async function writeMiseTotals(date, counts){
-    const params = new URLSearchParams();
-    params.append('action', 'writeMiseTotals');
-    params.append('date', date);
-    params.append('counts', JSON.stringify(counts));
-    const res = await fetch(API, { method:'POST', body:params });
-    return await res.json();
-  }
-
-  // regroup client rows into protein buckets (same shape the meal list needs)
-  function groupMeal(rows){
-    const opt1 = { Chicken:[], Veg:[], Seafood:[], Egg:[] };
-    const opt2 = { Chicken:[], Veg:[], Seafood:[], Egg:[] };
-    const breakfast = [], snack = [], juice1 = [], juice2 = [];
-    const proteinOf = code => String(code || '').replace(/\s*\d+\s*$/, '').trim();
-
-    rows.forEach(r => {
-      const o1 = String(r.option1 || '').trim();
-      const o2 = String(r.option2 || '').trim();
-      if(o1 && o1 !== 'N/A'){ const p = proteinOf(o1); (opt1[p] = opt1[p] || []).push({ name:r.name, val:r.type }); }
-      if(o2 && o2 !== 'N/A'){ const p = proteinOf(o2); (opt2[p] = opt2[p] || []).push({ name:r.name, val:r.type }); }
-      const bf = String(r.breakfast || '').trim();
-      const sn = String(r.snack     || '').trim();
-      if(bf && bf !== 'N/A') breakfast.push({ name:r.name, val:bf });   // Breakfast / Veg Breakfast
-      if(sn && sn !== 'N/A') snack.push({ name:r.name, val:sn });       // Snack / Veg Snack
-      if(String(r.juice1 || '').trim() && r.juice1 !== 'N/A') juice1.push(r.name);
-      if(String(r.juice2 || '').trim() && r.juice2 !== 'N/A') juice2.push(r.name);
-    });
-
-    return { opt1, opt2, breakfast, snack, juice1, juice2 };
-  }
-
-  function buildMealSheet(data, date){
-    const o1 = data.opt1 || {}, o2 = data.opt2 || {};
-    const len = x => (x ? x.length : 0);
-    const opt1Total = len(o1.Chicken) + len(o1.Veg) + len(o1.Seafood) + len(o1.Egg);
-    const opt2Total = len(o2.Chicken) + len(o2.Veg) + len(o2.Seafood) + len(o2.Egg);
-
-    const sheet = document.createElement('div'); sheet.className = 'mealsheet';
-    const h = document.createElement('h2');
-    h.textContent = new Date(date + 'T00:00:00')
-      .toLocaleDateString(undefined, { weekday:'long', year:'numeric', month:'long', day:'numeric' });
-    sheet.appendChild(h);
-
-    const grid = document.createElement('div'); grid.className = 'mealgrid';
-    const place = (el, area) => { el.style.gridArea = area; grid.appendChild(el); };
-
-    place(buildBucket('Chicken 1', o1.Chicken, false, true), 'c1');
-    place(buildBucket('Veg 1',     o1.Veg,     true,  true), 'v1');
-    place(buildBucket('Veg 2',     o2.Veg,     true,  true), 'v2');
-    place(buildBucket('Chicken 2', o2.Chicken, false, true), 'c2');
-    place(buildBucket('Seafood 1', o1.Seafood, false, true), 's1');
-    place(buildMiddle(opt1Total, opt2Total, opt1Total + opt2Total), 'mid');
-    place(buildBucket('Seafood 2', o2.Seafood, false, true), 's2');
-    place(buildBucket('Egg 1',     o1.Egg,     false, true), 'e1');
-    place(buildBucket('Breakfast', data.breakfast || [], false, false), 'bf');
-    place(buildBucket('Snack',     data.snack     || [], false, false), 'sn');
-    place(buildBucket('Egg 2',     o2.Egg,     false, true), 'e2');
-    place(buildNameBox('Juice 1', data.juice1 || []), 'j1');
-    place(buildNameBox('Juice 2', data.juice2 || []), 'j2');
-
-    sheet.appendChild(grid);
-    return sheet;
-  }
-
-  // single-column Name box (used for juices)
-  function buildNameBox(title, names){
-    names = names || [];
-    const box = document.createElement('div'); box.className = 'mbox';
-    const head = document.createElement('div'); head.className = 'mh'; head.textContent = title; box.appendChild(head);
-
-    const body = document.createElement('div'); body.className = 'mb';
-    const table = document.createElement('table'); table.className = 'single';
-    if(names.length === 0){
-      const tr = document.createElement('tr');
-      const td = document.createElement('td'); td.textContent = '#N/A'; td.style.color = '#999';
-      tr.appendChild(td); table.appendChild(tr);
-    } else {
-      names.forEach(nm => {
-        const tr = document.createElement('tr');
-        const td = document.createElement('td'); td.textContent = nm || '';
-        tr.appendChild(td); table.appendChild(tr);
-      });
-    }
-    body.appendChild(table); box.appendChild(body);
-
-    const f = document.createElement('div'); f.className = 'mf';
-    const lbl = document.createElement('span'); lbl.textContent = 'Total';
-    const val = document.createElement('span'); val.className = 'val'; val.textContent = names.length;
-    f.appendChild(lbl); f.appendChild(val); box.appendChild(f);
-    return box;
-  }
-
-  // Name | Value bucket box. sortNum=true sorts by leading number in the value
-  // (meal type); sortNum=false sorts by the value text (breakfast/snack option).
-  function buildBucket(title, items, isVeg, sortNum){
-    items = items || [];
-    const box = document.createElement('div'); box.className = 'mbox' + (isVeg ? ' veg' : '');
-    const head = document.createElement('div'); head.className = 'mh'; head.textContent = title; box.appendChild(head);
-
-    const body = document.createElement('div'); body.className = 'mb';
-    const table = document.createElement('table');
-    const sorted = items.map((it,i) => ({ ...it, _i:i })).sort((a,b) =>
-      sortNum
-        ? ((typeNum(a.val) - typeNum(b.val)) || (a._i - b._i))
-        : (String(a.val).localeCompare(String(b.val)) || (a._i - b._i))
-    );
-    if(sorted.length === 0){
-      const tr = document.createElement('tr');
-      const td = document.createElement('td'); td.colSpan = 2; td.textContent = '#N/A'; td.style.color = '#999';
-      tr.appendChild(td); table.appendChild(tr);
-    } else {
-      sorted.forEach(it => {
-        const tr = document.createElement('tr');
-        const tdN = document.createElement('td'); tdN.textContent = it.name || ''; tr.appendChild(tdN);
-        const tdV = document.createElement('td'); fillTypeCell(tdV, it.val); applyCell(tdV, it.val); tr.appendChild(tdV);
-        table.appendChild(tr);
+function distancesFrom(origin, dests) {
+  return new Promise(resolve => {
+    const svc = new google.maps.DistanceMatrixService();
+    const out = new Array(dests.length).fill(Infinity);
+    let pending = 0, started = false;
+    for (let i = 0; i < dests.length; i += 25) {
+      const chunk = dests.slice(i, i + 25);
+      pending++; started = true;
+      svc.getDistanceMatrix({ origins: [origin], destinations: chunk, travelMode: google.maps.TravelMode.DRIVING }, (res, status) => {
+        if (status === 'OK' && res.rows[0]) res.rows[0].elements.forEach((el, j) => { out[i + j] = (el.status === 'OK') ? el.distance.value : Infinity; });
+        if (--pending === 0) resolve(out);
       });
     }
-    body.appendChild(table); box.appendChild(body);
+    if (!started) resolve(out);
+  });
+}
 
-    const f = document.createElement('div'); f.className = 'mf';
-    const lbl = document.createElement('span'); lbl.textContent = 'Total';
-    const val = document.createElement('span'); val.className = 'val'; val.textContent = items.length;
-    f.appendChild(lbl); f.appendChild(val); box.appendChild(f);
-    return box;
+async function computeRouteTotal() {
+  if (!window.google || !google.maps || !google.maps.DistanceMatrixService) return;
+  const numbered = currentClients
+    .filter(c => stopAssignments[c.phone])
+    .map(c => ({ stop: parseInt(stopAssignments[c.phone]), coord: coordForClient(c, geoMap && geoMap[c.phone]) }))
+    .filter(x => x.coord && x.coord.lat != null)
+    .sort((a, b) => a.stop - b.stop);
+  if (!numbered.length) { routeTotalMeters = null; return; }
+  let total = 0, prev = KITCHEN;
+  for (const x of numbered) {
+    const d = await distancesFrom(prev, [x.coord]);
+    if (isFinite(d[0])) total += d[0];
+    prev = x.coord;
   }
+  routeTotalMeters = total;
+}
 
-  function buildMiddle(o1, o2, grand){
-    const box = document.createElement('div'); box.className = 'mbox mid';
-    const wrap = document.createElement('div'); wrap.className = 'midwrap';
-    const card = (label, num) =>
-      '<div class="midcard"><div class="midlbl">' + label + '</div><div class="midnum">' + num + '</div></div>';
-    wrap.innerHTML = card('Total Option 1', o1) + card('Total Meals', grand) + card('Total Option 2', o2);
-    box.appendChild(wrap);
-    return box;
-  }
+/* ---- message ---- */
+function linkForClient(c) {
+  const g = geoMap && geoMap[c.phone];
+  if (!g) return '';
+  if (c.location && c.location2 && c.location === c.location2) return g.loc2Link || g.loc1Link || '';
+  return g.loc1Link || g.loc2Link || '';
+}
 
-  // ---- meal counts for write-back / totals panel ----
-  // Type bucket rule (per user): contains "high protein" -> HP; everything else -> NB.
-  // HP and NB never co-occur. Protein comes from the option cell; type from the client's Type col.
-  function computeMealCounts(rows){
-    const proteinOf = code => String(code || '').replace(/\s*\d+\s*$/, '').trim();
-    const isHP = t => /high\s*protein/i.test(String(t || ''));
-
-    const blankOpt = () => ({
-      Chicken:{ nb:0, hp:0 }, Veg:{ nb:0, hp:0 }, Seafood:{ nb:0, hp:0 }, Egg:{ nb:0, hp:0 }, total:0
+function maybeRenderMessage() {
+  const clients = currentClients;
+  let ordered = [];
+  if (currentView === 'NEW') {
+    const numbered = [], checkedUnnum = [];
+    clients.forEach(c => {
+      if (stopAssignments[c.phone]) numbered.push({ ...c, stop: parseInt(stopAssignments[c.phone]) });
+      else if (checkedClients[c.phone]) checkedUnnum.push({ ...c, stop: null });
     });
-    const c = {
-      option1: blankOpt(),
-      option2: blankOpt(),
-      breakfast:{ reg:0, veg:0, total:0 },
-      snack:{ reg:0, veg:0, total:0 },
-      juice1:0, juice2:0
-    };
-
-    const tallyOpt = (bucket, code, type) => {
-      const p = proteinOf(code);
-      if(!bucket[p]) return;                 // only the four known proteins
-      if(isHP(type)) bucket[p].hp++; else bucket[p].nb++;
-      bucket.total++;
-    };
-
-    rows.forEach(r => {
-      const type = r.type;
-      const o1 = String(r.option1 || '').trim();
-      const o2 = String(r.option2 || '').trim();
-      if(o1 && o1 !== 'N/A') tallyOpt(c.option1, o1, type);
-      if(o2 && o2 !== 'N/A') tallyOpt(c.option2, o2, type);
-
-      const bf = String(r.breakfast || '').trim();
-      if(bf && bf !== 'N/A'){ if(/veg/i.test(bf)) c.breakfast.veg++; else c.breakfast.reg++; c.breakfast.total++; }
-
-      const sn = String(r.snack || '').trim();
-      if(sn && sn !== 'N/A'){ if(/veg/i.test(sn)) c.snack.veg++; else c.snack.reg++; c.snack.total++; }
-
-      if(String(r.juice1 || '').trim() && r.juice1 !== 'N/A') c.juice1++;
-      if(String(r.juice2 || '').trim() && r.juice2 !== 'N/A') c.juice2++;
+    numbered.sort((a, b) => a.stop - b.stop);
+    ordered = numbered.concat(checkedUnnum);
+  } else {
+    const numbered = [], unnumbered = [];
+    clients.forEach(c => {
+      if (stopAssignments[c.phone]) numbered.push({ ...c, stop: parseInt(stopAssignments[c.phone]) });
+      else unnumbered.push({ ...c, stop: null });
     });
-
-    return c;
+    numbered.sort((a, b) => a.stop - b.stop);
+    ordered = numbered.concat(unnumbered);
   }
 
-  // scale meal grid to fill — but not overflow — one portrait page
-  function fitMealSheet(sheet){
-    const TARGET = 1050;   // portrait A4 printable height ~ px at 96dpi
-    let s = 1; sheet.style.setProperty('--mscale', s);
-    let guard = 0;
-    // shrink only if a dense day pushes past the page; keep text readable (floor 0.8)
-    while(s > 0.8 && sheet.scrollHeight > TARGET && guard < 20){
-      s -= 0.02; sheet.style.setProperty('--mscale', s.toFixed(3)); guard++;
-    }
+  const out = document.getElementById('messageOutput');
+  if (!out) return;
+  if (!ordered.length) { out.innerHTML = ''; out.dataset.raw = ''; return; }
+
+  let message = '';
+  ordered.forEach(c => {
+    const link = linkForClient(c);
+    let block = (c.stop !== null ? (c.stop + '. ') : '') + c.name + '\n' + c.phone + '\n' + c.location;
+    if (link) block += '\n' + link;
+    message += block + '\n\n';
+  });
+  message = message.trim();
+
+  if (routeTotalMeters != null && routeTotalMeters > 0) {
+    message += '\n\nTotal distance: ' + (routeTotalMeters / 1000).toFixed(1) + ' km (kitchen \u2192 last stop)';
   }
 
-  // ============================================================
-  //  MISE LIST  (read-only values from the MiseList sheet)
-  // ============================================================
-  async function loadMise(){
-    if(!guard()) return;
-    const date = dateEl.value;
-    busy('Loading mise list for ' + date + '…');
-    try{
-      const data = await ensureMise(date);
-      const tbl = (data.tables && data.tables[0]) ? data.tables[0] : null;
-      miseWrap.innerHTML = '';
-      if(!tbl){
-        miseWrap.innerHTML = '<div class="sheet"><p style="text-align:center;color:#777">No mise list found for ' + date + '.</p></div>';
-        loadedView.mise = true; done('No mise list for ' + date, 'mise'); return;
-      }
-      const sheet = buildMiseSheet(tbl, date);
-      miseWrap.appendChild(sheet);
-      fitMiseSheet(sheet);
-      loadedView.mise = true;
-      done('Mise list ready for ' + date, 'mise');
-    }catch(e){ fail(e); }
-  }
-
-  function buildMiseSheet(tbl, date){
-    const sheet = document.createElement('div'); sheet.className = 'misesheet';
-
-    const table = document.createElement('table'); table.className = 'mise';
-
-    const rows = tbl.table || [];
-    // the captured block's first row is the date row; everything below is the mise grid.
-    // keep the full bordered block (don't trim empties) to match the sheet.
-    let lastUsed = rows.length - 1;
-    // drop only a long run of trailing blanks beyond the last data row + a small pad
-    let lastData = -1;
-    rows.forEach((r, i) => {
-      if(r.some(c => String((c && c.val) || '').trim() !== '')) lastData = i;
-    });
-    lastUsed = Math.min(rows.length - 1, lastData + 2);
-
-    // ---- two-line banner: "Week One" + date, spanning all columns ----
-    const dateLabel = tbl.dateLabel || new Date(date + 'T00:00:00')
-      .toLocaleDateString(undefined, { weekday:'long', year:'numeric', month:'long', day:'numeric' });
-
-    const trWeek = document.createElement('tr');
-    const tdWeek = document.createElement('td'); tdWeek.colSpan = 4; tdWeek.className = 'banner';
-    tdWeek.textContent = 'Week One';
-    trWeek.appendChild(tdWeek); table.appendChild(trWeek);
-
-    const trDate = document.createElement('tr');
-    const tdDate = document.createElement('td'); tdDate.colSpan = 4; tdDate.className = 'banner';
-    tdDate.textContent = dateLabel;
-    trDate.appendChild(tdDate); table.appendChild(trDate);
-
-    // ---- grid rows (skip the captured date row at index 0) ----
-    for(let i = 1; i <= lastUsed; i++){
-      const r = rows[i] || [];
-      const tr = document.createElement('tr');
-      for(let c = 0; c < 4; c++){
-        const cell = r[c] || {};
-        const val = String(cell.val || '').trim();
-        const td = document.createElement('td');
-        td.textContent = val;
-        tr.appendChild(td);
-      }
-      table.appendChild(tr);
-    }
-
-    sheet.appendChild(table);
-    return sheet;
-  }
-
-  function fitMiseSheet(sheet){
-    // Portrait A4 printable ~198mm wide x 285mm tall. The sheet is placed across
-    // the full printable width, so its height budget in its own px = width * (285/198).
-    const w = sheet.offsetWidth || 760;
-    const TARGET = w * (285/198);
-    let s = 1; sheet.style.setProperty('--msc', s);
-    let guard = 0;
-    // keep text readable — don't shrink below 0.82
-    while(s > 0.82 && sheet.scrollHeight > TARGET && guard < 40){
-      s -= 0.02; sheet.style.setProperty('--msc', s.toFixed(3)); guard++;
-    }
-  }
-
-  // ============================================================
-  //  DELIVERY LIST  (getOrdersForDate: name/location/slot/route)
-  // ============================================================
-  async function loadDelivery(){
-    if(!guard()) return;
-    const date = dateEl.value;
-    busy('Loading delivery list for ' + date + '…');
-    try{
-      const data = await ensureDelivery(date);
-      deliveryWrap.innerHTML = '';
-      const sheet = buildDeliverySheet(data.clients || [], date);
-      deliveryWrap.appendChild(sheet);
-      fitDeliverySheet(sheet);
-      loadedView.delivery = true;
-      done((data.clients || []).length + ' deliveries for ' + date, 'delivery');
-    }catch(e){ fail(e); }
-  }
-
-  function buildDeliverySheet(clients, date){
-    // sort by slot (Morning→Afternoon→Evening), then route ascending
-    const slotOrder = { Morning:1, Afternoon:2, Evening:3 };
-    const routeKey = r => {
-      const n = parseInt(String(r || '').match(/\d+/) || [9999], 10);
-      return { n: isNaN(n) ? 9999 : n, s: String(r || '') };
-    };
-    const sorted = clients.slice().sort((a, b) => {
-      const so = (slotOrder[a.slot] || 99) - (slotOrder[b.slot] || 99);
-      if(so) return so;
-      const ra = routeKey(a.route), rb = routeKey(b.route);
-      return (ra.n - rb.n) || ra.s.localeCompare(rb.s);
-    });
-
-    const wrap = document.createElement('div'); wrap.className = 'delsheet';
-    const h = document.createElement('h2');
-    h.textContent = new Date(date + 'T00:00:00')
-      .toLocaleDateString(undefined, { weekday:'long', year:'numeric', month:'long', day:'numeric' });
-    wrap.appendChild(h);
-
-    const table = document.createElement('table'); table.className = 'delivery';
-    const cols = [
-      { key:'_num',     label:'#'        },
-      { key:'name',     label:'Name'     },
-      { key:'location', label:'Location' },
-      { key:'slot',     label:'Slot'     },
-      { key:'route',    label:'Route'    },
-    ];
-
-    // fixed column widths so long addresses clip instead of widening the table
-    const colgroup = document.createElement('colgroup');
-    ['c-num','c-name','c-loc','c-slot','c-route'].forEach(cl => {
-      const col = document.createElement('col'); if(cl !== 'c-num') col.className = cl; colgroup.appendChild(col);
-    });
-    table.appendChild(colgroup);
-
-    const thead = document.createElement('thead');
-    const htr = document.createElement('tr');
-    cols.forEach(c => {
-      const th = document.createElement('th');
-      th.textContent = c.label;
-      if(c.key === '_num') th.className = 'num';
-      htr.appendChild(th);
-    });
-    thead.appendChild(htr); table.appendChild(thead);
-
-    const tbody = document.createElement('tbody');
-    let prevSlot = null, prevRoute = null, groupNum = 0;
-    sorted.forEach((r) => {
-      const tr = document.createElement('tr');
-      const slotChanged  = prevSlot  !== null && r.slot  !== prevSlot;
-      // route grouping only matters within the Afternoon slot
-      const routeMatters = r.slot === 'Afternoon';
-      const routeChanged = routeMatters && prevRoute !== null && !slotChanged && String(r.route) !== prevRoute;
-
-      if(slotChanged) tr.className = 'slotsep';
-      else if(routeChanged) tr.className = 'routesep';
-
-      // restart numbering on slot change always; on route change only for Afternoon
-      if(slotChanged || routeChanged || prevSlot === null) groupNum = 0;
-      prevSlot = r.slot; prevRoute = String(r.route);
-      groupNum++;
-      cols.forEach(c => {
-        const td = document.createElement('td');
-        if(c.key === '_num'){ td.className = 'num'; td.textContent = groupNum; }
-        else {
-          td.textContent = r[c.key] || '';
-          if(c.key === 'location') td.className = 'loc';
-        }
-        tr.appendChild(td);
-      });
-      tbody.appendChild(tr);
-    });
-    table.appendChild(tbody);
-    wrap.appendChild(table);
-    return wrap;
-  }
-
-  // scale the delivery sheet to fit one portrait page (same width-derived budget as mise)
-  function fitDeliverySheet(sheet){
-    const w = sheet.offsetWidth || 760;
-    const TARGET = w * (285/198);    // portrait one-page height budget in the sheet's own px
-    let s = 1; sheet.style.setProperty('--dsc', s);
-    let guard = 0;
-    while(s > 0.55 && sheet.scrollHeight > TARGET && guard < 40){
-      s -= 0.02; sheet.style.setProperty('--dsc', s.toFixed(3)); guard++;
-    }
-  }
-
-  // ============================================================
-  //  PAUSE LIST  (master clients with no order for the date)
-  // ============================================================
-  async function loadPause(){
-    if(!guard()) return;
-    const date = dateEl.value;
-    busy('Loading pause list for ' + date + '…');
-    try{
-      const data = await ensurePause(date);
-      renderPause(data, date);
-      loadedView.pause = true;
-      done((data.paused || []).length + ' paused clients for ' + date, 'pause');
-    }catch(e){ fail(e); }
-  }
-
-  function renderPause(data, date){
-    pauseWrap.innerHTML = '';
-    pauseWrap.appendChild(buildPauseSheet(data, date));
-  }
-
-  function buildPauseSheet(data, date){
-    // backend now returns {name, phone}; tolerate old plain-string shape too
-    const norm = x => (typeof x === 'string') ? { name:x, phone:'' } : { name:(x && x.name) || '', phone:(x && x.phone) || '' };
-    const byName = (a,b) => a.name.localeCompare(b.name);
-    const paused    = (data.paused || []).map(norm).sort(byName);
-    const cancelled = (data.cancelled || []).map(norm).sort(byName);
-    const inactive  = (data.pausedInactive || []).map(norm).sort(byName);
-
-    // tomorrow-reminder message for paused clients
-    const REMIND_MSG = (name) => "Hi " + name + "! It looks like tomorrow meal choice hasn't been selected yet. Just checking if you'd like to add the meal or pause for tomorrow. Let us know and we'll update it for you.";
-
-    const wrap = document.createElement('div'); wrap.className = 'pausesheet';
-    const h = document.createElement('h2');
-    h.textContent = 'Paused Clients — ' + new Date(date + 'T00:00:00')
-      .toLocaleDateString(undefined, { weekday:'long', year:'numeric', month:'long', day:'numeric' });
-    wrap.appendChild(h);
-
-    // toggle (hidden in print)
-    const tg = document.createElement('label'); tg.className = 'pause-toggle';
-    const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = showInactive;
-    cb.addEventListener('change', () => { showInactive = cb.checked; renderPause(data, date); });
-    tg.appendChild(cb);
-    tg.appendChild(document.createTextNode('Show inactive clients'));
-    wrap.appendChild(tg);
-
-    const waLink = (phone, msg) => {
-      let p = String(phone || '').replace(/\D/g,'');
-      if(p.length === 10) p = '91' + p;               // default to India country code
-      return 'intent://send?phone=' + p + '&text=' + encodeURIComponent(msg) + '#Intent;scheme=whatsapp;package=com.whatsapp.w4b;end';
-    };
-
-    const table = document.createElement('table'); table.className = 'pause';
-    let n = 0;
-    paused.forEach(c => {
-      const tr = document.createElement('tr');
-      const num = document.createElement('td'); num.className = 'num'; num.textContent = ++n;
-      const nm = document.createElement('td'); nm.textContent = c.name;
-      const act = document.createElement('td'); act.className = 'wa-cell';
-      if(c.phone){
-        const a = document.createElement('a');
-        a.className = 'wa-btn'; a.href = waLink(c.phone, REMIND_MSG(c.name));
-        a.target = '_blank'; a.rel = 'noopener'; a.textContent = 'WhatsApp';
-        act.appendChild(a);
-      }
-      tr.appendChild(num); tr.appendChild(nm); tr.appendChild(act); table.appendChild(tr);
-    });
-
-    // cancelled clients — explicitly cancelled the day; shown for awareness, NO reminder button
-    if(cancelled.length){
-      const sub = document.createElement('tr'); sub.className = 'subhead';
-      const td = document.createElement('td'); td.colSpan = 3; td.textContent = 'Cancelled (do not remind)';
-      sub.appendChild(td); table.appendChild(sub);
-      let k = 0;
-      cancelled.forEach(c => {
-        const tr = document.createElement('tr');
-        const num = document.createElement('td'); num.className = 'num'; num.textContent = ++k;
-        const nm = document.createElement('td'); nm.textContent = c.name;
-        const act = document.createElement('td'); act.className = 'wa-cell';
-        tr.appendChild(num); tr.appendChild(nm); tr.appendChild(act); table.appendChild(tr);
-      });
-    }
-
-    if(showInactive && inactive.length){
-      const sub = document.createElement('tr'); sub.className = 'subhead';
-      const td = document.createElement('td'); td.colSpan = 3; td.textContent = 'Inactive Clients';
-      sub.appendChild(td); table.appendChild(sub);
-      let m = 0;
-      inactive.forEach(c => {
-        const tr = document.createElement('tr');
-        const num = document.createElement('td'); num.className = 'num'; num.textContent = ++m;
-        const nm = document.createElement('td'); nm.textContent = c.name;
-        const act = document.createElement('td'); act.className = 'wa-cell';
-        tr.appendChild(num); tr.appendChild(nm); tr.appendChild(act); table.appendChild(tr);
-      });
-    }
-
-    wrap.appendChild(table);
-    return wrap;
-  }
-
-  // ============================================================
-  //  TAGS
-  // ============================================================
-  async function loadTags(){
-    if(!guard()) return;
-    const date = dateEl.value;
-    busy('Loading tags for ' + date + '…');
-    try{
-      const tags = await ensureTags(date);
-      pagesEl.innerHTML = '';
-      if(tags.length === 0){
-        loadedView.tags = true;
-        done('No tags for ' + date + ' (no orders, or all cancelled).', 'tags');
-        return;
-      }
-      const built = buildTagElements(tags);
-      paginateInto(pagesEl, built);
-      fitInners(pagesEl);
-      loadedView.tags = true;
-      done(built.meal + ' meal + ' + built.carry + ' carry bag tags', 'tags');
-    }catch(e){ fail(e); }
-  }
-
-  function buildTagElements(tags){
-    const ORDER = { breakfast:1, option1:2, option2:3, snack:4, juice1:5, juice2:6 };
-    const mealTags = tags.slice().sort((a,b) =>
-      ((ORDER[a.cat]||99) - (ORDER[b.cat]||99)) ||
-      (a.dish||'').localeCompare(b.dish||'') ||
-      ((a.remarks?1:0) - (b.remarks?1:0)) ||
-      (a.clientName||'').localeCompare(b.clientName||'')
-    );
-    const carryTags = buildCarryGroups(tags);
-    const els = [];
-    mealTags.forEach(t => els.push(buildTag(t)));
-    carryTags.forEach(g => els.push(buildCarryTag(g)));
-    els.meal = mealTags.length; els.carry = carryTags.length;
-    return els;
-  }
-
-  function paginateInto(container, els){
-    for(let p=0; p<els.length; p+=10){
-      const page = document.createElement('div');
-      page.className = 'page';
-      els.slice(p, p+10).forEach(el => page.appendChild(el));
-      container.appendChild(page);
-    }
-    const lastPage = container.querySelector('.page:last-of-type');
-    if(lastPage){
-      for(let b=lastPage.childElementCount; b<10; b++){
-        const empty = document.createElement('div');
-        empty.className = 'tag';
-        lastPage.appendChild(empty);
-      }
-    }
-  }
-
-  function buildTag(t){
-    const el = document.createElement('div'); el.className = 'tag';
-    const inner = document.createElement('div'); inner.className = 'inner';
-    const dish = document.createElement('div'); dish.className = 'dish';
-    dish.textContent = t.dish || '';
-    inner.appendChild(dish);
-    const isExtra = (t.kind === 'snack' || t.kind === 'juice');
-    if(!isExtra && t.type){
-      const ct = t.type.split(',').map(s => s.trim().replace(/^\d+\s*/, '')).filter(Boolean).join(', ');
-      if(ct){ const type = document.createElement('div'); type.className = 'type'; type.textContent = ct; inner.appendChild(type); }
-    }
-    if(t.remarks && !isExtra){
-      const rem = document.createElement('div'); rem.className = 'remark'; rem.textContent = t.remarks; inner.appendChild(rem);
-      const nm = document.createElement('div'); nm.className = 'cname'; nm.textContent = t.clientName || ''; inner.appendChild(nm);
-    }
-    el.appendChild(inner);
-    return el;
-  }
-
-  function buildCarryGroups(tags){
-    const catOrder = { breakfast:1, option1:2, option2:3, snack:4, juice1:5, juice2:6 };
-    const groups = {};
-    tags.forEach(t => {
-      const key = (t.phone || t.clientName) + '|' + t.slot;
-      if(!groups[key]) groups[key] = { clientName:t.clientName, slot:t.slot, type:t.type, remarks:t.remarks, codes:[] };
-      groups[key].codes.push({ code:t.code, cat:t.cat });
-    });
-    const arr = Object.values(groups);
-    arr.forEach(g => {
-      g.codes.sort((a,b) => (catOrder[a.cat]||99) - (catOrder[b.cat]||99));
-      const counts = {}; const seq = [];
-      g.codes.forEach(c => { if(counts[c.code]===undefined){ counts[c.code]=0; seq.push(c.code); } counts[c.code]++; });
-      g.codeList = seq.map(code => counts[code] > 1 ? counts[code] + 'x ' + code : code);
-    });
-    const slotOrder = { Morning:1, Afternoon:2, Evening:3 };
-    arr.sort((a,b) =>
-      ((slotOrder[a.slot]||99) - (slotOrder[b.slot]||99)) ||
-      (a.clientName||'').localeCompare(b.clientName||'')
-    );
-    return arr;
-  }
-
-  function buildCarryTag(g){
-    const el = document.createElement('div'); el.className = 'tag carry';
-    const inner = document.createElement('div'); inner.className = 'inner';
-    const name = document.createElement('div'); name.className = 'cb-name'; name.textContent = g.clientName || ''; inner.appendChild(name);
-    g.codeList.forEach(code => { const c = document.createElement('div'); c.className = 'cb-code'; c.textContent = code; inner.appendChild(c); });
-    if(g.type){
-      const ct = g.type.split(',').map(s => s.trim().replace(/^\d+\s*/, '')).filter(Boolean).join(', ');
-      if(ct){ const ty = document.createElement('div'); ty.className = 'cb-type'; ty.textContent = ct; inner.appendChild(ty); }
-    }
-    if(g.remarks){ const rem = document.createElement('div'); rem.className = 'cb-remark'; rem.textContent = g.remarks; inner.appendChild(rem); }
-    const slot = String(g.slot || '').trim();
-    if(slot === 'Morning' || slot === 'Evening'){ const s = document.createElement('div'); s.className = 'cb-slot'; s.textContent = slot; inner.appendChild(s); }
-    el.appendChild(inner);
-    return el;
-  }
-
-  function fitInners(container){
-    requestAnimationFrame(() => {
-      container.querySelectorAll('.inner').forEach(inner => {
-        let size = 24; inner.style.fontSize = size + 'px';
-        while(size > 7 && (inner.scrollHeight > inner.clientHeight || inner.scrollWidth > inner.clientWidth)){
-          size -= 0.5; inner.style.fontSize = size + 'px';
-        }
-      });
-    });
-  }
-
-  // ============================================================
-  //  KITCHEN LIST PDF  (tags portrait + lists landscape, one file)
-  // ============================================================
-  // preload tag backgrounds so html2canvas captures them
-  ['tag_template.png','carrybag_tags.png','logo.png'].forEach(src => { const im = new Image(); im.src = src; });
-
-  function fitInnerSync(inner){
-    let size = 24; inner.style.fontSize = size + 'px';
-    while(size > 7 && (inner.scrollHeight > inner.clientHeight || inner.scrollWidth > inner.clientWidth)){
-      size -= 0.5; inner.style.fontSize = size + 'px';
-    }
-  }
-
-  // wait for all <img> and CSS background images inside a node to load
-  function waitForImages(node){
-    const urls = [];
-    node.querySelectorAll('*').forEach(el => {
-      const bg = getComputedStyle(el).backgroundImage;
-      const m = bg && bg.match(/url\(["']?([^"')]+)["']?\)/);
-      if(m) urls.push(m[1]);
-    });
-    node.querySelectorAll('img').forEach(img => urls.push(img.src));
-    return Promise.all(urls.map(u => new Promise(res => {
-      const im = new Image(); im.onload = im.onerror = res; im.src = u;
-    })));
-  }
-
-  async function downloadKitchenPdf(){
-    if(!guard()) return;
-    if(!window.jspdf || !window.html2canvas){
-      setStatus('PDF libraries not loaded — check your connection.', false);
-      return;
-    }
-    const date = dateEl.value;
-    pdfBtn.disabled = true; busy('Building Kitchen List PDF for ' + date + '…');
-    showOverlay('Preparing lists…');
-
-    // offscreen staging (rendered, but off-screen so html2canvas can read layout)
-    const stage = document.createElement('div');
-    stage.style.cssText = 'position:absolute; left:-99999px; top:0; background:#fff;';
-    document.body.appendChild(stage);
-
-    try{
-      const needTags   = sectionOn('tags');
-      const needClient = sectionOn('client');
-      const needMeal   = sectionOn('meal');
-      const needOverview = sectionOn('overview');
-      const needMise   = sectionOn('mise');
-      const needDel    = sectionOn('delivery');
-      const needPause  = sectionOn('pause');
-
-      if(!(needTags || needClient || needMeal || needOverview || needMise || needDel || needPause)){
-        setStatus('Tick at least one list to include in the PDF.', false);
-        stage.remove(); goBtn.disabled = false; pdfBtn.disabled = false; hideOverlay();
-        return;
-      }
-
-      setOverlay('Fetching data…');
-      const tags = needTags ? await ensureTags(date) : [];
-      const rows = (needClient || needMeal || needOverview) ? await ensureClient(date) : [];
-
-      let miseData = null;
-      if(needMise){ try{ miseData = await ensureMise(date); }catch(e){ miseData = null; } }
-      let deliveryData = null;
-      if(needDel){ try{ deliveryData = await ensureDelivery(date); }catch(e){ deliveryData = null; } }
-      let pauseData = null;
-      if(needPause){ try{ pauseData = await ensurePause(date); }catch(e){ pauseData = null; } }
-
-      // ---- render tag pages, snapshot each ----
-      const tagCanvases = [];
-      if(needTags && tags.length){
-        setOverlay('Rendering tags…');
-        const pagesC = document.createElement('div');
-        pagesC.className = 'pages';
-        pagesC.style.cssText = 'padding:0; gap:0;';
-        stage.appendChild(pagesC);
-        const built = buildTagElements(tags);
-        paginateInto(pagesC, built);
-        pagesC.querySelectorAll('.inner').forEach(fitInnerSync);
-        await waitForImages(pagesC);
-        for(const page of pagesC.querySelectorAll('.page')){
-          const c = await html2canvas(page, { scale:PDF_SCALE, useCORS:true, backgroundColor:'#ffffff' });
-          tagCanvases.push(c);
-        }
-      }
-
-      // ---- render client list, snapshot ----
-      let clientCanvas = null;
-      if(needClient && rows.length){
-        setOverlay('Rendering client list…');
-        const sheet = buildClientSheet(rows, date);
-        sheet.style.padding = '0'; sheet.style.boxShadow = 'none'; sheet.style.width = '1400px';
-        const sw = document.createElement('div'); sw.className = 'listwrap'; sw.style.padding = '0';
-        sw.appendChild(sheet);
-        stage.appendChild(sw);
-        fitClientSheet(sheet, rows.length, 965);
-        await waitForImages(sw);
-        clientCanvas = await html2canvas(sheet, { scale:PDF_SCALE, useCORS:true, backgroundColor:'#ffffff' });
-      }
-
-      // ---- render meal list, snapshot ----
-      let mealCanvas = null;
-      if(needMeal && rows.length){
-        setOverlay('Rendering meal list…');
-        const mealSheet = buildMealSheet(groupMeal(rows), date);
-        stage.appendChild(mealSheet);
-        fitMealSheet(mealSheet);
-        mealCanvas = await html2canvas(mealSheet, { scale:PDF_SCALE, useCORS:true, backgroundColor:'#ffffff' });
-      }
-
-      // ---- render mise list, snapshot (optional) ----
-      let miseCanvas = null;
-      const miseTbl = (miseData && miseData.tables && miseData.tables[0]) ? miseData.tables[0] : null;
-      if(needMise && miseTbl){
-        setOverlay('Rendering mise list…');
-        const miseSheet = buildMiseSheet(miseTbl, date);
-        stage.appendChild(miseSheet);
-        fitMiseSheet(miseSheet);
-        miseCanvas = await html2canvas(miseSheet, { scale:PDF_SCALE, useCORS:true, backgroundColor:'#ffffff' });
-      }
-
-      // ---- render delivery list, snapshot (optional) ----
-      let deliveryCanvas = null;
-      if(needDel && deliveryData && deliveryData.clients && deliveryData.clients.length){
-        setOverlay('Rendering delivery list…');
-        const delSheet = buildDeliverySheet(deliveryData.clients, date);
-        delSheet.style.padding = '0'; delSheet.style.boxShadow = 'none'; delSheet.style.width = '760px';
-        stage.appendChild(delSheet);
-        fitDeliverySheet(delSheet);
-        deliveryCanvas = await html2canvas(delSheet, { scale:PDF_SCALE, useCORS:true, backgroundColor:'#ffffff' });
-      }
-
-      // ---- render meal overview, snapshot (optional) ----
-      let overviewCanvas = null;
-      if(needOverview && rows.length){
-        setOverlay('Rendering meal overview…');
-        const ovSheet = buildOverviewSheet(computeMealCounts(rows), date);
-        const ovAct = ovSheet.querySelector('.ov-actions'); if(ovAct) ovAct.remove();
-        ovSheet.style.padding = '0'; ovSheet.style.boxShadow = 'none'; ovSheet.style.width = '680px';
-        stage.appendChild(ovSheet);
-        overviewCanvas = await html2canvas(ovSheet, { scale:PDF_SCALE, useCORS:true, backgroundColor:'#ffffff' });
-      }
-
-      // ---- render pause list, snapshot (optional; respects the inactive toggle) ----
-      let pauseCanvas = null;
-      if(needPause && pauseData && ((pauseData.paused && pauseData.paused.length) || (showInactive && pauseData.pausedInactive && pauseData.pausedInactive.length))){
-        setOverlay('Rendering pause list…');
-        const pauseSheet = buildPauseSheet(pauseData, date);
-        pauseSheet.querySelectorAll('.wa-cell').forEach(el => el.remove());  // no buttons in PDF
-        pauseSheet.style.padding = '0'; pauseSheet.style.boxShadow = 'none';
-        stage.appendChild(pauseSheet);
-        pauseCanvas = await html2canvas(pauseSheet, { scale:PDF_SCALE, useCORS:true, backgroundColor:'#ffffff' });
-      }
-
-      setOverlay('Assembling PDF…');
-
-      // ---- assemble PDF ----
-      const { jsPDF } = window.jspdf;
-      // first page orientation = orientation of the first section actually included
-      let firstOrient = 'portrait';
-      if(tagCanvases.length) firstOrient = 'portrait';
-      else if(clientCanvas) firstOrient = 'landscape';
-      else firstOrient = 'portrait';   // meal/mise/delivery/pause are all portrait
-      const pdf = new jsPDF({ orientation:firstOrient, unit:'mm', format:'a4' });
-      let started = false;
-      const place = (orient) => { if(!started){ started = true; } else { pdf.addPage('a4', orient); } };
-
-      // tags: full-bleed portrait A4
-      for(const c of tagCanvases){
-        place('portrait');
-        pdf.addImage(c.toDataURL('image/jpeg', 0.96), 'JPEG', 0, 0, 210, 297);
-      }
-
-      // client list: landscape, sliced across pages if taller than one page
-      if(clientCanvas) addImagePaged(pdf, clientCanvas, place, 'landscape');
-
-      // meal list: portrait
-      if(mealCanvas) addImagePaged(pdf, mealCanvas, place, 'portrait');
-
-      // mise list: portrait (if present)
-      if(miseCanvas) addImagePaged(pdf, miseCanvas, place, 'portrait');
-
-      // delivery list: portrait (if present)
-      if(deliveryCanvas) addImagePaged(pdf, deliveryCanvas, place, 'portrait');
-
-      // meal overview: portrait (if present)
-      if(overviewCanvas) addImagePaged(pdf, overviewCanvas, place, 'portrait');
-
-      // pause list: portrait (if present)
-      if(pauseCanvas) addImageFitOnePage(pdf, pauseCanvas, place, 'portrait');
-
-      pdf.save('Kitchen_List_' + date + '.pdf');
-      setStatus('Kitchen List PDF downloaded for ' + date + '.', false);
-    }catch(e){
-      setStatus('PDF error: ' + e.message, false);
-    }finally{
-      stage.remove();
-      goBtn.disabled = false; pdfBtn.disabled = false;
-      hideOverlay();
-    }
-  }
-
-  // place a canvas onto A4 page(s) in the given orientation, 6mm margins, slicing if too tall
-  // Always fit the whole image on ONE page (scale down if needed, never slice). For the pause list.
-  function addImageFitOnePage(pdf, canvas, place, orient){
-    const margin = 6;
-    const pageW = orient === 'landscape' ? 297 : 210;
-    const pageH = orient === 'landscape' ? 210 : 297;
-    const Pw = pageW - 2*margin, Ph = pageH - 2*margin;
-    const Cw = canvas.width, Ch = canvas.height;
-    if(!Cw || !Ch) return;
-    // scale so both width and height fit within the page box
-    const scale = Math.min(Pw / Cw, Ph / Ch);
-    const w = Cw * scale, h = Ch * scale;
-    const x = margin + (Pw - w) / 2;   // center horizontally
-    place(orient);
-    pdf.addImage(canvas.toDataURL('image/jpeg', 0.96), 'JPEG', x, margin, w, h);
-  }
-
-  function addImagePaged(pdf, canvas, place, orient){
-    const margin = 6;
-    const pageW = orient === 'landscape' ? 297 : 210;
-    const pageH = orient === 'landscape' ? 210 : 297;
-    const Pw = pageW - 2*margin, Ph = pageH - 2*margin;
-    const Cw = canvas.width, Ch = canvas.height;
-    if(!Cw || !Ch) return;
-
-    const fullH = Ch * (Pw / Cw);
-    // tolerance: if it's within ~3mm of fitting, scale it down to one page instead of spilling
-    if(fullH <= Ph + 3){
-      place(orient);
-      const drawH = Math.min(fullH, Ph);
-      pdf.addImage(canvas.toDataURL('image/jpeg', 0.96), 'JPEG', margin, margin, Pw, drawH);
-      return;
-    }
-    const sliceHpx = Math.floor(Cw * (Ph / Pw));
-    const minSlicePx = Math.max(8, Cw * 0.01);   // skip slivers thinner than ~1% (blank-page guard)
-    for(let y = 0; y < Ch; y += sliceHpx){
-      const h = Math.min(sliceHpx, Ch - y);
-      if(h < minSlicePx) break;                  // trailing sliver → don't emit a near-blank page
-      const sc = document.createElement('canvas');
-      sc.width = Cw; sc.height = h;
-      const sctx = sc.getContext('2d');
-      sctx.fillStyle = '#ffffff'; sctx.fillRect(0, 0, Cw, h);
-      sctx.drawImage(canvas, 0, y, Cw, h, 0, 0, Cw, h);
-      place(orient);
-      pdf.addImage(sc.toDataURL('image/jpeg', 0.96), 'JPEG', margin, margin, Pw, h * (Pw / Cw));
-    }
-  }
-
-  // ---- small helpers ----
-  function guard(){
-    if(!API){ setStatus('No API URL found in config.js.', false); return false; }
-    if(!dateEl.value){ setStatus('Pick a date first.', false); return false; }
-    return true;
-  }
-  function busy(msg){ goBtn.disabled = true; printBtn.disabled = true; setStatus(msg, true); }
-  function done(msg, tab){ setStatus(msg, false); goBtn.disabled = false; if(activeTab === tab) printBtn.disabled = false; }
-  function fail(e){ setStatus('Error: ' + e.message, false); goBtn.disabled = false; }
+  out.innerHTML = `<div class="message-box" id="msgText">${escapeHtml(message)}</div>
+    <div class="action-row">
+      <button class="btn" onclick="copyMessage()">📋 Copy</button>
+      <button class="btn wa-btn" onclick="sendWhatsApp()">Share on WhatsApp</button>
+    </div>`;
+  out.dataset.raw = message;
+}
+
+function copyMessage() {
+  const text = document.getElementById('messageOutput').dataset.raw || '';
+  navigator.clipboard.writeText(text).then(() => showToast('Copied to clipboard!')).catch(() => {
+    const ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta);
+    showToast('Copied to clipboard!');
+  });
+}
+function sendWhatsApp() {
+  const text = document.getElementById('messageOutput').dataset.raw || '';
+  if (!text) { showToast('Nothing to share yet'); return; }
+  window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank');
+}
+
+function escapeHtml(str) { return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+function escapeAttr(str) { return String(str).replace(/'/g, "\\'"); }
 </script>
+
+<!-- Google Maps (Distance Matrix). Same key as quote.html. -->
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCqVJgCfV0C1KBF0u1Jc02p_RHE7K7g1V8" async defer></script>
+
 </body>
 </html>
