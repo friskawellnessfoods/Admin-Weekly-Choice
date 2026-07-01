@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Friska Admin Dashboard</title>
+<base target="_blank">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display&display=swap" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+<style>
+:root{
+  --bg:#eef2f6; --surface:#ffffff; --border:#d7e0ea;
+  --ink:#1f2a37; --muted:#5b6b7b;
+  --grad-a:#0ea5a3; --grad-b:#2563eb;
+  --primary:#0ea5a3; --primary-d:#0b8482; --primary-light:#e6faf9;
+  --green:#16a34a; --green-light:#dcfce7;
+  --radius:14px;
+  --shadow:0 4px 18px rgba(20,40,70,.08);
+  --shadow-hover:0 10px 30px rgba(20,40,70,.14);
+}
+.dark{
+  --bg:#0d0f1a; --surface:#161926; --border:#2a2f45;
+  --ink:#e8ecff; --muted:#8892b0;
+  --grad-a:#2dd4bf; --grad-b:#4f8ef7;
+  --primary:#2dd4bf; --primary-d:#5eead4; --primary-light:#123230;
+  --green:#4ade80; --green-light:#14291e;
+  --shadow:0 2px 12px rgba(0,0,0,.3); --shadow-hover:0 8px 24px rgba(0,0,0,.45);
+}
+*{ box-sizing:border-box; margin:0; padding:0; }
+body{
+  font-family:'DM Sans',sans-serif; color:var(--ink); min-height:100vh; transition:background .3s,color .3s;
+  padding:26px 20px 48px;
+  background:
+    radial-gradient(1200px 500px at 50% -10%, rgba(37,99,235,.08), transparent 60%),
+    radial-gradient(900px 500px at 50% 115%, rgba(14,165,163,.10), transparent 60%),
+    var(--bg);
+}
+
+.header{ max-width:680px; margin:0 auto 22px; display:flex; justify-content:space-between; align-items:center; }
+.header-left{ display:flex; align-items:center; gap:13px; }
+.logo-wrap img{ height:44px; width:auto; display:block; }
+.header-text h1{ font-family:'DM Serif Display',serif; font-size:21px; line-height:1.05;
+  background:linear-gradient(90deg,var(--grad-a),var(--grad-b)); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
+.header-text p{ font-size:12px; color:var(--muted); margin-top:3px; letter-spacing:.02em; }
+
+.icon-btn{ width:40px; height:40px; border-radius:11px; border:1.5px solid var(--border); background:var(--surface); color:var(--muted);
+  display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:15px; transition:all .2s; }
+.icon-btn:hover{ color:var(--primary); border-color:var(--primary); }
+
+.search{ max-width:680px; margin:0 auto 26px; position:relative; }
+.search i{ position:absolute; left:17px; top:50%; transform:translateY(-50%); color:var(--muted); font-size:15px; pointer-events:none; }
+.search input{ width:100%; padding:14px 16px 14px 46px; border:1.5px solid var(--border); border-radius:14px; background:var(--surface);
+  color:var(--ink); font-size:15px; font-family:inherit; box-shadow:var(--shadow); transition:border-color .15s, box-shadow .15s; }
+.search input::placeholder{ color:var(--muted); }
+.search input:focus{ outline:none; border-color:var(--primary); box-shadow:0 0 0 3px rgba(14,165,163,.16); }
+
+.content{ max-width:680px; margin:0 auto; }
+.section{ margin-bottom:26px; }
+.section-label{ display:flex; align-items:center; gap:10px; margin-bottom:12px; }
+.section-label span{ font-size:11px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:var(--muted); white-space:nowrap; }
+.section-label::after{ content:''; flex:1; height:1px; background:var(--border); }
+
+.grid{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+
+.card{ background:var(--surface); border:1.5px solid var(--border); padding:15px; border-radius:var(--radius); text-decoration:none;
+  color:var(--ink); display:flex; align-items:center; gap:13px; font-weight:600; font-size:14px; line-height:1.3;
+  transition:transform .18s, box-shadow .18s, border-color .18s; box-shadow:var(--shadow); position:relative; overflow:hidden; }
+.card::before{ content:''; position:absolute; left:0; top:0; bottom:0; width:3px; background:transparent; transition:background .2s; }
+.card:hover{ transform:translateY(-2px); box-shadow:var(--shadow-hover); border-color:transparent; }
+.card:hover::before{ background:linear-gradient(180deg,var(--grad-a),var(--grad-b)); }
+.card.green:hover::before{ background:var(--green); }
+
+.card-icon{ width:40px; height:40px; border-radius:11px; background:var(--primary-light); display:flex; align-items:center; justify-content:center;
+  font-size:16px; color:var(--primary-d); flex-shrink:0; transition:all .2s; }
+.card:hover .card-icon{ background:linear-gradient(135deg,var(--grad-a),var(--grad-b)); color:#fff; }
+.card.green .card-icon{ background:var(--green-light); color:var(--green); }
+.card.green:hover .card-icon{ background:var(--green); color:#fff; }
+
+.card-label{ flex:1; }
+.card-arrow{ margin-left:auto; color:var(--muted); font-size:11px; opacity:0; transform:translateX(-4px); transition:all .2s; flex-shrink:0; }
+.card:hover .card-arrow{ opacity:1; transform:translateX(0); color:var(--primary-d); }
+
+.no-results{ max-width:680px; margin:10px auto 0; text-align:center; color:var(--muted); padding:40px 20px; display:none; font-size:14px; }
+.no-results i{ font-size:26px; opacity:.5; display:block; margin-bottom:10px; }
+
+.footer{ max-width:680px; margin:32px auto 0; text-align:center; font-size:12px; color:var(--muted); }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <div class="logo-wrap"><img src="logo.png" alt="Friska"></div>
+    <div class="header-text">
+      <h1>Friska Wellness Foods</h1>
+      <p>Admin Dashboard</p>
+    </div>
+  </div>
+  <button class="icon-btn" onclick="toggleDark()" title="Toggle dark mode">
+    <i class="fas fa-moon" id="themeIcon"></i>
+  </button>
+</div>
+
+<div class="search">
+  <i class="fas fa-magnifying-glass"></i>
+  <input type="text" id="toolSearch" placeholder="Search tools…" oninput="filterTools()" autocomplete="off">
+</div>
+
+<div class="content">
+
+  <div class="section">
+    <div class="section-label"><span>Sheets</span></div>
+    <div class="grid">
+      <a class="card" data-search="meal list 2026 dishes sheet menu" href="https://docs.google.com/spreadsheets/d/1CsT6_oYsFjgQQ73pt1Bl1cuXuzKY8JnOTB3E4bDkTiA/edit?gid=424407152#gid=424407152">
+        <div class="card-icon"><i class="fas fa-table-list"></i></div>
+        <span class="card-label">Meal List 2026</span>
+        <i class="fas fa-arrow-right card-arrow"></i>
+      </a>
+      <a class="card" data-search="bills billing invoice payments sheet" href="https://docs.google.com/spreadsheets/d/1Z4rscSqlAiXk-cSziDED5C20LJCdkMEkF2xOEFKycgU/edit?gid=1540650741#gid=1540650741">
+        <div class="card-icon"><i class="fas fa-file-invoice-dollar"></i></div>
+        <span class="card-label">Bills</span>
+        <i class="fas fa-arrow-right card-arrow"></i>
+      </a>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-label"><span>Kitchen</span></div>
+    <div class="grid">
+      <a class="card" data-search="kitchen panel tags mise delivery lists ops" href="https://friskawellnessfoods.github.io/Admin-Weekly-Choice/kitchen.html">
+        <div class="card-icon"><i class="fas fa-kitchen-set"></i></div>
+        <span class="card-label">Kitchen Panel</span>
+        <i class="fas fa-arrow-right card-arrow"></i>
+      </a>
+      <a class="card" data-search="weekly menu dishes food" href="https://friskawellnessfoods.github.io/weekly-choice/menu.html">
+        <div class="card-icon"><i class="fas fa-utensils"></i></div>
+        <span class="card-label">Weekly Menu</span>
+        <i class="fas fa-arrow-right card-arrow"></i>
+      </a>
+      <a class="card" data-search="meal summary charts stats analytics" href="https://friskawellnessfoods.github.io/Admin-Weekly-Choice/summary.html">
+        <div class="card-icon"><i class="fas fa-chart-pie"></i></div>
+        <span class="card-label">Meal Summary</span>
+        <i class="fas fa-arrow-right card-arrow"></i>
+      </a>
+      <a class="card" data-search="miselist mise prep viewer" href="https://friskawellnessfoods.github.io/Admin-Weekly-Choice/miselist.html">
+        <div class="card-icon"><i class="fas fa-clipboard-list"></i></div>
+        <span class="card-label">MiseList Viewer</span>
+        <i class="fas fa-arrow-right card-arrow"></i>
+      </a>
+      <a class="card" data-search="delivery routes map driver agent navigation" href="https://friskawellnessfoods.github.io/Admin-Weekly-Choice/delivery.html">
+        <div class="card-icon"><i class="fas fa-truck-fast"></i></div>
+        <span class="card-label">Delivery Routes</span>
+        <i class="fas fa-arrow-right card-arrow"></i>
+      </a>
+      <a class="card" data-search="client message whatsapp notify reminder" href="https://friskawellnessfoods.github.io/Admin-Weekly-Choice/clientmessage.html">
+        <div class="card-icon"><i class="fas fa-comment-dots"></i></div>
+        <span class="card-label">Client Message</span>
+        <i class="fas fa-arrow-right card-arrow"></i>
+      </a>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-label"><span>Client</span></div>
+    <div class="grid">
+      <a class="card" data-search="weekly choice client order selection" href="https://friskawellnessfoods.github.io/weekly-choice/">
+        <div class="card-icon"><i class="fas fa-calendar-check"></i></div>
+        <span class="card-label">Weekly Choice</span>
+        <i class="fas fa-arrow-right card-arrow"></i>
+      </a>
+      <a class="card" data-search="client onboarding add new register signup" href="https://friskawellnessfoods.github.io/Admin-Weekly-Choice/clientonboard.html">
+        <div class="card-icon"><i class="fas fa-user-plus"></i></div>
+        <span class="card-label">Client Onboarding</span>
+        <i class="fas fa-arrow-right card-arrow"></i>
+      </a>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-label"><span>Admin</span></div>
+    <div class="grid">
+      <a class="card" data-search="billing calculator bill invoice charges" href="https://friskawellnessfoods.github.io/Admin-Weekly-Choice/Billing.html">
+        <div class="card-icon"><i class="fas fa-calculator"></i></div>
+        <span class="card-label">Billing Calculator</span>
+        <i class="fas fa-arrow-right card-arrow"></i>
+      </a>
+      <a class="card" data-search="price generator quote pricing plan" href="https://plan-details.friskawellness.com/">
+        <div class="card-icon"><i class="fas fa-tags"></i></div>
+        <span class="card-label">Price Generator</span>
+        <i class="fas fa-arrow-right card-arrow"></i>
+      </a>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-label"><span>System</span></div>
+    <div class="grid">
+      <a class="card" data-search="cache control refresh clear system" href="https://friskawellnessfoods.github.io/Admin-Weekly-Choice/cache-admin.html">
+        <div class="card-icon"><i class="fas fa-database"></i></div>
+        <span class="card-label">Cache Control</span>
+        <i class="fas fa-arrow-right card-arrow"></i>
+      </a>
+      <a class="card" data-search="yearly menu annual calendar" href="https://friskawellnessfoods.github.io/weekly-choice/yearlymenu.html">
+        <div class="card-icon"><i class="fas fa-calendar-days"></i></div>
+        <span class="card-label">Yearly Menu</span>
+        <i class="fas fa-arrow-right card-arrow"></i>
+      </a>
+      <a class="card green" data-search="process orders log output run" href="https://friskawellnessfoods.github.io/Admin-Weekly-Choice/process.html">
+        <div class="card-icon"><i class="fas fa-bolt"></i></div>
+        <span class="card-label">Process Orders</span>
+        <i class="fas fa-arrow-right card-arrow"></i>
+      </a>
+      <a class="card" data-search="admin weekly choice landing home" href="https://friskawellnessfoods.github.io/Admin-Weekly-Choice/">
+        <div class="card-icon"><i class="fas fa-sliders"></i></div>
+        <span class="card-label">Admin Weekly Choice</span>
+        <i class="fas fa-arrow-right card-arrow"></i>
+      </a>
+    </div>
+  </div>
+
+</div>
+
+<div class="no-results" id="noResults">
+  <i class="fas fa-magnifying-glass"></i>
+  No tools match your search.
+</div>
+
+<div class="footer">Friska Wellness Foods · Admin</div>
+
+<script>
+function toggleDark(){
+  document.body.classList.toggle('dark');
+  document.getElementById('themeIcon').className =
+    document.body.classList.contains('dark') ? 'fas fa-sun' : 'fas fa-moon';
+}
+
+function filterTools(){
+  const q = document.getElementById('toolSearch').value.trim().toLowerCase();
+  let anyVisible = false;
+  document.querySelectorAll('.section').forEach(sec => {
+    let shown = 0;
+    sec.querySelectorAll('.card').forEach(card => {
+      const hay = (card.dataset.search || card.textContent || '').toLowerCase();
+      const match = !q || hay.indexOf(q) !== -1;
+      card.style.display = match ? '' : 'none';
+      if (match) shown++;
+    });
+    sec.style.display = shown ? '' : 'none';
+    if (shown) anyVisible = true;
+  });
+  document.getElementById('noResults').style.display = anyVisible ? 'none' : 'block';
+}
+</script>
+</body>
+</html>
