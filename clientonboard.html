@@ -3,262 +3,662 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Friska — Client Onboarding</title>
+<title>Friska — Delivery Routes</title>
 <script src="config.js"></script>
 <style>
   :root{
     --c-bg:#eef2f6; --c-surface:#ffffff; --c-ink:#1f2a37; --c-muted:#5b6b7b; --c-line:#d7e0ea;
     --grad-a:#0ea5a3; --grad-b:#2563eb; --c-primary:#0ea5a3; --c-primary-d:#0b8482;
-    --radius:12px; --shadow:0 6px 24px rgba(20,40,70,.10);
+    --wa:#25D366; --radius:12px; --shadow:0 6px 24px rgba(20,40,70,.10);
   }
   *{ box-sizing:border-box; }
-  body{ font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif; margin:0; color:var(--c-ink);
+  body{ font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif; margin:0; background:var(--c-bg); color:var(--c-ink); -webkit-text-size-adjust:100%; }
+
+  /* landing vs working */
+  .bar{ background:var(--c-surface); }
+  body.landing .bar{
+    position:static; min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:18px; padding:32px 20px;
     background:
-      radial-gradient(1200px 500px at 50% -10%, rgba(37,99,235,.08), transparent 60%),
-      radial-gradient(900px 500px at 50% 110%, rgba(14,165,163,.10), transparent 60%),
+      radial-gradient(1200px 500px at 50% -10%, rgba(37,99,235,.10), transparent 60%),
+      radial-gradient(900px 500px at 50% 110%, rgba(14,165,163,.12), transparent 60%),
       var(--c-bg);
-    min-height:100vh; -webkit-text-size-adjust:100%; }
+  }
+  body.landing .content{ display:none; }
+  body.working .bar{
+    position:sticky; top:0; z-index:10; flex-direction:row; min-height:auto; padding:10px 16px;
+    display:flex; gap:10px; align-items:center; flex-wrap:wrap; justify-content:flex-start;
+    background:var(--c-surface); border-bottom:1px solid var(--c-line); box-shadow:0 1px 0 rgba(0,0,0,.02);
+  }
 
-  .bar{ background:var(--c-surface); border-bottom:1px solid var(--c-line); box-shadow:0 1px 0 rgba(0,0,0,.02);
-    padding:12px 16px; display:flex; align-items:center; justify-content:center; gap:12px; }
-  .bar img{ height:34px; width:auto; }
-  .bar span{ font-size:17px; font-weight:800; letter-spacing:.2px;
+  .brand{ display:flex; align-items:center; gap:12px; }
+  .brand img{ height:36px; width:auto; }
+  .brand span{ font-size:16px; font-weight:800; letter-spacing:.2px;
     background:linear-gradient(90deg,var(--grad-a),var(--grad-b)); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
+  body.landing .brand{ flex-direction:column; gap:10px; margin-bottom:4px; }
+  body.landing .brand img{ height:64px; }
+  body.landing .brand span{ font-size:26px; }
 
-  .wrap{ max-width:480px; margin:22px auto; padding:0 16px 60px; }
-  .card{ background:var(--c-surface); border:1px solid var(--c-line); border-radius:16px; padding:20px; box-shadow:var(--shadow); }
+  .hero-sub{ display:none; }
+  body.landing .hero-sub{ display:block; color:var(--c-muted); font-size:14px; margin-top:-6px; text-align:center; }
 
-  label.fld{ display:block; font-size:13px; font-weight:700; color:var(--c-muted); margin:0 0 6px 2px; }
-  .hint{ font-size:12px; color:var(--c-muted); margin:-6px 0 12px 2px; }
+  .controls{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; justify-content:center; }
+  body.landing .controls{ flex-direction:column; width:100%; max-width:340px; }
+  body.landing .controls > *{ width:100%; }
+  .field{ position:relative; display:flex; align-items:center; }
+  body.landing .field{ width:100%; }
+  .field input[type=date]{ padding:12px 14px; border:1.5px solid var(--c-line); border-radius:var(--radius); font-size:15px;
+    cursor:pointer; background:var(--c-surface); color:var(--c-ink); width:100%; transition:border-color .15s, box-shadow .15s; }
+  .field input[type=date]:focus{ outline:none; border-color:var(--c-primary); box-shadow:0 0 0 3px rgba(14,165,163,.16); }
 
-  input, select{ width:100%; padding:12px 14px; margin-bottom:14px; border-radius:var(--radius); border:1.5px solid var(--c-line);
-    font-size:15px; background:var(--c-surface); color:var(--c-ink); transition:border-color .15s, box-shadow .15s; }
-  input:focus, select:focus{ outline:none; border-color:var(--c-primary); box-shadow:0 0 0 3px rgba(14,165,163,.16); }
-
-  .dropdown-wrap{ position:relative; margin-bottom:14px; }
-  .dropdown-btn{ width:100%; padding:12px 14px; border-radius:var(--radius); border:1.5px solid var(--c-line); font-size:15px;
-    background:var(--c-surface); color:var(--c-ink); text-align:left; cursor:pointer; display:flex; justify-content:space-between; align-items:center; }
-  .dropdown-btn:hover{ border-color:#b9c6d6; }
-  .dropdown-btn .ph{ color:var(--c-muted); }
-  .dropdown-menu{ display:none; position:absolute; top:calc(100% + 6px); left:0; right:0; background:var(--c-surface);
-    border:1px solid var(--c-line); border-radius:var(--radius); box-shadow:var(--shadow); z-index:100; max-height:280px; overflow-y:auto; }
-  .dropdown-menu.active{ display:block; }
-  .dropdown-menu label{ display:flex; align-items:center; gap:9px; padding:11px 14px; font-size:14px; cursor:pointer;
-    border-bottom:1px solid var(--c-line); margin:0; color:var(--c-ink); font-weight:500; }
-  .dropdown-menu label:last-child{ border-bottom:none; }
-  .dropdown-menu label:hover{ background:var(--c-bg); }
-  .dropdown-menu input[type=checkbox]{ width:auto; margin:0; padding:0; border:none; accent-color:var(--c-primary); }
-
-  .slot-row{ display:flex; gap:8px; margin-bottom:16px; }
-  .slot-chip{ flex:1; display:flex; align-items:center; justify-content:center; gap:7px; padding:11px 6px; border:1.5px solid var(--c-line);
-    border-radius:var(--radius); font-size:14px; cursor:pointer; user-select:none; color:var(--c-ink); background:var(--c-surface); font-weight:600; }
-  .slot-chip input{ width:auto; margin:0; padding:0; border:none; accent-color:var(--c-primary); }
-  .slot-chip.on{ border-color:var(--c-primary); background:#e9fbfa; }
-
-  .btn{ width:100%; padding:14px; border:0; border-radius:var(--radius); font-size:15px; font-weight:800; cursor:pointer; color:#fff;
-    background:linear-gradient(90deg,var(--grad-a),var(--grad-b)); box-shadow:0 4px 14px rgba(37,99,235,.25);
-    display:flex; align-items:center; justify-content:center; gap:9px; transition:filter .15s, transform .08s; }
+  .btn{ padding:12px 18px; border:0; border-radius:var(--radius); font-size:15px; font-weight:700; cursor:pointer; color:#fff;
+    transition:transform .08s, filter .15s, box-shadow .15s; background:linear-gradient(90deg,var(--grad-a),var(--grad-b)); box-shadow:0 4px 14px rgba(37,99,235,.25); }
   .btn:hover:not(:disabled){ filter:brightness(1.05); }
   .btn:active:not(:disabled){ transform:translateY(1px); }
-  .btn:disabled{ opacity:.55; cursor:default; box-shadow:none; }
+  .btn.alt{ background:var(--c-surface); color:var(--c-primary-d); border:1.5px solid var(--c-line); box-shadow:none; }
+  .btn.alt:hover:not(:disabled){ border-color:var(--c-primary); }
+  .btn:disabled{ opacity:.45; cursor:default; box-shadow:none; }
+  body.landing .btn{ padding:14px 18px; font-size:16px; }
 
-  .spinner{ width:16px; height:16px; border:2.5px solid rgba(255,255,255,.5); border-top-color:#fff; border-radius:50%; animation:spin .7s linear infinite; }
+  .status{ font-size:13px; color:var(--c-muted); display:inline-flex; align-items:center; gap:8px; }
+  body.working .status{ margin-left:auto; }
+  body.landing .status{ margin-top:4px; }
+  .spinner{ width:15px; height:15px; border:2.5px solid var(--c-line); border-top-color:var(--c-primary); border-radius:50%; animation:spin .7s linear infinite; display:none; }
+  .status.busy .spinner{ display:inline-block; }
   @keyframes spin{ to{ transform:rotate(360deg); } }
 
-  .message{ margin-top:14px; text-align:center; font-weight:700; font-size:14px; min-height:18px; }
-  .message.ok{ color:#0b8482; } .message.err{ color:#c62828; }
+  /* content */
+  .content{ max-width:640px; margin:0 auto; padding:14px 14px 60px; }
+  .section-title{ font-size:16px; font-weight:800; margin:14px 0 10px; color:var(--c-ink); }
+  .back-link{ display:inline-block; margin-bottom:10px; color:var(--c-primary-d); font-weight:700; cursor:pointer; font-size:14px; }
+  .empty-state{ text-align:center; color:var(--c-muted); padding:40px 12px; font-size:14px; }
+  .loading{ text-align:center; padding:36px; color:var(--c-muted); }
 
-  /* Google Places dropdown above our card */
-  .pac-container{ z-index:9999; border-radius:10px; margin-top:2px; box-shadow:var(--shadow); font-family:inherit; }
+  .tiles{ display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-bottom:14px; }
+  .tile{ background:var(--c-surface); border:2px solid var(--c-line); border-radius:var(--radius); padding:16px; text-align:center;
+    cursor:pointer; transition:border-color .15s, transform .1s, box-shadow .15s; box-shadow:var(--shadow); }
+  .tile:active{ transform:scale(.97); }
+  .tile:hover{ border-color:#b9c6d6; }
+  .tile.active{ border-color:var(--c-primary); background:#e9fbfa; }
+  .tile .route-name{ font-weight:800; font-size:15px; margin-bottom:4px; }
+  .tile .route-count{ font-size:13px; color:var(--c-muted); }
+  .tile.new-route{ border-style:dashed; color:var(--c-primary-d); font-weight:800; display:flex; align-items:center; justify-content:center; }
+
+  /* search on routes page */
+  .search-wrap{ position:relative; margin-bottom:14px; }
+  .search-wrap input{ width:100%; padding:12px 14px; border:1.5px solid var(--c-line); border-radius:var(--radius); font-size:15px; background:var(--c-surface); color:var(--c-ink); }
+  .search-wrap input:focus{ outline:none; border-color:var(--c-primary); box-shadow:0 0 0 3px rgba(14,165,163,.16); }
+  .search-drop{ position:absolute; top:calc(100% + 6px); left:0; right:0; background:var(--c-surface); border:1px solid var(--c-line);
+    border-radius:var(--radius); box-shadow:var(--shadow); max-height:300px; overflow-y:auto; z-index:20; display:none; }
+  .search-drop.show{ display:block; }
+  .search-item{ padding:11px 14px; cursor:pointer; display:flex; justify-content:space-between; gap:10px; align-items:center; border-bottom:1px solid var(--c-line); }
+  .search-item:last-child{ border-bottom:none; }
+  .search-item:hover{ background:var(--c-bg); }
+  .search-item .nm{ font-weight:600; color:var(--c-ink); }
+  .search-item .rt{ font-size:12px; font-weight:700; color:#fff; background:linear-gradient(90deg,var(--grad-a),var(--grad-b)); padding:3px 11px; border-radius:999px; white-space:nowrap; }
+  .search-item .rt.none{ background:#94a3b8; }
+  .search-empty{ padding:12px 14px; color:var(--c-muted); font-size:14px; }
+
+  /* half search + half clear on New Route */
+  .filter-row{ display:flex; gap:8px; margin-bottom:10px; }
+  .filter-row input{ flex:1; min-width:0; padding:12px 14px; border:1.5px solid var(--c-line); border-radius:var(--radius); font-size:15px; background:var(--c-surface); color:var(--c-ink); }
+  .filter-row input:focus{ outline:none; border-color:var(--c-primary); box-shadow:0 0 0 3px rgba(14,165,163,.16); }
+  .filter-row .btn{ flex:1; }
+
+  /* client cards */
+  .client-card{ background:var(--c-surface); border:1px solid var(--c-line); border-radius:var(--radius); padding:12px; margin-bottom:8px;
+    display:flex; align-items:center; gap:12px; box-shadow:0 2px 8px rgba(20,40,70,.05); }
+  .client-info{ flex:1; min-width:0; }
+  .client-info .name{ font-weight:600; font-size:15px; }
+  .client-info .meta{ font-size:13px; color:var(--c-muted); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .client-info .dist{ font-size:12px; color:var(--c-primary-d); margin-top:2px; font-weight:600; }
+  .route-check{ width:20px; height:20px; flex-shrink:0; accent-color:var(--c-primary); }
+  .stop-dropdown{ position:relative; width:60px; flex:none; }
+  .stop-dropdown-btn{ width:100%; padding:8px 4px; border-radius:8px; border:1px solid var(--c-line); font-size:15px; text-align:center; background:#fff; cursor:pointer; color:var(--c-ink); }
+  .stop-dropdown-menu{ position:absolute; top:calc(100% + 4px); right:0; background:var(--c-surface); border:1px solid var(--c-line); border-radius:8px;
+    max-height:180px; overflow-y:auto; z-index:50; min-width:60px; box-shadow:var(--shadow); }
+  .stop-dropdown-menu div{ padding:8px 12px; text-align:center; font-size:15px; cursor:pointer; }
+  .stop-dropdown-menu div:hover{ background:var(--c-bg); }
+
+  .full{ width:100%; }
+  .secondary{ background:var(--c-surface); color:var(--c-primary-d); border:1.5px solid var(--c-line); box-shadow:none; }
+  .secondary:hover:not(:disabled){ border-color:var(--c-primary); }
+  .distance-btn{ background:linear-gradient(90deg,var(--grad-a),var(--grad-b)); }
+
+  .add-panel{ background:#f0f7f7; border:1px dashed var(--c-primary); border-radius:var(--radius); padding:10px; margin-bottom:12px; }
+  .add-row{ display:flex; align-items:center; gap:10px; padding:8px; border-bottom:1px solid var(--c-line); }
+  .add-row:last-child{ border-bottom:none; }
+  .add-row .info{ flex:1; min-width:0; }
+  .add-row .info .name{ font-weight:600; font-size:14px; }
+  .add-row .info .meta{ font-size:12px; color:var(--c-muted); }
+  .add-row button{ padding:6px 12px; font-size:13px; background:var(--c-primary); }
+
+  .message-box{ background:var(--c-surface); border:1px solid var(--c-line); border-radius:var(--radius); padding:12px; margin-top:12px;
+    white-space:pre-wrap; font-size:14px; line-height:1.5; font-family:ui-monospace,Menlo,Consolas,monospace; box-shadow:var(--shadow); }
+  .action-row{ display:flex; gap:8px; margin-top:10px; }
+  .action-row button{ flex:1; }
+  .action-row .wa-btn{ background:var(--wa); }
+  .action-row .wa-btn:active{ background:#1da851; }
+
+  .toast{ position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--c-primary-d); color:#fff; padding:10px 20px;
+    border-radius:8px; font-size:14px; opacity:0; transition:opacity .3s; pointer-events:none; z-index:100; max-width:90%; text-align:center; }
+  .toast.show{ opacity:1; }
+
+  @media screen and (max-width:640px){
+    body.working .bar{ padding:8px 10px; gap:8px; }
+    .brand span{ font-size:14px; } .brand img{ height:30px; }
+    .field{ flex:1 1 auto; }
+    .status{ width:100%; margin:2px 0 0; } body.working .status{ margin-left:0; }
+  }
 </style>
 </head>
-<body>
+<body class="landing">
 
   <div class="bar">
-    <img src="logo.png" alt="Friska Wellness Foods">
-    <span>Client Onboarding</span>
-  </div>
-
-  <div class="wrap">
-    <div class="card">
-      <label class="fld">Client name</label>
-      <input id="name" placeholder="Full name">
-
-      <label class="fld">Phone number</label>
-      <input id="phone" placeholder="10-digit mobile" inputmode="numeric">
-
-      <label class="fld">Meal types</label>
-      <div class="dropdown-wrap">
-        <button type="button" class="dropdown-btn" id="mealTypeBtn">
-          <span id="mealTypeText" class="ph">Select meal types</span><span>▼</span>
-        </button>
-        <div class="dropdown-menu" id="mealTypeDropdown">
-          <label><input type="checkbox" class="mealType" value="1 Morning deliver"> 1 Morning deliver</label>
-          <label><input type="checkbox" class="mealType" value="2 Nutri Balance"> 2 Nutri Balance</label>
-          <label><input type="checkbox" class="mealType" value="3 High Protein"> 3 High Protein</label>
-          <label><input type="checkbox" class="mealType" value="4 High Carb"> 4 High Carb</label>
-          <label><input type="checkbox" class="mealType" value="5 Low Carb"> 5 Low Carb</label>
-          <label><input type="checkbox" class="mealType" value="6 No Carb"> 6 No Carb</label>
-          <label><input type="checkbox" class="mealType" value="7 High Fiber"> 7 High Fiber</label>
-          <label><input type="checkbox" class="mealType" value="8 Multi-Category"> 8 Multi-Category</label>
-          <label><input type="checkbox" class="mealType" value="9 Evening Delivery"> 9 Evening Delivery</label>
-        </div>
-      </div>
-
-      <label class="fld">Remarks</label>
-      <input id="remarks" placeholder="Any notes">
-
-      <label class="fld">Location 1 (description)</label>
-      <input id="location1" placeholder="e.g. Flat 302, Green Meadows">
-
-      <label class="fld">Location 1 — map pin</label>
-      <input id="mapInput1" placeholder="Search address / landmark and pick">
-      <div class="hint">Type and select from the list — saves a tappable map link.</div>
-
-      <label class="fld">Location 2 (description)</label>
-      <input id="location2" placeholder="Optional second address">
-
-      <label class="fld">Location 2 — map pin</label>
-      <input id="mapInput2" placeholder="Search address / landmark and pick">
-      <div class="hint">Optional second location pin.</div>
-
-      <label class="fld">Delivery price</label>
-      <input id="deliveryPrice" placeholder="Per-delivery charge" inputmode="numeric">
-
-      <label class="fld">Delivery slots</label>
-      <div class="slot-row">
-        <label class="slot-chip"><input type="checkbox" id="morning"> Morning</label>
-        <label class="slot-chip"><input type="checkbox" id="afternoon"> Afternoon</label>
-        <label class="slot-chip"><input type="checkbox" id="evening"> Evening</label>
-      </div>
-
-      <button id="saveBtn" class="btn">Save Client</button>
-      <div id="message" class="message"></div>
+    <div class="brand">
+      <img src="logo.png" alt="Friska Wellness Foods">
+      <span>Delivery Routes</span>
+    </div>
+    <div class="hero-sub">Pick a date to plan the day's delivery routes.</div>
+    <div class="controls">
+      <div class="field"><input type="date" id="date"></div>
+      <button id="go" class="btn">Generate</button>
+      <span class="status" id="status"><span class="spinner"></span><span id="statusText">Pick a date to begin.</span></span>
     </div>
   </div>
 
+  <div id="content" class="content"></div>
+
+  <div class="toast" id="toast"></div>
+
 <script>
-  const API = (typeof API_URL !== 'undefined') ? API_URL : '';
-  let isSubmitting = false;
-  let mapLink1 = '', mapLink2 = '';
+const API = (typeof API_URL !== 'undefined') ? API_URL : '';
 
-  document.addEventListener('DOMContentLoaded', () => {
-    document.getElementById('saveBtn').addEventListener('click', addClient);
+let allClients = [];
+let slotGroups = {};
+let currentSlot = null;
+let currentView = null;
+let stopAssignments = {};
+let currentClients = [];
+let checkedClients = {};
 
-    document.getElementById('mealTypeBtn').addEventListener('click', (e) => {
-      e.stopPropagation();
-      document.getElementById('mealTypeDropdown').classList.toggle('active');
-    });
-    document.querySelectorAll('.mealType').forEach(cb => cb.addEventListener('change', updateMealTypeDisplay));
-    document.addEventListener('click', (e) => {
-      const btn = document.getElementById('mealTypeBtn');
-      const dd = document.getElementById('mealTypeDropdown');
-      if (!btn.contains(e.target) && !dd.contains(e.target)) dd.classList.remove('active');
-    });
+const KITCHEN = { lat: 17.452623115758335, lng: 78.41967516576499 };
+let geoMap = null;
+let lastDistance = {};
+let routeTotalMeters = null;
+let hasGenerated = false;
 
-    // slot chip highlight
-    ['morning','afternoon','evening'].forEach(id => {
-      const cb = document.getElementById(id);
-      cb.addEventListener('change', () => cb.closest('.slot-chip').classList.toggle('on', cb.checked));
+const content    = document.getElementById('content');
+const dateEl     = document.getElementById('date');
+const goBtn      = document.getElementById('go');
+const statusEl   = document.getElementById('status');
+const statusText = document.getElementById('statusText');
+
+dateEl.valueAsDate = new Date();
+
+function setStatus(msg, busy){ statusText.textContent = msg; statusEl.classList.toggle('busy', !!busy); }
+function showToast(msg){ const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 1800); }
+
+// date: click opens calendar; changing it doesn't auto-run
+dateEl.addEventListener('click', () => { try{ dateEl.showPicker(); }catch(e){} });
+dateEl.addEventListener('change', () => setStatus(dateEl.value ? 'Press Generate to load the day.' : 'Pick a date to begin.', false));
+
+goBtn.addEventListener('click', () => {
+  if(!dateEl.value){ setStatus('Pick a date first.', false); return; }
+  if(!hasGenerated){ hasGenerated = true; document.body.classList.remove('landing'); document.body.classList.add('working'); }
+  loadOrders();
+});
+
+async function apiPost(action, params = {}) {
+  const body = new URLSearchParams({ action, ...params });
+  const res = await fetch(API, { method: 'POST', body, redirect: 'follow' });
+  return res.json();
+}
+
+async function loadOrders() {
+  const date = dateEl.value;
+  content.innerHTML = '<div class="loading">Loading active clients…</div>';
+  setStatus('Loading ' + date + '…', true);
+  try {
+    const ordersRes = await apiPost('getOrdersForDate', { date });
+    if (!ordersRes.success || !ordersRes.clients.length) {
+      content.innerHTML = '<div class="empty-state">No active clients found for this date.</div>';
+      allClients = []; slotGroups = {};
+      setStatus('No clients for ' + date + '.', false);
+      return;
+    }
+    allClients = []; slotGroups = {};
+    ordersRes.clients.forEach(c => {
+      const slot = String(c.slot || 'Unspecified').trim() || 'Unspecified';
+      const route = String(c.route || '').trim() || 'No Route';
+      const clientObj = { phone:c.phone, name:c.name, location:c.location, slot, route, location1:c.location1 || '', location2:c.location2 || '' };
+      allClients.push(clientObj);
+      if (!slotGroups[slot]) slotGroups[slot] = {};
+      if (!slotGroups[slot][route]) slotGroups[slot][route] = [];
+      slotGroups[slot][route].push(clientObj);
     });
+    Object.values(slotGroups).forEach(routes => Object.values(routes).forEach(arr => arr.sort((a, b) => a.name.localeCompare(b.name))));
+    currentSlot = null; currentView = null; stopAssignments = {};
+    setStatus(allClients.length + ' clients loaded for ' + date + '.', false);
+    renderSummary();
+  } catch (err) {
+    content.innerHTML = '<div class="empty-state">Error loading data. Please try again.</div>';
+    setStatus('Error loading data.', false);
+    console.error(err);
+  }
+}
+
+const SLOT_ORDER = ['Morning', 'Afternoon', 'Evening'];
+function sortedSlots() {
+  return Object.keys(slotGroups).sort((a, b) => {
+    const ai = SLOT_ORDER.indexOf(a), bi = SLOT_ORDER.indexOf(b);
+    if (ai === -1 && bi === -1) return a.localeCompare(b);
+    if (ai === -1) return 1; if (bi === -1) return -1; return ai - bi;
+  });
+}
+
+function renderSummary() {
+  currentSlot = null; currentView = null; stopAssignments = {};
+  const slots = sortedSlots();
+  let html = '<div class="section-title">Select Slot</div><div class="tiles">';
+  slots.forEach(slot => {
+    const totalCount = Object.values(slotGroups[slot]).reduce((s, arr) => s + arr.length, 0);
+    html += `<div class="tile" onclick="openSlot('${escapeAttr(slot)}')"><div class="route-name">${escapeHtml(slot)}</div><div class="route-count">${totalCount} client(s)</div></div>`;
+  });
+  html += '</div>';
+  content.innerHTML = html;
+}
+
+function openSlot(slot) {
+  currentSlot = slot; currentView = null; stopAssignments = {};
+  const routes = Object.keys(slotGroups[slot]).sort((a, b) => {
+    if (a === 'No Route') return 1; if (b === 'No Route') return -1;
+    return a.localeCompare(b, undefined, { numeric: true });
+  });
+  let html = `<span class="back-link" onclick="renderSummary()">← Back to slots</span>`;
+  html += `<div class="section-title">${escapeHtml(slot)}</div>`;
+  html += `<div class="search-wrap">
+    <input type="text" id="routeSearch" placeholder="Search a client in ${escapeHtml(slot)}…" oninput="searchClients()" autocomplete="off">
+    <div class="search-drop" id="searchDrop"></div>
+  </div>`;
+  html += `<div class="tiles">`;
+  routes.forEach(route => {
+    html += `<div class="tile" onclick="openRoute('${escapeAttr(slot)}','${escapeAttr(route)}')"><div class="route-name">${escapeHtml(route)}</div><div class="route-count">${slotGroups[slot][route].length} client(s)</div></div>`;
+  });
+  html += `<div class="tile new-route" onclick="openNewRoute('${escapeAttr(slot)}')">➕ New Route</div>`;
+  html += `</div>`;
+  content.innerHTML = html;
+}
+
+// search clients within the current slot; show name + their route; tap to open that route
+function searchClients() {
+  const inp = document.getElementById('routeSearch');
+  const drop = document.getElementById('searchDrop');
+  if (!inp || !drop) return;
+  const q = inp.value.trim().toLowerCase();
+  if (!q) { drop.classList.remove('show'); drop.innerHTML = ''; return; }
+
+  const flat = [];
+  Object.keys(slotGroups[currentSlot]).forEach(route => {
+    slotGroups[currentSlot][route].forEach(c => flat.push({ name: c.name, route }));
+  });
+  const matches = flat.filter(c => (c.name || '').toLowerCase().includes(q)).slice(0, 40);
+
+  if (!matches.length) { drop.innerHTML = `<div class="search-empty">No client found in ${escapeHtml(currentSlot)}</div>`; drop.classList.add('show'); return; }
+
+  drop.innerHTML = matches.map(c => {
+    const none = c.route === 'No Route';
+    return `<div class="search-item" onclick="openRoute('${escapeAttr(currentSlot)}','${escapeAttr(c.route)}')">
+      <span class="nm">${escapeHtml(c.name)}</span>
+      <span class="rt${none ? ' none' : ''}">${escapeHtml(c.route)}</span>
+    </div>`;
+  }).join('');
+  drop.classList.add('show');
+}
+// close the search dropdown when tapping outside it
+document.addEventListener('click', (e) => {
+  const drop = document.getElementById('searchDrop');
+  if (drop && !e.target.closest('.search-wrap')) drop.classList.remove('show');
+});
+
+function openRoute(slot, route) {
+  currentSlot = slot; currentView = route;
+  stopAssignments = {}; checkedClients = {}; lastDistance = {}; routeTotalMeters = null;
+  currentClients = [...slotGroups[slot][route]];
+  renderClientView(`${slot} — ${route}`);
+}
+function openNewRoute(slot) {
+  currentSlot = slot; currentView = 'NEW';
+  stopAssignments = {}; checkedClients = {}; lastDistance = {}; routeTotalMeters = null;
+  currentClients = Object.values(slotGroups[slot]).flat();
+  renderClientView(`${slot} — New Route`);
+}
+
+function renderClientView(title) {
+  const isNew = currentView === 'NEW';
+  let html = `<span class="back-link" onclick="openSlot('${escapeAttr(currentSlot)}')">← Back to ${escapeHtml(currentSlot)}</span>`;
+  html += `<div class="section-title">${escapeHtml(title)}</div>`;
+  html += `<button class="btn distance-btn full" style="margin-bottom:10px;" onclick="autoOrderByDistance()">📍 Auto-order by distance (nearest first)</button>`;
+  if (isNew) {
+    html += `<div class="filter-row">
+      <input type="text" id="newSearch" placeholder="Search client…" oninput="filterNewList()" autocomplete="off">
+      <button class="btn secondary" onclick="clearSelection()">✕ Clear selection</button>
+    </div>`;
+  }
+  if (!isNew) {
+    html += `<button class="btn secondary full" style="margin-bottom:10px;" onclick="toggleAddPanel()">➕ Add clients to this route</button>`;
+    html += `<div id="addPanel"></div>`;
+  }
+  html += `<div id="clientListContainer">` + renderClientList(currentClients, true) + `</div>`;
+  html += `<div id="messageOutput"></div>`;
+  content.innerHTML = html;
+}
+
+function renderClientList(clients, withStopSelect) {
+  if (!clients.length) return '<div class="empty-state">No clients here.</div>';
+  const isNew = currentView === 'NEW';
+  let html = '';
+  clients.forEach(c => {
+    html += `<div class="client-card">`;
+    if (withStopSelect && isNew) {
+      const chk = checkedClients[c.phone] ? 'checked' : '';
+      html += `<input type="checkbox" class="route-check" ${chk} onchange="toggleCheck('${escapeAttr(c.phone)}', this.checked)">`;
+    }
+    const distLine = (lastDistance[c.phone] != null && isFinite(lastDistance[c.phone]))
+      ? `<div class="dist">${(lastDistance[c.phone] / 1000).toFixed(1)} km from previous stop</div>` : '';
+    html += `<div class="client-info"><div class="name">${escapeHtml(c.name)}</div><div class="meta">${escapeHtml(c.phone)} · ${escapeHtml(c.location)}</div>${distLine}</div>`;
+    if (withStopSelect) {
+      const currentVal = stopAssignments[c.phone] || '-';
+      html += `<div class="stop-dropdown" data-phone="${escapeAttr(c.phone)}"><div class="stop-dropdown-btn" onclick="toggleStopMenu(this, event)">${currentVal}</div></div>`;
+    }
+    html += `</div>`;
+  });
+  return html;
+}
+
+function toggleCheck(phone, val) { if (val) checkedClients[phone] = true; else delete checkedClients[phone]; }
+
+function clearSelection() {
+  checkedClients = {}; stopAssignments = {}; lastDistance = {}; routeTotalMeters = null;
+  const s = document.getElementById('newSearch'); if (s) s.value = '';
+  document.getElementById('clientListContainer').innerHTML = renderClientList(currentClients, true);
+  refreshStopOptions();
+  maybeRenderMessage();
+  showToast('Selection cleared');
+}
+
+// filter the New Route list by name (checked state + numbering are preserved)
+function filterNewList() {
+  const q = (document.getElementById('newSearch').value || '').trim().toLowerCase();
+  const subset = q ? currentClients.filter(c => (c.name || '').toLowerCase().includes(q)) : currentClients;
+  document.getElementById('clientListContainer').innerHTML = renderClientList(subset, true);
+  refreshStopOptions();
+}
+
+function toggleAddPanel() {
+  const panel = document.getElementById('addPanel');
+  if (panel.innerHTML.trim()) { panel.innerHTML = ''; return; }
+  renderAddPanel();
+}
+function renderAddPanel() {
+  const panel = document.getElementById('addPanel');
+  const all = Object.values(slotGroups[currentSlot]).flat();
+  const existing = new Set(currentClients.map(c => c.phone));
+  const avail = all.filter(c => !existing.has(c.phone));
+  if (!avail.length) { panel.innerHTML = `<div class="add-panel"><div class="empty-state">All slot clients already in this route.</div></div>`; return; }
+  let html = `<div class="add-panel">`;
+  avail.forEach(c => {
+    html += `<div class="add-row"><div class="info"><div class="name">${escapeHtml(c.name)}</div><div class="meta">${escapeHtml(c.phone)} · ${escapeHtml(c.route)}</div></div><button class="btn" onclick="addClientToRoute('${escapeAttr(c.phone)}')">Add</button></div>`;
+  });
+  html += `</div>`;
+  panel.innerHTML = html;
+}
+function addClientToRoute(phone) {
+  const all = Object.values(slotGroups[currentSlot]).flat();
+  const c = all.find(x => x.phone === phone);
+  if (c && !currentClients.some(x => x.phone === phone)) {
+    currentClients.push(c);
+    currentClients.sort((a, b) => a.name.localeCompare(b.name));
+  }
+  renderAddPanel();
+  document.getElementById('clientListContainer').innerHTML = renderClientList(currentClients, true);
+  refreshStopOptions();
+  showToast('Added');
+}
+
+function toggleStopMenu(btnEl, event) {
+  if (event) event.stopPropagation();
+  closeStopMenus();
+  const wrapper = btnEl.parentElement;
+  const phone = wrapper.dataset.phone;
+  const total = currentClients.length;
+  const currentVal = stopAssignments[phone] || '';
+  const menu = document.createElement('div');
+  menu.className = 'stop-dropdown-menu';
+  const noneOpt = document.createElement('div');
+  noneOpt.textContent = '-';
+  noneOpt.onclick = () => selectStop(phone, '');
+  menu.appendChild(noneOpt);
+  for (let i = 1; i <= total; i++) {
+    const taken = Object.entries(stopAssignments).some(([p, v]) => v === String(i) && p !== phone);
+    if (taken) continue;
+    const opt = document.createElement('div');
+    opt.textContent = i;
+    if (String(i) === currentVal) opt.style.fontWeight = '700';
+    opt.onclick = () => selectStop(phone, String(i));
+    menu.appendChild(opt);
+  }
+  menu.onclick = (e) => e.stopPropagation();
+  wrapper.appendChild(menu);
+  setTimeout(() => document.addEventListener('click', closeStopMenusOnce), 0);
+}
+function closeStopMenusOnce() { closeStopMenus(); document.removeEventListener('click', closeStopMenusOnce); }
+function closeStopMenus() { document.querySelectorAll('.stop-dropdown-menu').forEach(m => m.remove()); }
+function selectStop(phone, val) {
+  if (val === '') { delete stopAssignments[phone]; }
+  else { for (const p in stopAssignments) if (stopAssignments[p] === val && p !== phone) delete stopAssignments[p]; stopAssignments[phone] = val; }
+  closeStopMenus();
+  refreshStopOptions();
+  maybeRenderMessage();
+  computeRouteTotal().then(() => maybeRenderMessage());
+}
+function refreshStopOptions() {
+  document.querySelectorAll('.stop-dropdown').forEach(wrapper => {
+    const phone = wrapper.dataset.phone;
+    const btn = wrapper.querySelector('.stop-dropdown-btn');
+    if (btn) btn.textContent = stopAssignments[phone] || '-';
+  });
+}
+
+/* ---- geo + distance ---- */
+async function ensureGeo() {
+  if (geoMap && Object.keys(geoMap).length) return geoMap;
+  showToast('Loading client map locations…');
+  try {
+    const res = await apiPost('getClientGeo');
+    const g = (res && res.ok && res.geo) ? res.geo : {};
+    if (Object.keys(g).length) geoMap = g;
+    return g;
+  } catch (e) { return {}; }
+}
+function coordForClient(c, g) {
+  if (!g) return null;
+  if (c.location && c.location2 && c.location === c.location2) return g.loc2 || g.loc1;
+  return g.loc1 || g.loc2;
+}
+
+async function autoOrderByDistance() {
+  if (!window.google || !google.maps || !google.maps.DistanceMatrixService) { showToast('Maps still loading — try again in a moment'); return; }
+  const geo = await ensureGeo();
+  const isNew = currentView === 'NEW';
+
+  const pool = isNew ? currentClients.filter(c => checkedClients[c.phone]) : currentClients;
+  if (isNew && !pool.length) { showToast('Tick the clients for this route first'); return; }
+
+  const located = [], unlocated = [];
+  pool.forEach(c => {
+    const coord = coordForClient(c, geo[c.phone]);
+    if (coord && coord.lat != null) located.push({ c, coord });
+    else unlocated.push(c);
   });
 
-  // called by the Google Maps script once Places is ready
-  function initMaps() {
-    attachAutocomplete('mapInput1', v => mapLink1 = v);
-    attachAutocomplete('mapInput2', v => mapLink2 = v);
+  if (!located.length) { showToast('No saved map locations — number manually if needed'); routeTotalMeters = null; maybeRenderMessage(); return; }
+
+  showToast('Building route…');
+  const remaining = located.slice();
+  const order = [];
+  let current = KITCHEN;
+  while (remaining.length) {
+    const dists = await distancesFrom(current, remaining.map(x => x.coord));
+    let best = -1, bestD = Infinity;
+    for (let i = 0; i < dists.length; i++) { if (dists[i] < bestD) { bestD = dists[i]; best = i; } }
+    if (best === -1) break;
+    const chosen = remaining.splice(best, 1)[0];
+    chosen.leg = bestD;
+    order.push(chosen);
+    current = chosen.coord;
   }
-  function attachAutocomplete(id, setter) {
-    const el = document.getElementById(id);
-    if (!el || !window.google || !google.maps.places) return;
-    const ac = new google.maps.places.Autocomplete(el, {
-      fields: ['geometry', 'name', 'formatted_address'],
-      componentRestrictions: { country: 'in' }
-    });
-    // bias suggestions toward Hyderabad
-    ac.setBounds(new google.maps.LatLngBounds(
-      { lat: 17.2, lng: 78.2 }, { lat: 17.65, lng: 78.7 }
-    ));
-    ac.addListener('place_changed', () => {
-      const p = ac.getPlace();
-      if (p && p.geometry && p.geometry.location) {
-        const lat = p.geometry.location.lat(), lng = p.geometry.location.lng();
-        setter('https://www.google.com/maps?q=' + lat + ',' + lng);
-      } else {
-        setter('');
-      }
-    });
-  }
+  remaining.forEach(x => unlocated.push(x.c));
 
-  function updateMealTypeDisplay() {
-    const selected = Array.from(document.querySelectorAll('.mealType:checked')).map(c => c.value);
-    const t = document.getElementById('mealTypeText');
-    t.classList.toggle('ph', selected.length === 0);
-    if (selected.length === 0) t.innerText = 'Select meal types';
-    else if (selected.length === 1) t.innerText = selected[0];
-    else t.innerText = selected.length + ' meal types selected';
-  }
+  stopAssignments = {}; lastDistance = {};
+  order.forEach((x, i) => { stopAssignments[x.c.phone] = String(i + 1); lastDistance[x.c.phone] = x.leg; });
+  routeTotalMeters = order.reduce((s, x) => s + (isFinite(x.leg) ? x.leg : 0), 0);
 
-  function showMessage(text, error = false) {
-    const m = document.getElementById('message');
-    m.className = 'message ' + (error ? 'err' : 'ok');
-    m.innerText = text;
-  }
+  const orderedPhones = order.map(x => x.c.phone);
+  const numberedClients = order.map(x => x.c);
+  const restClients = currentClients.filter(c => orderedPhones.indexOf(c.phone) === -1);
+  currentClients = numberedClients.concat(restClients);
 
-  async function addClient() {
-    if (isSubmitting) return;
-    const saveBtn = document.getElementById('saveBtn');
+  document.getElementById('clientListContainer').innerHTML = renderClientList(currentClients, true);
+  refreshStopOptions();
+  maybeRenderMessage();
 
-    const selectedMealTypes = Array.from(document.querySelectorAll('.mealType:checked')).map(c => c.value).join(' ');
-    const data = {
-      name: document.getElementById('name').value.trim(),
-      phone: document.getElementById('phone').value.trim(),
-      type: selectedMealTypes,
-      remarks: document.getElementById('remarks').value.trim(),
-      location1: document.getElementById('location1').value.trim(),
-      location2: document.getElementById('location2').value.trim(),
-      mapLink1: mapLink1,
-      mapLink2: mapLink2,
-      deliveryPrice: document.getElementById('deliveryPrice').value.trim(),
-      morning: document.getElementById('morning').checked,
-      afternoon: document.getElementById('afternoon').checked,
-      evening: document.getElementById('evening').checked
-    };
+  const raw = document.getElementById('messageOutput').dataset.raw || '';
+  const copied = raw ? await copyText(raw) : false;
+  const base = unlocated.length ? `Routed ${order.length} stops; ${unlocated.length} without location` : `Routed ${order.length} stops, nearest first`;
+  showToast(base + (copied ? ' \u00b7 copied to clipboard' : ''));
+}
 
-    if (!data.name || !data.phone) { showMessage('Name & phone are required', true); return; }
-
-    isSubmitting = true;
-    saveBtn.disabled = true;
-    saveBtn.innerHTML = '<span class="spinner"></span> Saving…';
-
-    try {
-      const res = await fetch(API, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({ action: 'addClient', payload: JSON.stringify(data) })
+function distancesFrom(origin, dests) {
+  return new Promise(resolve => {
+    const svc = new google.maps.DistanceMatrixService();
+    const out = new Array(dests.length).fill(Infinity);
+    let pending = 0, started = false;
+    for (let i = 0; i < dests.length; i += 25) {
+      const chunk = dests.slice(i, i + 25);
+      pending++; started = true;
+      svc.getDistanceMatrix({ origins: [origin], destinations: chunk, travelMode: google.maps.TravelMode.DRIVING }, (res, status) => {
+        if (status === 'OK' && res.rows[0]) res.rows[0].elements.forEach((el, j) => { out[i + j] = (el.status === 'OK') ? el.distance.value : Infinity; });
+        if (--pending === 0) resolve(out);
       });
-      const result = await res.json();
-      if (result.success) { showMessage('Client added ✅'); clearForm(); }
-      else showMessage(result.message || 'Error saving client', true);
-    } catch (err) {
-      showMessage('Server error', true);
     }
+    if (!started) resolve(out);
+  });
+}
 
-    isSubmitting = false;
-    saveBtn.disabled = false;
-    saveBtn.innerHTML = 'Save Client';
+async function computeRouteTotal() {
+  if (!window.google || !google.maps || !google.maps.DistanceMatrixService) return;
+  const numbered = currentClients
+    .filter(c => stopAssignments[c.phone])
+    .map(c => ({ stop: parseInt(stopAssignments[c.phone]), coord: coordForClient(c, geoMap && geoMap[c.phone]) }))
+    .filter(x => x.coord && x.coord.lat != null)
+    .sort((a, b) => a.stop - b.stop);
+  if (!numbered.length) { routeTotalMeters = null; return; }
+  let total = 0, prev = KITCHEN;
+  for (const x of numbered) {
+    const d = await distancesFrom(prev, [x.coord]);
+    if (isFinite(d[0])) total += d[0];
+    prev = x.coord;
+  }
+  routeTotalMeters = total;
+}
+
+/* ---- message ---- */
+function linkForClient(c) {
+  const g = geoMap && geoMap[c.phone];
+  if (!g) return '';
+  if (c.location && c.location2 && c.location === c.location2) return g.loc2Link || g.loc1Link || '';
+  return g.loc1Link || g.loc2Link || '';
+}
+
+function maybeRenderMessage() {
+  const clients = currentClients;
+  let ordered = [];
+  if (currentView === 'NEW') {
+    const numbered = [], checkedUnnum = [];
+    clients.forEach(c => {
+      if (stopAssignments[c.phone]) numbered.push({ ...c, stop: parseInt(stopAssignments[c.phone]) });
+      else if (checkedClients[c.phone]) checkedUnnum.push({ ...c, stop: null });
+    });
+    numbered.sort((a, b) => a.stop - b.stop);
+    ordered = numbered.concat(checkedUnnum);
+  } else {
+    const numbered = [], unnumbered = [];
+    clients.forEach(c => {
+      if (stopAssignments[c.phone]) numbered.push({ ...c, stop: parseInt(stopAssignments[c.phone]) });
+      else unnumbered.push({ ...c, stop: null });
+    });
+    numbered.sort((a, b) => a.stop - b.stop);
+    ordered = numbered.concat(unnumbered);
   }
 
-  function clearForm() {
-    document.querySelectorAll('.card input').forEach(i => { if (i.type === 'checkbox') i.checked = false; else i.value = ''; });
-    document.querySelectorAll('.slot-chip').forEach(c => c.classList.remove('on'));
-    mapLink1 = ''; mapLink2 = '';
-    updateMealTypeDisplay();
+  const out = document.getElementById('messageOutput');
+  if (!out) return;
+  if (!ordered.length) { out.innerHTML = ''; out.dataset.raw = ''; return; }
+
+  let message = '';
+  ordered.forEach(c => {
+    const link = linkForClient(c);
+    let block = (c.stop !== null ? (c.stop + '. ') : '') + c.name + '\n' + c.phone + '\n' + c.location;
+    if (link) block += '\n' + link.replace(/,/g, '%2C');
+    message += block + '\n\n';
+  });
+  message = message.trim();
+
+  if (routeTotalMeters != null && routeTotalMeters > 0) {
+    message += '\n\nTotal distance: ' + (routeTotalMeters / 1000).toFixed(1) + ' km (kitchen \u2192 last stop)';
   }
+
+  out.innerHTML = `<div class="message-box" id="msgText">${escapeHtml(message)}</div>
+    <div class="action-row">
+      <button class="btn" onclick="copyMessage()">📋 Copy</button>
+      <button class="btn wa-btn" onclick="sendWhatsApp()">Share on WhatsApp</button>
+    </div>`;
+  out.dataset.raw = message;
+}
+
+function copyText(text) {
+  if (!text) return Promise.resolve(false);
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    return navigator.clipboard.writeText(text).then(() => true).catch(() => fallbackCopy(text));
+  }
+  return Promise.resolve(fallbackCopy(text));
+}
+function fallbackCopy(text) {
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.focus(); ta.select();
+    const ok = document.execCommand('copy'); document.body.removeChild(ta);
+    return ok;
+  } catch (e) { return false; }
+}
+function copyMessage() {
+  const text = document.getElementById('messageOutput').dataset.raw || '';
+  copyText(text).then(ok => showToast(ok ? 'Copied to clipboard!' : 'Copy failed — long-press to copy'));
+}
+function sendWhatsApp() {
+  const text = document.getElementById('messageOutput').dataset.raw || '';
+  if (!text) { showToast('Nothing to share yet'); return; }
+  window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank');
+}
+
+function escapeHtml(str) { return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+function escapeAttr(str) { return String(str).replace(/'/g, "\\'"); }
 </script>
 
-<!-- Google Maps + Places (same key as quote.html / delivery.html) -->
-<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCqVJgCfV0C1KBF0u1Jc02p_RHE7K7g1V8&libraries=places&callback=initMaps" async defer></script>
+<!-- Google Maps (Distance Matrix). Same key as quote.html. -->
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCqVJgCfV0C1KBF0u1Jc02p_RHE7K7g1V8" async defer></script>
 
 </body>
 </html>
