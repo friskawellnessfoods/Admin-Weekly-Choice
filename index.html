@@ -622,23 +622,41 @@ function initState(){
       remark: MASTER_REMARK,        // per-day remark, defaults to master
       remarkMode: null              // null | 'day' | 'permanent'
     };
-    // 🔵 FIX: Apply single-slot slot + location correction immediately
+    // total delivery slots for this client
+    const _slotCount =
+      (CLIENT_DELIVERY?.morning ? 1 : 0) +
+      (CLIENT_DELIVERY?.afternoon ? 1 : 0) +
+      (CLIENT_DELIVERY?.evening ? 1 : 0);
+
+    // the correct slot for main meals (option1/option2/snack):
+    //  - single slot: that slot
+    //  - morning + one other: the NON-morning slot (meals never go to morning)
+    //  - afternoon + evening: handled separately below
+    const _mealSlot =
+      _slotCount === 1
+        ? (CLIENT_DELIVERY?.morning ? 'Morning'
+           : CLIENT_DELIVERY?.afternoon ? 'Afternoon'
+           : CLIENT_DELIVERY?.evening ? 'Evening' : 'Afternoon')
+        : (CLIENT_DELIVERY?.afternoon ? 'Afternoon'
+           : CLIENT_DELIVERY?.evening ? 'Evening' : 'Afternoon');
+
+    // Apply for any client that is NOT afternoon+evening (those get per-card slots below)
     if (!hasAfternoonEveningSlots()) {
 
-      const singleSlot =
-        CLIENT_DELIVERY?.morning ? 'Morning' :
-        CLIENT_DELIVERY?.afternoon ? 'Afternoon' :
-        CLIENT_DELIVERY?.evening ? 'Evening' :
-        'Afternoon';
+      // morning + evening → meals default to location2; everyone else → location1
+      const isMorningEvening =
+        CLIENT_DELIVERY?.morning && CLIENT_DELIVERY?.evening && !CLIENT_DELIVERY?.afternoon;
 
-      const defaultLocation =
-        CLIENT_LOCATION_1 || CLIENT_LOCATION_2 || '';
+      const mealLocation = isMorningEvening
+        ? (CLIENT_LOCATION_2 || CLIENT_LOCATION_1 || '')
+        : (CLIENT_LOCATION_1 || CLIENT_LOCATION_2 || '');
 
-      STATE[date].sections.option1.slot = singleSlot;
-      STATE[date].sections.option2.slot = singleSlot;
+      STATE[date].sections.option1.slot = _mealSlot;
+      STATE[date].sections.option2.slot = _mealSlot;
+      STATE[date].sections.snack.slot   = _mealSlot;
 
-      STATE[date].sections.option1.location = defaultLocation;
-      STATE[date].sections.option2.location = defaultLocation;
+      STATE[date].sections.option1.location = mealLocation;
+      STATE[date].sections.option2.location = mealLocation;
     }
     // 🔵 FIX: Pre-assign location for dual-slot clients
     if (hasAfternoonEveningSlots()) {
@@ -806,13 +824,14 @@ function renderCurrentDay(){
       
           ${CLIENT_LOCATION_1 ? `
             <option value="${CLIENT_LOCATION_1}"
-              ${!CLIENT_LOCATION_2 ? 'selected' : ''}>
+              ${STATE[date].sections.option1.location === CLIENT_LOCATION_1 ? 'selected' : ''}>
               ${CLIENT_LOCATION_1}
             </option>
           ` : ''}
       
           ${CLIENT_LOCATION_2 ? `
-            <option value="${CLIENT_LOCATION_2}">
+            <option value="${CLIENT_LOCATION_2}"
+              ${STATE[date].sections.option1.location === CLIENT_LOCATION_2 ? 'selected' : ''}>
               ${CLIENT_LOCATION_2}
             </option>
           ` : ''}
@@ -1047,7 +1066,15 @@ function changeQty(d, cardSlot, label, delta, isAlt){
   if (span) span.innerText = obj.qty;
 }
 function updateSectionSlot(date, section, value) {
-  STATE[date].sections[section].slot = value;
+  const sec = STATE[date].sections[section];
+  sec.slot = value;
+  // re-stamp slotFrom on any already-picked items so backend matches the new slot
+  ['items', 'altItems'].forEach(store => {
+    if (!sec[store]) return;
+    Object.values(sec[store]).forEach(it => {
+      if (it && it.qty > 0) it.slotFrom = value;
+    });
+  });
 }
 
 function updateSectionLocation(date, section, value) {
