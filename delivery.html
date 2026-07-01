@@ -533,7 +533,10 @@ async function autoOrderByDistance() {
   refreshStopOptions();
   maybeRenderMessage();
 
-  showToast(unlocated.length ? `Routed ${order.length} stops; ${unlocated.length} without location` : `Routed ${order.length} stops, nearest first`);
+  const raw = document.getElementById('messageOutput').dataset.raw || '';
+  const copied = raw ? await copyText(raw) : false;
+  const base = unlocated.length ? `Routed ${order.length} stops; ${unlocated.length} without location` : `Routed ${order.length} stops, nearest first`;
+  showToast(base + (copied ? ' \u00b7 copied to clipboard' : ''));
 }
 
 function distancesFrom(origin, dests) {
@@ -624,14 +627,25 @@ function maybeRenderMessage() {
   out.dataset.raw = message;
 }
 
+function copyText(text) {
+  if (!text) return Promise.resolve(false);
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    return navigator.clipboard.writeText(text).then(() => true).catch(() => fallbackCopy(text));
+  }
+  return Promise.resolve(fallbackCopy(text));
+}
+function fallbackCopy(text) {
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.focus(); ta.select();
+    const ok = document.execCommand('copy'); document.body.removeChild(ta);
+    return ok;
+  } catch (e) { return false; }
+}
 function copyMessage() {
   const text = document.getElementById('messageOutput').dataset.raw || '';
-  navigator.clipboard.writeText(text).then(() => showToast('Copied to clipboard!')).catch(() => {
-    const ta = document.createElement('textarea');
-    ta.value = text; document.body.appendChild(ta); ta.select();
-    document.execCommand('copy'); document.body.removeChild(ta);
-    showToast('Copied to clipboard!');
-  });
+  copyText(text).then(ok => showToast(ok ? 'Copied to clipboard!' : 'Copy failed — long-press to copy'));
 }
 function sendWhatsApp() {
   const text = document.getElementById('messageOutput').dataset.raw || '';
