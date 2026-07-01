@@ -221,7 +221,7 @@ function renderClientView(title) {
   html += `<div id="clientListContainer">`;
   html += renderClientList(currentClients, true);
   html += `</div>`;
-  html += `<button class="full" style="margin-top:14px;" onclick="generateMessage()">Generate WhatsApp Message</button><div id="messageOutput"></div>`;
+  html += `<div id="messageOutput"></div>`;
   content.innerHTML = html;
 }
 
@@ -328,6 +328,7 @@ function selectStop(phone, val) {
   else { for (const p in stopAssignments) if (stopAssignments[p] === val && p !== phone) delete stopAssignments[p]; stopAssignments[phone] = val; }
   closeStopMenus();
   refreshStopOptions();
+  maybeRenderMessage();
 }
 function refreshStopOptions() {
   document.querySelectorAll('.stop-dropdown').forEach(wrapper => {
@@ -360,14 +361,24 @@ async function autoOrderByDistance() {
     showToast('Maps still loading — try again in a moment'); return;
   }
   const geo = await ensureGeo();
+  const isNew = currentView === 'NEW';
+
+  // New Route: only the clients you ticked. Existing route: everyone in it.
+  const pool = isNew ? currentClients.filter(c => checkedClients[c.phone]) : currentClients;
+  if (isNew && !pool.length) { showToast('Tick the clients for this route first'); return; }
 
   const located = [], unlocated = [];
-  currentClients.forEach(c => {
+  pool.forEach(c => {
     const coord = coordForClient(c, geo[c.phone]);
     if (coord && coord.lat != null) located.push({ c, coord });
     else unlocated.push(c);
   });
-  if (!located.length) { showToast('No saved map locations for these clients'); return; }
+
+  if (!located.length) {
+    showToast('No saved map locations — number manually if needed');
+    maybeRenderMessage();
+    return;
+  }
 
   showToast('Building route…');
 
@@ -379,23 +390,30 @@ async function autoOrderByDistance() {
     const dists = await distancesFrom(current, remaining.map(x => x.coord));
     let best = -1, bestD = Infinity;
     for (let i = 0; i < dists.length; i++) { if (dists[i] < bestD) { bestD = dists[i]; best = i; } }
-    if (best === -1) break;                     // remaining are unreachable
+    if (best === -1) break;
     const chosen = remaining.splice(best, 1)[0];
-    chosen.leg = bestD;                          // distance from previous stop
+    chosen.leg = bestD;
     order.push(chosen);
     current = chosen.coord;
   }
-  remaining.forEach(x => unlocated.push(x.c));   // unreachable -> unnumbered
+  remaining.forEach(x => unlocated.push(x.c));
 
   stopAssignments = {}; lastDistance = {};
   order.forEach((x, i) => { stopAssignments[x.c.phone] = String(i + 1); lastDistance[x.c.phone] = x.leg; });
 
+  // reorder the on-screen list: stop 1 on top ... last at bottom, rest after
+  const orderedPhones = order.map(x => x.c.phone);
+  const numberedClients = order.map(x => x.c);
+  const restClients = currentClients.filter(c => orderedPhones.indexOf(c.phone) === -1);
+  currentClients = numberedClients.concat(restClients);
+
   document.getElementById('clientListContainer').innerHTML = renderClientList(currentClients, true);
   refreshStopOptions();
+  maybeRenderMessage();
 
   showToast(unlocated.length
-    ? `Routed ${order.length} stops; ${unlocated.length} without location left blank`
-    : `Routed ${order.length} stops, nearest-neighbour order`);
+    ? `Routed ${order.length} stops; ${unlocated.length} without location`
+    : `Routed ${order.length} stops, nearest first`);
 }
 
 // distances from one origin to a list of destinations (driving), chunked at 25
@@ -421,7 +439,14 @@ function distancesFrom(origin, dests) {
 }
 
 /* ---- message generation ---- */
-function generateMessage() {
+function linkForClient(c) {
+  const g = geoMap && geoMap[c.phone];
+  if (!g) return '';
+  if (c.location && c.location2 && c.location === c.location2) return g.loc2Link || g.loc1Link || '';
+  return g.loc1Link || g.loc2Link || '';
+}
+
+function maybeRenderMessage() {
   const clients = currentClients;
   let ordered = [];
   if (currentView === 'NEW') {
@@ -432,7 +457,6 @@ function generateMessage() {
     });
     numbered.sort((a, b) => a.stop - b.stop);
     ordered = numbered.concat(checkedUnnum);
-    if (!ordered.length) { showToast('Assign numbers or check clients first'); return; }
   } else {
     const numbered = [], unnumbered = [];
     clients.forEach(c => {
@@ -442,14 +466,25 @@ function generateMessage() {
     numbered.sort((a, b) => a.stop - b.stop);
     ordered = numbered.concat(unnumbered);
   }
+
+  const out = document.getElementById('messageOutput');
+  if (!out) return;
+  if (!ordered.length) { out.innerHTML = ''; out.dataset.raw = ''; return; }
+
   let message = '';
   ordered.forEach(c => {
-    if (c.stop !== null) message += `${c.stop}. ${c.name}\n${c.phone}\n${c.location}\n\n`;
-    else message += `${c.name}\n${c.phone}\n${c.location}\n\n`;
+    const link = linkForClient(c);
+    let block = (c.stop !== null ? (c.stop + '. ') : '') + c.name + '\n' + c.phone + '\n' + c.location;
+    if (link) block += '\n' + link;
+    message += block + '\n\n';
   });
   message = message.trim();
-  const out = document.getElementById('messageOutput');
-  out.innerHTML = `<div class="message-box" id="msgText">${escapeHtml(message)}</div><div class="action-row"><button onclick="copyMessage()">📋 Copy Message</button><button class="wa-btn" onclick="sendWhatsApp()">Send on WhatsApp</button></div>`;
+
+  out.innerHTML = `<div class="message-box" id="msgText">${escapeHtml(message)}</div>
+    <div class="action-row">
+      <button onclick="copyMessage()">📋 Copy</button>
+      <button class="wa-btn" onclick="sendWhatsApp()">Share on WhatsApp</button>
+    </div>`;
   out.dataset.raw = message;
 }
 
