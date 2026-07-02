@@ -1397,7 +1397,7 @@
       let p = String(phone || '').replace(/\D/g,'');
       if(p.length === 10) p = '91' + p;               // default to India country code
       // hard-target WhatsApp Business (com.whatsapp.w4b) on Android
-      return 'intent://send/?phone=' + p + '&text=' + encodeURIComponent(msg) +
+      return 'intent://send?phone=' + p + '&text=' + encodeURIComponent(msg) +
              '#Intent;scheme=whatsapp;package=com.whatsapp.w4b;end';
     };
 
@@ -1411,7 +1411,7 @@
       if(c.phone){
         const a = document.createElement('a');
         a.className = 'wa-btn'; a.href = waLink(c.phone, REMIND_MSG);
-        a.target = '_blank'; a.rel = 'noopener'; a.textContent = 'WhatsApp';
+        a.rel = 'noopener'; a.textContent = 'WhatsApp';
         act.appendChild(a);
       }
       tr.appendChild(num); tr.appendChild(nm); tr.appendChild(act); table.appendChild(tr);
