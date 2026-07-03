@@ -521,15 +521,6 @@ async function fetchClient() {
 
   const client = data.client;
 
-  if (client.status === 'inactive') {
-    document.getElementById('inactiveModal').style.display = 'flex';
-    return;
-  }
-
-  clientName.value = client.clientName || '';
-
-  const client = data.client;
-
   clientName.value = client.clientName || '';
   const originalType = client.mealType || '';
 
@@ -1789,17 +1780,5 @@ function resolvePermModal(ok){
     <button class="btn" onclick="closeUpgradeModal()">OK</button>
   </div>
 </div>
-
-<div id="inactiveModal" class="modal">
-  <div class="modal-content" style="text-align:center; padding:28px 24px 22px; max-width:380px;">
-    <div style="font-size:34px; margin-bottom:10px;">⏸️</div>
-    <h3 style="margin:0 0 8px;">Account Inactive</h3>
-    <p style="font-size:14.5px; color:#445; line-height:1.55; margin:0 0 22px;">
-      Your account is currently inactive. Please contact Friska Wellness to place your order.
-    </p>
-    <button class="btn" style="margin-top:0;" onclick="document.getElementById('inactiveModal').style.display='none'">OK</button>
-  </div>
-</div>
-
 </body>
 </html>
