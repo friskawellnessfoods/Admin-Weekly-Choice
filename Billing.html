@@ -247,19 +247,19 @@
   <section id="tab-dash" class="hidden">
     <div class="card"><h2 class="sec">Follow-ups — expiring &amp; expired</h2><div id="d_followups"><div class="subtle">Loading…</div></div></div>
     <div class="card">
-      <h2 class="sec">All bills</h2>
-      <div class="row" style="margin-bottom:12px">
+      <h2 class="sec" style="cursor:pointer;user-select:none" id="d_allHead">▾ All bills</h2>
+      <div id="d_allBody"><div class="row" style="margin-bottom:12px">
         <div class="field" style="flex:1 1 200px"><input id="d_search" placeholder="Search name or bill no." /></div>
         <select id="d_filter" style="flex:0 0 140px"><option value="all">All</option><option value="unpaid">Unpaid</option><option value="paid">Paid</option></select>
         <button class="btn btn-ghost" id="d_reload" style="flex:0 0 auto">Reload</button>
       </div>
       <div id="d_table"></div>
-      <div class="status info" id="d_status"></div>
+      <div class="status info" id="d_status"></div></div>
     </div>
     <div class="card">
-      <h2 class="sec">Unbilled clients</h2>
-      <p class="subtle" style="margin-top:0">Clients with orders but no bill covering their first-order month. Tap ✕ to dismiss.</p>
-      <div id="d_unbilled"><div class="subtle">Loading…</div></div>
+      <h2 class="sec" style="cursor:pointer;user-select:none" id="d_ubHead">▾ Unbilled clients</h2>
+      <div id="d_ubBody"><p class="subtle" style="margin-top:0">Clients with orders but no bill covering their first-order month. Tap ✕ to dismiss.</p>
+      <div id="d_unbilled"><div class="subtle">Loading…</div></div></div>
     </div>
   </section>
 
@@ -458,7 +458,7 @@ function buildNewLines(resetQty,freshMains){
   const keepQ=(id,def)=>(prev[id]&&!resetQty)?prev[id].qty:def;
   const keepR=(id,def)=>prev[id]?prev[id].rate:def;
   const out=[];
-  if(hasLunch||hasDinner){const pl=plans.length?plans:["nb"];const ppl=nPeople();const def=(both?days*2:days)*ppl;const label=pl.map(p=>PLAN_LABEL[p]).join(" + ")+" · "+(both?"Lunch + Dinner":(hasLunch?"Lunch":"Dinner"));out.push({id:"main",label,qty:freshMains?def:keepQ("main",def),rate:keepR("main",both?rate(pl[0],dur,"combo"):rate(pl[0],dur,"lunch")),food:true});}
+  if(hasLunch||hasDinner){const pl=plans.length?plans:["nb"];const ppl=nPeople();const def=(both?days*2:days)*ppl;const sfx=ppl>1?" ("+ppl+" members)":"";const label=pl.map(p=>PLAN_LABEL[p]).join(" + ")+" · "+(both?"Lunch + Dinner":(hasLunch?"Lunch":"Dinner"))+sfx;out.push({id:"main",label,qty:freshMains?def:keepQ("main",def),rate:keepR("main",both?rate(pl[0],dur,"combo"):rate(pl[0],dur,"lunch")),food:true});}
   if(chosen.includes("breakfast"))out.push({id:"breakfast",label:"Breakfast",qty:keepQ("breakfast",days),rate:keepR("breakfast",plans.length?rate(plans[0],dur,"breakfast"):gRate("breakfast")),food:true});
   if(chosen.includes("snack"))out.push({id:"snack",label:"Snack",qty:keepQ("snack",days),rate:keepR("snack",plans.length?rate(plans[0],dur,"snack"):gRate("snack")),food:true});
   const jx=chosen.includes("juice2x")?2:(chosen.includes("juice1x")?1:0);
@@ -879,6 +879,8 @@ el("u_client").addEventListener("keydown",e=>{if(e.key==="Enter")runUsageCheck(f
 el("d_search").addEventListener("input",applyDashFilter);
 el("d_filter").addEventListener("change",applyDashFilter);
 el("d_reload").addEventListener("click",()=>loadDashboard(true));
+el("d_allHead").addEventListener("click",()=>{const b=el("d_allBody"),h=el("d_allHead");const o=!b.classList.toggle("hidden");h.textContent=(o?"▾":"▸")+" All bills";});
+el("d_ubHead").addEventListener("click",()=>{const b=el("d_ubBody"),h=el("d_ubHead");const o=!b.classList.toggle("hidden");h.textContent=(o?"▾":"▸")+" Unbilled clients";});
 
 // init
 el("n_billdate").value=keyOf(dateOnly(new Date()));
