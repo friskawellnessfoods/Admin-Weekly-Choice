@@ -406,7 +406,7 @@ function computeRenew(data,name,prev){
 
 /* line table */
 function lineRowHtml(line){
-  const lbl=line.custom?`<input class="lbl-in" value="${(line.label||"").replace(/"/g,"&quot;")}" data-f="label">`:`<span style="font-weight:600">${line.label}</span>`;
+  const lbl=line.custom?`<input class="lbl-in" value="${(line.label||"").replace(/"/g,"&quot;")}" data-f="label">`:`<span style="font-weight:600" data-meal="${line._meal||""}" data-plans="${line._plans||""}" data-dur="${line._dur||""}" data-days="${line._days||""}">${line.label}</span>`;
   return `<tr data-id="${line.id}" data-food="${line.food===false?0:1}"><td>${lbl}</td><td class="qtycol"><input type="number" min="0" value="${line.qty}" data-f="qty"></td><td class="ratecol"><input type="number" min="0" step="0.5" value="${line.rate}" data-f="rate"></td><td class="pricecol num" data-price>${money(line.qty*line.rate)}</td><td class="rmcol">${line.custom?`<button class="rm" data-rm>×</button>`:""}</td></tr>`;
 }
 function renderLines(tbodyId,lines){el(tbodyId).innerHTML=lines.map(lineRowHtml).join("");}
@@ -581,12 +581,12 @@ function renderRenew(){
   const newDays=prevDaysOf(prev),slots=Math.max(1,prevSlotCount(prev));
   el("r_days").value=newDays;el("r_disc").value=prev.discPct||0;el("r_gst").value=5;el("r_billdate").value=keyOf(dateOnly(new Date()));
   setDate("r_start",rc.nextStart);setDate("r_end",rc.nextEnd);
-  renderLines("r_nextlines",reconstructNextLines(prev,newDays,slots,op));
+  renderLines("r_nextlines",reconstructNextLines(prev,newDays,slots,op));bindMealToggle();
   suggestBillNo("r_billno","r_start");recalcRenewNext();
 }
 function reconstructNextLines(prev,days,slots,op){
   const plans=planCodesOf(prev),dur=durCodeOf(prev),p0=plans[0]||"nb";const out=[];
-  if(op.main){const both=op.main==="both";const pl=plans.length?plans:["nb"];out.push({id:"main",label:pl.map(p=>PLAN_LABEL[p]).join(" + ")+" · "+(both?"Lunch + Dinner":(op.main==="lunch"?"Lunch":"Dinner")),qty:both?days*2:days,rate:both?rate(pl[0],dur,"combo"):rate(pl[0],dur,"lunch"),food:true});}
+  if(op.main){const both=op.main==="both";const pl=plans.length?plans:["nb"];const base=pl.map(p=>PLAN_LABEL[p]).join(" + ");const meal=both?"Lunch + Dinner":(op.main==="lunch"?"Lunch":"Dinner");const label=both?(base+" · "+meal):(base+" · "+meal+` <span class="mealtoggle" data-add="${op.main==="lunch"?"dinner":"lunch"}" style="cursor:pointer;color:var(--accent);font-weight:700;margin-left:6px">+ ${op.main==="lunch"?"Dinner":"Lunch"}</span>`);out.push({id:"main",label,qty:both?days*2:days,rate:both?rate(pl[0],dur,"combo"):rate(pl[0],dur,"lunch"),food:true,_meal:op.main,_plans:pl.join(","),_dur:dur,_days:days});}
   if(op.breakfast)out.push({id:"breakfast",label:"Breakfast",qty:days,rate:rate(p0,dur,"breakfast"),food:true});
   if(op.snack)out.push({id:"snack",label:"Snack",qty:days,rate:rate(p0,dur,"snack"),food:true});
   if(op.juices)out.push({id:"juices",label:"Juices",qty:days*op.juices,rate:rate(p0,dur,"juice1"),food:true});
@@ -603,6 +603,7 @@ function recalcRenewActual(){
   recalcRenewNext();
 }
 function recalcRenewNext(){if(!renewCtx)return;renderTotals("r_nextTotals",computeTotals(readLines("r_nextlines"),parseFloat(el("r_disc").value)||0,parseFloat(el("r_gst").value)||0,renewCtx.adjustment||0));}
+function bindMealToggle(){el("r_nextlines").querySelectorAll(".mealtoggle").forEach(sp=>sp.onclick=e=>{e.stopPropagation();const tr=sp.closest("tr");const span=tr.querySelector('span[data-meal]');const plans=(span.dataset.plans||"nb").split(",");const dur=span.dataset.dur||"m";const days=parseInt(span.dataset.days)||26;const qi=tr.querySelector('[data-f="qty"]'),ri=tr.querySelector('[data-f="rate"]'),pi=tr.querySelector('[data-price]');qi.value=days*2;ri.value=rate(plans[0],dur,"combo");pi.textContent=money(qi.value*ri.value);span.innerHTML=plans.map(p=>PLAN_LABEL[p]).join(" + ")+" · Lunch + Dinner";recalcRenewNext();});}
 function renewDatesFromStart(){const s=readDate("r_start");const days=parseInt(el("r_days").value)||26;if(s){const f=nextServiceDates(addDays(s,-1),days);setDate("r_end",f[f.length-1]);}}
 
 /* bill number */
@@ -674,14 +675,14 @@ async function validateAndSave(meta,lines,t,statusId){
 async function loadDashboard(force){setStatus("d_status","Loading bills…","info");try{const bills=await fetchBills(force);renderDashboard(bills);try{const o=await fetchOrders(force);renderUnbilled(o,bills);}catch(e){el("d_unbilled").innerHTML='<div class="subtle err">Orders load failed.</div>';}setStatus("d_status",`${Math.max(0,bills.length-1)} bills.`,"ok");}catch(err){setStatus("d_status","Error: "+err.message,"err");el("d_followups").innerHTML="";}}
 function unbilledDismissed(){try{return new Set(JSON.parse(localStorage.getItem("friska_unbilled_dismiss")||"[]"));}catch(e){return new Set();}}
 function dismissUnbilled(k){const s=unbilledDismissed();s.add(k);try{localStorage.setItem("friska_unbilled_dismiss",JSON.stringify([...s]));}catch(e){}}
+function dismissUnbilledMany(ks){const s=unbilledDismissed();ks.forEach(k=>s.add(k));try{localStorage.setItem("friska_unbilled_dismiss",JSON.stringify([...s]));}catch(e){}}
+let unbilledOpen={};
 function renderUnbilled(orders,bills){
-  // build first-order date + phone per client (from orders)
   const first={};
   for(const row of orders){if(!row||row.length<2)continue;const dt=toDt(row[COL.date]);if(!dt)continue;const nm=String(row[COL.name]||"").trim();if(!nm)continue;
     let has=false;for(const i of[7,8,9,10,11,12])if(i<row.length){const v=String(row[i]).trim();if(v&&v!=="N/A"){has=true;break;}} if(!has)continue;
     const k=normName(nm);const ph=String(row[COL.phone]||"").trim();
     if(!first[k]||dt<first[k].date)first[k]={date:dateOnly(dt),name:nm,phone:ph};else if(!first[k].phone&&ph)first[k].phone=ph;}
-  // billed months per client (Start..End inclusive months)
   const billedMonths={};
   if(billsCache&&billsCache.length>1){const idx=billHeaderIndex(billsCache);const ci=idx["Client"],si=idx["Start"],ei=idx["End"];
     for(let i=1;i<billsCache.length;i++){const r=billsCache[i];const nm=normName(r[ci]);if(!nm)continue;const st=toDt(r[si]),en=toDt(r[ei]);if(!st)continue;const end=en||st;
@@ -693,12 +694,16 @@ function renderUnbilled(orders,bills){
   if(!rows.length){el("d_unbilled").innerHTML='<div class="subtle">All clients billed.</div>';return;}
   const groups={};rows.forEach(r=>(groups[r.mk]=groups[r.mk]||[]).push(r));
   const keys=Object.keys(groups).sort().reverse();
+  if(Object.keys(unbilledOpen).length===0&&keys.length)unbilledOpen[keys[0]]=true;
   let html="";keys.forEach(k=>{
     groups[k].sort((a,b)=>a.date-b.date);
-    html+=`<div style="margin-top:8px"><div class="oldhead">${monthLabel_(k)} (${groups[k].length})</div><div style="overflow-x:auto"><table class="dtable"><thead><tr><th>Client</th><th>Phone</th><th>First order</th><th></th></tr></thead><tbody>`+
-      groups[k].map(r=>`<tr><td><b>${r.name}</b></td><td>${r.phone}</td><td>${dtstr(r.date)}</td><td><button class="rm" data-dis="${r.key}">×</button></td></tr>`).join("")+`</tbody></table></div></div>`;});
+    const open=!!unbilledOpen[k];
+    html+=`<div style="margin-top:8px"><div style="display:flex;align-items:center;gap:8px"><div class="oldhead" data-mk="${k}" style="flex:1">${open?"▾":"▸"} ${monthLabel_(k)} (${groups[k].length})</div><button class="btn btn-ghost" data-dismm="${k}" style="padding:6px 10px;font-size:.8rem">Dismiss all</button></div><div class="${open?"":"hidden"}" data-wrap="${k}"><div style="overflow-x:auto"><table class="dtable"><thead><tr><th>Client</th><th>Phone</th><th>First order</th><th></th></tr></thead><tbody>`+
+      groups[k].map(r=>`<tr><td><b>${r.name}</b></td><td>${r.phone}</td><td>${dtstr(r.date)}</td><td><button class="rm" data-dis="${r.key}">×</button></td></tr>`).join("")+`</tbody></table></div></div></div>`;});
   el("d_unbilled").innerHTML=html;
   el("d_unbilled").querySelectorAll("button[data-dis]").forEach(b=>b.onclick=()=>{dismissUnbilled(b.dataset.dis);renderUnbilled(orders,bills);});
+  el("d_unbilled").querySelectorAll("button[data-dismm]").forEach(b=>b.onclick=()=>{const k=b.dataset.dismm;if(!confirm(`Dismiss all ${groups[k].length} clients in ${monthLabel_(k)}?`))return;dismissUnbilledMany(groups[k].map(r=>r.key));renderUnbilled(orders,bills);});
+  el("d_unbilled").querySelectorAll(".oldhead[data-mk]").forEach(h=>h.onclick=()=>{const k=h.dataset.mk;unbilledOpen[k]=!unbilledOpen[k];renderUnbilled(orders,bills);});
 }
 function dashRows(){
   if(!billsCache||billsCache.length<2)return [];
