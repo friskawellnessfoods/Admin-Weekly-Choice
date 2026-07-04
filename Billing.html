@@ -466,7 +466,8 @@ function buildNewLines(resetQty,freshMains){
   if(chosen.includes("seafood"))out.push({id:"seafood",label:"Seafood add-on",qty:keepQ("seafood",days),rate:keepR("seafood",gRate("seafood")),food:true});
   Object.values(prev).filter(l=>l.custom).forEach(l=>out.push(l));
   const km=parseFloat(el("n_km").value)||0;
-  out.push({id:"delivery",label:"Delivery",qty:days*nSlots(),rate:km*gRate("delivery"),food:false});
+  const slotNames=Array.from(el("n_slots").querySelectorAll("input:checked")).map(c=>c.value);const delLabel=slotNames.length?"Delivery · "+slotNames.join(" + "):"Delivery";
+  out.push({id:"delivery",label:delLabel,qty:days*nSlots(),rate:km*gRate("delivery"),food:false});
   return out;
 }
 function refreshNewRates(){
