@@ -133,6 +133,7 @@
           <select id="n_dur"><option value="d">2 day trial</option><option value="w">Weekly</option><option value="m" selected>1 month</option><option value="q">3 months</option><option value="custom">Custom</option></select>
         </div>
         <div class="field"><label>Days</label><input id="n_days" type="number" value="26" min="1" readonly /></div>
+        <div class="field"><label>People</label><input id="n_people" type="number" value="1" min="1" /></div>
       </div>
       <div class="grid g2" style="margin-top:12px">
         <div class="field"><label>Start date</label><input id="n_start" type="date" onclick="this.showPicker&&this.showPicker()" /></div>
@@ -254,6 +255,11 @@
       </div>
       <div id="d_table"></div>
       <div class="status info" id="d_status"></div>
+    </div>
+    <div class="card">
+      <h2 class="sec">Unbilled clients</h2>
+      <p class="subtle" style="margin-top:0">Clients with orders but no bill covering their first-order month. Tap ✕ to dismiss.</p>
+      <div id="d_unbilled"><div class="subtle">Loading…</div></div>
     </div>
   </section>
 
@@ -442,6 +448,7 @@ function nPlans(){return Array.from(el("n_planPanel").querySelectorAll("input:ch
 function nChosen(){return Array.from(el("n_items").querySelectorAll("input:checked")).map(c=>c.value);}
 function nSlots(){return el("n_slots").querySelectorAll("input:checked").length;}
 function nDays(){return parseInt(el("n_days").value)||0;}
+function nPeople(){return Math.max(1,parseInt(el("n_people").value)||1);}
 function mealLabel(plan,both,onlyLunch){return `${PLAN_LABEL[plan]} · `+(both?"Lunch + Dinner":(onlyLunch?"Lunch":"Dinner"));}
 function domLines(tbodyId){const m={};readLines(tbodyId).forEach(l=>m[l.id]=l);return m;}
 function buildNewLines(resetQty,freshMains){
@@ -451,7 +458,7 @@ function buildNewLines(resetQty,freshMains){
   const keepQ=(id,def)=>(prev[id]&&!resetQty)?prev[id].qty:def;
   const keepR=(id,def)=>prev[id]?prev[id].rate:def;
   const out=[];
-  if(hasLunch||hasDinner)plans.forEach(p=>{const id="main_"+p;const def=both?days*2:days;out.push({id,label:mealLabel(p,both,hasLunch),qty:freshMains?def:keepQ(id,def),rate:keepR(id,both?rate(p,dur,"combo"):rate(p,dur,"lunch")),food:true});});
+  if(hasLunch||hasDinner){const pl=plans.length?plans:["nb"];const ppl=nPeople();const def=(both?days*2:days)*ppl;const label=pl.map(p=>PLAN_LABEL[p]).join(" + ")+" · "+(both?"Lunch + Dinner":(hasLunch?"Lunch":"Dinner"));out.push({id:"main",label,qty:freshMains?def:keepQ("main",def),rate:keepR("main",both?rate(pl[0],dur,"combo"):rate(pl[0],dur,"lunch")),food:true});}
   if(chosen.includes("breakfast"))out.push({id:"breakfast",label:"Breakfast",qty:keepQ("breakfast",days),rate:keepR("breakfast",plans.length?rate(plans[0],dur,"breakfast"):gRate("breakfast")),food:true});
   if(chosen.includes("snack"))out.push({id:"snack",label:"Snack",qty:keepQ("snack",days),rate:keepR("snack",plans.length?rate(plans[0],dur,"snack"):gRate("snack")),food:true});
   const jx=chosen.includes("juice2x")?2:(chosen.includes("juice1x")?1:0);
@@ -466,7 +473,7 @@ function refreshNewRates(){
   const plans=nPlans(),dur=el("n_dur").value,chosen=nChosen();const both=chosen.includes("lunch")&&chosen.includes("dinner");
   const lines=readLines("n_lines");
   lines.forEach(l=>{
-    if(l.id&&l.id.indexOf("main_")===0){const p=l.id.slice(5);l.rate=both?rate(p,dur,"combo"):rate(p,dur,"lunch");}
+    if(l.id==="main"){const p=plans[0]||"nb";l.rate=both?rate(p,dur,"combo"):rate(p,dur,"lunch");}
     else if(l.id==="breakfast")l.rate=plans.length?rate(plans[0],dur,"breakfast"):gRate("breakfast");
     else if(l.id==="snack")l.rate=plans.length?rate(plans[0],dur,"snack"):gRate("snack");
     else if(l.id==="juices")l.rate=plans.length?rate(plans[0],dur,"juice1"):gRate("juice1");
@@ -560,8 +567,8 @@ function renderRenew(){
   el("r_paused").textContent=b.pausedDates.length?b.pausedDates.map(dtstr).join(", "):"None";
 
   // actual usage — every item the client actually took (qty>0), priced from sheet, juices combined
-  const comboActual=b.totals.meal2>0, actual=[];
-  if(b.totals.meals_total>0)actual.push({id:"main",label:comboActual?"Lunch + Dinner":"Meals",qty:b.totals.meals_total,rate:comboActual?rate(p0,dur,"combo"):rate(p0,dur,"lunch"),food:true});
+  const both=op.main==="both", plabel=(plans.length?plans:[p0]).map(p=>PLAN_LABEL[p]).join(" + "), actual=[];
+  if(b.totals.meals_total>0&&op.main)actual.push({id:"main",label:plabel+" · "+(both?"Lunch + Dinner":op.main==="lunch"?"Lunch":"Dinner"),qty:b.totals.meals_total,rate:both?rate(p0,dur,"combo"):rate(p0,dur,"lunch"),food:true});
   if(b.totals.brk>0)actual.push({id:"breakfast",label:"Breakfast",qty:b.totals.brk,rate:rate(p0,dur,"breakfast"),food:true});
   if(b.totals.snack>0)actual.push({id:"snack",label:"Snack",qty:b.totals.snack,rate:rate(p0,dur,"snack"),food:true});
   if(b.totals.juices_total>0)actual.push({id:"juices",label:"Juices",qty:b.totals.juices_total,rate:rate(p0,dur,"juice1"),food:true});
@@ -579,7 +586,7 @@ function renderRenew(){
 }
 function reconstructNextLines(prev,days,slots,op){
   const plans=planCodesOf(prev),dur=durCodeOf(prev),p0=plans[0]||"nb";const out=[];
-  if(op.main){const both=op.main==="both";(plans.length?plans:["nb"]).forEach(p=>out.push({id:"main_"+p,label:mealLabel(p,both,op.main==="lunch"),qty:both?days*2:days,rate:both?rate(p,dur,"combo"):rate(p,dur,"lunch"),food:true}));}
+  if(op.main){const both=op.main==="both";const pl=plans.length?plans:["nb"];out.push({id:"main",label:pl.map(p=>PLAN_LABEL[p]).join(" + ")+" · "+(both?"Lunch + Dinner":(op.main==="lunch"?"Lunch":"Dinner")),qty:both?days*2:days,rate:both?rate(pl[0],dur,"combo"):rate(pl[0],dur,"lunch"),food:true});}
   if(op.breakfast)out.push({id:"breakfast",label:"Breakfast",qty:days,rate:rate(p0,dur,"breakfast"),food:true});
   if(op.snack)out.push({id:"snack",label:"Snack",qty:days,rate:rate(p0,dur,"snack"),food:true});
   if(op.juices)out.push({id:"juices",label:"Juices",qty:days*op.juices,rate:rate(p0,dur,"juice1"),food:true});
@@ -664,7 +671,35 @@ async function validateAndSave(meta,lines,t,statusId){
 }
 
 /* ===================== DASHBOARD ===================== */
-async function loadDashboard(force){setStatus("d_status","Loading bills…","info");try{const bills=await fetchBills(force);renderDashboard(bills);setStatus("d_status",`${Math.max(0,bills.length-1)} bills.`,"ok");}catch(err){setStatus("d_status","Error: "+err.message,"err");el("d_followups").innerHTML="";}}
+async function loadDashboard(force){setStatus("d_status","Loading bills…","info");try{const bills=await fetchBills(force);renderDashboard(bills);try{const o=await fetchOrders(force);renderUnbilled(o,bills);}catch(e){el("d_unbilled").innerHTML='<div class="subtle err">Orders load failed.</div>';}setStatus("d_status",`${Math.max(0,bills.length-1)} bills.`,"ok");}catch(err){setStatus("d_status","Error: "+err.message,"err");el("d_followups").innerHTML="";}}
+function unbilledDismissed(){try{return new Set(JSON.parse(localStorage.getItem("friska_unbilled_dismiss")||"[]"));}catch(e){return new Set();}}
+function dismissUnbilled(k){const s=unbilledDismissed();s.add(k);try{localStorage.setItem("friska_unbilled_dismiss",JSON.stringify([...s]));}catch(e){}}
+function renderUnbilled(orders,bills){
+  // build first-order date + phone per client (from orders)
+  const first={};
+  for(const row of orders){if(!row||row.length<2)continue;const dt=toDt(row[COL.date]);if(!dt)continue;const nm=String(row[COL.name]||"").trim();if(!nm)continue;
+    let has=false;for(const i of[7,8,9,10,11,12])if(i<row.length){const v=String(row[i]).trim();if(v&&v!=="N/A"){has=true;break;}} if(!has)continue;
+    const k=normName(nm);const ph=String(row[COL.phone]||"").trim();
+    if(!first[k]||dt<first[k].date)first[k]={date:dateOnly(dt),name:nm,phone:ph};else if(!first[k].phone&&ph)first[k].phone=ph;}
+  // billed months per client (Start..End inclusive months)
+  const billedMonths={};
+  if(billsCache&&billsCache.length>1){const idx=billHeaderIndex(billsCache);const ci=idx["Client"],si=idx["Start"],ei=idx["End"];
+    for(let i=1;i<billsCache.length;i++){const r=billsCache[i];const nm=normName(r[ci]);if(!nm)continue;const st=toDt(r[si]),en=toDt(r[ei]);if(!st)continue;const end=en||st;
+      (billedMonths[nm]=billedMonths[nm]||new Set());let c=new Date(st.getFullYear(),st.getMonth(),1);const stop=new Date(end.getFullYear(),end.getMonth(),1);
+      while(c<=stop){billedMonths[nm].add(c.getFullYear()+"-"+String(c.getMonth()+1).padStart(2,"0"));c.setMonth(c.getMonth()+1);}}}
+  const dismissed=unbilledDismissed();
+  const rows=[];
+  for(const k in first){const f=first[k];const mk=monthKey_(f.date);const dk=k+"|"+mk;if(dismissed.has(dk))continue;if(billedMonths[k]&&billedMonths[k].has(mk))continue;rows.push({key:dk,name:f.name,phone:f.phone,date:f.date,mk});}
+  if(!rows.length){el("d_unbilled").innerHTML='<div class="subtle">All clients billed.</div>';return;}
+  const groups={};rows.forEach(r=>(groups[r.mk]=groups[r.mk]||[]).push(r));
+  const keys=Object.keys(groups).sort().reverse();
+  let html="";keys.forEach(k=>{
+    groups[k].sort((a,b)=>a.date-b.date);
+    html+=`<div style="margin-top:8px"><div class="oldhead">${monthLabel_(k)} (${groups[k].length})</div><div style="overflow-x:auto"><table class="dtable"><thead><tr><th>Client</th><th>Phone</th><th>First order</th><th></th></tr></thead><tbody>`+
+      groups[k].map(r=>`<tr><td><b>${r.name}</b></td><td>${r.phone}</td><td>${dtstr(r.date)}</td><td><button class="rm" data-dis="${r.key}">×</button></td></tr>`).join("")+`</tbody></table></div></div>`;});
+  el("d_unbilled").innerHTML=html;
+  el("d_unbilled").querySelectorAll("button[data-dis]").forEach(b=>b.onclick=()=>{dismissUnbilled(b.dataset.dis);renderUnbilled(orders,bills);});
+}
 function dashRows(){
   if(!billsCache||billsCache.length<2)return [];
   const idx=billHeaderIndex(billsCache);const out=[];
@@ -797,6 +832,7 @@ el("n_client").addEventListener("input",e=>{fillDatalist("n_clientNames",masterN
 el("n_client").addEventListener("change",onClientNameChange);
 el("n_dur").addEventListener("change",applyDuration);
 el("n_days").addEventListener("input",()=>{nRender(true);newDatesFromStart();});
+el("n_people").addEventListener("input",()=>nRender(true));
 el("n_start").addEventListener("change",()=>{newDatesFromStart();refreshNum("n_billno","n_start");});
 el("n_items").addEventListener("change",e=>{
   const v=e.target.value;
