@@ -14,6 +14,7 @@
   *{ box-sizing:border-box; }
   body{ font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif; margin:0; background:var(--c-bg); color:var(--c-ink); -webkit-text-size-adjust:100%; }
 
+  /* landing vs working */
   .bar{ background:var(--c-surface); }
   body.landing .bar{
     position:static; min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center;
@@ -66,6 +67,7 @@
   .status.busy .spinner{ display:inline-block; }
   @keyframes spin{ to{ transform:rotate(360deg); } }
 
+  /* content */
   .content{ max-width:640px; margin:0 auto; padding:14px 14px 60px; }
   .section-title{ font-size:16px; font-weight:800; margin:14px 0 10px; color:var(--c-ink); }
   .back-link{ display:inline-block; margin-bottom:10px; color:var(--c-primary-d); font-weight:700; cursor:pointer; font-size:14px; }
@@ -82,6 +84,7 @@
   .tile .route-count{ font-size:13px; color:var(--c-muted); }
   .tile.new-route{ border-style:dashed; color:var(--c-primary-d); font-weight:800; display:flex; align-items:center; justify-content:center; }
 
+  /* search on routes page */
   .search-wrap{ position:relative; margin-bottom:14px; }
   .search-wrap input{ width:100%; padding:12px 14px; border:1.5px solid var(--c-line); border-radius:var(--radius); font-size:15px; background:var(--c-surface); color:var(--c-ink); }
   .search-wrap input:focus{ outline:none; border-color:var(--c-primary); box-shadow:0 0 0 3px rgba(14,165,163,.16); }
@@ -96,14 +99,15 @@
   .search-item .rt.none{ background:#94a3b8; }
   .search-empty{ padding:12px 14px; color:var(--c-muted); font-size:14px; }
 
+  /* half search + half clear on New Route */
   .filter-row{ display:flex; gap:8px; margin-bottom:10px; }
   .filter-row input{ flex:1; min-width:0; padding:12px 14px; border:1.5px solid var(--c-line); border-radius:var(--radius); font-size:15px; background:var(--c-surface); color:var(--c-ink); }
   .filter-row input:focus{ outline:none; border-color:var(--c-primary); box-shadow:0 0 0 3px rgba(14,165,163,.16); }
   .filter-row .btn{ flex:1; }
 
+  /* client cards */
   .client-card{ background:var(--c-surface); border:1px solid var(--c-line); border-radius:var(--radius); padding:12px; margin-bottom:8px;
     display:flex; align-items:center; gap:12px; box-shadow:0 2px 8px rgba(20,40,70,.05); }
-  .client-card.off{ opacity:.5; }
   .client-info{ flex:1; min-width:0; }
   .client-info .name{ font-weight:600; font-size:15px; }
   .client-info .meta{ font-size:13px; color:var(--c-muted); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -195,6 +199,7 @@ dateEl.valueAsDate = new Date();
 function setStatus(msg, busy){ statusText.textContent = msg; statusEl.classList.toggle('busy', !!busy); }
 function showToast(msg){ const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 1800); }
 
+// date: click opens calendar; changing it doesn't auto-run
 dateEl.addEventListener('click', () => { try{ dateEl.showPicker(); }catch(e){} });
 dateEl.addEventListener('change', () => setStatus(dateEl.value ? 'Press Generate to load the day.' : 'Pick a date to begin.', false));
 
@@ -285,6 +290,7 @@ function openSlot(slot) {
   content.innerHTML = html;
 }
 
+// search clients within the current slot; show name + their route; tap to open that route
 function searchClients() {
   const inp = document.getElementById('routeSearch');
   const drop = document.getElementById('searchDrop');
@@ -309,6 +315,7 @@ function searchClients() {
   }).join('');
   drop.classList.add('show');
 }
+// close the search dropdown when tapping outside it
 document.addEventListener('click', (e) => {
   const drop = document.getElementById('searchDrop');
   if (drop && !e.target.closest('.search-wrap')) drop.classList.remove('show');
@@ -318,7 +325,6 @@ function openRoute(slot, route) {
   currentSlot = slot; currentView = route;
   stopAssignments = {}; checkedClients = {}; lastDistance = {}; routeTotalMeters = null;
   currentClients = [...slotGroups[slot][route]];
-  currentClients.forEach(c => checkedClients[c.phone] = true);   // all ticked by default
   renderClientView(`${slot} — ${route}`);
 }
 function openNewRoute(slot) {
@@ -350,11 +356,11 @@ function renderClientView(title) {
 
 function renderClientList(clients, withStopSelect) {
   if (!clients.length) return '<div class="empty-state">No clients here.</div>';
+  const isNew = currentView === 'NEW';
   let html = '';
   clients.forEach(c => {
-    const off = withStopSelect && !checkedClients[c.phone] ? ' off' : '';
-    html += `<div class="client-card${off}">`;
-    if (withStopSelect) {
+    html += `<div class="client-card">`;
+    if (withStopSelect && isNew) {
       const chk = checkedClients[c.phone] ? 'checked' : '';
       html += `<input type="checkbox" class="route-check" ${chk} onchange="toggleCheck('${escapeAttr(c.phone)}', this.checked)">`;
     }
@@ -370,14 +376,7 @@ function renderClientList(clients, withStopSelect) {
   return html;
 }
 
-function toggleCheck(phone, val) {
-  if (val) checkedClients[phone] = true;
-  else { delete checkedClients[phone]; delete stopAssignments[phone]; }
-  document.getElementById('clientListContainer').innerHTML = renderClientList(currentClients, true);
-  refreshStopOptions();
-  maybeRenderMessage();
-  computeRouteTotal().then(() => maybeRenderMessage());
-}
+function toggleCheck(phone, val) { if (val) checkedClients[phone] = true; else delete checkedClients[phone]; }
 
 function clearSelection() {
   checkedClients = {}; stopAssignments = {}; lastDistance = {}; routeTotalMeters = null;
@@ -388,6 +387,7 @@ function clearSelection() {
   showToast('Selection cleared');
 }
 
+// filter the New Route list by name (checked state + numbering are preserved)
 function filterNewList() {
   const q = (document.getElementById('newSearch').value || '').trim().toLowerCase();
   const subset = q ? currentClients.filter(c => (c.name || '').toLowerCase().includes(q)) : currentClients;
@@ -419,12 +419,10 @@ function addClientToRoute(phone) {
   if (c && !currentClients.some(x => x.phone === phone)) {
     currentClients.push(c);
     currentClients.sort((a, b) => a.name.localeCompare(b.name));
-    checkedClients[phone] = true;
   }
   renderAddPanel();
   document.getElementById('clientListContainer').innerHTML = renderClientList(currentClients, true);
   refreshStopOptions();
-  maybeRenderMessage();
   showToast('Added');
 }
 
@@ -458,7 +456,7 @@ function closeStopMenusOnce() { closeStopMenus(); document.removeEventListener('
 function closeStopMenus() { document.querySelectorAll('.stop-dropdown-menu').forEach(m => m.remove()); }
 function selectStop(phone, val) {
   if (val === '') { delete stopAssignments[phone]; }
-  else { for (const p in stopAssignments) if (stopAssignments[p] === val && p !== phone) delete stopAssignments[p]; stopAssignments[phone] = val; checkedClients[phone] = true; }
+  else { for (const p in stopAssignments) if (stopAssignments[p] === val && p !== phone) delete stopAssignments[p]; stopAssignments[phone] = val; }
   closeStopMenus();
   refreshStopOptions();
   maybeRenderMessage();
@@ -492,9 +490,10 @@ function coordForClient(c, g) {
 async function autoOrderByDistance() {
   if (!window.google || !google.maps || !google.maps.DistanceMatrixService) { showToast('Maps still loading — try again in a moment'); return; }
   const geo = await ensureGeo();
+  const isNew = currentView === 'NEW';
 
-  const pool = currentClients.filter(c => checkedClients[c.phone]);
-  if (!pool.length) { showToast('Tick at least one client'); return; }
+  const pool = isNew ? currentClients.filter(c => checkedClients[c.phone]) : currentClients;
+  if (isNew && !pool.length) { showToast('Tick the clients for this route first'); return; }
 
   const located = [], unlocated = [];
   pool.forEach(c => {
@@ -560,7 +559,7 @@ function distancesFrom(origin, dests) {
 async function computeRouteTotal() {
   if (!window.google || !google.maps || !google.maps.DistanceMatrixService) return;
   const numbered = currentClients
-    .filter(c => stopAssignments[c.phone] && checkedClients[c.phone])
+    .filter(c => stopAssignments[c.phone])
     .map(c => ({ stop: parseInt(stopAssignments[c.phone]), coord: coordForClient(c, geoMap && geoMap[c.phone]) }))
     .filter(x => x.coord && x.coord.lat != null)
     .sort((a, b) => a.stop - b.stop);
@@ -583,14 +582,25 @@ function linkForClient(c) {
 }
 
 function maybeRenderMessage() {
-  const clients = currentClients.filter(c => checkedClients[c.phone]);
-  const numbered = [], unnum = [];
-  clients.forEach(c => {
-    if (stopAssignments[c.phone]) numbered.push({ ...c, stop: parseInt(stopAssignments[c.phone]) });
-    else unnum.push({ ...c, stop: null });
-  });
-  numbered.sort((a, b) => a.stop - b.stop);
-  const ordered = numbered.concat(unnum);
+  const clients = currentClients;
+  let ordered = [];
+  if (currentView === 'NEW') {
+    const numbered = [], checkedUnnum = [];
+    clients.forEach(c => {
+      if (stopAssignments[c.phone]) numbered.push({ ...c, stop: parseInt(stopAssignments[c.phone]) });
+      else if (checkedClients[c.phone]) checkedUnnum.push({ ...c, stop: null });
+    });
+    numbered.sort((a, b) => a.stop - b.stop);
+    ordered = numbered.concat(checkedUnnum);
+  } else {
+    const numbered = [], unnumbered = [];
+    clients.forEach(c => {
+      if (stopAssignments[c.phone]) numbered.push({ ...c, stop: parseInt(stopAssignments[c.phone]) });
+      else unnumbered.push({ ...c, stop: null });
+    });
+    numbered.sort((a, b) => a.stop - b.stop);
+    ordered = numbered.concat(unnumbered);
+  }
 
   const out = document.getElementById('messageOutput');
   if (!out) return;
@@ -647,6 +657,7 @@ function escapeHtml(str) { return String(str).replace(/&/g, '&amp;').replace(/</
 function escapeAttr(str) { return String(str).replace(/'/g, "\\'"); }
 </script>
 
+<!-- Google Maps (Distance Matrix). Same key as quote.html. -->
 <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCqVJgCfV0C1KBF0u1Jc02p_RHE7K7g1V8" async defer></script>
 
 </body>
