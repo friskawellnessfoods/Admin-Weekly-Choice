@@ -567,9 +567,10 @@ function distancesFrom(origin, dests) {
 
 async function computeRouteTotal() {
   if (!window.google || !google.maps || !google.maps.DistanceMatrixService) return;
+  const geo = await ensureGeo();   // load map locations even if Auto-order was never used
   const numbered = currentClients
     .filter(c => stopAssignments[c.phone] && checkedClients[c.phone])
-    .map(c => ({ stop: parseInt(stopAssignments[c.phone]), coord: coordForClient(c, geoMap && geoMap[c.phone]) }))
+    .map(c => ({ stop: parseInt(stopAssignments[c.phone]), coord: coordForClient(c, geo[c.phone]) }))
     .filter(x => x.coord && x.coord.lat != null)
     .sort((a, b) => a.stop - b.stop);
   if (!numbered.length) { routeTotalMeters = null; return; }
