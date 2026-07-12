@@ -420,16 +420,17 @@ function readLines(tbodyId){
   return out;
 }
 function computeTotals(lines,discPct,gstPct,adjustment){
-  let food=0,delivery=0;
-  lines.forEach(l=>{const amt=l.qty*l.rate;if(l.id==="delivery"||l.food===false)delivery+=amt;else food+=amt;});
+  let food=0,delivery=0,other=0;
+  lines.forEach(l=>{const amt=l.qty*l.rate;if(l.id==="delivery")delivery+=amt;else if(l.custom||l.food===false)other+=amt;else food+=amt;});
   const discAmt=food*(discPct||0)/100;const foodAfter=food-discAmt;const gst=foodAfter*(gstPct||0)/100;
-  return {food,discAmt,foodAfter,gst,delivery,adjustment:adjustment||0,grand:foodAfter+gst+delivery+(adjustment||0)};
+  return {food,discAmt,foodAfter,gst,delivery,other,adjustment:adjustment||0,grand:foodAfter+gst+delivery+other+(adjustment||0)};
 }
 function renderTotals(containerId,t){
   let h=`<div class="tline"><span class="k">Food subtotal</span><span class="v">₹${money(t.food)}</span></div>`;
   if(t.discAmt>0)h+=`<div class="tline"><span class="k">Discount</span><span class="v credit">−₹${money(t.discAmt)}</span></div>`;
   h+=`<div class="tline"><span class="k">GST (food only)</span><span class="v">₹${money(t.gst)}</span></div>`;
   if(t.delivery>0)h+=`<div class="tline"><span class="k">Delivery</span><span class="v">₹${money(t.delivery)}</span></div>`;
+  if(t.other)h+=`<div class="tline"><span class="k">Other / adjustments</span><span class="v ${t.other<0?"credit":""}">${t.other<0?"−":""}₹${money(Math.abs(t.other))}</span></div>`;
   if(t.adjustment)h+=`<div class="tline"><span class="k">Prev-cycle adjustment</span><span class="v ${t.adjustment<0?'credit':'debit'}">${t.adjustment<0?'−':'+'}₹${money(Math.abs(t.adjustment))}</span></div>`;
   h+=`<div class="tline grand"><span class="k">Grand total</span><span class="v">₹${money(t.grand)}</span></div>`;
   el(containerId).innerHTML=h;
