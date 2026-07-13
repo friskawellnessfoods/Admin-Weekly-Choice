@@ -1,0 +1,4211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>ChillScenes | Crafting Cinematic Worlds</title>
+
+<meta name="description" content="ChillScenes creates cinematic 3D environments, cozy interiors, product visualization and immersive digital experiences.">
+
+<meta name="keywords" content="3D Artist, Blender, Environment Design, CGI, Rendering, ChillScenes">
+
+<meta property="og:title" content="ChillScenes">
+<meta property="og:description" content="Crafting Cinematic Worlds">
+<meta property="og:type" content="website">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.1/css/all.min.css">
+
+<script src="https://cdn.jsdelivr.net/npm/gsap@3/dist/gsap.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3/dist/ScrollTrigger.min.js"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/@studio-freight/lenis@1/bundled/lenis.min.js"></script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r155/three.min.js"></script>
+
+<style>
+
+:root{
+
+--bg:#050505;
+--bg2:#0b0b0b;
+--bg3:#141414;
+
+--card:#111111;
+--glass:rgba(255,255,255,.05);
+
+--gold:#d7b36a;
+--gold2:#f0d7a2;
+
+--white:#f6f6f6;
+--gray:#b8b8b8;
+
+--border:rgba(255,255,255,.08);
+
+--radius:24px;
+
+--transition:.45s cubic-bezier(.4,0,.2,1);
+
+}
+
+*{
+margin:0;
+padding:0;
+box-sizing:border-box;
+}
+
+html{
+
+scroll-behavior:smooth;
+
+}
+
+body{
+
+font-family:Inter,sans-serif;
+
+background:var(--bg);
+
+color:var(--white);
+
+overflow-x:hidden;
+
+cursor:none;
+
+}
+
+body.loading{
+
+overflow:hidden;
+
+}
+
+::selection{
+
+background:var(--gold);
+
+color:black;
+
+}
+
+a{
+
+text-decoration:none;
+
+color:inherit;
+
+}
+
+img{
+
+display:block;
+
+max-width:100%;
+
+}
+
+button{
+
+font-family:inherit;
+
+cursor:pointer;
+
+}
+
+ul{
+
+list-style:none;
+
+}
+
+canvas{
+
+display:block;
+
+}
+
+#bgCanvas{
+
+position:fixed;
+
+top:0;
+left:0;
+
+width:100%;
+height:100%;
+
+z-index:-5;
+
+}
+
+.gradient1{
+
+position:fixed;
+
+width:700px;
+height:700px;
+
+background:#c99d47;
+
+filter:blur(160px);
+
+opacity:.08;
+
+top:-300px;
+left:-200px;
+
+border-radius:50%;
+
+animation:blob1 16s linear infinite;
+
+z-index:-3;
+
+}
+
+.gradient2{
+
+position:fixed;
+
+width:600px;
+height:600px;
+
+background:#3d6aff;
+
+filter:blur(180px);
+
+opacity:.06;
+
+right:-220px;
+bottom:-250px;
+
+border-radius:50%;
+
+animation:blob2 20s linear infinite;
+
+z-index:-3;
+
+}
+
+.gradient3{
+
+position:fixed;
+
+width:500px;
+height:500px;
+
+background:#ff6dd6;
+
+filter:blur(180px);
+
+opacity:.05;
+
+left:45%;
+top:40%;
+
+border-radius:50%;
+
+animation:blob3 24s linear infinite;
+
+z-index:-3;
+
+}
+
+@keyframes blob1{
+
+0%{transform:translate(0,0);}
+25%{transform:translate(80px,-120px);}
+50%{transform:translate(160px,40px);}
+75%{transform:translate(-60px,90px);}
+100%{transform:translate(0,0);}
+
+}
+
+@keyframes blob2{
+
+0%{transform:translate(0,0);}
+50%{transform:translate(-120px,-60px);}
+100%{transform:translate(0,0);}
+
+}
+
+@keyframes blob3{
+
+0%{transform:translate(0,0);}
+25%{transform:translate(60px,120px);}
+50%{transform:translate(-100px,-80px);}
+75%{transform:translate(120px,40px);}
+100%{transform:translate(0,0);}
+
+}
+
+#loader{
+
+position:fixed;
+
+top:0;
+left:0;
+
+width:100%;
+height:100vh;
+
+background:#030303;
+
+display:flex;
+
+justify-content:center;
+
+align-items:center;
+
+flex-direction:column;
+
+z-index:999999;
+
+transition:1s;
+
+}
+
+.loader-logo{
+
+font-family:"Cormorant Garamond",serif;
+
+font-size:7rem;
+
+letter-spacing:12px;
+
+margin-bottom:25px;
+
+}
+
+.loader-line{
+
+width:220px;
+
+height:2px;
+
+background:rgba(255,255,255,.08);
+
+overflow:hidden;
+
+}
+
+.loader-progress{
+
+width:0%;
+
+height:100%;
+
+background:var(--gold);
+
+}
+
+.cursor{
+
+width:18px;
+height:18px;
+
+border:1px solid var(--gold);
+
+border-radius:50%;
+
+position:fixed;
+
+left:0;
+top:0;
+
+transform:translate(-50%,-50%);
+
+pointer-events:none;
+
+transition:
+
+width .25s,
+
+height .25s,
+
+background .25s,
+
+border .25s;
+
+z-index:999999;
+
+}
+
+.cursor.active{
+
+width:60px;
+
+height:60px;
+
+background:rgba(215,179,106,.12);
+
+border:1px solid rgba(215,179,106,.3);
+
+}
+
+header{
+
+position:fixed;
+
+top:0;
+left:0;
+
+width:100%;
+
+padding:24px 7%;
+
+display:flex;
+
+justify-content:center;
+
+z-index:9999;
+
+transition:.4s;
+
+}
+
+header.scrolled{
+
+background:rgba(8,8,8,.72);
+
+backdrop-filter:blur(18px);
+
+border-bottom:1px solid rgba(255,255,255,.05);
+
+}
+
+nav{
+
+width:100%;
+
+max-width:1450px;
+
+display:flex;
+
+justify-content:space-between;
+
+align-items:center;
+
+}
+
+.logo{
+
+font-family:"Cormorant Garamond",serif;
+
+font-size:2.2rem;
+
+font-weight:700;
+
+letter-spacing:4px;
+
+}
+
+.menu{
+
+display:flex;
+
+gap:48px;
+
+}
+
+.menu a{
+
+font-size:.95rem;
+
+letter-spacing:1px;
+
+position:relative;
+
+transition:.35s;
+
+}
+
+.menu a::after{
+
+content:"";
+
+position:absolute;
+
+left:0;
+
+bottom:-8px;
+
+width:0;
+
+height:1px;
+
+background:var(--gold);
+
+transition:.35s;
+
+}
+
+.menu a:hover{
+
+color:var(--gold);
+
+}
+
+.menu a:hover::after{
+
+width:100%;
+
+}
+
+.menuButton{
+
+display:none;
+
+font-size:1.4rem;
+
+}
+
+section{
+
+padding:140px 7%;
+
+position:relative;
+
+}
+
+.container{
+
+max-width:1450px;
+
+margin:auto;
+
+}
+
+.hero{
+
+height:100vh;
+
+display:flex;
+
+align-items:center;
+
+justify-content:center;
+
+text-align:center;
+
+padding-top:90px;
+
+}
+
+.heroContent{
+
+max-width:980px;
+
+z-index:5;
+
+}
+
+.tag{
+
+display:inline-block;
+
+color:var(--gold);
+
+letter-spacing:5px;
+
+font-size:.85rem;
+
+margin-bottom:35px;
+
+text-transform:uppercase;
+
+}
+
+.hero h1{
+
+font-family:"Cormorant Garamond",serif;
+
+font-size:8rem;
+
+font-weight:600;
+
+line-height:.92;
+
+margin-bottom:35px;
+
+}
+.hero h1 span{
+
+color:var(--gold);
+
+}
+
+.hero p{
+
+max-width:760px;
+
+margin:auto;
+
+font-size:1.12rem;
+
+line-height:1.9;
+
+color:var(--gray);
+
+margin-bottom:50px;
+
+}
+
+.heroButtons{
+
+display:flex;
+
+justify-content:center;
+
+align-items:center;
+
+gap:24px;
+
+flex-wrap:wrap;
+
+}
+
+.btn{
+
+display:inline-flex;
+
+align-items:center;
+
+justify-content:center;
+
+padding:18px 42px;
+
+border-radius:999px;
+
+border:1px solid var(--gold);
+
+font-weight:600;
+
+letter-spacing:1px;
+
+position:relative;
+
+overflow:hidden;
+
+transition:var(--transition);
+
+}
+
+.btn::before{
+
+content:"";
+
+position:absolute;
+
+left:-100%;
+top:0;
+
+width:100%;
+height:100%;
+
+background:var(--gold);
+
+transition:.45s;
+
+z-index:-1;
+
+}
+
+.btn:hover{
+
+color:#000;
+
+transform:translateY(-6px);
+
+box-shadow:0 18px 40px rgba(215,179,106,.18);
+
+}
+
+.btn:hover::before{
+
+left:0;
+
+}
+
+.btnSecondary{
+
+background:rgba(255,255,255,.04);
+
+border:1px solid rgba(255,255,255,.08);
+
+}
+
+.btnSecondary:hover{
+
+color:#fff;
+
+background:rgba(255,255,255,.08);
+
+border-color:rgba(255,255,255,.15);
+
+}
+
+.scrollIndicator{
+
+position:absolute;
+
+bottom:40px;
+
+left:50%;
+
+transform:translateX(-50%);
+
+display:flex;
+
+flex-direction:column;
+
+align-items:center;
+
+gap:14px;
+
+font-size:.75rem;
+
+letter-spacing:5px;
+
+color:#999;
+
+text-transform:uppercase;
+
+}
+
+.scrollIndicator span{
+
+width:1px;
+
+height:70px;
+
+background:linear-gradient(var(--gold),transparent);
+
+animation:scrollLine 2s infinite;
+
+}
+
+@keyframes scrollLine{
+
+0%{
+
+transform:translateY(0);
+
+opacity:.3;
+
+}
+
+50%{
+
+transform:translateY(12px);
+
+opacity:1;
+
+}
+
+100%{
+
+transform:translateY(0);
+
+opacity:.3;
+
+}
+
+}
+
+.sectionTitle{
+
+text-align:center;
+
+margin-bottom:90px;
+
+}
+
+.sectionTitle small{
+
+display:block;
+
+font-size:.8rem;
+
+letter-spacing:5px;
+
+text-transform:uppercase;
+
+color:var(--gold);
+
+margin-bottom:18px;
+
+}
+
+.sectionTitle h2{
+
+font-family:"Cormorant Garamond",serif;
+
+font-size:4.6rem;
+
+margin-bottom:20px;
+
+}
+
+.sectionTitle p{
+
+max-width:700px;
+
+margin:auto;
+
+}
+
+.portfolioGrid{
+
+display:grid;
+
+grid-template-columns:repeat(3,1fr);
+
+gap:34px;
+
+}
+
+.project{
+
+background:var(--card);
+
+border:1px solid var(--border);
+
+border-radius:28px;
+
+overflow:hidden;
+
+transition:var(--transition);
+
+transform-style:preserve-3d;
+
+position:relative;
+
+}
+
+.project:hover{
+
+transform:translateY(-12px);
+
+border-color:rgba(215,179,106,.35);
+
+box-shadow:0 30px 60px rgba(0,0,0,.45);
+
+}
+
+.projectImage{
+
+height:430px;
+
+position:relative;
+
+overflow:hidden;
+
+background:
+linear-gradient(135deg,#262626,#111);
+
+}
+
+.projectImage::before{
+
+content:"";
+
+position:absolute;
+
+inset:0;
+
+background:
+
+radial-gradient(circle at 20% 20%,rgba(215,179,106,.22),transparent 35%),
+
+radial-gradient(circle at 80% 70%,rgba(255,255,255,.06),transparent 35%),
+
+linear-gradient(180deg,transparent,rgba(0,0,0,.45));
+
+animation:imageGlow 12s linear infinite;
+
+}
+
+@keyframes imageGlow{
+
+0%{
+
+transform:scale(1) rotate(0deg);
+
+}
+
+50%{
+
+transform:scale(1.08) rotate(180deg);
+
+}
+
+100%{
+
+transform:scale(1) rotate(360deg);
+
+}
+
+}
+
+.projectInfo{
+
+padding:34px;
+
+}
+
+.projectCategory{
+
+display:inline-block;
+
+font-size:.75rem;
+
+letter-spacing:3px;
+
+text-transform:uppercase;
+
+color:var(--gold);
+
+margin-bottom:15px;
+
+}
+
+.project h3{
+
+font-family:"Cormorant Garamond",serif;
+
+font-size:2.2rem;
+
+margin-bottom:16px;
+
+}
+
+.project p{
+
+margin-bottom:28px;
+
+}
+
+.projectLink{
+
+display:inline-flex;
+
+align-items:center;
+
+gap:10px;
+
+font-size:.9rem;
+
+letter-spacing:2px;
+
+text-transform:uppercase;
+
+color:var(--gold);
+
+}
+
+.projectLink i{
+
+transition:.3s;
+
+}
+
+.project:hover .projectLink i{
+
+transform:translateX(8px);
+
+}
+
+.aboutGrid{
+
+display:grid;
+
+grid-template-columns:1.05fr .95fr;
+
+gap:90px;
+
+align-items:center;
+
+}
+
+.aboutVisual{
+
+height:760px;
+
+border-radius:32px;
+
+background:
+linear-gradient(145deg,#202020,#111);
+
+border:1px solid var(--border);
+
+position:relative;
+
+overflow:hidden;
+
+}
+
+.aboutVisual::before{
+
+content:"";
+
+position:absolute;
+
+width:500px;
+
+height:500px;
+
+border-radius:50%;
+
+background:rgba(215,179,106,.08);
+
+filter:blur(80px);
+
+top:-150px;
+
+right:-150px;
+
+}
+
+.aboutVisual::after{
+
+content:"";
+
+position:absolute;
+
+inset:40px;
+
+border:1px solid rgba(215,179,106,.18);
+
+border-radius:22px;
+
+}
+
+.aboutContent h2{
+
+font-family:"Cormorant Garamond",serif;
+
+font-size:4.8rem;
+
+margin-bottom:28px;
+
+}
+
+.aboutContent p{
+
+margin-bottom:22px;
+
+font-size:1.05rem;
+
+}
+
+.aboutStats{
+
+display:grid;
+
+grid-template-columns:repeat(3,1fr);
+
+gap:22px;
+
+margin-top:45px;
+
+}
+
+.statCard{
+
+padding:26px;
+
+background:rgba(255,255,255,.03);
+
+border:1px solid var(--border);
+
+border-radius:22px;
+
+text-align:center;
+
+transition:var(--transition);
+
+}
+
+.statCard:hover{
+
+transform:translateY(-8px);
+
+border-color:rgba(215,179,106,.35);
+
+}
+
+.statCard h3{
+
+font-family:"Cormorant Garamond",serif;
+
+font-size:3rem;
+
+color:var(--gold);
+
+margin-bottom:8px;
+
+}
+
+.servicesGrid{
+
+display:grid;
+
+grid-template-columns:repeat(3,1fr);
+
+gap:32px;
+
+}
+.serviceCard{
+
+background:linear-gradient(180deg,#171717,#101010);
+
+border:1px solid var(--border);
+
+border-radius:28px;
+
+padding:42px;
+
+transition:var(--transition);
+
+position:relative;
+
+overflow:hidden;
+
+}
+
+.serviceCard::before{
+
+content:"";
+
+position:absolute;
+
+top:0;
+left:0;
+
+width:100%;
+height:3px;
+
+background:linear-gradient(90deg,var(--gold),transparent);
+
+transform:translateX(-100%);
+
+transition:.6s;
+
+}
+
+.serviceCard:hover::before{
+
+transform:translateX(0);
+
+}
+
+.serviceCard:hover{
+
+transform:translateY(-12px);
+
+border-color:rgba(215,179,106,.35);
+
+box-shadow:0 25px 60px rgba(0,0,0,.4);
+
+}
+
+.serviceIcon{
+
+width:72px;
+
+height:72px;
+
+border-radius:50%;
+
+display:flex;
+
+align-items:center;
+
+justify-content:center;
+
+background:rgba(215,179,106,.08);
+
+color:var(--gold);
+
+font-size:1.7rem;
+
+margin-bottom:28px;
+
+}
+
+.serviceCard h3{
+
+font-family:"Cormorant Garamond",serif;
+
+font-size:2.1rem;
+
+margin-bottom:16px;
+
+}
+
+.serviceCard p{
+
+margin-bottom:26px;
+
+}
+
+.serviceCard a{
+
+color:var(--gold);
+
+letter-spacing:2px;
+
+font-size:.85rem;
+
+text-transform:uppercase;
+
+}
+
+.gallery{
+
+display:grid;
+
+grid-template-columns:repeat(4,1fr);
+
+grid-auto-rows:240px;
+
+gap:18px;
+
+}
+
+.galleryItem{
+
+position:relative;
+
+overflow:hidden;
+
+border-radius:24px;
+
+cursor:pointer;
+
+background:linear-gradient(145deg,#232323,#121212);
+
+border:1px solid rgba(255,255,255,.06);
+
+transition:var(--transition);
+
+}
+
+.galleryItem.large{
+
+grid-column:span 2;
+
+grid-row:span 2;
+
+}
+
+.galleryItem:hover{
+
+transform:scale(.98);
+
+border-color:rgba(215,179,106,.3);
+
+}
+
+.galleryItem::before{
+
+content:"";
+
+position:absolute;
+
+inset:0;
+
+background:
+
+linear-gradient(to top,rgba(0,0,0,.65),transparent),
+
+radial-gradient(circle at top left,rgba(215,179,106,.18),transparent 45%);
+
+transition:.45s;
+
+}
+
+.galleryItem:hover::before{
+
+opacity:.8;
+
+}
+
+.galleryInfo{
+
+position:absolute;
+
+bottom:28px;
+
+left:28px;
+
+z-index:2;
+
+}
+
+.galleryInfo h4{
+
+font-family:"Cormorant Garamond",serif;
+
+font-size:2rem;
+
+margin-bottom:8px;
+
+}
+
+.galleryInfo span{
+
+font-size:.8rem;
+
+letter-spacing:3px;
+
+text-transform:uppercase;
+
+color:var(--gold);
+
+}
+
+.testimonials{
+
+display:grid;
+
+grid-template-columns:repeat(3,1fr);
+
+gap:28px;
+
+}
+
+.testimonial{
+
+background:rgba(255,255,255,.03);
+
+border:1px solid var(--border);
+
+border-radius:26px;
+
+padding:38px;
+
+transition:var(--transition);
+
+}
+
+.testimonial:hover{
+
+transform:translateY(-10px);
+
+border-color:rgba(215,179,106,.28);
+
+}
+
+.quote{
+
+font-size:2rem;
+
+color:var(--gold);
+
+margin-bottom:20px;
+
+}
+
+.client{
+
+display:flex;
+
+align-items:center;
+
+gap:16px;
+
+margin-top:28px;
+
+}
+
+.avatar{
+
+width:56px;
+
+height:56px;
+
+border-radius:50%;
+
+background:linear-gradient(145deg,#2b2b2b,#151515);
+
+}
+
+.client h5{
+
+font-size:1rem;
+
+margin-bottom:4px;
+
+}
+
+.client span{
+
+font-size:.82rem;
+
+color:var(--gray);
+
+}
+
+.ctaSection{
+
+padding:180px 7%;
+
+text-align:center;
+
+position:relative;
+
+overflow:hidden;
+
+}
+
+.ctaSection::before{
+
+content:"";
+
+position:absolute;
+
+width:900px;
+
+height:900px;
+
+background:rgba(215,179,106,.05);
+
+filter:blur(180px);
+
+left:50%;
+
+top:50%;
+
+transform:translate(-50%,-50%);
+
+border-radius:50%;
+
+}
+
+.ctaContent{
+
+position:relative;
+
+z-index:2;
+
+max-width:900px;
+
+margin:auto;
+
+}
+
+.ctaContent h2{
+
+font-family:"Cormorant Garamond",serif;
+
+font-size:5rem;
+
+margin-bottom:28px;
+
+}
+
+.ctaContent p{
+
+font-size:1.08rem;
+
+margin-bottom:42px;
+
+}
+
+.contactGrid{
+
+display:grid;
+
+grid-template-columns:.9fr 1.1fr;
+
+gap:40px;
+
+}
+
+.contactCard{
+
+padding:42px;
+
+border-radius:28px;
+
+background:rgba(255,255,255,.03);
+
+border:1px solid var(--border);
+
+}
+
+.contactCard h3{
+
+font-family:"Cormorant Garamond",serif;
+
+font-size:2.4rem;
+
+margin-bottom:30px;
+
+}
+
+.contactItem{
+
+margin-bottom:28px;
+
+}
+
+.contactItem strong{
+
+display:block;
+
+margin-bottom:6px;
+
+font-size:.95rem;
+
+color:var(--white);
+
+}
+
+.contactItem span{
+
+color:var(--gray);
+
+}
+
+.contactForm{
+
+display:grid;
+
+gap:18px;
+
+}
+
+.contactForm input,
+.contactForm textarea{
+
+width:100%;
+
+padding:18px 22px;
+
+border-radius:18px;
+
+background:#161616;
+
+border:1px solid rgba(255,255,255,.08);
+
+color:#fff;
+
+font-size:1rem;
+
+outline:none;
+
+transition:var(--transition);
+
+}
+
+.contactForm textarea{
+
+resize:none;
+
+min-height:180px;
+
+}
+
+.contactForm input:focus,
+.contactForm textarea:focus{
+
+border-color:rgba(215,179,106,.45);
+
+box-shadow:0 0 0 4px rgba(215,179,106,.08);
+
+}
+
+footer{
+
+padding:80px 7% 40px;
+
+border-top:1px solid rgba(255,255,255,.06);
+
+}
+
+.footerGrid{
+
+display:grid;
+
+grid-template-columns:2fr 1fr 1fr 1fr;
+
+gap:40px;
+
+margin-bottom:50px;
+
+}
+
+.footerLogo{
+
+font-family:"Cormorant Garamond",serif;
+
+font-size:2.8rem;
+
+margin-bottom:18px;
+
+}
+
+.footerTitle{
+
+font-weight:600;
+
+margin-bottom:18px;
+
+color:var(--white);
+
+}
+
+.footerLinks{
+
+display:flex;
+
+flex-direction:column;
+
+gap:12px;
+
+}
+
+.footerLinks a{
+
+color:var(--gray);
+
+transition:.3s;
+
+}
+
+.footerLinks a:hover{
+
+color:var(--gold);
+
+padding-left:6px;
+
+}
+
+.footerBottom{
+
+padding-top:30px;
+
+border-top:1px solid rgba(255,255,255,.06);
+
+display:flex;
+
+justify-content:space-between;
+
+align-items:center;
+
+flex-wrap:wrap;
+
+gap:20px;
+
+}
+
+.socials{
+
+display:flex;
+
+gap:16px;
+
+}
+
+.socials a{
+
+width:44px;
+
+height:44px;
+
+border-radius:50%;
+
+display:flex;
+
+align-items:center;
+
+justify-content:center;
+
+background:rgba(255,255,255,.04);
+
+border:1px solid rgba(255,255,255,.06);
+
+transition:var(--transition);
+
+}
+
+.socials a:hover{
+
+background:var(--gold);
+
+color:#000;
+
+transform:translateY(-5px);
+
+}
+.fadeUp{
+
+opacity:0;
+
+transform:translateY(80px);
+
+}
+
+.fadeLeft{
+
+opacity:0;
+
+transform:translateX(-80px);
+
+}
+
+.fadeRight{
+
+opacity:0;
+
+transform:translateX(80px);
+
+}
+
+.scaleIn{
+
+opacity:0;
+
+transform:scale(.9);
+
+}
+
+.rotateIn{
+
+opacity:0;
+
+transform:rotate(-8deg) scale(.94);
+
+}
+
+.glass{
+
+background:rgba(255,255,255,.04);
+
+backdrop-filter:blur(18px);
+
+-webkit-backdrop-filter:blur(18px);
+
+border:1px solid rgba(255,255,255,.08);
+
+}
+
+.textGradient{
+
+background:linear-gradient(90deg,var(--white),var(--gold));
+
+-webkit-background-clip:text;
+
+-webkit-text-fill-color:transparent;
+
+}
+
+.gold{
+
+color:var(--gold);
+
+}
+
+.hide{
+
+display:none;
+
+}
+
+.mobileMenu{
+
+position:fixed;
+
+top:0;
+
+right:-100%;
+
+width:340px;
+
+max-width:90%;
+
+height:100vh;
+
+background:rgba(8,8,8,.96);
+
+backdrop-filter:blur(24px);
+
+padding:120px 40px;
+
+transition:.45s;
+
+z-index:99999;
+
+border-left:1px solid rgba(255,255,255,.08);
+
+}
+
+.mobileMenu.active{
+
+right:0;
+
+}
+
+.mobileMenu a{
+
+display:block;
+
+font-size:1.15rem;
+
+padding:18px 0;
+
+border-bottom:1px solid rgba(255,255,255,.06);
+
+}
+
+.menuOverlay{
+
+position:fixed;
+
+inset:0;
+
+background:rgba(0,0,0,.55);
+
+opacity:0;
+
+visibility:hidden;
+
+transition:.35s;
+
+z-index:9998;
+
+}
+
+.menuOverlay.active{
+
+opacity:1;
+
+visibility:visible;
+
+}
+
+.backToTop{
+
+position:fixed;
+
+right:30px;
+
+bottom:30px;
+
+width:54px;
+
+height:54px;
+
+border-radius:50%;
+
+display:flex;
+
+align-items:center;
+
+justify-content:center;
+
+background:rgba(255,255,255,.06);
+
+border:1px solid rgba(255,255,255,.08);
+
+color:var(--gold);
+
+opacity:0;
+
+visibility:hidden;
+
+transition:.35s;
+
+z-index:999;
+
+}
+
+.backToTop.show{
+
+opacity:1;
+
+visibility:visible;
+
+}
+
+.backToTop:hover{
+
+background:var(--gold);
+
+color:#000;
+
+transform:translateY(-5px);
+
+}
+
+@media(max-width:1400px){
+
+.hero h1{
+
+font-size:7rem;
+
+}
+
+.portfolioGrid{
+
+grid-template-columns:repeat(2,1fr);
+
+}
+
+.servicesGrid{
+
+grid-template-columns:repeat(2,1fr);
+
+}
+
+.gallery{
+
+grid-template-columns:repeat(2,1fr);
+
+}
+
+.galleryItem.large{
+
+grid-column:span 1;
+
+grid-row:span 1;
+
+}
+
+.footerGrid{
+
+grid-template-columns:repeat(2,1fr);
+
+}
+
+}
+
+@media(max-width:992px){
+
+.menu{
+
+display:none;
+
+}
+
+.menuButton{
+
+display:block;
+
+}
+
+.hero h1{
+
+font-size:5.6rem;
+
+}
+
+.aboutGrid{
+
+grid-template-columns:1fr;
+
+}
+
+.aboutVisual{
+
+height:520px;
+
+}
+
+.servicesGrid{
+
+grid-template-columns:1fr;
+
+}
+
+.testimonials{
+
+grid-template-columns:1fr;
+
+}
+
+.contactGrid{
+
+grid-template-columns:1fr;
+
+}
+
+}
+
+@media(max-width:768px){
+
+section{
+
+padding:100px 7%;
+
+}
+
+.hero{
+
+height:auto;
+
+min-height:100vh;
+
+padding-top:140px;
+
+padding-bottom:80px;
+
+}
+
+.hero h1{
+
+font-size:4.2rem;
+
+}
+
+.sectionTitle h2{
+
+font-size:3.2rem;
+
+}
+
+.ctaContent h2{
+
+font-size:3.6rem;
+
+}
+
+.aboutStats{
+
+grid-template-columns:1fr;
+
+}
+
+.portfolioGrid{
+
+grid-template-columns:1fr;
+
+}
+
+.gallery{
+
+grid-template-columns:1fr;
+
+}
+
+.footerGrid{
+
+grid-template-columns:1fr;
+
+}
+
+.footerBottom{
+
+flex-direction:column;
+
+text-align:center;
+
+}
+
+}
+
+@media(max-width:520px){
+
+.logo{
+
+font-size:1.8rem;
+
+}
+
+.hero h1{
+
+font-size:3.2rem;
+
+}
+
+.loader-logo{
+
+font-size:3.8rem;
+
+letter-spacing:6px;
+
+}
+
+.btn{
+
+width:100%;
+
+}
+
+.heroButtons{
+
+flex-direction:column;
+
+}
+
+.sectionTitle h2{
+
+font-size:2.6rem;
+
+}
+
+.ctaContent h2{
+
+font-size:2.8rem;
+
+}
+
+}
+
+</style>
+
+</head>
+
+<body class="loading">
+
+<div id="loader">
+
+<div class="loader-logo">
+
+CHILLSCENES
+
+</div>
+
+<div class="loader-line">
+
+<div class="loader-progress"></div>
+
+</div>
+
+</div>
+
+<div id="bgCanvas"></div>
+
+<div class="gradient1"></div>
+
+<div class="gradient2"></div>
+
+<div class="gradient3"></div>
+
+<div class="cursor"></div>
+
+<div class="menuOverlay"></div>
+
+<div class="mobileMenu">
+
+<a href="#home">Home</a>
+
+<a href="#portfolio">Portfolio</a>
+
+<a href="#about">About</a>
+
+<a href="#services">Services</a>
+
+<a href="#gallery">Gallery</a>
+
+<a href="#contact">Contact</a>
+
+</div>
+
+<a href="#home" class="backToTop">
+
+<i class="fas fa-arrow-up"></i>
+
+</a>
+
+<header>
+
+<nav>
+
+<div class="logo">
+
+ChillScenes
+
+</div>
+
+<ul class="menu">
+
+<li><a href="#home">Home</a></li>
+
+<li><a href="#portfolio">Portfolio</a></li>
+
+<li><a href="#about">About</a></li>
+
+<li><a href="#services">Services</a></li>
+
+<li><a href="#gallery">Gallery</a></li>
+
+<li><a href="#contact">Contact</a></li>
+
+</ul>
+
+<div class="menuButton">
+
+<i class="fas fa-bars"></i>
+
+</div>
+
+</nav>
+
+</header>
+
+<section class="hero" id="home">
+
+<div class="heroContent">
+
+<div class="tag fadeUp">
+
+WELCOME TO CHILLSCENES
+
+</div>
+
+<h1 class="fadeUp">
+
+Crafting
+<span class="textGradient">Cinematic</span>
+Worlds
+
+</h1>
+
+<p class="fadeUp">
+
+Immersive 3D environments, cinematic storytelling,
+stylized interiors and premium digital artwork
+designed to make people stop scrolling and start exploring.
+
+</p>
+
+<div class="heroButtons fadeUp">
+
+<a href="#portfolio" class="btn">
+
+Explore Portfolio
+
+</a>
+
+<a href="#contact" class="btn btnSecondary">
+
+Let's Talk
+
+</a>
+
+</div>
+
+</div>
+
+<div class="scrollIndicator">
+
+Scroll
+
+<span></span>
+
+</div>
+
+</section>
+
+<section id="portfolio">
+
+<div class="container">
+
+<div class="sectionTitle fadeUp">
+
+<small>
+
+Featured Projects
+
+</small>
+
+<h2>
+
+Selected Work
+
+</h2>
+
+<p>
+
+A collection of cinematic environments,
+cozy spaces and visual storytelling crafted
+with lighting, mood and atmosphere.
+
+</p>
+
+</div>
+
+<div class="portfolioGrid">
+<div class="project fadeUp">
+
+<div class="projectImage"></div>
+
+<div class="projectInfo">
+
+<div class="projectCategory">
+
+Environment Design
+
+</div>
+
+<h3>
+
+Forest Retreat
+
+</h3>
+
+<p>
+
+A peaceful forest cabin surrounded by towering pine trees,
+soft morning fog and warm cinematic lighting designed
+to evoke calm and solitude.
+
+</p>
+
+<a href="#" class="projectLink">
+
+View Project
+
+<i class="fas fa-arrow-right"></i>
+
+</a>
+
+</div>
+
+</div>
+
+<div class="project fadeUp">
+
+<div class="projectImage"></div>
+
+<div class="projectInfo">
+
+<div class="projectCategory">
+
+Interior Visualization
+
+</div>
+
+<h3>
+
+Cozy Workspace
+
+</h3>
+
+<p>
+
+A warm productivity space combining natural wood,
+minimalist decor and soft indirect lighting for a relaxing atmosphere.
+
+</p>
+
+<a href="#" class="projectLink">
+
+View Project
+
+<i class="fas fa-arrow-right"></i>
+
+</a>
+
+</div>
+
+</div>
+
+<div class="project fadeUp">
+
+<div class="projectImage"></div>
+
+<div class="projectInfo">
+
+<div class="projectCategory">
+
+Urban Scene
+
+</div>
+
+<h3>
+
+Rainy Night Street
+
+</h3>
+
+<p>
+
+Neon reflections, cinematic rain and carefully composed
+lighting create an immersive urban environment.
+
+</p>
+
+<a href="#" class="projectLink">
+
+View Project
+
+<i class="fas fa-arrow-right"></i>
+
+</a>
+
+</div>
+
+</div>
+
+<div class="project fadeUp">
+
+<div class="projectImage"></div>
+
+<div class="projectInfo">
+
+<div class="projectCategory">
+
+Product Visualization
+
+</div>
+
+<h3>
+
+Minimal Product Set
+
+</h3>
+
+<p>
+
+Luxury product rendering with studio-quality lighting,
+realistic materials and premium presentation.
+
+</p>
+
+<a href="#" class="projectLink">
+
+View Project
+
+<i class="fas fa-arrow-right"></i>
+
+</a>
+
+</div>
+
+</div>
+
+<div class="project fadeUp">
+
+<div class="projectImage"></div>
+
+<div class="projectInfo">
+
+<div class="projectCategory">
+
+Fantasy
+
+</div>
+
+<h3>
+
+Floating Islands
+
+</h3>
+
+<p>
+
+Stylized floating worlds inspired by fantasy landscapes
+and cinematic adventure films.
+
+</p>
+
+<a href="#" class="projectLink">
+
+View Project
+
+<i class="fas fa-arrow-right"></i>
+
+</a>
+
+</div>
+
+</div>
+
+<div class="project fadeUp">
+
+<div class="projectImage"></div>
+
+<div class="projectInfo">
+
+<div class="projectCategory">
+
+Architecture
+
+</div>
+
+<h3>
+
+Modern Villa
+
+</h3>
+
+<p>
+
+Architectural visualization highlighting elegant design,
+luxury materials and beautiful natural light.
+
+</p>
+
+<a href="#" class="projectLink">
+
+View Project
+
+<i class="fas fa-arrow-right"></i>
+
+</a>
+
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+</section>
+
+<section id="about">
+
+<div class="container">
+
+<div class="aboutGrid">
+
+<div class="aboutVisual fadeLeft"></div>
+
+<div class="aboutContent fadeRight">
+
+<div class="tag">
+
+ABOUT STUDIO
+
+</div>
+
+<h2>
+
+Where Imagination
+Meets
+Precision
+
+</h2>
+
+<p>
+
+ChillScenes is a creative studio focused on crafting
+cinematic 3D worlds that tell stories through
+composition, atmosphere and lighting.
+
+</p>
+
+<p>
+
+Every environment is carefully built from the ground up
+to capture emotion rather than simply display visuals.
+Our goal is to create artwork that feels alive.
+
+</p>
+
+<p>
+
+Whether it's a cozy room, an architectural render,
+a fantasy landscape or a commercial visualization,
+each project is designed with obsessive attention to detail.
+
+</p>
+
+<div class="aboutStats">
+
+<div class="statCard">
+
+<h3 data-count="120">
+
+0
+
+</h3>
+
+<p>
+
+Projects Completed
+
+</p>
+
+</div>
+
+<div class="statCard">
+
+<h3 data-count="18">
+
+0
+
+</h3>
+
+<p>
+
+Countries Reached
+
+</p>
+
+</div>
+
+<div class="statCard">
+
+<h3 data-count="7">
+
+0
+
+</h3>
+
+<p>
+
+Years Experience
+
+</p>
+
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+</section>
+
+<section id="services">
+
+<div class="container">
+
+<div class="sectionTitle fadeUp">
+
+<small>
+
+Our Expertise
+
+</small>
+
+<h2>
+
+Services
+
+</h2>
+
+<p>
+
+Professional visualization solutions designed
+for brands, architects, creators and businesses.
+
+</p>
+
+</div>
+
+<div class="servicesGrid">
+<div class="serviceCard fadeUp">
+
+<div class="serviceIcon">
+
+<i class="fas fa-cube"></i>
+
+</div>
+
+<h3>
+
+3D Environment Design
+
+</h3>
+
+<p>
+
+Detailed cinematic worlds created with realistic
+lighting, storytelling and atmosphere to bring
+ideas to life.
+
+</p>
+
+<a href="#contact">
+
+Learn More →
+
+</a>
+
+</div>
+
+<div class="serviceCard fadeUp">
+
+<div class="serviceIcon">
+
+<i class="fas fa-house"></i>
+
+</div>
+
+<h3>
+
+Interior Visualization
+
+</h3>
+
+<p>
+
+Luxury interiors, cozy rooms and architectural
+renders designed with premium materials
+and beautiful lighting.
+
+</p>
+
+<a href="#contact">
+
+Learn More →
+
+</a>
+
+</div>
+
+<div class="serviceCard fadeUp">
+
+<div class="serviceIcon">
+
+<i class="fas fa-box-open"></i>
+
+</div>
+
+<h3>
+
+Product Rendering
+
+</h3>
+
+<p>
+
+High-end product visualization for advertising,
+branding and e-commerce with realistic materials
+and studio-quality presentation.
+
+</p>
+
+<a href="#contact">
+
+Learn More →
+
+</a>
+
+</div>
+
+<div class="serviceCard fadeUp">
+
+<div class="serviceIcon">
+
+<i class="fas fa-film"></i>
+
+</div>
+
+<h3>
+
+Animation
+
+</h3>
+
+<p>
+
+Camera fly-throughs, cinematic sequences,
+turntables and promotional animations
+that tell engaging stories.
+
+</p>
+
+<a href="#contact">
+
+Learn More →
+
+</a>
+
+</div>
+
+<div class="serviceCard fadeUp">
+
+<div class="serviceIcon">
+
+<i class="fas fa-lightbulb"></i>
+
+</div>
+
+<h3>
+
+Creative Direction
+
+</h3>
+
+<p>
+
+Helping brands visualize ideas before production
+through mood boards, concept design and
+creative planning.
+
+</p>
+
+<a href="#contact">
+
+Learn More →
+
+</a>
+
+</div>
+
+<div class="serviceCard fadeUp">
+
+<div class="serviceIcon">
+
+<i class="fas fa-wand-magic-sparkles"></i>
+
+</div>
+
+<h3>
+
+Custom CGI
+
+</h3>
+
+<p>
+
+Tailored CGI artwork and premium digital
+visual experiences built specifically for
+your project requirements.
+
+</p>
+
+<a href="#contact">
+
+Learn More →
+
+</a>
+
+</div>
+
+</div>
+
+</div>
+
+</section>
+
+<section id="gallery">
+
+<div class="container">
+
+<div class="sectionTitle fadeUp">
+
+<small>
+
+Visual Collection
+
+</small>
+
+<h2>
+
+Gallery
+
+</h2>
+
+<p>
+
+A curated showcase of environments,
+interiors and visual concepts.
+
+</p>
+
+</div>
+
+<div class="gallery">
+
+<div class="galleryItem large fadeUp">
+
+<div class="galleryInfo">
+
+<h4>
+
+Forest Cabin
+
+</h4>
+
+<span>
+
+Environment
+
+</span>
+
+</div>
+
+</div>
+
+<div class="galleryItem fadeUp">
+
+<div class="galleryInfo">
+
+<h4>
+
+Coffee Shop
+
+</h4>
+
+<span>
+
+Interior
+
+</span>
+
+</div>
+
+</div>
+
+<div class="galleryItem fadeUp">
+
+<div class="galleryInfo">
+
+<h4>
+
+Studio Desk
+
+</h4>
+
+<span>
+
+Workspace
+
+</span>
+
+</div>
+
+</div>
+
+<div class="galleryItem fadeUp">
+
+<div class="galleryInfo">
+
+<h4>
+
+Night City
+
+</h4>
+
+<span>
+
+Urban
+
+</span>
+
+</div>
+
+</div>
+
+<div class="galleryItem fadeUp">
+
+<div class="galleryInfo">
+
+<h4>
+
+Bedroom
+
+</h4>
+
+<span>
+
+Interior
+
+</span>
+
+</div>
+
+</div>
+
+<div class="galleryItem fadeUp">
+
+<div class="galleryInfo">
+
+<h4>
+
+Mountain Lake
+
+</h4>
+
+<span>
+
+Landscape
+
+</span>
+
+</div>
+
+</div>
+
+<div class="galleryItem fadeUp">
+
+<div class="galleryInfo">
+
+<h4>
+
+Product Stage
+
+</h4>
+
+<span>
+
+CGI
+
+</span>
+
+</div>
+
+</div>
+
+<div class="galleryItem large fadeUp">
+
+<div class="galleryInfo">
+
+<h4>
+
+Luxury Villa
+
+</h4>
+
+<span>
+
+Architecture
+
+</span>
+
+</div>
+
+</div>
+
+<div class="galleryItem fadeUp">
+
+<div class="galleryInfo">
+
+<h4>
+
+Library
+
+</h4>
+
+<span>
+
+Cozy Scene
+
+</span>
+
+</div>
+
+</div>
+
+<div class="galleryItem fadeUp">
+
+<div class="galleryInfo">
+
+<h4>
+
+Floating Island
+
+</h4>
+
+<span>
+
+Fantasy
+
+</span>
+
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+</section>
+
+<section>
+
+<div class="container">
+
+<div class="sectionTitle fadeUp">
+
+<small>
+
+Testimonials
+
+</small>
+
+<h2>
+
+What Clients Say
+
+</h2>
+
+</div>
+
+<div class="testimonials">
+<div class="testimonial fadeUp">
+
+<div class="quote">
+
+❝
+
+</div>
+
+<p>
+
+The attention to detail and cinematic quality exceeded our expectations.
+Every frame felt like a scene from a movie.
+
+</p>
+
+<div class="client">
+
+<div class="avatar"></div>
+
+<div>
+
+<h5>
+
+Alex Carter
+
+</h5>
+
+<span>
+
+Creative Director
+
+</span>
+
+</div>
+
+</div>
+
+</div>
+
+<div class="testimonial fadeUp">
+
+<div class="quote">
+
+❝
+
+</div>
+
+<p>
+
+Working with ChillScenes was effortless.
+Communication, quality and delivery were exceptional from start to finish.
+
+</p>
+
+<div class="client">
+
+<div class="avatar"></div>
+
+<div>
+
+<h5>
+
+Sophia Williams
+
+</h5>
+
+<span>
+
+Interior Designer
+
+</span>
+
+</div>
+
+</div>
+
+</div>
+
+<div class="testimonial fadeUp">
+
+<div class="quote">
+
+❝
+
+</div>
+
+<p>
+
+Our product renders looked premium and dramatically improved our marketing
+campaigns across social media and web.
+
+</p>
+
+<div class="client">
+
+<div class="avatar"></div>
+
+<div>
+
+<h5>
+
+Daniel Brooks
+
+</h5>
+
+<span>
+
+Brand Founder
+
+</span>
+
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+</section>
+
+<section class="ctaSection">
+
+<div class="ctaContent fadeUp">
+
+<div class="tag">
+
+READY TO BUILD?
+
+</div>
+
+<h2>
+
+Let's Create Something
+Amazing Together
+
+</h2>
+
+<p>
+
+From concept sketches to final cinematic renders,
+we help transform ideas into memorable visual experiences.
+
+</p>
+
+<a href="#contact" class="btn">
+
+Start Your Project
+
+</a>
+
+</div>
+
+</section>
+
+<section id="contact">
+
+<div class="container">
+
+<div class="sectionTitle fadeUp">
+
+<small>
+
+Contact
+
+</small>
+
+<h2>
+
+Let's Talk
+
+</h2>
+
+<p>
+
+Have an idea or project in mind?
+Let's discuss how we can bring it to life.
+
+</p>
+
+</div>
+
+<div class="contactGrid">
+
+<div class="contactCard fadeLeft">
+
+<h3>
+
+Contact Information
+
+</h3>
+
+<div class="contactItem">
+
+<strong>Email</strong>
+
+<span>
+
+hello@chillscenes.com
+
+</span>
+
+</div>
+
+<div class="contactItem">
+
+<strong>Instagram</strong>
+
+<span>
+
+@chillscenes.3d
+
+</span>
+
+</div>
+
+<div class="contactItem">
+
+<strong>Location</strong>
+
+<span>
+
+Worldwide Remote
+
+</span>
+
+</div>
+
+<div class="contactItem">
+
+<strong>Availability</strong>
+
+<span>
+
+Open for freelance and collaborations
+
+</span>
+
+</div>
+
+</div>
+
+<div class="contactCard fadeRight">
+
+<form class="contactForm">
+
+<input
+type="text"
+placeholder="Your Name"
+required>
+
+<input
+type="email"
+placeholder="Email Address"
+required>
+
+<input
+type="text"
+placeholder="Project Type">
+
+<textarea
+placeholder="Tell us about your project..."
+required></textarea>
+
+<button
+class="btn"
+type="submit">
+
+Send Message
+
+</button>
+
+</form>
+
+</div>
+
+</div>
+
+</div>
+
+</section>
+
+<footer>
+
+<div class="container">
+
+<div class="footerGrid">
+
+<div>
+
+<div class="footerLogo">
+
+ChillScenes
+
+</div>
+
+<p>
+
+Creating cinematic 3D worlds through
+lighting, storytelling and premium visualization.
+
+</p>
+
+</div>
+
+<div>
+
+<div class="footerTitle">
+
+Navigation
+
+</div>
+
+<div class="footerLinks">
+
+<a href="#home">Home</a>
+
+<a href="#portfolio">Portfolio</a>
+
+<a href="#about">About</a>
+
+<a href="#services">Services</a>
+
+<a href="#gallery">Gallery</a>
+
+<a href="#contact">Contact</a>
+
+</div>
+
+</div>
+
+<div>
+
+<div class="footerTitle">
+
+Services
+
+</div>
+
+<div class="footerLinks">
+
+<a href="#">Environment Design</a>
+
+<a href="#">Product CGI</a>
+
+<a href="#">Animation</a>
+
+<a href="#">Architecture</a>
+
+<a href="#">Creative Direction</a>
+
+</div>
+
+</div>
+
+<div>
+
+<div class="footerTitle">
+
+Follow
+
+</div>
+
+<div class="socials">
+
+<a href="#"><i class="fab fa-instagram"></i></a>
+
+<a href="#"><i class="fab fa-artstation"></i></a>
+
+<a href="#"><i class="fab fa-behance"></i></a>
+
+<a href="#"><i class="fab fa-linkedin"></i></a>
+
+</div>
+
+</div>
+
+</div>
+
+<div class="footerBottom">
+
+<p>
+
+© 2026 ChillScenes. All Rights Reserved.
+
+</p>
+
+<p>
+
+Designed & Developed with ❤
+
+</p>
+
+</div>
+
+</div>
+
+</footer>
+
+<script>
+
+gsap.registerPlugin(ScrollTrigger);
+
+const lenis=new Lenis({
+
+duration:1.2,
+
+smoothWheel:true,
+
+smoothTouch:false
+
+});
+
+function raf(time){
+
+lenis.raf(time);
+
+requestAnimationFrame(raf);
+
+}
+
+requestAnimationFrame(raf);
+
+const loader=document.getElementById("loader");
+
+const progress=document.querySelector(".loader-progress");
+
+gsap.to(progress,{
+width:"100%",
+duration:1.5,
+ease:"power2.out"
+});
+
+window.addEventListener("load",()=>{
+gsap.to(loader,{
+
+opacity:0,
+
+duration:.8,
+
+delay:.3,
+
+onComplete:()=>{
+
+loader.style.display="none";
+
+document.body.classList.remove("loading");
+
+}
+
+});
+
+});
+
+const cursor=document.querySelector(".cursor");
+
+window.addEventListener("mousemove",(e)=>{
+
+gsap.to(cursor,{
+
+x:e.clientX,
+
+y:e.clientY,
+
+duration:.12,
+
+ease:"power2.out"
+
+});
+
+});
+
+document.querySelectorAll("a,button,.project,.galleryItem,.serviceCard").forEach(el=>{
+
+el.addEventListener("mouseenter",()=>{
+
+cursor.classList.add("active");
+
+});
+
+el.addEventListener("mouseleave",()=>{
+
+cursor.classList.remove("active");
+
+});
+
+});
+
+const header=document.querySelector("header");
+
+const backToTop=document.querySelector(".backToTop");
+
+window.addEventListener("scroll",()=>{
+
+if(window.scrollY>50){
+
+header.classList.add("scrolled");
+
+backToTop.classList.add("show");
+
+}else{
+
+header.classList.remove("scrolled");
+
+backToTop.classList.remove("show");
+
+}
+
+});
+
+gsap.utils.toArray(".fadeUp").forEach(el=>{
+
+gsap.fromTo(el,{
+
+y:70,
+
+opacity:0
+
+},{
+
+y:0,
+
+opacity:1,
+
+duration:1,
+
+ease:"power3.out",
+
+scrollTrigger:{
+
+trigger:el,
+
+start:"top 82%"
+
+}
+
+});
+
+});
+
+gsap.utils.toArray(".fadeLeft").forEach(el=>{
+
+gsap.from(el,{
+
+x:-80,
+
+opacity:0,
+
+duration:1,
+
+ease:"power3.out",
+
+scrollTrigger:{
+
+trigger:el,
+
+start:"top 80%"
+
+}
+
+});
+
+});
+
+gsap.utils.toArray(".fadeRight").forEach(el=>{
+
+gsap.from(el,{
+
+x:80,
+
+opacity:0,
+
+duration:1,
+
+ease:"power3.out",
+
+scrollTrigger:{
+
+trigger:el,
+
+start:"top 80%"
+
+}
+
+});
+
+});
+
+document.querySelectorAll(".statCard h3").forEach(counter=>{
+
+ScrollTrigger.create({
+
+trigger:counter,
+
+start:"top 85%",
+
+once:true,
+
+onEnter:()=>{
+
+let end=parseInt(counter.dataset.count);
+
+let obj={value:0};
+
+gsap.to(obj,{
+
+value:end,
+
+duration:2,
+
+ease:"power2.out",
+
+onUpdate:()=>{
+
+counter.innerHTML=Math.floor(obj.value);
+
+}
+
+});
+
+}
+
+});
+
+});
+
+document.querySelectorAll(".project").forEach(card=>{
+
+card.addEventListener("mousemove",(e)=>{
+
+const rect=card.getBoundingClientRect();
+
+const x=e.clientX-rect.left;
+
+const y=e.clientY-rect.top;
+
+const rotateY=((x/rect.width)-0.5)*12;
+
+const rotateX=((y/rect.height)-0.5)*-12;
+
+gsap.to(card,{
+
+rotationY:rotateY,
+
+rotationX:rotateX,
+
+transformPerspective:1200,
+
+transformOrigin:"center",
+
+duration:.3
+
+});
+
+});
+
+card.addEventListener("mouseleave",()=>{
+
+gsap.to(card,{
+
+rotationX:0,
+
+rotationY:0,
+
+duration:.5,
+
+ease:"power2.out"
+
+});
+
+});
+
+});
+
+const menuButton=document.querySelector(".menuButton");
+
+const mobileMenu=document.querySelector(".mobileMenu");
+
+const overlay=document.querySelector(".menuOverlay");
+
+menuButton.addEventListener("click",()=>{
+
+mobileMenu.classList.add("active");
+
+overlay.classList.add("active");
+
+});
+
+overlay.addEventListener("click",()=>{
+
+mobileMenu.classList.remove("active");
+
+overlay.classList.remove("active");
+
+});
+
+mobileMenu.querySelectorAll("a").forEach(link=>{
+
+link.addEventListener("click",()=>{
+
+mobileMenu.classList.remove("active");
+
+overlay.classList.remove("active");
+
+});
+
+});
+
+document.querySelector(".contactForm").addEventListener("submit",e=>{
+
+e.preventDefault();
+
+const btn=e.target.querySelector("button");
+
+btn.innerHTML="Message Sent ✓";
+
+btn.style.background="#d7b36a";
+
+btn.style.color="#000";
+
+setTimeout(()=>{
+
+btn.innerHTML="Send Message";
+
+btn.style.background="";
+
+btn.style.color="";
+
+e.target.reset();
+
+},2500);
+
+});
+
+const hero=document.querySelector(".heroContent");
+
+window.addEventListener("mousemove",e=>{
+
+const x=(window.innerWidth/2-e.clientX)/45;
+
+const y=(window.innerHeight/2-e.clientY)/45;
+
+gsap.to(hero,{
+
+x:x,
+
+y:y,
+
+duration:1,
+
+ease:"power2.out"
+
+});
+
+});
+
+/* ---------- THREE.JS BACKGROUND ---------- */
+
+const scene=new THREE.Scene();
+
+const camera=new THREE.PerspectiveCamera(
+60,
+window.innerWidth/window.innerHeight,
+1,
+1000
+);
+
+camera.position.z=40;
+
+const renderer=new THREE.WebGLRenderer({
+
+alpha:true,
+
+antialias:true
+
+});
+
+renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+
+renderer.setSize(
+
+window.innerWidth,
+
+window.innerHeight
+
+);
+
+document.getElementById("bgCanvas").appendChild(renderer.domElement);
+
+const particles=2500;
+
+const geometry=new THREE.BufferGeometry();
+
+const positions=new Float32Array(particles*3);
+
+for(let i=0;i<particles*3;i++){
+
+positions[i]=(Math.random()-.5)*220;
+
+}
+
+geometry.setAttribute(
+
+"position",
+
+new THREE.BufferAttribute(positions,3)
+
+);
+const material=new THREE.PointsMaterial({
+
+color:0xd7b36a,
+
+size:.18,
+
+transparent:true,
+
+opacity:.65,
+
+depthWrite:false
+
+});
+
+const pointCloud=new THREE.Points(
+
+geometry,
+
+material
+
+);
+
+scene.add(pointCloud);
+
+const clock=new THREE.Clock();
+
+function animate(){
+
+requestAnimationFrame(animate);
+
+const elapsed=clock.getElapsedTime();
+
+pointCloud.rotation.y=elapsed*.035;
+
+pointCloud.rotation.x=Math.sin(elapsed*.15)*.08;
+
+const pos=geometry.attributes.position.array;
+
+for(let i=0;i<particles;i++){
+
+const index=i*3;
+
+pos[index+1]+=Math.sin(elapsed+index)*0.002;
+
+}
+
+geometry.attributes.position.needsUpdate=true;
+
+renderer.render(scene,camera);
+
+}
+
+animate();
+
+window.addEventListener("resize",()=>{
+
+camera.aspect=window.innerWidth/window.innerHeight;
+
+camera.updateProjectionMatrix();
+
+renderer.setSize(
+
+window.innerWidth,
+
+window.innerHeight
+
+);
+
+});
+
+/* ---------- MAGNETIC BUTTONS ---------- */
+
+document.querySelectorAll(".btn").forEach(btn=>{
+
+btn.addEventListener("mousemove",e=>{
+
+const rect=btn.getBoundingClientRect();
+
+const x=e.clientX-rect.left-rect.width/2;
+
+const y=e.clientY-rect.top-rect.height/2;
+
+gsap.to(btn,{
+
+x:x*.18,
+
+y:y*.18,
+
+duration:.35,
+
+ease:"power2.out"
+
+});
+
+});
+
+btn.addEventListener("mouseleave",()=>{
+
+gsap.to(btn,{
+
+x:0,
+
+y:0,
+
+duration:.45,
+
+ease:"elastic.out(1,0.4)"
+
+});
+
+});
+
+});
+
+/* ---------- PARALLAX GALLERY ---------- */
+
+document.querySelectorAll(".galleryItem").forEach(item=>{
+
+item.addEventListener("mousemove",e=>{
+
+const rect=item.getBoundingClientRect();
+
+const mx=e.clientX-rect.left;
+
+const my=e.clientY-rect.top;
+
+const rx=((my/rect.height)-.5)*8;
+
+const ry=((mx/rect.width)-.5)*-8;
+
+gsap.to(item,{
+
+rotationX:rx,
+
+rotationY:ry,
+
+transformPerspective:1000,
+
+duration:.3
+
+});
+
+});
+
+item.addEventListener("mouseleave",()=>{
+
+gsap.to(item,{
+
+rotationX:0,
+
+rotationY:0,
+
+duration:.5
+
+});
+
+});
+
+});
+
+/* ---------- FLOATING ANIMATION ---------- */
+
+gsap.to(".gradient1",{
+
+x:120,
+
+y:-90,
+
+duration:12,
+
+repeat:-1,
+
+yoyo:true,
+
+ease:"sine.inOut"
+
+});
+
+gsap.to(".gradient2",{
+
+x:-140,
+
+y:70,
+
+duration:15,
+
+repeat:-1,
+
+yoyo:true,
+
+ease:"sine.inOut"
+
+});
+
+gsap.to(".gradient3",{
+
+x:90,
+
+y:120,
+
+duration:18,
+
+repeat:-1,
+
+yoyo:true,
+
+ease:"sine.inOut"
+
+});
+
+/* ---------- HERO TITLE ---------- */
+
+gsap.from(".hero h1",{
+
+duration:1.3,
+
+y:100,
+
+opacity:0,
+
+ease:"power4.out",
+
+delay:1.2
+
+});
+
+gsap.from(".hero p",{
+
+duration:1,
+
+y:50,
+
+opacity:0,
+
+delay:1.45
+
+});
+
+gsap.from(".heroButtons",{
+
+duration:1,
+
+y:40,
+
+opacity:0,
+
+delay:1.65
+
+});
+
+/* ---------- LOGO ---------- */
+
+gsap.from(".logo",{
+
+opacity:0,
+
+x:-40,
+
+duration:1,
+
+delay:1.3
+
+});
+
+gsap.from(".menu li",{
+
+opacity:0,
+
+y:-20,
+
+stagger:.08,
+
+duration:.7,
+
+delay:1.5
+
+});
+
+/* ---------- PROJECT HOVER SHINE ---------- */
+
+document.querySelectorAll(".project").forEach(card=>{
+
+const shine=document.createElement("div");
+
+shine.style.position="absolute";
+
+shine.style.inset="0";
+
+shine.style.pointerEvents="none";
+
+shine.style.background="linear-gradient(120deg,transparent,rgba(255,255,255,.08),transparent)";
+
+shine.style.transform="translateX(-150%)";
+
+card.appendChild(shine);
+
+card.addEventListener("mouseenter",()=>{
+
+gsap.fromTo(shine,{
+
+xPercent:-150
+
+},{
+
+xPercent:250,
+
+duration:1.1,
+
+ease:"power2.out"
+
+});
+
+});
+
+});
+
+/* ---------- PREVENT RIGHT CLICK (OPTIONAL) ---------- */
+
+document.addEventListener("contextmenu",e=>{
+
+e.preventDefault();
+
+});
+
+/* ---------- CONSOLE BRANDING ---------- */
+
+console.clear();
+
+console.log(
+
+"%cCHILLSCENES",
+
+"font-size:34px;font-family:serif;color:#d7b36a;font-weight:bold;"
+
+);
+
+console.log(
+
+"%cCrafting Cinematic Worlds",
+
+"font-size:14px;color:white;"
+
+);
+
+console.log(
+
+"%cWebsite initialized successfully.",
+
+"color:#8f8f8f;"
+
+);
+
+</script>
+
+</body>
+
+</html>
