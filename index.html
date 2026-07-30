@@ -1,1798 +1,1013 @@
 <!DOCTYPE html>
+<html>
 <head>
-  <base target="_top">
-  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-  <meta http-equiv="Pragma" content="no-cache">
-  <meta http-equiv="Expires" content="0">
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, user-scalable=yes">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700;800&display=swap" rel="stylesheet">
-  <script src="config.js"></script>
-  <style>
-  :root{
-    --navy:#0a1a6e;
-    --navy-deep:#08155a;
-    --accent:#10b981;
-    --accent-soft:#e7f7f1;
-    --bg:#eef2f9;
-    --ink:#16213e;
-    --muted:#6b7596;
-    --line:#e2e7f1;
-    --radius:18px;
-    --shadow:0 14px 40px rgba(20,33,62,0.12);
-  }
-  
-  * { box-sizing: border-box; }
 
-  body {
-    margin: 0;
-    padding: 0;
-    min-height: 100vh;
-    position: relative;
-    font-family: "Poppins", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    -webkit-text-size-adjust: 100%;
-    touch-action: manipulation;
-    overflow-x: hidden;
-    background: var(--bg);
-    color: var(--ink);
-  }
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Choose Your Plan | Friska Wellness</title>
 
-  /* your photo, dimmed under a light wash */
-  body::before {
-    content: "";
-    position: fixed;
-    inset: 0;
-    background-image:
-      linear-gradient(rgba(238,242,249,0.86), rgba(238,242,249,0.92)),
-      url("bg.webp");
-    background-size: cover;
-    background-position: center;
-    background-repeat: no-repeat;
-    z-index: -2;
-  }
-  /* mint glow accent */
-  body::after {
-    content: "";
-    position: fixed;
-    width: 360px; height: 360px;
-    border-radius: 50%;
-    background: rgba(16,185,129,0.12);
-    filter: blur(70px);
-    bottom: -160px; right: -120px;
-    z-index: -1;
-    pointer-events: none;
-  }
-  .nav-row { max-width: 420px; margin-left: auto; margin-right: auto; }
-  .btn.submit, .content > .btn { max-width: 420px; display: block; margin-left: auto; margin-right: auto; }
-  .app { width: 100%; max-width: 100%; padding: 0 0 16px; position: relative; z-index: 1; }
-  .wrapper { width: 100%; max-width: 620px; margin: 0 auto; }
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700;800&display=swap" rel="stylesheet">
 
-  /* NAVY HEADER BANNER */
-  .hero {
-    background: linear-gradient(135deg, var(--navy), #13278f);
-    padding: 22px 16px 48px;
-    text-align: center;
-    position: relative;
-    overflow: hidden;
-  }
-  .hero::before {
-    content: "";
-    position: absolute;
-    width: 180px; height: 180px;
-    border-radius: 50%;
-    background: rgba(16,185,129,0.22);
-    filter: blur(50px);
-    bottom: -70px; left: -40px;
-  }
-  .hero::after {
-    content: "";
-    position: absolute;
-    width: 160px; height: 160px;
-    border-radius: 50%;
-    background: rgba(255,255,255,0.10);
-    filter: blur(44px);
-    top: -50px; right: -30px;
-  }
-  .hero-inner { position: relative; z-index: 1; }
-  .hero .logo {
-    max-width: 130px;
-    height: auto;
-    margin-bottom: 8px;
-    background: #fff;
-    padding: 8px 14px;
-    border-radius: 12px;
-    box-shadow: 0 4px 14px rgba(0,0,0,0.12);
-  }
-  .hero h2 { font-size: 18px; font-weight: 700; color: #fff; margin: 4px 0 0; letter-spacing: .2px; }
+<style>
 
-  /* content pulled up over the banner */
-  .content { padding: 0 14px; margin-top: -28px; position: relative; z-index: 2; }
+:root{
+--navy:#0a1a6e;
+--navy-deep:#08155a;
+--accent:#10b981;
+--accent-soft:#e7f7f1;
+--bg:#f4f7fc;
+--ink:#16213e;
+--muted:#6b7596;
+}
 
-  h2 { font-size: 20px; font-weight: 700; margin: 0; text-align: center; color: var(--navy); }
-  h3 { font-size: 18px; margin-bottom: 14px; }
-  h4 { font-size: 15px; font-weight: 700; margin: 0; color: var(--navy); }
+*{ box-sizing:border-box; }
 
-  /* CARD */
-  .box {
-    background: #fff;
-    border-radius: var(--radius);
-    padding: 18px 16px;
-    margin-bottom: 14px;
-    box-shadow: var(--shadow);
-    border: 1px solid rgba(226,231,241,0.7);
-  }
+body{
+font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto;
+background:var(--bg);
+margin:0;
+padding:0;
+color:var(--ink);
+position:relative;
+overflow-x:hidden;
+}
 
-  /* FORM */
-  label { font-size: 12px; margin-bottom: 6px; display: block; font-weight: 600; color: #445; }
+body::before,
+body::after{
+content:"";
+position:fixed;
+border-radius:50%;
+filter:blur(70px);
+z-index:0;
+pointer-events:none;
+}
+body::before{
+width:340px; height:340px;
+background:rgba(16,185,129,0.16);
+top:-120px; left:-120px;
+}
+body::after{
+width:380px; height:380px;
+background:rgba(10,26,110,0.10);
+bottom:-160px; right:-140px;
+}
 
-  input[type="text"],
-  input#phone,
-  select {
-    width: 100%;
-    padding: 12px 14px;
-    font-size: 16px;
-    border-radius: 12px;
-    border: 1.5px solid var(--line);
-    background: #fbfcfe;
-    color: var(--ink);
-    box-sizing: border-box;
-    transition: border-color .15s, box-shadow .15s, background .15s;
-    font-family: inherit;
-  }
-  input[type="text"]:focus,
-  input#phone:focus,
-  select:focus {
-    outline: none;
-    border-color: var(--accent);
-    background: #fff;
-    box-shadow: 0 0 0 3px rgba(16,185,129,0.12);
-  }
-  #phone { font-size: 17px; letter-spacing: .3px; }
-  input[readonly] { background: #f4f6fa; color: #555; }
-  .box label:not(:first-child) { margin-top: 16px; }
+h1,h2,h3,.brandFont,.stepTitle,.railLabel,.btn,.goalText b,.tileLabel{
+font-family:"Poppins",system-ui,sans-serif;
+}
 
-  /* BUTTONS */
-  .btn {
-    width: 100%;
-    padding: 13px;
-    font-size: 15px;
-    border-radius: 13px;
-    border: none;
-    background: var(--navy);
-    color: #fff;
-    margin-top: 12px;
-    font-weight: 700;
-    cursor: pointer;
-    font-family: inherit;
-    box-shadow: 0 6px 16px rgba(10,26,110,0.18);
-    transition: transform .08s ease, background .15s;
-  }
-  .btn:active { transform: scale(0.98); background: var(--navy-deep); }
-  .btn.secondary { background: #fff; color: var(--navy); border: 1.5px solid var(--line); box-shadow: none; }
-  .btn.secondary:active { background: #f1f4fb; }
-  /* Submit = emerald primary */
-  .btn.submit { background: var(--navy); box-shadow: 0 6px 16px rgba(10,26,110,0.18); }
-  .btn.submit:active { background: var(--navy-deep); }
-  .menu-btn{
-    background:var(--navy); color:white; border:none;
-    padding:10px 18px; font-weight:700; letter-spacing:1px;
-    cursor:pointer; margin-top:10px; border-radius:12px;
-  }
+.header{
+position:sticky;
+top:0;
+background:rgba(255,255,255,0.92);
+backdrop-filter:blur(8px);
+padding:14px 0;
+display:flex;
+justify-content:center;
+align-items:center;
+border-bottom:1px solid #eef1f7;
+z-index:30;
+}
 
-  /* SECTION PANEL (tinted wrapper around each section) */
-  .sec-panel {
-    background: #f5f8fc;
-    border: 1px solid #eef2f8;
-    border-radius: 14px;
-    padding: 12px;
-    margin-bottom: 12px;
-  }
+.logo{ height:44px; max-width:200px; object-fit:contain; display:block; }
 
-  /* SECTION HEADER */
-  .section-header {
-    display: flex; align-items: center; justify-content: space-between;
-    gap: 8px; margin: 0 0 10px;
-  }
-  .section-header h4 {
-    font-size: 15px; white-space: nowrap; flex-shrink: 0;
-    display: inline-flex; align-items: center; gap: 8px;
-  }
-  .section-controls { display: flex; gap: 6px; }
-  .section-controls select {
-    width: 108px !important; padding: 8px 9px !important;
-    font-size: 12.5px !important; border-radius: 10px; background: #fff;
-  }
-  @media (max-width: 480px) {
-    .section-controls select { width: 100px !important; font-size: 12px !important; }
-  }
+.backLink{
+position:absolute; left:18px;
+display:flex; align-items:center; gap:6px;
+font-family:"Poppins",system-ui,sans-serif;
+font-size:14px; font-weight:600; color:var(--navy);
+text-decoration:none;
+}
+.backLink svg{ width:17px; height:17px; }
+.backLink span{ display:none; }
+@media(min-width:520px){ .backLink span{ display:inline; } }
 
-  /* lone h4 (no slot control) still needs spacing inside panel */
-  .sec-panel > h4 { margin-bottom: 10px; }
+.menuButton{ position:absolute; right:18px; font-size:24px; cursor:pointer; color:var(--navy); }
 
-  /* SWAP ARROW PILL */
-  .swap-arrow {
-    border: 1.5px solid #d8deea; background: #fff; color: var(--navy);
-    width: 26px; height: 26px; border-radius: 50%;
-    font-size: 13px; line-height: 1; cursor: pointer;
-    display: inline-flex; align-items: center; justify-content: center;
-    transition: all .15s ease; flex: none; padding: 0;
-  }
-  .swap-arrow:active { transform: scale(0.9); }
-  .swap-arrow.active {
-    background: var(--accent); border-color: var(--accent); color: #fff;
-    box-shadow: 0 3px 10px rgba(16,185,129,0.3);
-  }
+.headerMenu{
+position:fixed;
+top:64px; right:18px;
+background:white;
+border-radius:12px;
+box-shadow:0 6px 20px rgba(0,0,0,0.15);
+overflow:hidden;
+display:none;
+z-index:1000;
+}
+.headerMenu div{ padding:12px 18px; cursor:pointer; font-size:15px; white-space:nowrap; }
+.headerMenu div:hover{ background:#f5f5f5; }
 
-  /* PRESETS */
-  #presetBox { padding: 6px 16px; }
-  #presetBox details { margin: 0; }
-  #presetBox summary {
-    font-size: 15px; font-weight: 700; padding: 8px 0;
-    list-style: none; cursor: pointer; color: var(--navy);
-  }
-  #presetBox summary::-webkit-details-marker { display: none; }
-  #presetBox summary::after { content: "▾"; float: right; transition: 0.2s ease; color: var(--muted); }
-  #presetBox details[open] summary::after { transform: rotate(180deg); }
-  .preset-grid { padding-top: 8px; }
-  .preset-grid label {
-    font-weight: 500; color: var(--ink); font-size: 14px;
-    padding: 7px 0; display: flex; align-items: center;
-  }
+.shell{
+position:relative;
+z-index:1;
+display:flex;
+gap:30px;
+max-width:840px;
+margin:0 auto;
+padding:24px 18px 150px;
+align-items:flex-start;
+justify-content:center;
+}
 
-  /* DISH */
-  .dish {
-    background: #fff;
-    border: 1px solid #edf1f7;
-    border-radius: 11px;
-    padding: 9px 12px;
-    margin-bottom: 6px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-  .dish:last-child { margin-bottom: 0; }
-  .dish-name { font-size: 14px; line-height: 1.3; flex: 1; padding-right: 10px; }
+.stepRail{ display:none; }
 
-  /* QTY */
-  .qty { display: flex; align-items: center; gap: 8px; }
-  .qty button {
-    width: 29px; height: 29px; font-size: 17px;
-    border-radius: 50%; border: none;
-    background: var(--navy); color: #fff; font-weight: 700;
-    display: flex; align-items: center; justify-content: center;
-    transition: all 0.15s ease; cursor: pointer;
-  }
-  .qty button:active { transform: scale(0.9); background: var(--navy-deep); }
-  .qty span { min-width: 18px; text-align: center; font-size: 15px; font-weight: 700; color: var(--navy); }
+.railInner{ position:relative; padding:8px 0; }
+.railTrack{ position:absolute; left:19px; top:32px; width:3px; height:448px; background:#e1e6f2; border-radius:9px; }
+.railFill{ position:absolute; left:19px; top:32px; width:3px; height:0; background:var(--accent); border-radius:9px; transition:height .35s ease; }
 
-  input[type="checkbox"] { transform: scale(1.2); margin-right: 6px; accent-color: var(--accent); }
+.railNode{ position:relative; display:flex; align-items:center; gap:12px; height:64px; z-index:2; }
+.railDot{
+width:40px; height:40px;
+border-radius:50%;
+background:white;
+border:2px solid #e1e6f2;
+display:flex; align-items:center; justify-content:center;
+color:#aab1c9;
+transition:all .25s ease;
+flex:none;
+}
+.railDot svg{ width:20px; height:20px; }
+.railLabel{ font-size:13px; color:#9aa2bd; font-weight:600; transition:all .2s ease; }
 
-  html, body { height: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; }
+.railNode.done .railDot{ border-color:var(--accent); color:var(--accent); }
+.railNode.done .railLabel{ color:#5a6488; }
+.railNode.active .railDot{
+background:var(--navy); border-color:var(--navy); color:white;
+box-shadow:0 6px 16px rgba(10,26,110,0.30);
+transform:scale(1.1);
+}
+.railNode.active .railLabel{ color:var(--navy); font-weight:700; }
 
-  /* DAY HEADER */
-  .day-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
-  .day-text { flex: 1; text-align: center; }
-  .day-name {
-    font-size: 19px; font-weight: 700; cursor: pointer;
-    position: relative; display: inline-flex; align-items: center; gap: 6px; color: var(--navy);
-  }
-  .day-arrow { font-size: 11px; color: var(--accent); }
-  .day-dropdown {
-    display: none; position: absolute; background: #fff;
-    border-radius: 12px; box-shadow: 0 8px 22px rgba(20,33,62,0.12);
-    margin-top: 6px; z-index: 10; min-width: 170px; padding: 6px 0;
-    border: 1px solid var(--line);
-  }
-  .day-dropdown div { padding: 11px 18px; font-size: 14px; cursor: pointer; }
-  .day-dropdown div:hover { background: var(--accent-soft); color: var(--navy); }
-  .day-date { font-size: 12px; color: var(--muted); margin-top: 3px; font-weight: 500; }
+.main{ flex:1; max-width:480px; width:100%; }
 
-  .cancel-wrap {
-    display: flex; align-items: center; gap: 5px;
-    font-size: 12px; white-space: nowrap; font-weight: 600; color: var(--muted);
-  }
+.progressWrap{ margin-bottom:18px; }
 
-  .nav-row { display: flex; gap: 10px; margin-top: 0; }
-  .nav-row .btn { flex: 1; margin-top: 0; }
+.mNodes{ position:relative; display:flex; justify-content:space-between; padding:4px 0; }
+.mTrack,.mFill{ position:absolute; top:50%; transform:translateY(-50%); height:3px; border-radius:9px; z-index:0; }
+.mTrack{ left:18px; right:18px; background:#e1e6f2; }
+.mFill{ left:18px; width:0; background:var(--accent); transition:width .35s ease; }
+.mNode{
+position:relative; z-index:2; flex:none;
+width:36px; height:36px; border-radius:50%;
+background:white; border:2px solid #e1e6f2;
+display:flex; align-items:center; justify-content:center;
+color:#aab1c9; transition:all .25s ease;
+}
+.mNode svg{ width:17px; height:17px; }
+.mNode.done{ border-color:var(--accent); color:var(--accent); }
+.mNode.active{ background:var(--navy); border-color:var(--navy); color:white; box-shadow:0 4px 12px rgba(10,26,110,0.30); }
 
-  /* protein colors */
-  .protein-chicken { color: #d32f2f; font-weight: 600; }
-  .protein-veg { color: #2e7d32; font-weight: 600; }
-  .protein-egg { color: #e69500; font-weight: 600; }
-  .protein-seafood { color: #1565c0; font-weight: 600; }
+.card{
+background:white;
+border-radius:24px;
+padding:26px 22px 24px;
+box-shadow:0 20px 50px rgba(20,33,62,0.10);
+}
 
-  /* SUMMARY MODAL */
-  .modal {
-    display: none; position: fixed; inset: 0;
-    background: rgba(10,21,50,0.55); backdrop-filter: blur(4px);
-    justify-content: center; align-items: center; padding: 16px; z-index: 9999;
-  }
-  .modal-content {
-    background: #fff; border-radius: 20px;
-    width: 100%; max-width: 480px; max-height: 82vh;
-    box-shadow: 0 24px 60px rgba(10,26,110,0.28);
-    display: flex; flex-direction: column;
-    overflow: hidden;
-    padding: 0;
-  }
-  .modal-head { padding: 22px 24px 8px; }
-  .modal-scroll { padding: 4px 24px; overflow-y: auto; flex: 1; }
-  .modal-foot {
-    padding: 14px 24px 18px;
-    border-top: 1px solid var(--line);
-    display: flex; gap: 10px;
-    background: #fff;
-  }
-  .modal-foot .btn { margin-top: 0; }
-  .modal-content h3 { text-align: center; margin: 0 0 14px; font-weight: 700; }
-  .summary-day { margin-bottom: 18px; }
-  .summary-day h4 { margin-bottom: 8px; color: var(--navy); }
-  .summary-slot {
-    font-size: 13px; color: var(--accent); font-weight: 700;
-    margin: 8px 0 4px; text-transform: uppercase; letter-spacing: .4px;
-  }
+.step{ display:none; animation:fadeStep .3s ease; }
+.step.active{ display:block; }
+@keyframes fadeStep{ from{ opacity:0; transform:translateY(8px);} to{ opacity:1; transform:translateY(0);} }
 
-  .loader {
-    display: none; position: fixed; inset: 0;
-    background: rgba(255,255,255,0.6);
-    justify-content: center; align-items: center; z-index: 9999;
-  }
-  .spinner {
-    width: 40px; height: 40px; border: 4px solid #ddd;
-    border-top: 4px solid var(--navy); border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-  }
-  @keyframes spin { to { transform: rotate(360deg); } }
+.stepEyebrow{
+display:inline-flex; align-items:center; gap:7px;
+background:var(--accent-soft); color:var(--accent);
+font-size:12px; font-weight:700; letter-spacing:.3px;
+padding:6px 12px; border-radius:99px; margin-bottom:12px;
+}
+.stepEyebrow svg{ width:15px; height:15px; }
 
-  .btn.loading { opacity: 0.7; pointer-events: none; position: relative; }
-  .btn.loading::after {
-    content: ""; width: 16px; height: 16px;
-    border: 2px solid #fff; border-top: 2px solid transparent;
-    border-radius: 50%; position: absolute; right: 14px; top: 50%;
-    transform: translateY(-50%); animation: spinBtn 0.6s linear infinite;
-  }
-  @keyframes spinBtn { to { transform: translateY(-50%) rotate(360deg); } }
+.stepTitle{ font-size:24px; font-weight:700; margin:0 0 5px; color:var(--navy); line-height:1.2; }
+.stepSub{ font-size:14px; color:var(--muted); margin-bottom:20px; line-height:1.5; }
 
-  .dish-locked { opacity: 0.45; }
-  .dish-locked .qty button { background: #ccc; cursor: not-allowed; }
+input[type="text"],input[type="tel"],input[type="number"]{
+width:100%; padding:15px 14px; margin-top:10px;
+border-radius:13px; border:1.5px solid #e2e7f1; font-size:16px; background:#fbfcfe;
+}
+input:focus{ outline:none; border-color:var(--accent); background:white; box-shadow:0 0 0 3px rgba(16,185,129,0.12); }
 
-  /* UPGRADE MODAL */
-  #upgradeModal {
-    display: none; position: fixed; inset: 0;
-    background: rgba(10,21,50,0.55); backdrop-filter: blur(4px);
-    justify-content: center; align-items: center; padding: 16px; z-index: 99999;
-  }
-  #upgradeModal .modal-content { position: relative; text-align: center; padding: 28px 24px 20px; }
-  #upgradeModal .modal-close {
-    position: absolute; top: 12px; right: 14px; font-size: 18px;
-    cursor: pointer; color: #888; background: none; border: none; line-height: 1;
-  }
-  #upgradeModal .modal-icon { font-size: 36px; margin-bottom: 12px; }
-  #upgradeModal p { font-size: 15px; color: #333; margin-bottom: 20px; line-height: 1.5; }
-  </style>
+.fieldLabel{ font-size:13px; font-weight:600; color:#445; margin-top:18px; display:block; }
+.fieldLabel:first-child{ margin-top:0; }
+.dualField{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+
+.goalCard{
+display:flex; align-items:center; gap:14px;
+background:white;
+border:1.5px solid #e6e9f2;
+border-radius:99px;
+padding:13px 18px;
+margin-top:13px;
+cursor:pointer;
+transition:all .15s ease;
+}
+.goalCard:hover{ border-color:#cfd5e6; transform:translateY(-1px); box-shadow:0 6px 16px rgba(20,33,62,0.07); }
+.goalCard.active{ border-color:var(--accent); background:var(--accent-soft); }
+.goalIcon{
+font-size:22px; width:42px; height:42px;
+display:flex; align-items:center; justify-content:center;
+background:#f1f4fb; border-radius:50%; flex:none;
+}
+.goalCard.active .goalIcon{ background:white; }
+.goalText b{ font-size:15.5px; color:var(--navy); }
+.goalText span{ display:block; font-size:12.5px; color:var(--muted); margin-top:1px; }
+
+.plan-card{
+position:relative; border-radius:18px; overflow:hidden; cursor:pointer;
+border:2.5px solid transparent; margin-top:16px; background:white;
+box-shadow:0 4px 14px rgba(20,33,62,0.06); transition:all .15s ease;
+}
+.plan-card.active{ border-color:var(--accent); box-shadow:0 8px 22px rgba(16,185,129,0.20); }
+.plan-card img{ width:100%; display:block; }
+.recBadge{
+position:absolute; bottom:12px; left:12px;
+background:rgba(16,185,129,0.62);
+backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px);
+color:white; text-shadow:0 1px 2px rgba(0,0,0,0.25);
+font-size:11.5px; font-weight:700; padding:5px 12px; border-radius:99px;
+border:1px solid rgba(255,255,255,0.35);
+z-index:2; box-shadow:0 2px 8px rgba(0,0,0,0.18);
+}
+
+.tileGrid{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.tile{
+position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center;
+gap:10px; background:white; border:2px solid #eaecf3; border-radius:18px;
+padding:18px 12px; cursor:pointer; transition:all .15s ease; text-align:center;
+}
+.tile:hover{ border-color:#cfd5e6; }
+.tile input{ position:absolute; opacity:0; pointer-events:none; }
+.tileIcon{ width:50px; height:50px; border-radius:15px; display:flex; align-items:center; justify-content:center; font-size:25px; background:var(--tint); transition:all .15s ease; }
+.tileLabel{ font-size:15px; font-weight:600; color:#222; }
+.tileTime{ font-size:11.5px; color:#889; margin-top:-4px; }
+.tile.on{ border-color:var(--ta); background:var(--tint); box-shadow:0 5px 16px rgba(0,0,0,0.08); }
+.tile.on .tileLabel{ color:var(--ta); }
+.tileCheck{ position:absolute; top:9px; right:9px; width:22px; height:22px; border-radius:50%; background:var(--ta); color:white; display:none; align-items:center; justify-content:center; font-size:13px; }
+.tile.on .tileCheck{ display:flex; }
+
+.addonRow{ display:flex; align-items:center; gap:12px; margin-top:14px; padding:14px 16px; border:1.5px solid #e2e7f1; border-radius:16px; cursor:pointer; background:#fbfcfe; transition:all .15s ease; }
+.addonRow.on{ border-color:var(--accent); background:var(--accent-soft); }
+.addonRow input{ width:20px; height:20px; accent-color:var(--accent); flex:0 0 auto; }
+.addonMain{ flex:1; display:flex; flex-direction:column; }
+.addonTitle{ font-weight:700; color:var(--navy); font-size:15px; }
+.addonSub{ font-size:12px; color:var(--muted); }
+.addonPrice{ font-weight:800; color:var(--accent); font-size:14px; white-space:nowrap; }
+.infoNote{ margin-top:16px; background:var(--accent-soft); border:1px solid #cdeee2; color:#0b6b53; border-radius:14px; padding:13px 15px; font-size:13px; line-height:1.5; }
+.infoNote b{ color:var(--navy); }
+.addonBox{ margin-top:18px; border:1.5px solid #e2e7f1; border-radius:16px; padding:14px 16px; background:#fbfcfe; }
+.addonHead{ font-weight:700; color:var(--navy); font-size:15px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.addonTag{ font-size:11.5px; font-weight:700; color:var(--accent); background:var(--accent-soft); padding:3px 9px; border-radius:99px; }
+.addonBody{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:12px; }
+.addonQlabel{ font-size:13px; color:var(--muted); }
+.stepper{ display:flex; align-items:center; gap:14px; flex:0 0 auto; }
+.stepper button{ width:38px; height:38px; border-radius:11px; border:1.5px solid #e2e7f1; background:white; font-size:20px; font-weight:700; color:var(--navy); cursor:pointer; line-height:1; }
+.stepper button:active{ background:#eef1fb; }
+.stepper span{ min-width:26px; text-align:center; font-size:18px; font-weight:800; color:var(--navy); }
+.addonNote{ margin-top:12px; font-size:12px; color:var(--muted); line-height:1.4; }
+.addonMax{ font-size:12px; font-weight:700; color:var(--accent); }
+
+.spinWrap{ position:relative; }
+.fieldSpinner{ position:absolute; right:14px; top:50%; transform:translateY(-50%); width:16px; height:16px; border:2px solid #ddd; border-top:2px solid var(--navy); border-radius:50%; animation:spin .8s linear infinite; display:none; }
+
+.locWrap{ position:relative; margin-top:10px; }
+.locWrap input{ padding-right:54px; }
+.locBtn{ position:absolute; right:8px; top:50%; transform:translateY(-50%); border:none; background:transparent; cursor:pointer; padding:8px; }
+#locationSpinner{ position:absolute; right:46px; top:50%; transform:translateY(-50%); width:16px; height:16px; border:2px solid #ddd; border-top:2px solid var(--navy); border-radius:50%; animation:spin .8s linear infinite; display:none; }
+@keyframes spin{ 0%{transform:translateY(-50%) rotate(0);} 100%{transform:translateY(-50%) rotate(360deg);} }
+
+.navRow{ display:flex; gap:12px; margin-top:26px; }
+.btn{ flex:1; padding:15px; border:none; border-radius:14px; font-size:16px; font-weight:700; cursor:pointer; }
+.btnPrimary{ background:var(--navy); color:white; box-shadow:0 6px 16px rgba(10,26,110,0.22); }
+.btnPrimary:active{ background:var(--navy-deep); }
+.btnGhost{ flex:none; width:54px; background:white; color:var(--navy); border:1.5px solid #e2e7f1; font-size:20px; }
+.skipLink{ display:block; width:100%; margin-top:16px; background:transparent; border:none; color:#aab; font-size:12px; text-decoration:underline; cursor:pointer; padding:4px; }
+
+.resultCard{
+background:white;
+border:1.5px solid #e2e7f1;
+border-left:4px solid var(--navy);
+border-radius:14px;
+padding:18px 20px;
+margin-top:16px;
+box-shadow:0 4px 14px rgba(20,33,62,0.06);
+}
+.resultTop{ display:flex; align-items:center; gap:12px; }
+.resultTick{ width:34px; height:34px; border-radius:50%; background:var(--accent-soft); color:var(--accent); display:flex; align-items:center; justify-content:center; font-size:16px; flex:none; }
+.resultMeta{ flex:1; min-width:0; }
+.resultEyebrow{ font-size:11px; letter-spacing:1px; font-weight:700; color:var(--muted); text-transform:uppercase; }
+.resultPlan{ font-size:14.5px; font-weight:700; color:var(--navy); margin-top:1px; }
+.priceRow{ display:flex; align-items:baseline; justify-content:space-between; padding:12px 0; border-bottom:1px solid #eef1f7; }
+.priceRow:last-of-type{ border-bottom:none; }
+.priceLabel{ font-size:13px; font-weight:600; color:var(--muted); }
+.priceValue{ font-size:22px; font-weight:800; color:var(--navy); }
+.resultNote{ font-size:12px; color:var(--muted); margin-top:2px; }
+.trialOpt{ display:flex; align-items:center; gap:8px; margin:2px 0 2px; font-size:13px; font-weight:600; color:var(--navy); cursor:pointer; }
+.trialOpt input{ width:17px; height:17px; accent-color:var(--accent); flex:0 0 auto; }
+
+.summaryBox{ background:white; border-radius:18px; padding:16px 18px; margin-top:16px; box-shadow:0 4px 14px rgba(20,33,62,0.06); font-size:14px; }
+.summaryBox .row{ display:flex; justify-content:space-between; gap:14px; padding:8px 0; border-bottom:1px solid #f0f2f7; }
+.summaryBox .row:last-child{ border-bottom:none; }
+.summaryBox .row span:first-child{ color:var(--muted); flex:none; }
+.summaryBox .row span:last-child{ font-weight:600; text-align:right; }
+
+.toastPopup{ position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); background:white; padding:16px 22px; border-radius:14px; box-shadow:0 6px 20px rgba(0,0,0,0.18); font-size:15px; font-weight:500; color:#333; z-index:9999; display:none; max-width:280px; text-align:center; }
+
+.bookBar{ position:fixed; bottom:0; left:0; right:0; background:rgba(255,255,255,0.96); backdrop-filter:blur(8px); padding:14px 18px; border-top:1px solid #eee; box-shadow:0 -3px 12px rgba(0,0,0,0.07); display:none; z-index:50; }
+.bookBar button{ display:block; max-width:340px; width:100%; margin:0 auto; padding:16px; border-radius:14px; border:none; background:var(--navy); color:white; font-size:17px; font-weight:700; cursor:pointer; box-shadow:0 6px 16px rgba(10,26,110,0.32); }
+.bookBar button:active{ background:var(--navy-deep); }
+
+@media(min-width:920px){
+.stepRail{ display:block; width:218px; position:sticky; top:96px; }
+.progressWrap{ display:none; }
+.card{ padding:32px 30px 30px; }
+}
+
+</style>
 </head>
 
 <body>
-<div class="app">
-  <div class="hero">
-    <div class="hero-inner">
-      <img src="logo.png" class="logo" alt="Friska Logo">
-      <h2>Weekly Meal Selection</h2>
-    </div>
-  </div>
 
-  <div class="content wrapper">
-
-<div class="box">
-  <div id="adminSearchWrap" style="display:none; position:relative;">
-    <label>Search Client (Admin)</label>
-    <input type="text" id="adminSearch" autocomplete="off"
-           placeholder="Type 2+ letters of name"
-           oninput="onAdminSearch(this.value)">
-    <div id="adminResults" style="
-      display:none; position:absolute; left:0; right:0; top:100%;
-      background:#fff; border:1px solid var(--line); border-radius:12px;
-      box-shadow:0 8px 22px rgba(20,33,62,0.12); margin-top:4px; z-index:30;
-      max-height:260px; overflow-y:auto; padding:4px 0;"></div>
-  </div>
-
-  <label>Phone</label>
-  <input id="phone" inputmode="numeric"
-         onkeydown="if(event.key==='Enter'){fetchClient()}">
-  <button class="btn" onclick="fetchClient(event)">Login</button>
-
-  <button class="btn secondary" onclick="openMenu()">
-  View Weekly Menu
-  </button>
-  
-  <button class="btn" id="viewPastBtn" style="display:none;" onclick="openOrdersPage()">
-    View Past Selections
-  </button>
-  
-  <label style="margin-top:24px;">Client Name</label>
-  <input type="text" id="clientName" readonly>
-
-  <label>Type</label>
-  <input type="text" id="clientType" readonly>
-
-  <label>Remarks</label>
-  <input type="text" id="clientRemarks" readonly
-         oninput="onRemarkInput(this.value)">
-  <div style="display:flex; gap:16px; margin-top:8px; align-items:center;">
-    <label style="display:flex; align-items:center; gap:6px; font-size:13px; margin:0; cursor:pointer;">
-      <input type="checkbox" id="rmDay" onchange="toggleRemarkMode('day', this)"> This Day Remark
-    </label>
-    <label style="display:flex; align-items:center; gap:6px; font-size:13px; margin:0; cursor:pointer;">
-      <input type="checkbox" id="rmPerm" onchange="toggleRemarkMode('permanent', this)"> Permanent Change
-    </label>
-  </div>
+<div class="header">
+<a href="../index.html" class="backLink"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg><span>Website</span></a>
+<img src="logo.png" class="logo">
+<div class="menuButton" onclick="toggleMenu()">&#9776;</div>
 </div>
 
-<div class="box" id="presetBox">
-
-  <details>
-    <summary style="font-weight:600; cursor:pointer;">Presets</summary>
-
-    <div class="preset-grid">
-
-      
-      <label><input type="checkbox" onchange="togglePreset('meals','chicken',this)"> Both Chicken Meals Everyday</label>
-      <label><input type="checkbox" onchange="togglePreset('meals','veg',this)"> Both Veg Meals Everyday</label>
-      <label><input type="checkbox" onchange="togglePreset('breakfast','veg',this)"> Veg Breakfast Everyday</label>
-      <label><input type="checkbox" onchange="togglePreset('breakfast','breakfast',this)"> Breakfast Everyday (Egg)</label>
-      <label><input type="checkbox" onchange="togglePreset('meals','seafood',this)"> Both Seafood Meals Everyday</label>
-      <label><input type="checkbox" onchange="togglePreset('meals','egg',this)"> One Egg Meal Everyday</label>
-      <label><input type="checkbox" onchange="togglePreset('meals','fish',this)"> One Fish Meal Everyday</label>
-      <label><input type="checkbox" onchange="togglePreset('meals','prawns',this)"> One Prawns Meal Everyday</label>
-      
-
-      
-      <label><input type="checkbox" onchange="togglePreset('snack','all',this)"> Snack Everyday</label>
-      <label><input type="checkbox" onchange="togglePreset('snack','veg',this)"> Veg Snack Everyday</label>
-
-     
-      <label><input type="checkbox" onchange="togglePreset('juice','both',this)"> Both Juices Everyday</label>
-
-    </div>
-
-  </details>
-
+<div class="headerMenu" id="headerMenu">
+<div onclick="location.href='../index.html'">Back to Website</div>
+<div onclick="openWeeklyMenu()">Weekly Menu</div>
+<div onclick="contactSupport()">Customer Service</div>
 </div>
 
-<div id="dayContainer"></div>
+<div class="shell">
+
+<div class="stepRail">
+<div class="railInner">
+<div class="railTrack"></div>
+<div class="railFill" id="railFill"></div>
+<div id="railNodes"></div>
+</div>
 </div>
 
-<div class="nav-row">
-  <button id="backBtn" class="btn secondary" onclick="prevDay()">Back</button>
-  <button id="nextBtn" class="btn secondary" onclick="nextDay(event)">Next Day</button>
+<div class="main">
+
+<div class="progressWrap">
+<div class="mNodes" id="mNodes">
+<div class="mTrack"></div>
+<div class="mFill" id="mFill"></div>
 </div>
-  
-<button class="btn submit" onclick="handleSubmit(event)">Submit & Exit</button>
-  </div>
 </div>
+
+<div class="card">
+
+<div class="step active" data-step>
+<div class="stepEyebrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-6 8-6s8 2 8 6"/></svg>Get started</div>
+<div class="stepTitle">Welcome to Friska</div>
+<div class="stepSub">Let's start with a few details so we can prepare your plan.</div>
+
+<label class="fieldLabel">Phone number</label>
+<div class="spinWrap">
+<input type="tel" id="clientPhone" placeholder="10-digit mobile number" maxlength="10">
+<div id="phoneSpinner" class="fieldSpinner"></div>
+</div>
+<label class="fieldLabel">Your name</label>
+<input type="text" id="clientName" placeholder="Enter your name">
+
+<div class="navRow"><button class="btn btnPrimary" onclick="next(0)">Continue</button></div>
+</div>
+
+<div class="step" data-step>
+<div class="stepEyebrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s7-7 7-12a7 7 0 1 0-14 0c0 5 7 12 7 12z"/><circle cx="12" cy="10" r="2.5"/></svg>Delivery</div>
+<div class="stepTitle">Delivery location</div>
+<div class="stepSub">Tell us where we'll be delivering. This helps us check timing and delivery charges.</div>
+
+<div class="locWrap" id="locWrapBox">
+<input id="location" type="text" placeholder="Enter delivery location">
+<div id="locationSpinner"></div>
+<button type="button" class="locBtn" onclick="useCurrentLocation()">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8" stroke="#0a1a6e" stroke-width="2"/><circle cx="12" cy="12" r="2.5" fill="#0a1a6e"/></svg>
+</button>
+</div>
+
+<div class="addonBox" id="savedLocationBox" style="display:none;">
+<div class="addonHead">&#128205; Using your saved location</div>
+<div id="savedLocationText" style="font-size:14px;color:var(--muted);margin-top:6px;line-height:1.5;"></div>
+<button type="button" class="skipLink" style="margin:8px 0 0;" onclick="changeLocation()">Change location</button>
+</div>
+
+<div class="navRow"><button class="btn btnGhost" onclick="back(1)">&#8592;</button><button class="btn btnPrimary" onclick="next(1)">Continue</button></div>
+</div>
+
+<div class="step" data-step>
+<div class="stepEyebrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="1"/></svg>Your goal</div>
+<div class="stepTitle">What's your goal?</div>
+<div class="stepSub">We'll use this to recommend the right plan for you.</div>
+
+<div class="goalCard" onclick="selectGoal(this,'weightloss')"><div class="goalIcon">&#128293;</div><div class="goalText"><b>Weight Loss</b><span>Lighter meals, controlled carbs</span></div></div>
+<div class="goalCard" onclick="selectGoal(this,'musclegain')"><div class="goalIcon">&#128170;</div><div class="goalText"><b>Muscle Gain</b><span>Higher protein, performance focused</span></div></div>
+<div class="goalCard" onclick="selectGoal(this,'wellness')"><div class="goalIcon">&#127807;</div><div class="goalText"><b>Overall Wellness</b><span>Balanced everyday nutrition</span></div></div>
+
+<div class="navRow"><button class="btn btnGhost" onclick="back(2)">&#8592;</button><button class="btn btnPrimary" onclick="next(2)">Continue</button></div>
+</div>
+
+<div class="step" data-step>
+<div class="stepEyebrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 16a8 8 0 0 1 16 0"/><path d="M12 16l4-3"/></svg>About you</div>
+<div class="stepTitle">A little about you</div>
+<div class="stepSub">This lets us match you to the best plan for your body and goal.</div>
+
+<label class="fieldLabel">Age</label>
+<input type="number" id="age" placeholder="Years">
+<label class="fieldLabel">Height</label>
+<div class="dualField"><input type="number" id="heightFt" placeholder="Feet"><input type="number" id="heightIn" placeholder="Inches"></div>
+<label class="fieldLabel">Weight (kg)</label>
+<input type="number" id="weight" placeholder="e.g. 68">
+
+<div class="navRow"><button class="btn btnGhost" onclick="back(3)">&#8592;</button><button class="btn btnPrimary" onclick="next(3)">Continue</button></div>
+<button class="skipLink" onclick="skipBody()">Skip</button>
+</div>
+
+<div class="step" data-step>
+<div class="stepEyebrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 4h6v3H9z"/><path d="M9 11h6M9 15h4"/></svg>Your plan</div>
+<div class="stepTitle">Choose your plan</div>
+<div class="stepSub">Macros and suitability are explained on each plan banner.</div>
+<div id="planList"></div>
+<div class="navRow"><button class="btn btnGhost" onclick="back(4)">&#8592;</button><button class="btn btnPrimary" onclick="next(4)">Continue</button></div>
+</div>
+
+<div class="step" data-step>
+<div class="stepEyebrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3v6a2 2 0 0 0 4 0V3"/><path d="M8 9v12"/><path d="M16 3c2 2 2 7 0 9v9"/></svg>Meals</div>
+<div class="stepTitle">Select your meals</div>
+<div class="stepSub">Tap to add the meals you'd like delivered each day.</div>
+<div class="tileGrid">
+<label class="tile" style="--ta:#F59E0B;--tint:#FEF3E2;"><input type="checkbox" id="breakfast"><div class="tileIcon">&#127859;</div><div class="tileLabel">Breakfast</div><div class="tileCheck">&#10003;</div></label>
+<label class="tile" style="--ta:#8B5CF6;--tint:#F1ECFD;"><input type="checkbox" id="snack"><div class="tileIcon">&#127822;</div><div class="tileLabel">Snack</div><div class="tileCheck">&#10003;</div></label>
+<label class="tile" style="--ta:#10B981;--tint:#E7F7F1;"><input type="checkbox" id="lunch"><div class="tileIcon">&#127857;</div><div class="tileLabel">Lunch</div><div class="tileCheck">&#10003;</div></label>
+<label class="tile" style="--ta:#EC4899;--tint:#FCE9F3;"><input type="checkbox" id="juice1"><div class="tileIcon">&#129380;</div><div class="tileLabel">1 Juice</div><div class="tileCheck">&#10003;</div></label>
+<label class="tile" style="--ta:#3B82F6;--tint:#E8F1FE;"><input type="checkbox" id="dinner"><div class="tileIcon">&#127858;</div><div class="tileLabel">Dinner</div><div class="tileCheck">&#10003;</div></label>
+<label class="tile" style="--ta:#14B8A6;--tint:#E5F6F4;"><input type="checkbox" id="juice2"><div class="tileIcon">&#129380;</div><div class="tileLabel">2 Juices</div><div class="tileCheck">&#10003;</div></label>
+</div>
+<div class="infoNote">&#129424; <b>Seafood meals</b> are available as an add-on (<span id="seafoodNotePrice">+&#8377;90</span> each) &mdash; you'll pick how many after choosing your duration. Juices &amp; snacks can be added now, or anytime later during your subscription.</div>
+<div class="navRow"><button class="btn btnGhost" onclick="back(5)">&#8592;</button><button class="btn btnPrimary" onclick="next(5)">Continue</button></div>
+</div>
+
+<div class="step" data-step>
+<div class="stepEyebrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 9h16M8 3v4M16 3v4"/></svg>Duration</div>
+<div class="stepTitle">Choose duration</div>
+<div class="stepSub">How long would you like to subscribe?</div>
+<div class="tileGrid">
+<label class="tile" style="--ta:#0a1a6e;--tint:#eef1fb;"><input type="radio" name="duration" value="d"><div class="tileIcon">&#9889;</div><div class="tileLabel">2 Day Trial</div><div class="tileCheck">&#10003;</div></label>
+<label class="tile" style="--ta:#0a1a6e;--tint:#eef1fb;"><input type="radio" name="duration" value="w"><div class="tileIcon">&#128197;</div><div class="tileLabel">1 Week</div><div class="tileCheck">&#10003;</div></label>
+<label class="tile" style="--ta:#0a1a6e;--tint:#eef1fb;"><input type="radio" name="duration" value="m"><div class="tileIcon">&#128467;</div><div class="tileLabel">26 Days</div><div class="tileCheck">&#10003;</div></label>
+<label class="tile" style="--ta:#0a1a6e;--tint:#eef1fb;"><input type="radio" name="duration" value="q"><div class="tileIcon">&#127775;</div><div class="tileLabel">3 Months</div><div class="tileCheck">&#10003;</div></label>
+</div>
+<div class="navRow"><button class="btn btnGhost" onclick="back(6)">&#8592;</button><button class="btn btnPrimary" onclick="next(6)">Continue</button></div>
+</div>
+
+<div class="step" data-step>
+<div class="stepEyebrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg>Slot</div>
+<div class="stepTitle">Delivery slot</div>
+<div class="stepSub">Pick the timings that work best for you.</div>
+<div class="tileGrid">
+<label class="tile" id="morningLabel" style="--ta:#F59E0B;--tint:#FEF3E2;"><input type="checkbox" id="morning"><div class="tileIcon">&#127749;</div><div class="tileLabel">Morning</div><div class="tileTime">7am - 8am</div><div class="tileCheck">&#10003;</div></label>
+<label class="tile" style="--ta:#F97316;--tint:#FFF0E6;"><input type="checkbox" id="afternoon"><div class="tileIcon">&#9728;</div><div class="tileLabel">Afternoon</div><div class="tileTime">11:30am - 1:30pm</div><div class="tileCheck">&#10003;</div></label>
+<label class="tile" style="--ta:#6366F1;--tint:#ECECFB;"><input type="checkbox" id="evening"><div class="tileIcon">&#127769;</div><div class="tileLabel">Evening</div><div class="tileTime">6pm - 8pm</div><div class="tileCheck">&#10003;</div></label>
+</div>
+<div class="addonBox">
+<div class="addonHead">&#129424; Seafood meals <span class="addonTag" id="seafoodTag">Add-on &middot; +&#8377;90 each</span></div>
+<div class="addonBody"><span class="addonQlabel">How many seafood meals? <span id="seafoodMaxLbl" class="addonMax"></span></span>
+<div class="stepper"><button type="button" onclick="seafoodStep(-1)">&minus;</button><span id="seafoodQty">0</span><button type="button" onclick="seafoodStep(1)">+</button></div></div>
+<div class="addonNote">Optional &mdash; leave at 0 if not needed. You can also add seafood, juices or snacks anytime later during your subscription.</div>
+</div>
+<div class="navRow"><button class="btn btnGhost" onclick="back(7)">&#8592;</button><button class="btn btnPrimary" onclick="next(7)">See your price</button></div>
+</div>
+
+<div class="step" data-step>
+<div class="stepEyebrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>Done</div>
+<div class="stepTitle">You're all set</div>
+<div class="stepSub">Here's your personalised plan and estimated pricing.</div>
+<div id="quoteSummary"></div>
+<div id="quoteResult"></div>
+<div class="navRow"><button class="btn btnGhost" onclick="back(8)">&#8592;</button></div>
+</div>
+
+</div>
+</div>
+</div>
+
+<div class="bookBar" id="bookBar"><button onclick="bookNow()">Book Now</button></div>
+<div id="toastPopup" class="toastPopup"><span id="toastMessage"></span></div>
+
+<script src="config.js"></script>
 
 <script>
 
-let CLIENT_LOCATION_1 = '';
-let CLIENT_LOCATION_2 = '';
-let CLIENT_DELIVERY = {};
-let MASTER_REMARK = '';
-/* ========= CONFIG ========= */
-const ADMIN_MODE = true;              // admin repo = true, client repo = false
-const CUTOFF_HOUR = 0;                // cutoff time (only used when cutoff is active)
-const CUTOFF_ENABLED = !ADMIN_MODE;   // admin = no cutoff, client = cutoff on
+const PRICING_URL = (typeof API_URL !== "undefined" && API_URL) ? API_URL : "";
+if(!PRICING_URL){ console.warn("API_URL not found — make sure config.js is present and loaded."); }
+const WHATSAPP_NUMBER = "919390097670";
+const SUPPORT_NUMBER  = "918400964170";
+const KITCHEN = { lat:17.452623115758335, lng:78.41967516576499 };
 
-let MASTER_CLIENTS = [];              // admin name search cache
+const PLANS = {
+  nb:{ name:"Nutri Balance", img:"nutri_balance.webp" },
+  hp:{ name:"High Protein",  img:"high_protein.webp"  },
+  lc:{ name:"Low Carb",      img:"low_carb.webp"      },
+  hc:{ name:"High Carb",     img:"high_carb.webp"     },
+  nc:{ name:"No Carb",       img:"no_carb.webp"       }
+};
+const GOAL_PLANS = { weightloss:["nb","lc","nc"], musclegain:["hp","nc"], wellness:["hc","nb"] };
+const GOAL_NAME  = { weightloss:"Weight Loss", musclegain:"Muscle Gain", wellness:"Overall Wellness" };
 
-let MENU = {};
-let DATES = [];
-let VISIBLE_DATES = [];
-let STATE = {};
-let currentIndex = 0;
+function recommendByBMI(goal, bmi){
+  if(goal === "weightloss"){ if(bmi < 25) return "nb"; if(bmi < 30) return "lc"; return "nc"; }
+  if(goal === "musclegain"){ if(bmi < 25) return "hp"; return "nc"; }
+  if(goal === "wellness"){ if(bmi < 18.5) return "hc"; return "nb"; }
+  return GOAL_PLANS[goal][0];
+}
 
-/* ========= FETCH ========= */
-async function fetchClient() {
+let selectedPlan="", selectedGoal="", recommendedPlan="", bmiValue=0, distance=0, pricing={};
+let lastQuote=null;
+let seafoodQty=0;
+let seafoodMax=0;
+let mapsLink="";
+let returningLead=null;
+let phoneLookedUp="";
+fetch(PRICING_URL).then(r=>r.json()).then(d=>{ pricing=d; updateSeafoodPrice(); });
+function getPrice(key){ if(!pricing[key]) return 0; return Number(pricing[key]); }
+function updateSeafoodPrice(){
+  let p=getPrice("seafood")||0;
+  let a=document.getElementById("seafoodTag"); if(a) a.innerHTML="Add-on &middot; +&#8377;"+p+" each";
+  let b=document.getElementById("seafoodNotePrice"); if(b) b.innerHTML="+&#8377;"+p;
+}
+function daysForDur(){
+  let el=document.querySelector('input[name="duration"]:checked');
+  let d=el?el.value:"";
+  return d==="w"?6 : d==="m"?26 : d==="q"?78 : d==="d"?2 : 0;
+}
+function computeSeafoodMax(){
+  let lunch=document.getElementById("lunch").checked;
+  let dinner=document.getElementById("dinner").checked;
+  let perDay=(lunch?1:0)+(dinner?1:0);          // seafood applies only to lunch/dinner
+  seafoodMax=perDay*daysForDur();
+  if(seafoodQty>seafoodMax) seafoodQty=0;
+  renderSeafood();
+}
+function renderSeafood(){
+  let el=document.getElementById("seafoodQty"); if(el) el.textContent=seafoodQty;
+  let m=document.getElementById("seafoodMaxLbl");
+  if(m) m.textContent = seafoodMax>0 ? ("(max "+seafoodMax+")") : "(add lunch/dinner)";
+}
+function seafoodStep(d){
+  if(seafoodMax<=0){ seafoodQty=0; renderSeafood(); return; }
+  seafoodQty += d;
+  if(seafoodQty > seafoodMax) seafoodQty = 0;     // plus past max -> back to 0
+  if(seafoodQty < 0)          seafoodQty = seafoodMax; // minus below 0 -> jump to max
+  renderSeafood();
+  invalidateQuote();
+}
 
-  const btn = event.target;
-  btn.classList.add("loading");
-
-  const phone = document.getElementById('phone').value.trim();
-  if (!phone) {
-    btn.classList.remove("loading");
-    return alert('Enter phone');
-  }
-
-  const params = new URLSearchParams();
-  params.append("action", "getClient");
-  params.append("phone", phone);
-
-  const res = await fetch(API_URL, {
-    method: "POST",
-    body: params
+const RAIL = [
+  { label:"Your details", svg:'<circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-6 8-6s8 2 8 6"/>' },
+  { label:"Location",     svg:'<path d="M12 22s7-7 7-12a7 7 0 1 0-14 0c0 5 7 12 7 12z"/><circle cx="12" cy="10" r="2.5"/>' },
+  { label:"Goal",         svg:'<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="1"/>' },
+  { label:"About you",    svg:'<path d="M4 16a8 8 0 0 1 16 0"/><path d="M12 16l4-3"/>' },
+  { label:"Plan",         svg:'<rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 4h6v3H9z"/><path d="M9 11h6M9 15h4"/>' },
+  { label:"Meals",        svg:'<path d="M6 3v6a2 2 0 0 0 4 0V3"/><path d="M8 9v12"/><path d="M16 3c2 2 2 7 0 9v9"/>' },
+  { label:"Duration",     svg:'<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 9h16M8 3v4M16 3v4"/>' },
+  { label:"Slot",         svg:'<circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/>' }
+];
+(function buildRail(){
+  let html="";
+  RAIL.forEach((n,i)=>{
+    html += '<div class="railNode" data-rail="'+i+'">'+
+      '<div class="railDot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+n.svg+'</svg></div>'+
+      '<div class="railLabel">'+n.label+'</div></div>';
   });
-
-  const data = await res.json();
-
-  btn.classList.remove("loading");
-
-  if (!data || !data.client || !data.client.found)
-    return alert('Client not found');
-
-  if (data.client.status === 'inactive') {
-    document.getElementById('inactiveModal').style.display = 'flex';
-    return;
-  }
-
-  const client = data.client;
-
-  clientName.value = client.clientName || '';
-  const originalType = client.mealType || '';
-
-  const cleanedType = originalType
-    .replace(/\d+/g, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-  
-  clientType.value = cleanedType;
-  
-  clientRemarks.value = client.remarks || '';
-  MASTER_REMARK = client.remarks || '';
-  clientRemarks.readOnly = true;   // locked until a checkbox is ticked
-   
-  // store original for backend
-  clientType.dataset.original = originalType,
-
-
-  CLIENT_LOCATION_1 = client.location1 || '';
-  CLIENT_LOCATION_2 = client.location2 || '';
-  CLIENT_DELIVERY = client.delivery || {};
-
-  const menuRes = await fetch(`${API_URL}?action=getGlideMenu&t=${Date.now()}`, { cache: "no-store" });
-  MENU = await menuRes.json() || {};
-  DATES = Object.keys(MENU).sort();
-  applyCutoff();
-  initState();
-  renderCurrentDay();
-
-  document.getElementById("viewPastBtn").style.display = "block";
-}
-
-function openMenu(){
-
-window.open("menu.html","_blank");
-
-}
-/* ========= CUTOFF ========= */
-function applyCutoff() {
-
-  if (!CUTOFF_ENABLED) {
-    VISIBLE_DATES = DATES.filter(d => MENU[d]);
-    currentIndex = 0;
-    return;
-  }
-
-  const now = new Date();
-  const today = new Date(
-    now.getFullYear(),
-    now.getMonth(),
-    now.getDate()
-  );
-
-  const todayStr =
-    today.getFullYear() + '-' +
-    String(today.getMonth() + 1).padStart(2, '0') + '-' +
-    String(today.getDate()).padStart(2, '0');
-
-  const todayExists = DATES.includes(todayStr);
-
-  if (!todayExists) {
-    // Show only valid dates that exist in MENU
-    VISIBLE_DATES = DATES.filter(d => MENU[d]);
-    currentIndex = 0;
-    return;
-  }
-
-  let targetDate = new Date(today);
-  targetDate.setDate(today.getDate() + 1);
-
-  if (CUTOFF_HOUR > 0 && now.getHours() >= CUTOFF_HOUR) {
-    targetDate.setDate(targetDate.getDate() + 1);
-  }
-
-  const targetStr =
-    targetDate.getFullYear() + '-' +
-    String(targetDate.getMonth() + 1).padStart(2, '0') + '-' +
-    String(targetDate.getDate()).padStart(2, '0');
-
-  VISIBLE_DATES = DATES.filter(d => d >= targetStr && MENU[d]);
-
-  currentIndex = 0;
-}
-
-/* ========= STATE ========= */
-function initState(){
-  VISIBLE_DATES.forEach(date => {
-
-    STATE[date] = {
-      sections: {
-        breakfast: { items: {}, slot: 'Morning', location: '' },
-        option1:   { items: {}, slot: 'Afternoon', location: '', view: 'option1' },
-        option2:   { items: {}, slot: 'Evening', location: '', view: 'option2' },
-        snack:     { items: {}, slot: 'Afternoon', location: '' },
-        juice1:    { items: {}, slot: 'Afternoon', location: '' },
-        juice2:    { items: {}, slot: 'Evening', location: '' }
-      },
-      cancel: false,
-      remark: MASTER_REMARK,        // per-day remark, defaults to master
-      remarkMode: null              // null | 'day' | 'permanent'
-    };
-    // total delivery slots for this client
-    const _slotCount =
-      (CLIENT_DELIVERY?.morning ? 1 : 0) +
-      (CLIENT_DELIVERY?.afternoon ? 1 : 0) +
-      (CLIENT_DELIVERY?.evening ? 1 : 0);
-
-    // the correct slot for main meals (option1/option2/snack):
-    //  - single slot: that slot
-    //  - morning + one other: the NON-morning slot (meals never go to morning)
-    //  - afternoon + evening: handled separately below
-    const _mealSlot =
-      _slotCount === 1
-        ? (CLIENT_DELIVERY?.morning ? 'Morning'
-           : CLIENT_DELIVERY?.afternoon ? 'Afternoon'
-           : CLIENT_DELIVERY?.evening ? 'Evening' : 'Afternoon')
-        : (CLIENT_DELIVERY?.afternoon ? 'Afternoon'
-           : CLIENT_DELIVERY?.evening ? 'Evening' : 'Afternoon');
-
-    // Apply for any client that is NOT afternoon+evening (those get per-card slots below)
-    if (!hasAfternoonEveningSlots()) {
-
-      // morning + evening → meals default to location2; everyone else → location1
-      const isMorningEvening =
-        CLIENT_DELIVERY?.morning && CLIENT_DELIVERY?.evening && !CLIENT_DELIVERY?.afternoon;
-
-      const mealLocation = isMorningEvening
-        ? (CLIENT_LOCATION_2 || CLIENT_LOCATION_1 || '')
-        : (CLIENT_LOCATION_1 || CLIENT_LOCATION_2 || '');
-
-      STATE[date].sections.option1.slot = _mealSlot;
-      STATE[date].sections.option2.slot = _mealSlot;
-      STATE[date].sections.snack.slot   = _mealSlot;
-
-      STATE[date].sections.option1.location = mealLocation;
-      STATE[date].sections.option2.location = mealLocation;
-    }
-    // 🔵 FIX: Pre-assign location for dual-slot clients
-    if (hasAfternoonEveningSlots()) {
-      STATE[date].sections.option1.location = CLIENT_LOCATION_1 || CLIENT_LOCATION_2 || '';
-      STATE[date].sections.option2.location = CLIENT_LOCATION_2 || CLIENT_LOCATION_1 || '';
-      STATE[date].sections.breakfast.location = CLIENT_LOCATION_1 || CLIENT_LOCATION_2 || '';
-    }
-
-    // 🔵 FIX: ensure EVERY section has a location default (covers untouched dropdowns)
-    {
-      const defLoc = CLIENT_LOCATION_1 || CLIENT_LOCATION_2 || '';
-      ['breakfast','snack','juice1','juice2'].forEach(sec => {
-        if (!STATE[date].sections[sec].location) {
-          STATE[date].sections[sec].location = defLoc;
-        }
-      });
-      // single-slot already set option1/2 above; guarantee non-empty
-      if (!STATE[date].sections.option1.location)
-        STATE[date].sections.option1.location = defLoc;
-      if (!STATE[date].sections.option2.location)
-        STATE[date].sections.option2.location = defLoc;
-    }
-
-    // Populate items
-    ['option1','option2','breakfast'].forEach(sec => {
-      if (!MENU[date][sec]) return;
-
-      MENU[date][sec].forEach(item => {
-        STATE[date].sections[sec].items[item.label] = {
-          qty: 0,
-          protein: item.protein,
-          optNo: sec === 'option1' ? 1 : (sec === 'option2' ? 2 : undefined)
-        };
-      });
-    });
-
-    // Each option card also holds an independent copy of the OTHER option's dishes
-    // (used when the card is swapped). These carry the other option's native optNo.
-    STATE[date].sections.option1.altItems = {};
-    STATE[date].sections.option2.altItems = {};
-    (MENU[date].option2 || []).forEach(item => {
-      STATE[date].sections.option1.altItems[item.label] =
-        { qty: 0, protein: item.protein, optNo: 2 };
-    });
-    (MENU[date].option1 || []).forEach(item => {
-      STATE[date].sections.option2.altItems[item.label] =
-        { qty: 0, protein: item.protein, optNo: 1 };
-    });
-
-    if (MENU[date].snack) {
-      MENU[date].snack.forEach(item => {
-        STATE[date].sections.snack.items[item.label] = {
-          qty: 0,
-          type: item.type,
-          label: item.label
-        };
-      });
-    }
-
-    if (MENU[date].juice1) {
-      MENU[date].juice1.forEach(j => {
-        STATE[date].sections.juice1.items[j] = { qty: 0 };
-      });
-    }
-
-    if (MENU[date].juice2) {
-      MENU[date].juice2.forEach(j => {
-        STATE[date].sections.juice2.items[j] = { qty: 0 };
-      });
-    }
-    
-  });
-}
-
-function hasAfternoonEveningSlots() {
-  return CLIENT_DELIVERY?.afternoon && CLIENT_DELIVERY?.evening;
-}
-function hasAfternoonEveningOnly() {
-  return (
-    !CLIENT_DELIVERY?.morning &&
-    CLIENT_DELIVERY?.afternoon &&
-    CLIENT_DELIVERY?.evening
-  );
-}
-
-function isMorningOnlyClient() {
-  return (
-    CLIENT_DELIVERY?.morning &&
-    !CLIENT_DELIVERY?.afternoon &&
-    !CLIENT_DELIVERY?.evening
-  );
-}
-
-function openUpgradeModal() {
-  document.getElementById('upgradeModal').style.display = 'flex';
-}
-
-function closeUpgradeModal() {
-  document.getElementById('upgradeModal').style.display = 'none';
-}
-/* ========= RENDER ========= */
-function renderCurrentDay(){
-  const date = VISIBLE_DATES[currentIndex];
-  const container = document.getElementById('dayContainer');
-
-  if (!date) {
-    container.innerHTML = '<div class="box">Ordering closed.</div>';
-    return;
-  }
-
-  const parsedDate = new Date(date);
-  
-
-
-  const dayName = parsedDate.toLocaleDateString('en-US', {
-    weekday: 'long'
-  });
-
-  const formattedDate =
-    String(parsedDate.getDate()).padStart(2, '0') + '-' +
-    parsedDate.toLocaleDateString('en-US', { month: 'short' }) + '-' +
-    parsedDate.getFullYear();
-
-
-  container.innerHTML = `
-    <div class="box">
-     
-    <div class="day-header">
-      <div class="day-text" style="position:relative;">
-        <div class="day-name" onclick="toggleDayDropdown(event)">
-          <span class="day-arrow">▼</span> ${dayName}
-        </div>
-
-        <div id="dayDropdown" class="day-dropdown">
-          ${VISIBLE_DATES.map((d,i)=>{
-            const dn = new Date(d).toLocaleDateString('en-US',{weekday:'long'});
-            return `<div onclick="jumpToDay(${i})">${dn}</div>`;
-          }).join('')}
-        </div>
-
-        <div class="day-date">${formattedDate}</div>
-      </div>
-    
-      <label class="cancel-wrap">
-        <input type="checkbox"
-          onchange="STATE['${date}'].cancel=this.checked">
-        Cancel This Day
-      </label>
-    </div>
-
-      ${renderBlock(date,'breakfast','Breakfast')}
-      ${renderBlock(date,'option1','Option 1')}
-      ${renderBlock(date,'option2','Option 2')}
-      ${renderBlock(date,'snack','Snack')}
-      ${renderBlock(date,'juice1','Juice 1')}
-      ${renderBlock(date,'juice2','Juice 2')}
-      
-     ${!hasAfternoonEveningSlots() ? `
-        <label>Location</label>
-        <select id="loc_${date}"
-          onchange="
-            STATE['${date}'].sections.option1.location=this.value;
-            STATE['${date}'].sections.option2.location=this.value;
-          ">
-      
-          ${CLIENT_LOCATION_1 ? `
-            <option value="${CLIENT_LOCATION_1}"
-              ${STATE[date].sections.option1.location === CLIENT_LOCATION_1 ? 'selected' : ''}>
-              ${CLIENT_LOCATION_1}
-            </option>
-          ` : ''}
-      
-          ${CLIENT_LOCATION_2 ? `
-            <option value="${CLIENT_LOCATION_2}"
-              ${STATE[date].sections.option1.location === CLIENT_LOCATION_2 ? 'selected' : ''}>
-              ${CLIENT_LOCATION_2}
-            </option>
-          ` : ''}
-      
-        </select>
-      ` : ``}
-
-    </div>
-  `;
-
-  backBtn.style.display = currentIndex > 0 ? 'block' : 'none';
-  nextBtn.style.display = currentIndex < VISIBLE_DATES.length - 1 ? 'block' : 'none';
-
-  // sync remarks box to this day's remark + lock state
-  const rb = document.getElementById('clientRemarks');
-  const dstate = STATE[date];
-  if (rb && dstate) {
-    rb.value = dstate.remark != null ? dstate.remark : MASTER_REMARK;
-    const dayCb = document.getElementById('rmDay');
-    const permCb = document.getElementById('rmPerm');
-    // a permanent change stays unlocked across days; a this-day edit is per-day
-    if (dstate.remarkMode === 'day') {
-      rb.readOnly = false;
-      if (dayCb) dayCb.checked = true;
-      if (permCb) permCb.checked = false;
-    } else if (dstate.remarkMode === 'permanent') {
-      rb.readOnly = false;
-      if (permCb) permCb.checked = true;
-      if (dayCb) dayCb.checked = false;
-    } else {
-      rb.readOnly = true;
-      if (dayCb) dayCb.checked = false;
-      if (permCb) permCb.checked = false;
-    }
-  }
-}
-
-
-function renderBlock(date, slot, title) {
-  const section = STATE[date].sections[slot];
-  const items = section?.items;
-  if (!items || !Object.keys(items).length) return '';
-
-  const totalDeliverySlots =
-    (CLIENT_DELIVERY?.morning ? 1 : 0) +
-    (CLIENT_DELIVERY?.afternoon ? 1 : 0) +
-    (CLIENT_DELIVERY?.evening ? 1 : 0);
-
-  const singleSlotLabel =
-    CLIENT_DELIVERY?.morning && totalDeliverySlots === 1 ? 'Morning' :
-    CLIENT_DELIVERY?.afternoon && totalDeliverySlots === 1 ? 'Afternoon' :
-    CLIENT_DELIVERY?.evening && totalDeliverySlots === 1 ? 'Evening' : '';
-
-  const nonMorningSlot =
-    CLIENT_DELIVERY?.afternoon ? 'Afternoon' :
-    CLIENT_DELIVERY?.evening ? 'Evening' : '';
-
- const hasTwoLocations = !!(CLIENT_LOCATION_1 && CLIENT_LOCATION_2);
-
-  const showLocationControl =
-    (hasAfternoonEveningSlots() &&
-      (slot === 'option1' || slot === 'option2' || slot === 'breakfast'))
-    || (slot === 'breakfast' && hasTwoLocations);
-  // ✅ Set default location safely BEFORE rendering
-  if (hasAfternoonEveningSlots() && !section.location) {
-    if (slot === 'option1' && CLIENT_LOCATION_1) {
-      section.location = CLIENT_LOCATION_1;
-    }
-    if (slot === 'option2' && CLIENT_LOCATION_2) {
-      section.location = CLIENT_LOCATION_2;
-    }
-  }
-
-  const staticBox = (label) =>
-    `<div style="
-      min-width:104px;
-      padding:9px 10px;
-      font-size:13px;
-      font-weight:600;
-      border-radius:10px;
-      border:1.5px solid #e2e7f1;
-      background:#f4f6fa;
-      color:#445;
-      text-align:center;
-      pointer-events:none;
-      user-select:none;
-    ">${label}</div>`;
-
-  let slotControlHTML = '';
-
- if (slot === 'breakfast') {
-    if (totalDeliverySlots === 1) {
-      slotControlHTML = staticBox(singleSlotLabel);
-    } else if (CLIENT_DELIVERY?.morning) {
-      slotControlHTML = staticBox('Morning');
-    } else if (hasAfternoonEveningOnly()) {
-      slotControlHTML = `
-        <select id="slot_${date}_${slot}"
-          onchange="updateSectionSlot('${date}','${slot}',this.value)">
-          ${CLIENT_DELIVERY?.afternoon ? `<option value="Afternoon" ${section.slot === 'Afternoon' ? 'selected' : ''}>Afternoon</option>` : ''}
-          ${CLIENT_DELIVERY?.evening ? `<option value="Evening" ${section.slot === 'Evening' ? 'selected' : ''}>Evening</option>` : ''}
-        </select>`;
-    }
-  }
-
-  else if (slot === 'option1' || slot === 'option2' || slot === 'snack') {
-    if (totalDeliverySlots === 1) {
-      slotControlHTML = staticBox(singleSlotLabel);
-    } else if (CLIENT_DELIVERY?.morning && totalDeliverySlots === 2) {
-      slotControlHTML = staticBox(nonMorningSlot);
-    } else {
-      slotControlHTML = `
-        <select id="slot_${date}_${slot}"
-          onchange="updateSectionSlot('${date}','${slot}',this.value)">
-          ${CLIENT_DELIVERY?.afternoon ? `<option value="Afternoon" ${section.slot === 'Afternoon' ? 'selected' : ''}>Afternoon</option>` : ''}
-          ${CLIENT_DELIVERY?.evening ? `<option value="Evening" ${section.slot === 'Evening' ? 'selected' : ''}>Evening</option>` : ''}
-        </select>`;
-    }
-  }
-
-  else if (slot === 'juice1' || slot === 'juice2') {
-    if (totalDeliverySlots === 1) {
-      slotControlHTML = staticBox(singleSlotLabel);
-    } else {
-      slotControlHTML = `
-        <select id="slot_${date}_${slot}"
-          onchange="updateSectionSlot('${date}','${slot}',this.value)">
-          ${CLIENT_DELIVERY?.morning ? `<option value="Morning" ${section.slot === 'Morning' ? 'selected' : ''}>Morning</option>` : ''}
-          ${CLIENT_DELIVERY?.afternoon ? `<option value="Afternoon" ${section.slot === 'Afternoon' ? 'selected' : ''}>Afternoon</option>` : ''}
-          ${CLIENT_DELIVERY?.evening ? `<option value="Evening" ${section.slot === 'Evening' ? 'selected' : ''}>Evening</option>` : ''}
-        </select>`;
-    }
-  }
-
-  let headerHTML = '';
-
-  if (slotControlHTML) {
-    headerHTML = `
-      <div class="section-header">
-        <h4 class="section-title">${title}</h4>
-        <div class="section-controls">
-          ${slotControlHTML}
-          ${showLocationControl ? `
-            <select id="loc_${date}_${slot}"
-              onchange="updateSectionLocation('${date}','${slot}',this.value)">
-              ${CLIENT_LOCATION_1 ? `
-                <option value="${CLIENT_LOCATION_1}"
-                  ${section.location === CLIENT_LOCATION_1 ||
-                    (!section.location && (slot === 'option1' || slot === 'breakfast')) ? 'selected' : ''}>
-                  ${CLIENT_LOCATION_1}
-                </option>` : ''}
-              ${CLIENT_LOCATION_2 ? `
-                <option value="${CLIENT_LOCATION_2}"
-                  ${section.location === CLIENT_LOCATION_2 ||
-                    (!section.location && slot === 'option2') ? 'selected' : ''}>
-                  ${CLIENT_LOCATION_2}
-                </option>` : ''}
-            </select>` : ''}
-        </div>
-      </div>`;
-  } else {
-    headerHTML = `<h4>${title}</h4>`;
-  }
-
-  const isLocked =
-    isMorningOnlyClient() &&
-    (slot === 'option1' || slot === 'option2' || slot === 'snack');
-
-  const isOptionCard = (slot === 'option1' || slot === 'option2');
-  const showingOther = isOptionCard && (section.view && section.view !== slot);
-
-  // render from THIS card's own store: items (own) or altItems (swapped) — never the other card's state
-  const renderItems = showingOther ? section.altItems : section.items;
-
-  // heading reflects what's shown
-  if (isOptionCard) {
-    const shownTitle = showingOther
-      ? (slot === 'option1' ? 'Option 2' : 'Option 1')
-      : (slot === 'option1' ? 'Option 1' : 'Option 2');
-    headerHTML = headerHTML
-      .replace(/<h4 class="section-title">[^<]*<\/h4>/, `<h4 class="section-title">${shownTitle}</h4>`)
-      .replace(/<h4>[^<]*<\/h4>/, `<h4>${shownTitle}</h4>`);
-  }
-
-  // arrow toggle (option cards, multi-slot only)
-  let arrowHTML = '';
-  if (isOptionCard && hasAfternoonEveningSlots()) {
-    arrowHTML = `
-      <button class="swap-arrow ${showingOther ? 'active' : ''}"
-        onclick="toggleOptionView('${date}','${slot}')"
-        title="Show the other option's dishes">⇅</button>`;
-  }
-  headerHTML = headerHTML.replace(
-    /<h4 class="section-title">([^<]*)<\/h4>/,
-    `<h4 class="section-title">$1 ${arrowHTML}</h4>`
-  );
-  if (arrowHTML && !headerHTML.includes('swap-arrow')) {
-    headerHTML = headerHTML.replace(/<h4>([^<]*)<\/h4>/, `<h4>$1 ${arrowHTML}</h4>`);
-  }
-
-  // span ID keyed by the CARD slot + view, so swapped opt1 and real opt2 never collide
-  const idTag = slot + (showingOther ? '_alt' : '');
-
- return `<div class="sec-panel">` + headerHTML +
-    Object.keys(renderItems).map(label => `
-      <div class="dish ${isLocked ? 'dish-locked' : ''}">
-        <div class="dish-name ${getProteinClass(slot, renderItems[label])}">
-          ${label}
-        </div>
-        <div class="qty">
-          <button onclick="${isLocked ? 'openUpgradeModal()' : `changeQty('${date}','${slot}','${label}',-1,${showingOther})`}">−</button>
-          <span id="${btoa(date+idTag+label)}">${renderItems[label].qty}</span>
-          <button onclick="${isLocked ? 'openUpgradeModal()' : `changeQty('${date}','${slot}','${label}',1,${showingOther})`}">+</button>
-        </div>
-      </div>
-    `).join('') + `</div>`;
-}
-
-
-
-function changeQty(d, cardSlot, label, delta, isAlt){
-  const section = STATE[d].sections[cardSlot];
-  const store = isAlt ? section.altItems : section.items;
-  const obj = store[label];
-  obj.qty = Math.max(0, obj.qty + delta);
-
-  // this card's slot drives the row's slot for everything picked in it
-  obj.slotFrom = section.slot;
-
-  const idTag = cardSlot + (isAlt ? '_alt' : '');
-  const span = document.getElementById(btoa(d + idTag + label));
-  if (span) span.innerText = obj.qty;
-}
-function updateSectionSlot(date, section, value) {
-  const sec = STATE[date].sections[section];
-  sec.slot = value;
-  // re-stamp slotFrom on any already-picked items so backend matches the new slot
-  ['items', 'altItems'].forEach(store => {
-    if (!sec[store]) return;
-    Object.values(sec[store]).forEach(it => {
-      if (it && it.qty > 0) it.slotFrom = value;
-    });
-  });
-}
-
-function updateSectionLocation(date, section, value) {
-  STATE[date].sections[section].location = value;
-}
-function nextDay(){
-
-  if (currentIndex < VISIBLE_DATES.length - 1) {
-    currentIndex++;
-    renderCurrentDay();
-
-    const daySection = document.getElementById("dayContainer");
-    if (daySection) {
-      daySection.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
-  }
-}
-
-function toggleOptionView(date, cardSlot){
-  const sec = STATE[date].sections[cardSlot];
-  sec.view = (sec.view === cardSlot)
-    ? (cardSlot === 'option1' ? 'option2' : 'option1')
-    : cardSlot;
-  renderCurrentDay();
-}
-
-function prevDay(){
-
-  if (currentIndex > 0) {
-    currentIndex--;
-    renderCurrentDay();
-
-    const daySection = document.getElementById("dayContainer");
-    if (daySection) {
-      daySection.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
-  }
-}
-
-function hasSelectionForDate(date) {
-
-  const day = STATE[date];
-  if (!day) return false;
-
-  if (day.cancel) return true;
-
-  const sections = day.sections;
-
-  for (let sec in sections) {
-    const stores = [sections[sec].items || {}, sections[sec].altItems || {}];
-    for (const items of stores) {
-      for (let key in items) {
-        if (items[key].qty > 0) return true;
-      }
-    }
-  }
-
-  return false;
-}
-
-/* ========= SUBMIT ========= */
-async function saveCurrentDay(btn) {
-
-  if (btn) btn.classList.add("loading");
-
-  const phone = document.getElementById('phone').value.trim();
-  if (!phone) {
-    if (btn) btn.classList.remove("loading");
-    alert('Phone missing');
-    return { success: false };
-  }
-
-  const date = VISIBLE_DATES[currentIndex];
-
-  // 🔴 IMPORTANT FIX — Skip backend if nothing selected
-  if (!hasSelectionForDate(date)) {
-    if (btn) btn.classList.remove("loading");
-    return { success: true };
-  }
-
-  const payload = {
-    phone,
-    remarks: clientRemarks.dataset.original || clientRemarks.value || '',
-    days: [{
-      date,
-      sections: STATE[date].sections,
-      cancel: STATE[date].cancel
-    }]
-  };
-
-  const params = new URLSearchParams();
-  params.append("action", "submitOrder");
-  params.append("payload", JSON.stringify(payload));
-
-  try {
-
-    const res = await fetch(API_URL, {
-      method: "POST",
-      body: params
-    });
-
-    const result = await res.json();
-
-    if (btn) btn.classList.remove("loading");
-    return result;
-
-  } catch (error) {
-
-    if (btn) btn.classList.remove("loading");
-    alert("Network error");
-    return { success: false };
-  }
-}
-
-  async function handleSubmit(event) {
-
-  const btn = event.target;
-
-  // 🔒 Prevent double click
-  if (btn.dataset.locked === "true") return;
-
-  btn.dataset.locked = "true";
-  btn.disabled = true;
-  btn.classList.add("loading");
-
-  const phone = document.getElementById('phone').value.trim();
-  if (!phone) {
-    btn.disabled = false;
-    btn.dataset.locked = "false";
-    btn.classList.remove("loading");
-    return alert("Phone missing");
-  }
-
-  const allDays = [];
-
-  VISIBLE_DATES.forEach(date => {
-    if (!hasSelectionForDate(date)) return;
-
-    allDays.push({
-      date,
-      sections: STATE[date].sections,
-      cancel: STATE[date].cancel,
-      remark: STATE[date].remark != null ? STATE[date].remark : MASTER_REMARK
-    });
-  });
-
-  if (!allDays.length) {
-    btn.disabled = false;
-    btn.dataset.locked = "false";
-    btn.classList.remove("loading");
-    return alert("No selections made.");
-  }
-
- const now = new Date();
-    const pad = n => String(n).padStart(2,'0');
-    const submissionTimestamp =
-      now.getFullYear() + '-' +
-      pad(now.getMonth()+1) + '-' +
-      pad(now.getDate()) + ' ' +
-      pad(now.getHours()) + ':' +
-      pad(now.getMinutes()) + ':' +
-      pad(now.getSeconds());
-  
-    const payload = {
-      phone,
-      remarks: clientRemarks.value || '',
-      submissionTimestamp,
-      days: allDays
-    };
-
-  const params = new URLSearchParams();
-  params.append("action", "submitOrder");
-  params.append("payload", JSON.stringify(payload));
-
-  try {
-    await fetch(API_URL, {
-      method: "POST",
-      body: params
-    });
-
-    generateSummary();
-
-  } catch (err) {
-    alert("Network error. Please try again.");
-  }
-
-  btn.classList.remove("loading");
-
-  // ⏳ Keep disabled for 60 seconds
-  let countdown = 30;
-    btn.textContent = `Wait ${countdown}s`;
-  
-    const timer = setInterval(() => {
-      countdown--;
-      btn.textContent = countdown > 0 ? `Wait ${countdown}s` : 'Submit & Exit';
-      if (countdown <= 0) {
-        clearInterval(timer);
-        btn.disabled = false;
-        btn.dataset.locked = "false";
-      }
-    }, 1000);
-}
-
-
-
-function getProteinClass(slot, item) {
-
-  // Only apply to Option 1 & Option 2
-  if (slot !== 'option1' && slot !== 'option2') {
-    return '';
-  }
-
-  if (!item || !item.protein) return '';
-
-  const p = item.protein.toLowerCase();
-
-  if (p.includes('chicken')) return 'protein-chicken';
-  if (p.includes('veg')) return 'protein-veg';
-  if (p.includes('egg')) return 'protein-egg';
-  if (p.includes('seafood')) return 'protein-seafood';
-
-  return '';
-}
-function generateSummary() {
-  let html = "";
-
-  VISIBLE_DATES.forEach(date => {
-
-    const dayState = STATE[date];
-    if (!dayState) return;
-
-    const hasSelection =
-      dayState.cancel ||
-      Object.values(dayState.sections).some(sec =>
-        Object.values(sec.items || {}).some(i => i.qty > 0) ||
-        Object.values(sec.altItems || {}).some(i => i.qty > 0)
-      );
-
-    if (!hasSelection) return;
-
-    const dayName = new Date(date)
-      .toLocaleDateString('en-US',{ weekday:'long' });
-
-    html += `<div class="summary-day">`;
-    html += `<h4>${dayName} – ${date}</h4>`;
-
-    if (dayState.cancel) {
-      html += `<div>❌ Cancelled</div></div>`;
-      return;
-    }
-
-    // 🔹 GROUP BY SLOT + LOCATION
-    const grouped = {};
-
-   Object.values(dayState.sections).forEach(sec => {
-
-      const merged = Object.assign({}, sec.items || {}, sec.altItems || {});
-      const selectedItems = Object.entries(merged)
-        .filter(([_, item]) => item.qty > 0);
-
-      if (!selectedItems.length) return;
-
-      const key = (sec.slot || '') + "||" + (sec.location || '');
-
-      if (!grouped[key]) {
-        grouped[key] = {
-          slot: sec.slot || '',
-          location: sec.location || '',
-          items: []
-        };
-      }
-
-      selectedItems.forEach(([label, item]) => {
-        grouped[key].items.push({
-          label,
-          qty: item.qty
-        });
-      });
-
-    });
-
-    // 🔹 RENDER GROUPED OUTPUT
-    Object.values(grouped).forEach(group => {
-
-      const cap = s => {
-        s = String(s || '').trim();
-        return s.length > 50 ? s.slice(0, 50).trim() + '…' : s;
-      };
-
-      const slotTxt = group.slot ? `🕒 ${group.slot}` : '';
-      const locTxt  = group.location ? `📍 ${cap(group.location)}` : '';
-
-      if (slotTxt || locTxt) {
-        html += `<div class="summary-slot">` +
-          [slotTxt, locTxt].filter(Boolean).join('  ·  ') +
-          `</div>`;
-      }
-
-      group.items.forEach(item => {
-        html += `<div>• ${item.qty > 1 ? item.qty + 'x ' : ''}${item.label}</div>`;
-      });
-
-    });
-
-    html += `</div>`;
-  });
-
-  document.getElementById("summaryContent").innerHTML = html;
-  document.getElementById("summaryModal").style.display = "flex";
-}
-
-
-function closeSummary() {
-  document.getElementById("summaryModal").style.display = "none";
-}
-function showLoader() {
-  document.getElementById("loader").style.display = "flex";
-}
-
-function hideLoader() {
-  document.getElementById("loader").style.display = "none";
-}
-function togglePreset(type, protein, checkbox) {
-
-  const isChecked = checkbox.checked;
-
-  Object.keys(STATE).forEach(date => {
-
-    const sections = STATE[date].sections;
-
-    /* =======================
-       MEALS (Option1 + Option2)
-    ======================== */
-    if (type === 'meals') {
-
-  ['option1', 'option2'].forEach(slot => {
-
-    Object.entries(sections[slot].items).forEach(([label, item]) => {
-
-      const proteinType = (item.protein || '').toLowerCase();
-      const labelLower = label.toLowerCase();
-
-      // Regular protein presets (chicken / veg / seafood / egg)
-      if (
-        ['chicken','veg','seafood','egg'].includes(protein) &&
-        proteinType === protein.toLowerCase()
-      ) {
-        item.qty = Math.max(0, item.qty + (isChecked ? 1 : -1));
-      }
-
-      // Fish preset
-      if (
-        protein === 'fish' &&
-        proteinType === 'seafood' &&
-        labelLower.includes('fish')
-      ) {
-        item.qty = Math.max(0, item.qty + (isChecked ? 1 : -1));
-      }
-
-      // Prawns preset
-      if (
-        protein === 'prawns' &&
-        proteinType === 'seafood' &&
-        labelLower.includes('prawn')
-      ) {
-        item.qty = Math.max(0, item.qty + (isChecked ? 1 : -1));
-      }
-
-    });
-
-  });
-
-}
-
-
-    /* =======================
-       BREAKFAST
-    ======================== */
-    if (type === 'breakfast') {
-
-      Object.values(sections.breakfast.items).forEach(item => {
-    
-        const proteinType = item.protein.toLowerCase().trim();
-    
-        // Veg Breakfast preset
-        if (protein === 'veg' && proteinType === 'veg breakfast') {
-          item.qty = Math.max(0, item.qty + (isChecked ? 1 : -1));
-        }
-    
-        // Breakfast (Egg) preset
-        if (protein === 'breakfast' && proteinType === 'breakfast') {
-          item.qty = Math.max(0, item.qty + (isChecked ? 1 : -1));
-        }
-    
-      });
-    
-    }
-
-
-    /* =======================
-       SNACK
-    ======================== */
-    if (type === 'snack') {
-
-      Object.values(sections.snack.items).forEach(item => {
-
-        const snackType = (item.type || '').toLowerCase();
-
-        // Normal snack only
-        if (protein === 'all' && snackType === 'snack') {
-          item.qty = Math.max(0, item.qty + (isChecked ? 1 : -1));
-        }
-
-        // Veg snack only
-        if (protein === 'veg' && snackType === 'veg snack') {
-          item.qty = Math.max(0, item.qty + (isChecked ? 1 : -1));
-        }
-
-      });
-
-    }
-
-    /* =======================
-       JUICES
-    ======================== */
-    if (type === 'juice') {
-
-      if (protein === 'both') {
-
-        ['juice1','juice2'].forEach(j => {
-          Object.values(sections[j].items).forEach(item => {
-            item.qty = Math.max(0, item.qty + (isChecked ? 1 : -1));
-          });
-        });
-
-      }
-
-    }
-
-  });
-
-  renderCurrentDay();
-}
-function toggleDayDropdown(e) {
-  e.stopPropagation();
-  const dd = document.getElementById("dayDropdown");
-  dd.style.display = dd.style.display === "block" ? "none" : "block";
-}
-
-function jumpToDay(index) {
-  currentIndex = index;
-  renderCurrentDay();
-}
-
-document.addEventListener("click", function(){
-  const dd = document.getElementById("dayDropdown");
-  if (dd) dd.style.display = "none";
-});
-function resetAllSelections() {
-
-  Object.keys(STATE).forEach(date => {
-
-    const day = STATE[date];
-    if (!day) return;
-
-    day.cancel = false;
-
-    Object.values(day.sections).forEach(sec => {
-
-      Object.values(sec.items || {}).forEach(item => {
-        item.qty = 0;
-      });
-
-    });
-
-  });
-
-  renderCurrentDay();
-}
-async function shareSummary() {
-
-  const summaryDiv = document.getElementById("summaryContent");
-
-  let text = summaryDiv.innerText;
-
-  const clientName = document.getElementById("clientName").value;
-  const phone = document.getElementById("phone").value;
-
-  const header =
-`Friska Wellness - Weekly Meal Confirmation
-Client: ${clientName}
-Phone: ${phone}
-
-`;
-
-  const finalText = header + text;
-
-  // ✅ Use native share if supported
-  if (navigator.share) {
-    try {
-      await navigator.share({
-        title: "Friska Weekly Meal Summary",
-        text: finalText
-      });
-    } catch (err) {
-      console.log("Share cancelled");
-    }
-  } else {
-    // Fallback for desktop
-    navigator.clipboard.writeText(finalText);
-    alert("Summary copied to clipboard. Paste anywhere to share.");
-  }
-}
-
-function openOrdersPage(){
-
-  const phone = document.getElementById("phone").value.trim();
-
-  if(!phone){
-    alert("Login first");
-    return;
-  }
-
-  const url =
-    "orders.html?phone=" + encodeURIComponent(phone);
-
-  window.open(url, "_blank");
-
-}
-
-/* ========= ADMIN NAME SEARCH ========= */
-(function initAdminSearch(){
-  if (!ADMIN_MODE) return;
-  const wrap = document.getElementById('adminSearchWrap');
-  if (wrap) wrap.style.display = 'block';
-  // preload master clients once (POST → doPost, where getMasterClientsAll lives)
-  const _mp = new URLSearchParams();
-  _mp.append("action", "getMasterClientsAll");
-  fetch(API_URL, { method: "POST", body: _mp })
-    .then(r => r.json())
-    .then(d => { MASTER_CLIENTS = (d && d.clients) ? d.clients : []; })
-    .catch(() => { MASTER_CLIENTS = []; });
+  document.getElementById("railNodes").innerHTML = html;
 })();
 
-function onAdminSearch(q){
-  const box = document.getElementById('adminResults');
-  q = (q || '').trim().toLowerCase();
+(function buildMobileRail(){
+  let html="";
+  RAIL.forEach((n,i)=>{
+    html += '<div class="mNode" data-mrail="'+i+'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+n.svg+'</svg></div>';
+  });
+  document.getElementById("mNodes").insertAdjacentHTML("beforeend", html);
+})();
 
-  if (q.length < 2) { box.style.display = 'none'; box.innerHTML = ''; return; }
+function renderRail(idx){
+  document.querySelectorAll('.railNode').forEach((node,i)=>{
+    node.classList.toggle('done', i < idx);
+    node.classList.toggle('active', i === idx);
+  });
+  let capped = Math.min(idx, RAIL.length-1);
+  document.getElementById("railFill").style.height = (capped*64) + "px";
 
-  const matches = MASTER_CLIENTS
-    .filter(c => c.phone && c.name && c.name.toLowerCase().includes(q))
-    .sort((a, b) => {
-      const an = a.name.toLowerCase(), bn = b.name.toLowerCase();
-      const aStarts = an.startsWith(q) ? 0 : 1;
-      const bStarts = bn.startsWith(q) ? 0 : 1;
-      if (aStarts !== bStarts) return aStarts - bStarts;   // prefix matches first
-      return an.localeCompare(bn);                          // then alphabetical
-    })
-    .slice(0, 8);
-
-  if (!matches.length) {
-    box.innerHTML = `<div style="padding:11px 16px; font-size:13px; color:var(--muted);">No matches</div>`;
-    box.style.display = 'block';
-    return;
+  let mNodes = document.querySelectorAll('.mNode');
+  mNodes.forEach((node,i)=>{
+    node.classList.toggle('done', i < idx);
+    node.classList.toggle('active', i === idx);
+  });
+  let track = document.querySelector('.mNodes');
+  if(track && mNodes.length){
+    let span = track.clientWidth - 36;
+    let frac = capped / (RAIL.length - 1);
+    document.getElementById("mFill").style.width = (span * frac) + "px";
   }
+}
+window.addEventListener("resize", function(){ renderRail(current); });
 
-  box.innerHTML = matches.map(c => `
-    <div onclick="pickAdminClient('${c.phone}', ${JSON.stringify(c.name).replace(/"/g,'&quot;')})"
-         style="padding:11px 16px; font-size:14px; cursor:pointer; display:flex; justify-content:space-between; gap:10px;"
-         onmouseover="this.style.background='var(--accent-soft)'"
-         onmouseout="this.style.background='#fff'">
-      <span style="font-weight:600; color:var(--navy);">${c.name}</span>
-      <span style="color:var(--muted); font-size:13px;">${c.phone}</span>
-    </div>
-  `).join('');
-  box.style.display = 'block';
+const steps = document.querySelectorAll('[data-step]');
+const TOTAL_INPUT_STEPS = 8;
+let current = 0;
+
+function showStep(idx){
+  steps.forEach((s,i)=> s.classList.toggle('active', i===idx));
+  current = idx;
+  renderRail(idx);
+  window.scrollTo({ top:0, behavior:"smooth" });
+}
+function back(fromIdx){ showStep(fromIdx-1); }
+function next(fromIdx){ if(!validateStep(fromIdx)) return; showStep(fromIdx+1); onEnter(fromIdx+1); }
+function autoNext(stepIdx){ setTimeout(function(){ if(current===stepIdx) next(stepIdx); }, 280); }
+function onEnter(idx){ if(idx===4) renderPlans(); if(idx===5) updateSeafoodPrice(); if(idx===7){ refreshMorningSlot(); updateSeafoodPrice(); computeSeafoodMax(); } if(idx===8) generateQuote(); }
+
+function validateStep(idx){
+  if(idx===0){
+    let name=document.getElementById("clientName").value.trim();
+    let phone=document.getElementById("clientPhone").value.replace(/\D/g,'');
+    if(!name){ showPopup("Please enter your name."); return false; }
+    if(phone.length!==10){ showPopup("Please enter a valid 10-digit phone number."); return false; }
+    return true;
+  }
+  if(idx===1){ if(distance<=0){ showPopup("Please select your delivery location from the suggestions."); return false; } return true; }
+  if(idx===2){ if(!selectedGoal){ showPopup("Please choose a goal."); return false; } return true; }
+  if(idx===3){ computeRecommendation(); return true; }
+  if(idx===4){ if(!selectedPlan){ showPopup("Please choose a plan."); return false; } return true; }
+  if(idx===5){ let any=["breakfast","lunch","dinner","snack","juice1","juice2"].some(id=>document.getElementById(id).checked); if(!any){ showPopup("Please select at least one meal."); return false; } return true; }
+  if(idx===6){ if(!document.querySelector('input[name="duration"]:checked')){ showPopup("Please choose a duration."); return false; } return true; }
+  if(idx===7){ return validateSlots(); }
+  return true;
 }
 
-function pickAdminClient(phone, name){
-  document.getElementById('phone').value = phone;
-  const cn = document.getElementById('clientName');
-  if (cn) cn.value = name || '';
-  document.getElementById('adminSearch').value = name || '';
-  document.getElementById('adminResults').style.display = 'none';
-  // no auto-login — user presses Login (spinner works on click)
+function selectGoal(card, goal){
+  invalidateQuote();
+  document.querySelectorAll('.goalCard').forEach(c=>c.classList.remove('active'));
+  card.classList.add('active');
+  selectedGoal = goal;
+  autoNext(2);
+}
+function skipBody(){
+  document.getElementById("age").value="";
+  document.getElementById("heightFt").value="";
+  document.getElementById("heightIn").value="";
+  document.getElementById("weight").value="";
+  bmiValue=0; computeRecommendation(); showStep(4); onEnter(4);
+}
+function computeRecommendation(){
+  let ft=parseFloat(document.getElementById("heightFt").value)||0;
+  let inch=parseFloat(document.getElementById("heightIn").value)||0;
+  let w=parseFloat(document.getElementById("weight").value)||0;
+  let totalInches=ft*12+inch;
+  if(totalInches>0 && w>0){ let m=totalInches*0.0254; bmiValue=w/(m*m); recommendedPlan=recommendByBMI(selectedGoal,bmiValue); }
+  else{ bmiValue=0; recommendedPlan=GOAL_PLANS[selectedGoal][0]; }
+}
+function renderPlans(){
+  if(!recommendedPlan) computeRecommendation();
+  let order=[recommendedPlan];
+  GOAL_PLANS[selectedGoal].forEach(p=>{ if(!order.includes(p)) order.push(p); });
+  Object.keys(PLANS).forEach(p=>{ if(!order.includes(p)) order.push(p); });
+  let html="";
+  order.forEach(p=>{
+    let inGoal = GOAL_PLANS[selectedGoal].includes(p);
+    let isSelected = (p===recommendedPlan);
+    html += '<div class="plan-card'+(isSelected?' active':'')+'" onclick="selectPlan(this,\''+p+'\')">'+
+            (inGoal?'<div class="recBadge">&#9733; Recommended</div>':'')+
+            '<img src="'+PLANS[p].img+'" alt="'+PLANS[p].name+'"></div>';
+  });
+  document.getElementById("planList").innerHTML = html;
+  selectedPlan = recommendedPlan;
+}
+function selectPlan(card, plan){
+  invalidateQuote();
+  document.querySelectorAll(".plan-card").forEach(c=>c.classList.remove("active"));
+  card.classList.add("active");
+  selectedPlan = plan;
+  autoNext(4);
 }
 
-// close the results dropdown when clicking elsewhere
-document.addEventListener('click', function(e){
-  const wrap = document.getElementById('adminSearchWrap');
-  const box = document.getElementById('adminResults');
-  if (wrap && box && !wrap.contains(e.target)) box.style.display = 'none';
-});
-
-/* ========= REMARKS (this-day / permanent) ========= */
-function currentDate(){ return VISIBLE_DATES[currentIndex]; }
-
-async function toggleRemarkMode(mode, cb){
-  const box = document.getElementById('clientRemarks');
-  const day = STATE[currentDate()];
-  const other = mode === 'day' ? document.getElementById('rmPerm')
-                               : document.getElementById('rmDay');
-
-  if (!cb.checked) {
-    // unticking → re-lock, keep whatever text is there
-    box.readOnly = true;
-    if (day) day.remarkMode = null;
-    return;
-  }
-
-  // ticking one unticks the other (mutually exclusive)
-  if (other) other.checked = false;
-
-  if (mode === 'permanent') {
-    const ok = await askPermConfirm();
-    if (!ok) { cb.checked = false; box.readOnly = true; return; }
-  }
-
-  box.readOnly = false;
-  box.focus();
-  if (day) day.remarkMode = mode;
-}
-
-function onRemarkInput(val){
-  const day = STATE[currentDate()];
-  if (!day) return;
-
-  if (day.remarkMode === 'day') {
-    day.remark = val;                       // this day only
-  } else if (day.remarkMode === 'permanent') {
-    // apply to all days that don't have their own this-day remark, + master default
-    MASTER_REMARK = val;
-    VISIBLE_DATES.forEach(d => {
-      const s = STATE[d];
-      if (s && s.remarkMode !== 'day') s.remark = val;
+function bindTiles(){
+  document.querySelectorAll('.tile input').forEach(inp=>{
+    inp.addEventListener('change', function(){
+      if(this.type==='radio'){
+        document.querySelectorAll('input[name="'+this.name+'"]').forEach(r=>{ r.closest('.tile').classList.toggle('on', r.checked); });
+      }else{ this.closest('.tile').classList.toggle('on', this.checked); }
     });
-    savePermanentRemark(val);               // debounced write to Master
-  }
-}
-
-let _permTimer = null;
-function savePermanentRemark(val){
-  clearTimeout(_permTimer);
-  _permTimer = setTimeout(() => {
-    const phone = document.getElementById('phone').value.trim();
-    if (!phone) return;
-    const p = new URLSearchParams();
-    p.append("action", "updateClientRemark");
-    p.append("phone", phone);
-    p.append("remark", val);
-    fetch(API_URL, { method: "POST", body: p }).catch(()=>{});
-  }, 800);   // wait until typing pauses, then save once
-}
-
-let _permResolve = null;
-function askPermConfirm(){
-  return new Promise(resolve => {
-    _permResolve = resolve;
-    document.getElementById('permModal').style.display = 'flex';
+  });
+  document.querySelectorAll('input[name="duration"]').forEach(r=>{ r.addEventListener('change', function(){ invalidateQuote(); autoNext(6); }); });
+  ["breakfast","lunch","dinner","snack","juice1","juice2","morning","afternoon","evening"].forEach(id=>{
+    let el=document.getElementById(id); if(el) el.addEventListener("change", invalidateQuote);
   });
 }
-function resolvePermModal(ok){
-  document.getElementById('permModal').style.display = 'none';
-  if (_permResolve) { _permResolve(ok); _permResolve = null; }
+
+let autocomplete;
+function initAutocomplete(){
+  const input=document.getElementById("location");
+  autocomplete=new google.maps.places.Autocomplete(input,{ componentRestrictions:{country:"in"}, locationBias:{ center:{lat:17.385044,lng:78.486671}, radius:50000 } });
+  autocomplete.addListener("place_changed", function(){ const place=autocomplete.getPlace(); if(place && place.geometry){ calculateDistance(place.geometry.location, place.geometry.location.lat(), place.geometry.location.lng()); } });
+}
+function calculateDistance(destination, lat, lng){
+  const service=new google.maps.DistanceMatrixService();
+  service.getDistanceMatrix({ origins:[KITCHEN], destinations:[destination], travelMode:"DRIVING" }, function(response,status){
+    if(status!=="OK"){ return; }
+    const element=response.rows[0].elements[0];
+    distance=element.distance.value/1000;
+    if(isFinite(lat) && isFinite(lng) && (lat!==0 || lng!==0)){
+      mapsLink="https://www.google.com/maps?q="+lat+","+lng;
+    } else {
+      mapsLink="";
+    }
+    if(distance>20){ showPopup("Delivery location is more than 20 km away. This may affect delivery timing and meal plan availability."); }
+  });
+}
+function useCurrentLocation(){
+  const spinner=document.getElementById("locationSpinner");
+  spinner.style.display="block";
+  if(!navigator.geolocation){ spinner.style.display="none"; alert("Geolocation not supported"); return; }
+  navigator.geolocation.getCurrentPosition(function(position){
+    let lat=position.coords.latitude, lng=position.coords.longitude;
+    const latlng={lat:lat,lng:lng};
+    const geocoder=new google.maps.Geocoder();
+    geocoder.geocode({ location:latlng }, function(results,status){
+      spinner.style.display="none";
+      if(status==="OK" && results[0]){ document.getElementById("location").value=results[0].formatted_address; calculateDistance(latlng, lat, lng); }
+      else{ alert("Unable to determine address from location."); }
+    });
+  }, function(){ spinner.style.display="none"; alert("Unable to fetch current location. Please allow location permission."); });
+}
+document.getElementById("location").addEventListener("input", function(){ distance=0; mapsLink=""; invalidateQuote(); });
+
+function refreshMorningSlot(){
+  let breakfast=document.getElementById("breakfast").checked;
+  let morningLabel=document.getElementById("morningLabel");
+  let morning=document.getElementById("morning");
+  if(!breakfast){ morningLabel.style.display="none"; morning.checked=false; morningLabel.classList.remove("on"); }
+  else{ morningLabel.style.display="flex"; }
+}
+function validateSlots(){
+  let morning=document.getElementById("morning").checked;
+  let afternoon=document.getElementById("afternoon").checked;
+  let evening=document.getElementById("evening").checked;
+  let breakfast=document.getElementById("breakfast").checked;
+  let lunch=document.getElementById("lunch").checked;
+  let dinner=document.getElementById("dinner").checked;
+  let snack=document.getElementById("snack").checked;
+  let slotCount=(morning?1:0)+(afternoon?1:0)+(evening?1:0);
+  if(slotCount===0){ showPopup("Please choose at least one delivery slot."); return false; }
+  if(morning && !afternoon && !evening && (lunch||dinner||snack)){ showPopup("Lunch, Dinner or Snack require Afternoon or Evening delivery."); return false; }
+  let mealCount=(breakfast?1:0)+(lunch?1:0)+(dinner?1:0);
+  if(mealCount===1 && slotCount>1){ showPopup("Only one meal selected. Please choose only one delivery slot."); return false; }
+  return true;
+}
+document.getElementById("clientName").addEventListener("input", invalidateQuote);
+document.getElementById("clientPhone").addEventListener("input", function(){
+  invalidateQuote();
+  let phone=this.value.replace(/\D/g,'');
+  if(phone.length===10 && phone!==phoneLookedUp){
+    phoneLookedUp=phone;
+    lookupLead(phone);
+  }
+});
+
+function lookupLead(phone){
+  if(!PRICING_URL) return;
+  document.getElementById("phoneSpinner").style.display="block";
+  fetch(PRICING_URL+"?action=leadByPhone&phone="+phone)
+    .then(r=>r.json())
+    .then(d=>{
+      document.getElementById("phoneSpinner").style.display="none";
+      if(!d || !d.found) return;
+      returningLead=d.lead;
+      if(returningLead.name) document.getElementById("clientName").value=returningLead.name;
+      if(returningLead.age) document.getElementById("age").value=returningLead.age;
+      if(returningLead.height){
+        let m=/(\d+)\s*ft\s*(\d+)?/i.exec(returningLead.height);
+        if(m){ document.getElementById("heightFt").value=m[1]; document.getElementById("heightIn").value=m[2]||0; }
+      }
+      if(returningLead.weight) document.getElementById("weight").value=returningLead.weight;
+      let displayLoc = returningLead.locationText || returningLead.location;
+      if(displayLoc && Number(returningLead.distance)>0){
+        distance=Number(returningLead.distance);
+        mapsLink=returningLead.mapsLink||"";
+        document.getElementById("location").value=displayLoc;
+        document.getElementById("savedLocationText").innerHTML=displayLoc+(mapsLink?" &middot; <a href='"+mapsLink+"' target='_blank'>View on map</a>":"");
+        document.getElementById("savedLocationBox").style.display="block";
+        document.getElementById("locWrapBox").style.display="none";
+      }
+      showPopup("Welcome back! We've filled in your saved details.");
+    })
+    .catch(()=>{ document.getElementById("phoneSpinner").style.display="none"; });
+}
+function changeLocation(){
+  distance=0; mapsLink="";
+  document.getElementById("location").value="";
+  document.getElementById("savedLocationBox").style.display="none";
+  document.getElementById("locWrapBox").style.display="block";
+  invalidateQuote();
 }
 
+function invalidateQuote(){
+  document.getElementById("quoteResult").innerHTML="";
+  document.getElementById("quoteSummary").innerHTML="";
+  document.getElementById("bookBar").style.display="none";
+}
+function generateQuote(){
+  let name=document.getElementById("clientName").value.trim();
+  let phone=document.getElementById("clientPhone").value.replace(/\D/g,'');
+  let age=document.getElementById("age").value.trim();
+
+  let durationElement=document.querySelector('input[name="duration"]:checked');
+  let duration=durationElement.value;
+  let durationText={ d:"2 Day Trial", w:"1 Week", m:"26 Days", q:"3 Months" }[duration];
+
+  let prefix=selectedPlan+"_", dur=duration+"_";
+  let breakfast=document.getElementById("breakfast").checked;
+  let lunch=document.getElementById("lunch").checked;
+  let dinner=document.getElementById("dinner").checked;
+  let snack=document.getElementById("snack").checked;
+  let juice1=document.getElementById("juice1").checked;
+  let juice2=document.getElementById("juice2").checked;
+  let morning=document.getElementById("morning").checked;
+  let afternoon=document.getElementById("afternoon").checked;
+  let evening=document.getElementById("evening").checked;
+
+  /* per-day food cost for a given duration key (d_/w_/m_/q_); seafood is a flat per-day add-on */
+  function foodPerDayFor(durKey){
+    let f=0;
+    if(breakfast) f+=getPrice(prefix+durKey+"breakfast");
+    let mc=(lunch?1:0)+(dinner?1:0);
+    if(mc==1) f+=getPrice(prefix+durKey+"lunch");
+    if(mc==2) f+=getPrice(prefix+durKey+"combo")*2;
+    if(snack)  f+=getPrice(prefix+durKey+"snack");
+    if(juice1) f+=getPrice(prefix+durKey+"juice1");
+    if(juice2) f+=getPrice(prefix+durKey+"juice2")*2;
+    return f;
+  }
+  let foodPerDay=foodPerDayFor(dur);
+
+  let days=2;
+  if(duration=="w") days=6;
+  if(duration=="m") days=26;
+  if(duration=="q") days=78;
+
+  let seafoodExtra=seafoodQty*getPrice("seafood");
+  let foodTotal=foodPerDay*days + seafoodExtra;
+  let trips=0;
+  if(morning) trips++;
+  if(afternoon) trips++;
+  if(evening) trips++;
+  let roundedDistance=Math.round(distance);
+  let deliveryPerTrip=roundedDistance*getPrice("delivery");
+  let deliveryTotal=deliveryPerTrip*trips*days;
+  let gst=foodTotal*(getPrice("gst")/100);
+  let total=foodTotal+gst+deliveryTotal;
+
+  /* ---- 2-Day Trial price for the SAME selection (uses d_ prices) ---- */
+  let trialDays=2;
+  let trialFoodTotal=foodPerDayFor("d_")*trialDays;
+  let trialDelivery=deliveryPerTrip*trips*trialDays;
+  let trialGst=trialFoodTotal*(getPrice("gst")/100);
+  let trialTotal=trialFoodTotal+trialGst+trialDelivery;
+
+  let meals=[];
+  if(breakfast) meals.push("Breakfast");
+  if(lunch) meals.push("Lunch");
+  if(dinner) meals.push("Dinner");
+  if(snack) meals.push("Snack");
+  if(juice1) meals.push("1 Juice");
+  if(juice2) meals.push("2 Juices");
+  let addons = seafoodQty>0 ? ("Seafood x"+seafoodQty) : "";
+  let slots=[];
+  if(morning) slots.push("Morning");
+  if(afternoon) slots.push("Afternoon");
+  if(evening) slots.push("Evening");
+
+  let planText=PLANS[selectedPlan].name;
+  let ft=document.getElementById("heightFt").value;
+  let inch=document.getElementById("heightIn").value;
+  let heightText=(ft||inch)?((ft||0)+"ft "+(inch||0)+"in"):"";
+  let locationText=document.getElementById("location").value;
+
+  fetch(PRICING_URL,{
+    method:"POST",
+    body:JSON.stringify({
+      name:name, phone:phone, age:age,
+      plan:planText, goal:GOAL_NAME[selectedGoal],
+      height:heightText, weight:document.getElementById("weight").value,
+      bmi: bmiValue ? bmiValue.toFixed(1) : "",
+      recommended: PLANS[recommendedPlan] ? PLANS[recommendedPlan].name : "",
+      meals:meals.join(", "), addons:addons, duration:durationText, slots:slots.join(", "),
+      location:locationText, locationText:locationText, distance:roundedDistance, price:total,
+      mapsLink:mapsLink
+    })
+  });
+
+  let priceBlock;
+  if(duration!=="d"){
+    priceBlock =
+      "<div class='priceRow'>"+
+        "<div class='priceLabel'>2-Day Trial</div>"+
+        "<div class='priceValue'>&#8377;"+trialTotal.toFixed(0)+"</div>"+
+      "</div>"+
+      "<label class='trialOpt'><input type='checkbox' id='startTrial'> Start my 2-day trial first (from tomorrow)</label>"+
+      "<div class='priceRow'>"+
+        "<div class='priceLabel'>Full Plan &middot; "+durationText+"</div>"+
+        "<div class='priceValue'>&#8377;"+total.toFixed(0)+"</div>"+
+      "</div>"+
+      "<div class='resultNote'>Prices include delivery &amp; taxes</div>";
+  } else {
+    priceBlock =
+      "<div class='priceRow'>"+
+        "<div class='priceLabel'>"+durationText+"</div>"+
+        "<div class='priceValue'>&#8377;"+total.toFixed(0)+"</div>"+
+      "</div>"+
+      "<div class='resultNote'>Prices include delivery &amp; taxes</div>";
+  }
+
+  document.getElementById("quoteResult").innerHTML =
+    "<div class='resultCard'>"+
+      "<div class='resultTop'>"+
+        "<div class='resultTick'>&#10003;</div>"+
+        "<div class='resultMeta'>"+
+          "<div class='resultEyebrow'>Estimated pricing</div>"+
+          "<div class='resultPlan'>"+planText+"</div>"+
+        "</div>"+
+      "</div>"+
+      priceBlock+
+    "</div>";
+
+  document.getElementById("quoteSummary").innerHTML =
+    "<div class='summaryBox'>"+
+      row("Plan",planText)+ row("Goal",GOAL_NAME[selectedGoal])+
+      row("Meals",meals.join(", "))+
+      (seafoodQty>0 ? row("Seafood", seafoodQty+" meal(s) (+&#8377;"+seafoodExtra+")") : "")+
+      row("Duration",durationText)+
+      row("Slots",slots.join(", "))+ row("Delivery",roundedDistance+" km")+
+    "</div>";
+
+  lastQuote={ planText:planText, durationText:durationText, duration:duration,
+    meals:meals.join(", "), addons:addons, slots:slots.join(", "),
+    total:total.toFixed(0), trialTotal:trialTotal.toFixed(0), name:name };
+
+  document.getElementById("bookBar").style.display="block";
+}
+function row(label,value){ return "<div class='row'><span>"+label+"</span><span>"+(value||"-")+"</span></div>"; }
+
+function bookNow(){
+  /* mark this lead as Booked in the backend (read later in leads.html) */
+  let bookedPhone=document.getElementById("clientPhone").value.replace(/\D/g,'');
+  fetch(PRICING_URL + "?action=markBooked", {
+    method:"POST", keepalive:true,
+    body: JSON.stringify({ phone: bookedPhone })
+  });
+
+  let q=lastQuote;
+  if(!q){ showPopup("Please generate a quote first."); return; }
+  let clientName=q.name || document.getElementById("clientName").value.trim();
+  let trialEl=document.getElementById("startTrial");
+  let wantTrial=trialEl && trialEl.checked;
+  let addonLine = q.addons ? ("Add-on: "+q.addons+".%0A") : "";
+
+  let message;
+  if(wantTrial){
+    let t=new Date(Date.now()+86400000);
+    let tomorrow=t.toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"});
+    message="Hello Friska Wellness,%0A%0A"+"My name is "+clientName+".%0A"+
+      "I have opted for the "+q.planText+" plan.%0A"+
+      "I would like to START WITH THE 2-DAY TRIAL from tomorrow ("+tomorrow+").%0A"+
+      "Meals: "+q.meals+".%0A"+addonLine+"%0A"+
+      "Please confirm my trial and share the menu & payment details.%0A%0AThank you.";
+  } else {
+    message="Hello Friska Wellness,%0A%0A"+"My name is "+clientName+".%0A"+
+      "I have opted for the "+q.planText+" plan for "+q.durationText+".%0A"+addonLine+"%0A"+
+      "I would like to proceed with the subscription.%0A"+
+      "Please share the weekly menu and payment details.%0A%0AThank you.";
+  }
+  window.open("https://wa.me/"+WHATSAPP_NUMBER+"?text="+message,"_blank");
+}
+function toggleMenu(){ let m=document.getElementById("headerMenu"); m.style.display=(m.style.display==="block")?"none":"block"; }
+document.addEventListener("click", function(e){
+  let menu=document.getElementById("headerMenu"), button=document.querySelector(".menuButton");
+  if(!menu.contains(e.target) && !button.contains(e.target)){ menu.style.display="none"; }
+});
+function openWeeklyMenu(){ window.open("https://friskawellnessfoods.github.io/weekly-choice/menu.html","_blank"); }
+function contactSupport(){ let message="Hello Friska Wellness,%0A%0AI would like to know more about the meal plans."; window.open("https://wa.me/"+SUPPORT_NUMBER+"?text="+message,"_blank"); }
+function showPopup(message){ let p=document.getElementById("toastPopup"); document.getElementById("toastMessage").innerText=message; p.style.display="block"; setTimeout(()=>{ p.style.display="none"; },2500); }
+
+bindTiles();
+showStep(0);
+
 </script>
-  </div>
-  <div id="summaryModal" class="modal">
-  <div class="modal-content">
-    <div class="modal-head">
-      <h3 style="color:#2e7d32;">Submitted Successfully ✅</h3>
-      <h4 style="text-align:center;margin-top:-6px;">Order Summary</h4>
-    </div>
-    <div class="modal-scroll">
-      <div id="summaryContent"></div>
-    </div>
-    <div class="modal-foot">
-      <button class="btn secondary" onclick="shareSummary()">Share</button>
-      <button class="btn" onclick="closeSummary()">Make Changes</button>
-    </div>
-  </div>
-</div>
-<div id="permModal" class="modal">
-  <div class="modal-content" style="text-align:center; padding:28px 24px 22px; max-width:380px;">
-    <div style="font-size:34px; margin-bottom:10px;">📝</div>
-    <h3 style="margin:0 0 8px;">Permanent Change</h3>
-    <p style="font-size:14.5px; color:#445; line-height:1.55; margin:0 0 22px;">
-      This will permanently update the remark saved in the client's profile (Master Client List).
-    </p>
-    <div style="display:flex; gap:10px;">
-      <button class="btn secondary" style="margin-top:0;" onclick="resolvePermModal(false)">Cancel</button>
-      <button class="btn" style="margin-top:0;" onclick="resolvePermModal(true)">Confirm</button>
-    </div>
-  </div>
-</div>
-<div id="upgradeModal" class="modal">
-  <div class="modal-content">
-    <button class="modal-close" onclick="closeUpgradeModal()">✕</button>
-    <div class="modal-icon">🍽️</div>
-    <p>Lunch, Dinner & Snack dishes are not available in your morning slot.<br><br>Please contact our team to subscribe for them.</p>
-    <button class="btn" onclick="closeUpgradeModal()">OK</button>
-  </div>
-</div>
-<div id="inactiveModal" class="modal">
-  <div class="modal-content" style="text-align:center; padding:28px 24px 22px; max-width:380px;">
-    <div style="font-size:34px; margin-bottom:10px;">⏸️</div>
-    <h3 style="margin:0 0 8px;">Account Inactive</h3>
-    <p style="font-size:14.5px; color:#445; line-height:1.55; margin:0 0 22px;">
-      Your account is currently inactive. Please contact Friska Wellness to place your order.
-    </p>
-    <button class="btn" style="margin-top:0;" onclick="document.getElementById('inactiveModal').style.display='none'">OK</button>
-  </div>
-</div>
+
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCqVJgCfV0C1KBF0u1Jc02p_RHE7K7g1V8&libraries=places&callback=initAutocomplete" async defer></script>
+
 </body>
+</html>
