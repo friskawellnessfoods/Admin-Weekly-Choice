@@ -302,7 +302,7 @@ const DUR_DAYS={d:2,w:6,m:26,q:78,custom:26};
 const PLAN_CODE={},DUR_CODE={};
 Object.keys(PLAN_LABEL).forEach(c=>PLAN_CODE[PLAN_LABEL[c].toLowerCase()]=c);
 Object.keys(DUR_LABEL).forEach(c=>DUR_CODE[DUR_LABEL[c].toLowerCase()]=c);
-let ordersCache=null,billsCache=null,priceMap=null,masterCache=null;
+let ordersCache=null,billsCache=null,priceMap=null,masterCache=null,statusCache=null;
 
 /* date helpers */
 function dateOnly(d){return new Date(d.getFullYear(),d.getMonth(),d.getDate(),12,0,0,0);}
@@ -345,6 +345,7 @@ async function apiCall(action,params){
 async function fetchOrders(force){if(ordersCache&&!force)return ordersCache;const j=await apiCall("getOrdersOutputAll");ordersCache=Array.isArray(j)?j:(j.rows||[]);return ordersCache;}
 async function fetchBills(force){if(billsCache&&!force)return billsCache;const j=await apiCall("getBillsAll");billsCache=Array.isArray(j)?j:(j.rows||[]);return billsCache;}
 async function fetchMaster(force){if(masterCache&&!force)return masterCache;const j=await apiCall("getMasterClientsAll");masterCache=(j&&j.clients)||[];return masterCache;}
+async function fetchStatus(force){if(statusCache&&!force)return statusCache;const j=await apiCall("getMasterClientStatusAll");statusCache=(j&&j.clients)||[];return statusCache;}
 async function fetchPrices(force){
   if(priceMap&&!force)return priceMap;
   const j=await apiCall("getPricesAll");const rows=Array.isArray(j)?j:(j.rows||[]);const map={};
@@ -681,7 +682,7 @@ async function validateAndSave(meta,lines,t,statusId){
 function followDismissed(){try{return JSON.parse(localStorage.getItem("friska_follow_dismiss")||"{}");}catch(e){return {};}}
 function followDismissSave(o){try{localStorage.setItem("friska_follow_dismiss",JSON.stringify(o));}catch(e){}}
 function openRenewFor(name){switchTab("renew");el("r_client").value=name;runRenew(false);}
-async function loadDashboard(force){setStatus("d_status","Loading bills…","info");try{const bills=await fetchBills(force);let orders=[];try{orders=await fetchOrders(force);}catch(e){}renderDashboard(orders);try{renderUnbilled(orders,bills);}catch(e){el("d_unbilled").innerHTML='<div class="subtle">Orders load failed.</div>';}setStatus("d_status",`${Math.max(0,bills.length-1)} bills.`,"ok");}catch(err){setStatus("d_status","Error: "+err.message,"err");el("d_followups").innerHTML="";}}
+async function loadDashboard(force){setStatus("d_status","Loading bills…","info");try{const bills=await fetchBills(force);let orders=[];try{orders=await fetchOrders(force);}catch(e){}let inactiveSet=new Set();try{const st=await fetchStatus(force);inactiveSet=new Set(st.filter(c=>c.status==="inactive").map(c=>normName(c.name)));}catch(e){}renderDashboard(orders,inactiveSet);try{renderUnbilled(orders,bills);}catch(e){el("d_unbilled").innerHTML='<div class="subtle">Orders load failed.</div>';}setStatus("d_status",`${Math.max(0,bills.length-1)} bills.`,"ok");}catch(err){setStatus("d_status","Error: "+err.message,"err");el("d_followups").innerHTML="";}}
 function unbilledDismissed(){try{return new Set(JSON.parse(localStorage.getItem("friska_unbilled_dismiss")||"[]"));}catch(e){return new Set();}}
 function dismissUnbilled(k){const s=unbilledDismissed();s.add(k);try{localStorage.setItem("friska_unbilled_dismiss",JSON.stringify([...s]));}catch(e){}}
 function dismissUnbilledMany(ks){const s=unbilledDismissed();ks.forEach(k=>s.add(k));try{localStorage.setItem("friska_unbilled_dismiss",JSON.stringify([...s]));}catch(e){}}
@@ -734,7 +735,7 @@ function bindPills(scopeId){
   };});
 }
 function followTag(r,today){const expired=r.end<today,isToday=keyOf(r.end)===keyOf(today);return expired?`<span class="rowtag exp">expired</span>`:(isToday?`<span class="rowtag">today</span>`:`<span class="rowtag">${Math.round((r.end-today)/86400000)}d</span>`);}
-function renderDashboard(orders){
+function renderDashboard(orders,inactiveSet){
   const rows=dashRows();
   const latestEnd={};rows.forEach(r=>{if(r.end){const k=normName(r.client);if(!latestEnd[k]||r.end>latestEnd[k])latestEnd[k]=r.end;}});
   const latestRows=rows.filter(r=>r.end&&latestEnd[normName(r.client)]&&keyOf(latestEnd[normName(r.client)])===keyOf(r.end));
@@ -743,6 +744,7 @@ function renderDashboard(orders){
   const follow=[];
   if(idx&&orders&&orders.length){
     latestRows.forEach(r=>{
+      if(inactiveSet&&inactiveSet.has(normName(r.client)))return; // explicitly marked inactive — not renewing
       let raw=null;for(let i=1;i<billsCache.length;i++){if(String(billsCache[i][idx["BillNo"]])===String(r.billNo)){raw=billsCache[i];break;}}
       if(!raw)return;
       const prev=parseBillRow(raw,idx);
@@ -762,7 +764,7 @@ function renderDashboard(orders){
       `</tbody></table></div>`;
     bindPills("d_followups");
     el("d_followups").querySelectorAll(".clientlink").forEach(nd=>{nd.onclick=()=>openRenewFor(nd.dataset.name);});
-    el("d_followups").querySelectorAll("button[data-followdis]").forEach(b=>{b.onclick=()=>{const o=followDismissed();o[b.dataset.followdis]=parseInt(b.dataset.ac)||0;followDismissSave(o);renderDashboard(orders);};});
+    el("d_followups").querySelectorAll("button[data-followdis]").forEach(b=>{b.onclick=()=>{const o=followDismissed();o[b.dataset.followdis]=parseInt(b.dataset.ac)||0;followDismissSave(o);renderDashboard(orders,inactiveSet);};});
   }
   applyDashFilter();
 }
