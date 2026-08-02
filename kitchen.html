@@ -162,15 +162,19 @@
     display:flex; flex-direction:column; align-items:center; justify-content:center;
     text-align:center; overflow:hidden; line-height:1.18;
   }
-  .dish{ font-weight:400; font-size:1.45em; }
-  .type{ font-weight:600; font-size:1em; margin-top:.28em; }
-  .remark{ font-size:.95em; font-style:italic; margin-top:.45em; }
-  .cname{ font-size:.85em; font-weight:600; margin-top:.15em; }
-  .cb-name{ font-weight:700; font-size:1.3em; }
-  .cb-code{ font-weight:700; font-size:1.3em; }
-  .cb-type{ font-size:1em; margin-top:.22em; }
-  .cb-remark{ font-size:.95em; font-style:italic; margin-top:.35em; }
-  .cb-slot{ font-weight:600; font-size:.95em; margin-top:.15em; text-transform:uppercase; letter-spacing:.5px; }
+  .dish{ font-weight:400; font-size:24px; line-height:1.16; }
+  .type{ font-weight:600; font-size:15px; margin-top:.28em; }
+  .remark{ font-size:13px; font-style:italic; margin-top:.45em; overflow:hidden;
+           display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;
+           word-break:break-word; max-width:100%; }
+  .cname{ font-size:16px; font-weight:700; margin-top:.2em; }
+  .cb-name{ font-weight:700; font-size:26px; }
+  .cb-code{ font-weight:700; font-size:26px; }
+  .cb-type{ font-size:17px; margin-top:.22em; }
+  .cb-remark{ font-size:14px; font-style:italic; margin-top:.35em; overflow:hidden;
+              display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;
+              word-break:break-word; max-width:100%; }
+  .cb-slot{ font-weight:600; font-size:15px; margin-top:.15em; text-transform:uppercase; letter-spacing:.5px; }
 
   /* ---------- LISTS (client etc.) ---------- */
   .listwrap{ padding:18px; overflow-x:auto; -webkit-overflow-scrolling:touch; }
@@ -228,6 +232,17 @@
   table.mise td{ border:1px solid #555; padding:3px 6px; text-align:center; white-space:nowrap;
                  overflow:hidden; text-overflow:ellipsis; height:calc(20px * var(--msc)); line-height:calc(14px * var(--msc)); box-sizing:border-box; }
   table.mise td.banner{ font-weight:700; border:none; padding:3px; height:auto; line-height:1.2; }
+
+  /* ---------- WORK PLAN ---------- */
+  .wpsheet{ --wsc:1; background:#fff; box-shadow:0 2px 10px rgba(0,0,0,.18); margin:0 auto; padding:18px;
+            width:620px; max-width:100%; box-sizing:border-box; }
+  table.wp{ border-collapse:collapse; width:100%; font-size:calc(13px * var(--wsc)); color:#000; table-layout:fixed; }
+  table.wp col.wp-l{ width:58%; }
+  table.wp col.wp-r{ width:42%; }
+  table.wp td{ border:1px solid #555; padding:calc(3px * var(--wsc)) 6px; text-align:left;
+               white-space:normal; word-break:break-word; overflow-wrap:break-word; vertical-align:middle;
+               line-height:1.2; }
+  table.wp td.banner{ font-weight:700; border:1px solid #555; padding:4px; text-align:center; }
 
   /* ---------- DELIVERY LIST ---------- */
   .delsheet{ background:#fff; box-shadow:0 2px 10px rgba(0,0,0,.18); margin:0 auto; padding:14px; }
@@ -311,6 +326,7 @@
     .sheet h2{ margin:0 0 6px; }
     .mealsheet{ box-shadow:none; padding:0; margin:0; width:auto; page:portraitList; }
     .misesheet{ box-shadow:none; padding:0; margin:0; width:auto; page:portraitList; }
+    .wpsheet{ box-shadow:none; padding:0; margin:0; width:auto; page:portraitList; }
     .delsheet{ box-shadow:none; padding:0; margin:0; page:portraitList; }
     .pausesheet{ box-shadow:none; padding:0; margin:0; width:auto; page:portraitList; }
     .ovsheet{ box-shadow:none; padding:0; margin:0; width:auto; page:portraitList; }
@@ -367,6 +383,7 @@
     <button data-tab="client" class="active"><input type="checkbox" class="tabchk" data-sec="client" checked onclick="event.stopPropagation()">Client List</button>
     <button data-tab="meal"><input type="checkbox" class="tabchk" data-sec="meal" checked onclick="event.stopPropagation()">Meal List</button>
     <button data-tab="mise"><input type="checkbox" class="tabchk" data-sec="mise" checked onclick="event.stopPropagation()">Mise List</button>
+    <button data-tab="workplan"><input type="checkbox" class="tabchk" data-sec="workplan" checked onclick="event.stopPropagation()">Work Plan</button>
     <button data-tab="delivery"><input type="checkbox" class="tabchk" data-sec="delivery" checked onclick="event.stopPropagation()">Delivery List</button>
     <button data-tab="overview"><input type="checkbox" class="tabchk" data-sec="overview" onclick="event.stopPropagation()">Meal Overview</button>
     <button data-tab="pause"><input type="checkbox" class="tabchk" data-sec="pause" onclick="event.stopPropagation()">Pause List</button>
@@ -393,6 +410,10 @@
     <div id="miseWrap" class="listwrap"></div>
   </div>
 
+  <div id="view-workplan" class="view">
+    <div id="wpWrap" class="listwrap"></div>
+  </div>
+
   <div id="view-delivery" class="view">
     <div id="deliveryWrap" class="listwrap"></div>
   </div>
@@ -414,6 +435,7 @@
   const mealWrap   = document.getElementById('mealWrap');
   const overviewWrap = document.getElementById('overviewWrap');
   const miseWrap   = document.getElementById('miseWrap');
+  const wpWrap     = document.getElementById('wpWrap');
   const deliveryWrap = document.getElementById('deliveryWrap');
   const pauseWrap  = document.getElementById('pauseWrap');
   const goBtn      = document.getElementById('go');
@@ -427,8 +449,8 @@
   let overlayTick = null;
 
   let activeTab = 'client';
-  const loadedView = { tags:false, client:false, meal:false, overview:false, mise:false, delivery:false, pause:false };
-  let cache = { date:null, tags:null, client:null, mise:null, delivery:null, pause:null };  // raw data per date
+  const loadedView = { tags:false, client:false, meal:false, overview:false, mise:false, workplan:false, delivery:false, pause:false };
+  let cache = { date:null, tags:null, client:null, mise:null, workplan:null, delivery:null, pause:null };  // raw data per date
   let showInactive = false;   // pause-list toggle
   let hasGenerated = false;   // becomes true after first Generate (controls landing→working)
 
@@ -472,7 +494,7 @@
     activeTab = tab;
     document.querySelectorAll('.tabs button').forEach(b =>
       b.classList.toggle('active', b.dataset.tab === tab));
-    ['tags','client','meal','overview','mise','delivery','pause'].forEach(t =>
+    ['tags','client','meal','overview','mise','workplan','delivery','pause'].forEach(t =>
       document.getElementById('view-' + t).classList.toggle('active', t === tab));
     printBtn.disabled = !loadedView[tab];
     if(hasGenerated && dateEl.value && !loadedView[tab]) load(tab);
@@ -578,6 +600,7 @@
     const tasks = [
       () => ensureClient(date),
       () => ensureMise(date),
+      () => ensureWorkPlan(date),
       () => ensureDelivery(date),
       () => ensurePause(date),
       () => ensureTags(date),
@@ -592,11 +615,11 @@
   }
 
   function invalidate(){
-    cache = { date:null, tags:null, client:null, mise:null, delivery:null, pause:null };
-    loadedView.tags = loadedView.client = loadedView.meal = loadedView.overview = loadedView.mise = loadedView.delivery = loadedView.pause = false;
+    cache = { date:null, tags:null, client:null, mise:null, workplan:null, delivery:null, pause:null };
+    loadedView.tags = loadedView.client = loadedView.meal = loadedView.overview = loadedView.mise = loadedView.workplan = loadedView.delivery = loadedView.pause = false;
     pagesEl.innerHTML = ''; clientWrap.innerHTML = ''; mealWrap.innerHTML = '';
     overviewWrap.innerHTML = '';
-    miseWrap.innerHTML = ''; deliveryWrap.innerHTML = ''; pauseWrap.innerHTML = '';
+    miseWrap.innerHTML = ''; wpWrap.innerHTML = ''; deliveryWrap.innerHTML = ''; pauseWrap.innerHTML = '';
     printBtn.disabled = true;
   }
 
@@ -606,6 +629,7 @@
     if(tab === 'meal')     return loadMeal();
     if(tab === 'overview') return loadOverview();
     if(tab === 'mise')     return loadMise();
+    if(tab === 'workplan') return loadWorkPlan();
     if(tab === 'delivery') return loadDelivery();
     if(tab === 'pause')    return loadPause();
   }
@@ -628,6 +652,16 @@
     if(!data.success) throw new Error(data.message || 'No mise data returned');
     cache.date = date; cache.mise = data;
     return cache.mise;
+  }
+
+  // ---- work plan fetch + cache (read-only values from the Workplan sheet) ----
+  async function ensureWorkPlan(date){
+    if(cache.workplan && cache.date === date) return cache.workplan;
+    const res = await fetch(API + '?action=getWorkPlanByDate&start=' + encodeURIComponent(date) + '&end=' + encodeURIComponent(date));
+    const data = await res.json();
+    if(!data.success) throw new Error(data.message || 'No work plan data returned');
+    cache.date = date; cache.workplan = data;
+    return cache.workplan;
   }
 
   // ---- delivery fetch + cache (getOrdersForDate via POST: name/location/slot/route, deduped phone+slot) ----
@@ -1242,6 +1276,86 @@
   }
 
   // ============================================================
+  //  WORK PLAN  (read-only 2-column values from the Workplan sheet)
+  // ============================================================
+  async function loadWorkPlan(){
+    if(!guard()) return;
+    const date = dateEl.value;
+    busy('Loading work plan for ' + date + '…');
+    try{
+      const data = await ensureWorkPlan(date);
+      const tbl = (data.tables && data.tables[0]) ? data.tables[0] : null;
+      wpWrap.innerHTML = '';
+      if(!tbl){
+        wpWrap.innerHTML = '<div class="sheet"><p style="text-align:center;color:#777">No work plan found for ' + date + '.</p></div>';
+        loadedView.workplan = true; done('No work plan for ' + date, 'workplan'); return;
+      }
+      const sheet = buildWorkPlanSheet(tbl, date);
+      wpWrap.appendChild(sheet);
+      fitWorkPlanSheet(sheet);
+      loadedView.workplan = true;
+      done('Work plan ready for ' + date, 'workplan');
+    }catch(e){ fail(e); }
+  }
+
+  function buildWorkPlanSheet(tbl, date){
+    const sheet = document.createElement('div'); sheet.className = 'wpsheet';
+
+    const table = document.createElement('table'); table.className = 'wp';
+    const colgroup = document.createElement('colgroup');
+    const colL = document.createElement('col'); colL.className = 'wp-l';
+    const colR = document.createElement('col'); colR.className = 'wp-r';
+    colgroup.appendChild(colL); colgroup.appendChild(colR);
+    table.appendChild(colgroup);
+
+    const rows = tbl.table || [];
+    // trim trailing blank rows beyond the last row with real data (+ small pad)
+    let lastData = -1;
+    rows.forEach((r, i) => {
+      if(r.some(c => String((c && c.val) || '').trim() !== '')) lastData = i;
+    });
+    const lastUsed = Math.min(rows.length - 1, Math.max(lastData, 0) + 1);
+
+    // ---- single date banner spanning both columns ----
+    const dateLabel = tbl.dateLabel || new Date(date + 'T00:00:00')
+      .toLocaleDateString(undefined, { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+
+    const trDate = document.createElement('tr');
+    const tdDate = document.createElement('td'); tdDate.colSpan = 2; tdDate.className = 'banner';
+    tdDate.textContent = dateLabel;
+    trDate.appendChild(tdDate); table.appendChild(trDate);
+
+    // ---- grid rows (skip the captured date row at index 0) ----
+    for(let i = 1; i <= lastUsed; i++){
+      const r = rows[i] || [];
+      const tr = document.createElement('tr');
+      for(let c = 0; c < 2; c++){
+        const cell = r[c] || {};
+        const val = String(cell.val || '').trim();
+        const td = document.createElement('td');
+        td.textContent = val;
+        tr.appendChild(td);
+      }
+      table.appendChild(tr);
+    }
+
+    sheet.appendChild(table);
+    return sheet;
+  }
+
+  function fitWorkPlanSheet(sheet){
+    // Portrait A4 printable ~198mm wide x 285mm tall, same width-derived budget as mise.
+    const w = sheet.offsetWidth || 620;
+    const TARGET = w * (285/198);
+    let s = 1; sheet.style.setProperty('--wsc', s);
+    let guard = 0;
+    // text here is longer/variable-length than mise, so allow a lower floor
+    while(s > 0.6 && sheet.scrollHeight > TARGET && guard < 40){
+      s -= 0.02; sheet.style.setProperty('--wsc', s.toFixed(3)); guard++;
+    }
+  }
+
+  // ============================================================
   //  DELIVERY LIST  (getOrdersForDate: name/location/slot/route)
   // ============================================================
   async function loadDelivery(){
@@ -1564,17 +1678,6 @@
     return el;
   }
 
-  function fitInners(container){
-    requestAnimationFrame(() => {
-      container.querySelectorAll('.inner').forEach(inner => {
-        let size = 24; inner.style.fontSize = size + 'px';
-        while(size > 7 && (inner.scrollHeight > inner.clientHeight || inner.scrollWidth > inner.clientWidth)){
-          size -= 0.5; inner.style.fontSize = size + 'px';
-        }
-      });
-    });
-  }
-
   // ============================================================
   //  KITCHEN LIST PDF  (tags portrait + lists landscape, one file)
   // ============================================================
@@ -1582,10 +1685,40 @@
   ['tag_template.png','carrybag_tags.png','logo.png'].forEach(src => { const im = new Image(); im.src = src; });
 
   function fitInnerSync(inner){
-    let size = 24; inner.style.fontSize = size + 'px';
-    while(size > 7 && (inner.scrollHeight > inner.clientHeight || inner.scrollWidth > inner.clientWidth)){
-      size -= 0.5; inner.style.fontSize = size + 'px';
+    const dishEls = inner.querySelectorAll('.dish, .cb-name, .cb-code');   // meal tag has 1 dish; carry tag can have multiple .cb-code lines
+    const secondary = Array.from(inner.querySelectorAll('.type, .remark, .cb-type, .cb-remark, .cb-slot'));
+    const nameEls = Array.from(inner.querySelectorAll('.cname'));
+
+    // 1) Dish/code lines: highest priority — fit to width only, wrap freely, never shrunk for the remark's sake
+    let dSize = 24;
+    dishEls.forEach(el => el.style.fontSize = dSize + 'px');
+    let g = 0;
+    while(dSize > 15 && dishEls.length && Array.from(dishEls).some(el => el.scrollWidth > inner.clientWidth + 1) && g < 30){
+      dSize -= 0.5; dishEls.forEach(el => el.style.fontSize = dSize + 'px'); g++;
     }
+
+    // 2) Client name: bold + noticeably bigger than the remark
+    let nSize = 17;
+    nameEls.forEach(el => el.style.fontSize = nSize + 'px');
+
+    // 3) Secondary block (type/remark/etc): shrink together to fit remaining space.
+    //    The remark's CSS line-clamp:2 is a hard backstop — it can NEVER push the dish out of frame.
+    let sSize = 15;
+    secondary.forEach(el => el.style.fontSize = sSize + 'px');
+    let g2 = 0;
+    while(sSize > 9 && inner.scrollHeight > inner.clientHeight && g2 < 30){
+      sSize -= 0.5;
+      secondary.forEach(el => el.style.fontSize = sSize + 'px');
+      nSize = Math.max(11, nSize - 0.4); nameEls.forEach(el => el.style.fontSize = nSize + 'px');
+      g2++;
+    }
+  }
+
+  // async wrapper used on-screen — waits for layout to fully settle (mobile can lag a frame)
+  // before measuring, then applies the same independent, priority-based fit as the PDF path.
+  function fitInners(container){
+    const run = () => container.querySelectorAll('.inner').forEach(fitInnerSync);
+    requestAnimationFrame(() => requestAnimationFrame(run));
   }
 
   // wait for all <img> and CSS background images inside a node to load
@@ -1623,10 +1756,11 @@
       const needMeal   = sectionOn('meal');
       const needOverview = sectionOn('overview');
       const needMise   = sectionOn('mise');
+      const needWorkPlan = sectionOn('workplan');
       const needDel    = sectionOn('delivery');
       const needPause  = sectionOn('pause');
 
-      if(!(needTags || needClient || needMeal || needOverview || needMise || needDel || needPause)){
+      if(!(needTags || needClient || needMeal || needOverview || needMise || needWorkPlan || needDel || needPause)){
         setStatus('Tick at least one list to include in the PDF.', false);
         stage.remove(); goBtn.disabled = false; pdfBtn.disabled = false; hideOverlay();
         return;
@@ -1638,6 +1772,8 @@
 
       let miseData = null;
       if(needMise){ try{ miseData = await ensureMise(date); }catch(e){ miseData = null; } }
+      let workPlanData = null;
+      if(needWorkPlan){ try{ workPlanData = await ensureWorkPlan(date); }catch(e){ workPlanData = null; } }
       let deliveryData = null;
       if(needDel){ try{ deliveryData = await ensureDelivery(date); }catch(e){ deliveryData = null; } }
       let pauseData = null;
@@ -1696,6 +1832,17 @@
         miseCanvas = await html2canvas(miseSheet, { scale:PDF_SCALE, useCORS:true, backgroundColor:'#ffffff' });
       }
 
+      // ---- render work plan, snapshot (optional) ----
+      let workPlanCanvas = null;
+      const wpTbl = (workPlanData && workPlanData.tables && workPlanData.tables[0]) ? workPlanData.tables[0] : null;
+      if(needWorkPlan && wpTbl){
+        setOverlay('Rendering work plan…');
+        const wpSheet = buildWorkPlanSheet(wpTbl, date);
+        stage.appendChild(wpSheet);
+        fitWorkPlanSheet(wpSheet);
+        workPlanCanvas = await html2canvas(wpSheet, { scale:PDF_SCALE, useCORS:true, backgroundColor:'#ffffff' });
+      }
+
       // ---- render delivery list, snapshot (optional) ----
       let deliveryCanvas = null;
       if(needDel && deliveryData && deliveryData.clients && deliveryData.clients.length){
@@ -1737,7 +1884,7 @@
       let firstOrient = 'portrait';
       if(tagCanvases.length) firstOrient = 'portrait';
       else if(clientCanvas) firstOrient = 'landscape';
-      else firstOrient = 'portrait';   // meal/mise/delivery/pause are all portrait
+      else firstOrient = 'portrait';   // meal/mise/workplan/delivery/pause are all portrait
       const pdf = new jsPDF({ orientation:firstOrient, unit:'mm', format:'a4' });
       let started = false;
       const place = (orient) => { if(!started){ started = true; } else { pdf.addPage('a4', orient); } };
@@ -1756,6 +1903,9 @@
 
       // mise list: portrait (if present)
       if(miseCanvas) addImageFitOnePage(pdf, miseCanvas, place, 'portrait');
+
+      // work plan: portrait (if present)
+      if(workPlanCanvas) addImageFitOnePage(pdf, workPlanCanvas, place, 'portrait');
 
       // delivery list: portrait (if present)
       if(deliveryCanvas) addImagePaged(pdf, deliveryCanvas, place, 'portrait');
@@ -1778,7 +1928,7 @@
   }
 
   // place a canvas onto A4 page(s) in the given orientation, 6mm margins, slicing if too tall
-  // Always fit the whole image on ONE page (scale down if needed, never slice). For the pause list.
+  // Always fit the whole image on ONE page (scale down if needed, never slice). For the pause/mise/workplan lists.
   function addImageFitOnePage(pdf, canvas, place, orient){
     const margin = 6;
     const pageW = orient === 'landscape' ? 297 : 210;
