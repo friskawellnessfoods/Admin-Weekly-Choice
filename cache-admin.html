@@ -51,6 +51,8 @@
     button:disabled { opacity: 0.55; cursor: default; }
     .btn-menu { background: #2e9e6b; }
     .btn-clients { background: #2f6fb0; }
+    .btn-check { background: #b0752f; }
+    .btn-mark { background: #c0392b; margin-top: 4px; }
     #status {
       margin-top: 8px;
       min-height: 22px;
@@ -60,37 +62,110 @@
     }
     #status.success { color: #2e9e6b; }
     #status.error { color: #c0392b; }
+    .divider {
+      border: none;
+      border-top: 1px solid #e4e8ec;
+      margin: 22px 0 18px;
+    }
+    .stale-config {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+    .stale-config label {
+      font-size: 13px;
+      color: #5a6673;
+      white-space: nowrap;
+    }
+    .stale-config input {
+      width: 64px;
+      padding: 10px;
+      border: 1px solid #dbe1e7;
+      border-radius: 8px;
+      font-size: 14px;
+    }
+    .hidden { display: none; }
+    #stalePanel {
+      border: 1px solid #eee2d8;
+      background: #fdf8f2;
+      border-radius: 12px;
+      padding: 10px 12px;
+      margin-bottom: 14px;
+    }
+    .stale-toolbar {
+      padding: 4px 2px 10px;
+      border-bottom: 1px solid #f0e5d6;
+      margin-bottom: 6px;
+    }
+    .stale-all {
+      font-size: 13px;
+      font-weight: 600;
+      color: #5a6673;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+    }
+    .stale-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 2px;
+      cursor: pointer;
+    }
+    .stale-name {
+      font-size: 14px;
+      font-weight: 600;
+      color: #1f2d3d;
+      flex: 1;
+    }
+    .stale-meta {
+      font-size: 11.5px;
+      color: #9aa4ae;
+      white-space: nowrap;
+    }
   </style>
 </head>
 <body>
   <div class="card">
     <h2>Friska Cache Control</h2>
     <p class="subtitle">Refresh cached data from the backend.</p>
-
     <button class="btn-menu" onclick="refresh('refreshMenu', this)">
       Refresh Menu Cache
     </button>
     <button class="btn-clients" onclick="refresh('refreshClients', this)">
       Refresh Client Cache
     </button>
-
     <div id="status"></div>
-  </div>
 
+    <hr class="divider">
+
+    <p class="subtitle" style="margin-bottom:12px">Find active clients with no real order in the last N days, and mark them inactive.</p>
+    <div class="stale-config">
+      <label for="staleDays">Days since last order</label>
+      <input id="staleDays" type="number" value="15" min="1">
+    </div>
+    <button class="btn-check" onclick="checkStale()">Check for stale clients</button>
+    <div id="stalePanel" class="hidden"></div>
+  </div>
   <script src="config.js"></script>
   <script>
     const statusEl = document.getElementById("status");
+    let staleCandidates = [];
 
     function setStatus(msg, type) {
       statusEl.textContent = msg;
       statusEl.className = type || "";
     }
 
-    function refresh(action, btn) {
-      const buttons = document.querySelectorAll("button");
-      buttons.forEach(b => b.disabled = true);
-      setStatus("Refreshing…", "");
+    function setButtonsDisabled(v) {
+      document.querySelectorAll("button").forEach(b => b.disabled = v);
+    }
 
+    function refresh(action, btn) {
+      setButtonsDisabled(true);
+      setStatus("Refreshing…", "");
       fetch(API_URL + "?t=" + Date.now(), {
         method: "POST",
         cache: "no-store",
@@ -104,8 +179,79 @@
         setStatus("Error occurred. Please try again.", "error");
       })
       .finally(() => {
-        buttons.forEach(b => b.disabled = false);
+        setButtonsDisabled(false);
       });
+    }
+
+    function checkStale() {
+      const days = parseInt(document.getElementById("staleDays").value) || 15;
+      setButtonsDisabled(true);
+      setStatus("Checking…", "");
+      fetch(API_URL + "?t=" + Date.now(), {
+        method: "POST",
+        cache: "no-store",
+        body: new URLSearchParams({ action: "getStaleActiveClients", days })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (!data.ok) { setStatus("Error checking clients.", "error"); return; }
+        staleCandidates = data.stale || [];
+        renderStaleList();
+        setStatus(
+          staleCandidates.length
+            ? `${staleCandidates.length} client(s) with no order in ${days}+ days.`
+            : `No stale clients found (${days}+ days).`,
+          "success"
+        );
+      })
+      .catch(() => setStatus("Error occurred. Please try again.", "error"))
+      .finally(() => setButtonsDisabled(false));
+    }
+
+    function renderStaleList() {
+      const panel = document.getElementById("stalePanel");
+      if (!staleCandidates.length) { panel.classList.add("hidden"); panel.innerHTML = ""; return; }
+      panel.classList.remove("hidden");
+      panel.innerHTML =
+        `<div class="stale-toolbar">
+           <label class="stale-all"><input type="checkbox" id="staleAll" checked onclick="toggleAllStale(this)"> Select all</label>
+         </div>` +
+        staleCandidates.map((c, i) =>
+          `<label class="stale-row">
+             <input type="checkbox" class="stale-chk" data-i="${i}" checked>
+             <span class="stale-name">${c.name}</span>
+             <span class="stale-meta">${c.phone} · last order ${c.lastOrder || "never"}</span>
+           </label>`
+        ).join("") +
+        `<button class="btn-mark" onclick="markInactive()">Mark selected Inactive</button>`;
+    }
+
+    function toggleAllStale(cb) {
+      document.querySelectorAll(".stale-chk").forEach(c => c.checked = cb.checked);
+    }
+
+    function markInactive() {
+      const rows = [];
+      document.querySelectorAll(".stale-chk:checked").forEach(c => rows.push(staleCandidates[parseInt(c.dataset.i)].row));
+      if (!rows.length) { setStatus("Nothing selected.", "error"); return; }
+      if (!confirm(`Mark ${rows.length} client(s) Inactive? This updates the Master Client List.`)) return;
+      setButtonsDisabled(true);
+      setStatus("Updating…", "");
+      fetch(API_URL + "?t=" + Date.now(), {
+        method: "POST",
+        cache: "no-store",
+        body: new URLSearchParams({ action: "markClientsInactive", rows: JSON.stringify(rows) })
+      })
+      .then(res => res.json())
+      .then(data => {
+        setStatus(data.ok ? `Marked ${data.updated} client(s) inactive.` : "Update failed.", data.ok ? "success" : "error");
+        if (data.ok) {
+          staleCandidates = staleCandidates.filter(c => !rows.includes(c.row));
+          renderStaleList();
+        }
+      })
+      .catch(() => setStatus("Error occurred. Please try again.", "error"))
+      .finally(() => setButtonsDisabled(false));
     }
   </script>
 </body>
