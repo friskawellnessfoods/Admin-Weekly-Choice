@@ -184,6 +184,7 @@
   table.client{ border-collapse:collapse; width:100%; font-size:11px; color:#000; line-height:1.1; }
   table.client th, table.client td{ border:1px solid #999; padding:1px 5px; text-align:left; white-space:nowrap; }
   table.client td.typecell{ white-space:normal; overflow-wrap:break-word; }
+  table.client td.wrapcell{ white-space:normal; overflow-wrap:break-word; word-break:break-word; }
   table.client th{ background:#f0f0f0; font-weight:700; text-align:center; }
   table.client td.num{ text-align:center; width:24px; color:#666; }
   table.client tr.slotsep td{ border-top:2.5px solid #111 !important; }
@@ -877,6 +878,7 @@
         else {
           const val = r[c.key] || '';
           td.textContent = val;
+          if(c.key === 'remarks') td.className = 'wrapcell';
           applyCell(td, val);
         }
         tr.appendChild(td);
@@ -1811,17 +1813,13 @@
       if(needClient && rows.length){
         setOverlay('Rendering client list…');
         const sheet = buildClientSheet(rows, date);
-        sheet.style.padding = '0'; sheet.style.boxShadow = 'none';
-        sheet.style.width = 'auto'; sheet.style.minWidth = '1400px'; sheet.style.overflow = 'visible';
+        sheet.style.padding = '0'; sheet.style.boxShadow = 'none'; sheet.style.width = '1400px';
         const sw = document.createElement('div'); sw.className = 'listwrap'; sw.style.padding = '0';
-        sw.style.width = 'auto'; sw.style.overflow = 'visible';
         sw.appendChild(sheet);
         stage.appendChild(sw);
         fitClientSheet(sheet, rows.length, 965);
         await waitForImages(sw);
-        // capture the sheet's actual full width — never clip long Remarks/Type/Slot content
-        const fullW = Math.max(1400, sheet.scrollWidth);
-        clientCanvas = await html2canvas(sheet, { scale:PDF_SCALE, useCORS:true, backgroundColor:'#ffffff', width: fullW, windowWidth: fullW });
+        clientCanvas = await html2canvas(sheet, { scale:PDF_SCALE, useCORS:true, backgroundColor:'#ffffff' });
       }
 
       // ---- render meal list, snapshot ----
