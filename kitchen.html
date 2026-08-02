@@ -1645,7 +1645,7 @@
     tags.forEach(t => {
       const key = (t.phone || t.clientName) + '|' + t.slot;
       if(!groups[key]) groups[key] = { clientName:t.clientName, slot:t.slot, type:t.type, remarks:t.remarks, codes:[] };
-      groups[key].codes.push({ code:t.code, cat:t.cat });
+      groups[key].codes.push({ code: (t.kind === 'juice' ? (t.dish || t.code) : t.code), cat:t.cat });
     });
     const arr = Object.values(groups);
     arr.forEach(g => {
@@ -1802,13 +1802,17 @@
       if(needClient && rows.length){
         setOverlay('Rendering client list…');
         const sheet = buildClientSheet(rows, date);
-        sheet.style.padding = '0'; sheet.style.boxShadow = 'none'; sheet.style.width = '1400px';
+        sheet.style.padding = '0'; sheet.style.boxShadow = 'none';
+        sheet.style.width = 'auto'; sheet.style.minWidth = '1400px'; sheet.style.overflow = 'visible';
         const sw = document.createElement('div'); sw.className = 'listwrap'; sw.style.padding = '0';
+        sw.style.width = 'auto'; sw.style.overflow = 'visible';
         sw.appendChild(sheet);
         stage.appendChild(sw);
         fitClientSheet(sheet, rows.length, 965);
         await waitForImages(sw);
-        clientCanvas = await html2canvas(sheet, { scale:PDF_SCALE, useCORS:true, backgroundColor:'#ffffff' });
+        // capture the sheet's actual full width — never clip long Remarks/Type/Slot content
+        const fullW = Math.max(1400, sheet.scrollWidth);
+        clientCanvas = await html2canvas(sheet, { scale:PDF_SCALE, useCORS:true, backgroundColor:'#ffffff', width: fullW, windowWidth: fullW });
       }
 
       // ---- render meal list, snapshot ----
