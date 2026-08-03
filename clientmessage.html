@@ -20,11 +20,13 @@ body{ font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; backgrou
 .head{ display:flex; align-items:baseline; gap:8px; margin:4px 2px 12px; }
 .head h1{ font-size:17px; font-weight:700; color:var(--navy); margin:0; }
 .head span{ font-size:11.5px; color:var(--muted); }
+.head .pstat{ margin-left:auto; font-size:10.5px; font-weight:700; padding:3px 9px; border-radius:99px; }
+.pstat.ok{ background:#e7f7f1; color:var(--accent); }
+.pstat.load{ background:#eef1fb; color:var(--navy); }
+.pstat.err{ background:#fde8e8; color:#c0392b; }
 
 .card{ background:white; border:1px solid var(--line); border-radius:10px; padding:12px; margin-bottom:10px; }
 .card h2{ font-size:12.5px; font-weight:700; color:var(--navy); margin:0 0 9px; }
-.adminTop{ display:flex; align-items:center; }
-.toggle{ margin-left:auto; border:1px solid var(--line); background:white; color:var(--navy); font-weight:600; font-size:11.5px; padding:5px 9px; border-radius:7px; cursor:pointer; }
 
 label{ display:block; font-size:11.5px; font-weight:600; color:#445; margin:0 0 3px; }
 input,select{ width:100%; padding:8px 9px; border:1px solid var(--line); border-radius:7px; background:#fbfcfe; font-size:13.5px; color:var(--ink); font-family:inherit; }
@@ -37,16 +39,12 @@ input[type=number]{ -moz-appearance:textfield; }
 .r3{ grid-template-columns:1fr 1fr 1fr; }
 @media(max-width:520px){ .r3{ grid-template-columns:1fr 1fr; } }
 
-.adminGroup{ margin-bottom:9px; }
-.adminGroup h3{ font-size:10.5px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.3px; margin:0 0 5px; }
-
 .btn{ font-weight:700; font-size:13.5px; border:none; border-radius:8px; padding:10px; cursor:pointer; font-family:inherit; }
 .btnPrimary{ background:var(--navy); color:white; width:100%; }
 .btnPrimary:active{ background:var(--navy-deep); }
 .btnGhost{ flex:1; background:white; color:var(--navy); border:1px solid var(--line); }
 .btnRow{ display:flex; gap:8px; margin-top:8px; }
 
-/* compact select tiles (meals + slots) */
 .tileGrid{ display:grid; gap:8px; }
 .g4{ grid-template-columns:repeat(4,1fr); }
 .g3{ grid-template-columns:repeat(3,1fr); }
@@ -72,53 +70,12 @@ input[type=number]{ -moz-appearance:textfield; }
 <body>
 <div class="wrap">
 
-  <div class="head"><h1>Quote Generator</h1><span>walk-in clients</span></div>
-
-  <!-- ADMIN -->
-  <div class="card" id="adminCard">
-    <div class="adminTop"><h2 style="margin:0">Admin Prices</h2><button class="toggle" id="toggleAdmin">Collapse</button></div>
-    <div id="adminContent" style="margin-top:9px">
-      <div class="row r3">
-        <div class="adminGroup"><h3>Standard tier</h3>
-          <div class="field"><label>Single meal &#8377;</label><input type="number" id="nb_single" min="0"></div>
-          <div class="field"><label>Per-meal 2/day &#8377;</label><input type="number" id="nb_double" min="0"></div>
-          <p class="hint" style="margin:2px 0 0">Nutri-Balance, Low Carb, No Carb</p>
-        </div>
-        <div class="adminGroup"><h3>Protein tier</h3>
-          <div class="field"><label>Single meal &#8377;</label><input type="number" id="hp_single" min="0"></div>
-          <div class="field"><label>Per-meal 2/day &#8377;</label><input type="number" id="hp_double" min="0"></div>
-          <p class="hint" style="margin:2px 0 0">High Protein, High Carb</p>
-        </div>
-        <div class="adminGroup"><h3>Breakfast / Seafood</h3>
-          <div class="field"><label>Breakfast &#8377;</label><input type="number" id="bf_price" min="0"></div>
-          <div class="field"><label>Seafood / day &#8377;</label><input type="number" id="addon_seafood" min="0"></div>
-        </div>
-      </div>
-      <div class="row r3">
-        <div class="adminGroup"><h3>Add-ons</h3>
-          <div class="field"><label>Snack/day &#8377;</label><input type="number" id="addon_snack" min="0"></div>
-          <div class="field"><label>Juice/bottle &#8377;</label><input type="number" id="addon_juice" min="0"></div>
-        </div>
-        <div class="adminGroup"><h3>Tax / delivery</h3>
-          <div class="field"><label>GST % (food)</label><input type="number" id="gst" min="0" step="0.01"></div>
-          <div class="field"><label>Per-km rate &#8377;</label><input type="number" id="per_km" min="0" step="0.5"></div>
-        </div>
-        <div class="adminGroup"><h3>Duration</h3>
-          <div class="field"><label>Billing duration</label>
-            <select id="duration"><option value="trial">2 Day Trial</option><option value="week">1 Week</option><option value="month" selected>26 Days</option><option value="quarter">3 Months</option></select></div>
-          <div class="field"><label>Trial days</label><input type="number" id="trial_days_default" min="1"></div>
-        </div>
-      </div>
-      <div class="btnRow">
-        <button class="btn btnGhost" id="presetBtn">Apply preset</button>
-        <button class="btn btnGhost" id="resetBtn">Reset</button>
-      </div>
-    </div>
-  </div>
+  <div class="head"><h1>Quote Generator</h1><span>walk-in clients</span><span class="pstat load" id="pstat">Loading prices…</span></div>
 
   <!-- CLIENT QUOTE -->
   <div class="card">
     <h2>Client Quote</h2>
+
     <div class="row r2">
       <div class="field"><label>Plan</label>
         <select id="plan">
@@ -128,7 +85,18 @@ input[type=number]{ -moz-appearance:textfield; }
           <option value="LC">Low Carb</option>
           <option value="NC">No Carb</option>
         </select></div>
+      <div class="field"><label>Duration</label>
+        <select id="duration">
+          <option value="trial">2 Day Trial</option>
+          <option value="week">1 Week (6 days)</option>
+          <option value="month" selected>26 Days</option>
+          <option value="quarter">3 Months</option>
+        </select></div>
+    </div>
+
+    <div class="row r2">
       <div class="field"><label>Distance (km)</label><input type="number" id="kms" min="0" step="0.1" placeholder="e.g. 6"></div>
+      <div class="field"><label>Delivery price &#8377; (optional)</label><input type="number" id="delivery_price" min="0" step="1" placeholder="overrides km"></div>
     </div>
 
     <div class="field"><label>Meals</label>
@@ -141,7 +109,8 @@ input[type=number]{ -moz-appearance:textfield; }
     </div>
 
     <div class="row r3">
-      <div class="field"><label>Juices/day</label><input type="number" id="juice_qty" min="0" value="0"></div>
+      <div class="field"><label>Juices/day</label>
+        <select id="juice_qty"><option value="0">None</option><option value="1">1 Juice</option><option value="2">2 Juices</option></select></div>
       <div class="field"><label>Seafood days</label><input type="number" id="seafood_days" min="0" value="0"></div>
       <div class="field"><label>Seafood (if 2 meals)</label>
         <select id="seafood_meals_when_2"><option value="1">1 meal</option><option value="2">Both meals</option></select></div>
@@ -153,7 +122,7 @@ input[type=number]{ -moz-appearance:textfield; }
         <div class="tile" data-slot="afternoon" style="--ta:#F97316;--tint:#FFF0E6;"><span class="ck">&#10003;</span><div class="ic">&#9728;</div><div class="lb">Afternoon</div></div>
         <div class="tile" data-slot="evening" style="--ta:#6366F1;--tint:#ECECFB;"><span class="ck">&#10003;</span><div class="ic">&#127769;</div><div class="lb">Evening</div></div>
       </div>
-      <p class="hint">1 slot = combined delivery &middot; 2 slots = separate deliveries.</p>
+      <p class="hint">More slots = more delivery trips (charged per trip per day).</p>
     </div>
   </div>
 
@@ -168,168 +137,115 @@ input[type=number]{ -moz-appearance:textfield; }
     <button class="btn btnGhost" id="copyBtn">Copy message</button>
     <button class="btn btnGhost" id="printBtn">Print / PDF</button>
   </div>
-  <div class="hint" style="text-align:center">GST on food only, not delivery.</div>
+  <div class="hint" style="text-align:center">Prices are read live from the sheet. GST on food only, not delivery.</div>
 
 </div>
 <div id="toast" class="toast"></div>
 
+<script src="config.js"></script>
 <script>
 const $ = id => document.getElementById(id);
-const KEY='friska.quote.settings', UI_KEY='friska.quote.ui';
-const DEF={ nb_single:180,nb_double:180,hp_single:200,hp_double:200,bf_price:150,
-  addon_seafood:80,addon_snack:80,addon_juice:40,gst:5,per_km:8,trial_days_default:2 };
+const API = (typeof API_URL !== "undefined" && API_URL) ? API_URL : "";
 
 const PLAN_NAME={ NB:'Nutri Balance', HP:'High Protein', HC:'High Carb', LC:'Low Carb', NC:'No Carb' };
-const PROTEIN_TIER={ HP:1, HC:1 };
-const DUR_DAYS={ week:6, month:26, quarter:78 };
-const DUR_LABEL={ week:'1 Week', month:'26 Days', quarter:'3 Months' };
+const DUR_CODE={ trial:'d', week:'w', month:'m', quarter:'q' };
+const DUR_DAYS={ trial:2, week:6, month:26, quarter:78 };
+const DUR_LABEL={ trial:'2 Day Trial', week:'1 Week (6 days)', month:'26 Days', quarter:'3 Months' };
 
 let selMeals={breakfast:false,lunch:false,dinner:false,snack:false};
 let selSlots={morning:false,afternoon:false,evening:false};
 
+let pricing={}, priceLoaded=false;
+function loadPrices(){
+  setPStat('load','Loading prices…');
+  return fetch(API).then(r=>r.json()).then(d=>{ pricing=d||{}; priceLoaded=true; setPStat('ok','Live prices'); })
+    .catch(()=>{ priceLoaded=false; setPStat('err','Price load failed'); });
+}
+function setPStat(cls,txt){ let e=$('pstat'); e.className='pstat '+cls; e.textContent=txt; }
+function getPrice(key){ let v=pricing[key]; return v?Number(v):0; }
+
 function toast(m){ const t=$('toast'); t.textContent=m; t.style.display='block'; setTimeout(()=>t.style.display='none',1200); }
 function inr(n){ return '\u20B9'+new Intl.NumberFormat('en-IN',{maximumFractionDigits:0}).format(Math.round(n)); }
-function cap(s){ return s.charAt(0).toUpperCase()+s.slice(1); }
-
-function loadSettings(){
-  const raw=localStorage.getItem(KEY);
-  const s=raw?{...DEF,...JSON.parse(raw)}:{...DEF};
-  for(const k of Object.keys(DEF)) if($(k)) $(k).value=s[k];
-  if(s.duration) $('duration').value=s.duration;
-  const ui=JSON.parse(localStorage.getItem(UI_KEY)||'{"adminCollapsed":false}');
-  collapseAdmin(ui.adminCollapsed);
-}
-function saveSettings(){
-  const s={}; for(const k of Object.keys(DEF)) if($(k)) s[k]=Number($(k).value||0);
-  s.duration=$('duration').value;
-  localStorage.setItem(KEY,JSON.stringify(s));
-}
-function collapseAdmin(c){
-  $('adminContent').style.display=c?'none':'block';
-  $('toggleAdmin').textContent=c?'Expand':'Collapse';
-  localStorage.setItem(UI_KEY,JSON.stringify({adminCollapsed:c}));
-}
-function durDays(){ const d=$('duration').value; return d==='trial'? Number($('trial_days_default').value||2) : DUR_DAYS[d]; }
-function durLabel(){ const d=$('duration').value; return d==='trial'? (Number($('trial_days_default').value||2)+' Day Trial') : DUR_LABEL[d]; }
-
-/* afternoon/evening slots chosen (for the main delivery block) */
-function aeSlots(){ return ['afternoon','evening'].filter(s=>selSlots[s]); }
 
 function generate(){
-  const plan=$('plan').value, planName=PLAN_NAME[plan];
-  const protein=!!PROTEIN_TIER[plan];
-  const days=durDays(), trialDays=Number($('trial_days_default').value||2);
+  if(!priceLoaded){ $('preview').textContent='Live prices not loaded yet — check connection.'; loadPrices(); return; }
 
-  const P={
-    single: protein?Number($('hp_single').value):Number($('nb_single').value),
-    double: protein?Number($('hp_double').value):Number($('nb_double').value),
-    bf:Number($('bf_price').value), seafood:Number($('addon_seafood').value),
-    snack:Number($('addon_snack').value), juice:Number($('addon_juice').value),
-    gst:Number($('gst').value), perKm:Number($('per_km').value)
-  };
+  const planSel=$('plan').value, plan=planSel.toLowerCase(), planName=PLAN_NAME[planSel];
+  const durSel=$('duration').value, durCode=DUR_CODE[durSel], days=DUR_DAYS[durSel], durLbl=DUR_LABEL[durSel];
+
   const kms=Number($('kms').value||0);
+  const flatDelivery=Number($('delivery_price').value||0);
   const juiceQty=Number($('juice_qty').value||0);
   const seafoodDays=Number($('seafood_days').value||0);
   const seafoodWhen2=Number($('seafood_meals_when_2').value||1);
 
-  const hasMain = selMeals.lunch||selMeals.dinner||selMeals.snack||seafoodDays>0;
-  if(!hasMain && !selMeals.breakfast && juiceQty<=0){ $('preview').textContent='Select at least one meal.'; return; }
+  const bf=selMeals.breakfast, lunch=selMeals.lunch, dinner=selMeals.dinner, snack=selMeals.snack;
+  const mains=(lunch?1:0)+(dinner?1:0);
+  if(!bf && !mains && !snack && juiceQty<=0 && seafoodDays<=0){ $('preview').textContent='Select at least one meal.'; return; }
 
-  // a small price+trial helper for one delivery block
-  function block(foodPerDay, trips){
-    const deliveryPerDay = kms*P.perKm*trips;
-    const fM=foodPerDay*days, gM=fM*(P.gst/100);
-    const totalMonth = fM + gM + deliveryPerDay*days;
-    const tF=foodPerDay*trialDays;
-    const trialTotal = tF + tF*(P.gst/100) + deliveryPerDay*trialDays;
-    return { totalMonth, trialTotal };
+  const gst=getPrice('gst'), perKm=getPrice('delivery'), seafoodP=getPrice('seafood');
+
+  function k(item,dc){ return plan+'_'+dc+'_'+item; }
+  function juicePerDay(dc){ return juiceQty<=0?0 : juiceQty===1?getPrice(k('juice1',dc)) : getPrice(k('juice2',dc))*juiceQty; }
+  function foodPerDay(dc){
+    let f=0;
+    if(bf) f+=getPrice(k('breakfast',dc));
+    if(mains===1) f+=getPrice(k('lunch',dc));
+    if(mains===2) f+=getPrice(k('combo',dc))*2;
+    if(snack) f+=getPrice(k('snack',dc));
+    f+=juicePerDay(dc);
+    return f;
   }
 
-  const blocks=[];
+  /* seafood = flat price per seafood meal, added once (not per day). only on lunch/dinner */
+  const seafoodMeals = (seafoodDays>0 && mains>0) ? seafoodDays*(mains===2?seafoodWhen2:1) : 0;
+  const seafoodExtra = seafoodMeals*seafoodP;
 
-  /* ---- MAIN block(s): lunch/dinner/snack/seafood/juice (afternoon/evening) ---- */
-  if(hasMain){
-    const bothMains = selMeals.lunch && selMeals.dinner;
+  const trips=((selSlots.morning?1:0)+(selSlots.afternoon?1:0)+(selSlots.evening?1:0)) || 1;
 
-    // addons common to the main meal(s)
-    const addonLbls=[];
-    if(selMeals.snack) addonLbls.push('Snack');
-    if(seafoodDays>0)  addonLbls.push('Seafood');
-    if(juiceQty>0)     addonLbls.push(juiceQty>1? juiceQty+' Juices':'1 Juice');
-    function addonsPerDay(applied){
-      let v=0;
-      if(selMeals.snack) v+=P.snack;
-      if(juiceQty>0)     v+=juiceQty*P.juice;
-      if(seafoodDays>0)  v+=(P.seafood*seafoodDays*applied)/days;
-      return v;
-    }
-    function lineLabel(base, slotTxt){
-      return [base, ...addonLbls].join(' + ')+' '+slotTxt;
-    }
+  /* ---- selected duration total ---- */
+  const foodTotal = foodPerDay(durCode)*days + seafoodExtra;
+  const gstAmt = foodTotal*(gst/100);
+  const delivery = flatDelivery>0 ? flatDelivery : kms*perKm*trips*days;
+  const total = foodTotal + gstAmt + delivery;
 
-    if(bothMains){
-      // Line 1: single meal (Lunch) — single rate, 1 afternoon delivery
-      const f1 = P.single*1 + addonsPerDay(1);
-      const r1 = block(f1, 1);
-      blocks.push({ label: lineLabel('Lunch','(Afternoon delivery)'), ...r1 });
+  /* ---- 2-day trial (d_ prices, no seafood) ---- */
+  const foodTotalT = foodPerDay('d')*2;
+  const gstT = foodTotalT*(gst/100);
+  const deliveryT = flatDelivery>0 ? 0 : kms*perKm*trips*2;   /* flat price is plan-level */
+  const trialTotal = foodTotalT + gstT + deliveryT;
 
-      // Line 2: Lunch + Dinner — double rate, slot-based delivery
-      let ae=aeSlots(); if(!ae.length) ae=['afternoon'];
-      const trips=ae.length;
-      const f2 = P.double*2 + addonsPerDay(seafoodWhen2);
-      const slotTxt2 = trips===1 ? '('+cap(ae[0])+' delivery)' : '(Afternoon & Evening deliveries)';
-      const r2 = block(f2, trips);
-      blocks.push({ label: lineLabel('Lunch + Dinner', slotTxt2), ...r2 });
-    } else {
-      // single main meal (lunch OR dinner OR addon-only)
-      const meals=(selMeals.lunch?1:0)+(selMeals.dinner?1:0);
-      const perMeal = P.single;
-      let foodPerDay = perMeal*meals + addonsPerDay(1);
-      let ae=aeSlots(); if(!ae.length) ae=['afternoon'];
-      const trips=ae.length;
-      const base=[];
-      if(selMeals.lunch)  base.push('Lunch');
-      if(selMeals.dinner) base.push('Dinner');
-      const baseStr = base.length? base.join(' + ') : (addonLbls.shift()||'Meal');
-      const slotTxt = trips===1 ? '('+cap(ae[0])+' delivery)' : '(Afternoon & Evening deliveries)';
-      const r=block(foodPerDay, trips);
-      blocks.push({ label: [baseStr, ...addonLbls].join(' + ')+' '+slotTxt, ...r });
-    }
-  }
+  /* ---- labels ---- */
+  const items=[];
+  if(bf) items.push('Breakfast');
+  if(lunch) items.push('Lunch');
+  if(dinner) items.push('Dinner');
+  if(snack) items.push('Snack');
+  if(juiceQty>0) items.push(juiceQty>1? juiceQty+' Juices':'1 Juice');
+  if(seafoodMeals>0) items.push('Seafood x'+seafoodMeals);
+  const slotTxt=[];
+  if(selSlots.morning) slotTxt.push('Morning');
+  if(selSlots.afternoon) slotTxt.push('Afternoon');
+  if(selSlots.evening) slotTxt.push('Evening');
 
-  /* ---- BREAKFAST block: morning, own trip (juice rides along if no main) ---- */
-  if(selMeals.breakfast){
-    let foodPerDay = P.bf;
-    let lbl=['Breakfast'];
-    if(!hasMain && juiceQty>0){ foodPerDay += juiceQty*P.juice; lbl.push(juiceQty>1? juiceQty+' Juices':'1 Juice'); }
-    const r=block(foodPerDay, 1);
-    blocks.push({ label: lbl.join(' + ')+' (Morning delivery)', ...r });
-  }
-
-  /* ---- juice-only (no main, no breakfast) ---- */
-  if(!hasMain && !selMeals.breakfast && juiceQty>0){
-    const foodPerDay = juiceQty*P.juice;
-    const r=block(foodPerDay, 1);
-    blocks.push({ label:(juiceQty>1? juiceQty+' Juices':'1 Juice')+' (Morning delivery)', ...r });
-  }
-
-  let out = planName+' Plan\n'+durLabel()+'\n\n';
-  blocks.forEach(b=>{
-    out += b.label+'\n'+inr(b.totalMonth)+'/-\n'+trialDays+' day trial @ '+inr(b.trialTotal)+'/-\n\n';
-  });
-  out += 'Including Delivery Charge & Taxes.';
+  let out=planName+' Plan\n'+durLbl+'\n\n';
+  out+=items.join(' + ')+'\n';
+  if(slotTxt.length) out+='Slots: '+slotTxt.join(', ')+'\n';
+  out+='\nTotal: '+inr(total)+'/-\n';
+  if(durSel!=='trial') out+='2 day trial @ '+inr(trialTotal)+'/-\n';
+  out+='\nIncluding Delivery Charge & Taxes.';
   $('preview').textContent=out;
 }
 
 function copyMsg(){
   const t=($('preview').innerText||'').trim();
-  if(!t || t.startsWith('Pick the') || t.startsWith('Select at')){ toast('Generate first'); return; }
+  if(!t || t.startsWith('Pick the') || t.startsWith('Select at') || t.startsWith('Live prices')){ toast('Generate first'); return; }
   if(navigator.clipboard?.writeText){ navigator.clipboard.writeText(t).then(()=>toast('Copied')).catch(()=>fb(t)); }
   else fb(t);
 }
 function fb(t){ const ta=document.createElement('textarea'); ta.value=t; ta.style.position='fixed'; ta.style.left='-9999px'; document.body.appendChild(ta); ta.select(); try{ document.execCommand('copy'); toast('Copied'); }catch(e){ toast('Copy failed'); } document.body.removeChild(ta); }
 
-/* enforce slot rule: morning only enabled when breakfast or juice present */
+/* morning slot only when breakfast or juice present */
 function refreshSlotRule(){
   const morningOk = selMeals.breakfast || Number($('juice_qty').value||0)>0;
   const mt=document.querySelector('.tile[data-slot="morning"]');
@@ -339,18 +255,12 @@ function refreshSlotRule(){
 
 $('mealTiles').addEventListener('click',e=>{ const t=e.target.closest('.tile'); if(!t)return; const m=t.dataset.meal; selMeals[m]=!selMeals[m]; t.classList.toggle('on',selMeals[m]); refreshSlotRule(); });
 $('slotTiles').addEventListener('click',e=>{ const t=e.target.closest('.tile'); if(!t||t.classList.contains('dim'))return; const s=t.dataset.slot; selSlots[s]=!selSlots[s]; t.classList.toggle('on',selSlots[s]); });
-$('juice_qty').addEventListener('input',refreshSlotRule);
-
-$('toggleAdmin').addEventListener('click',()=>{ const ui=JSON.parse(localStorage.getItem(UI_KEY)||'{}'); collapseAdmin(!ui.adminCollapsed); });
-$('presetBtn').addEventListener('click',()=>{ for(const k of Object.keys(DEF)) if($(k)) $(k).value=DEF[k]; $('duration').value='month'; saveSettings(); toast('Preset applied'); });
-$('resetBtn').addEventListener('click',()=>{ localStorage.removeItem(KEY); localStorage.removeItem(UI_KEY); loadSettings(); toast('Reset'); });
+$('juice_qty').addEventListener('change',refreshSlotRule);
 $('genBtn').addEventListener('click',generate);
 $('copyBtn').addEventListener('click',copyMsg);
 $('printBtn').addEventListener('click',()=>window.print());
-document.querySelectorAll('#adminCard input, #duration').forEach(el=>el.addEventListener('input',saveSettings));
-$('duration').addEventListener('change',saveSettings);
 
-loadSettings();
+loadPrices();
 refreshSlotRule();
 </script>
 </body>
