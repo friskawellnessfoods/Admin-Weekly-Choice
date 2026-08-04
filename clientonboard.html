@@ -68,6 +68,27 @@
   .message{ margin-top:14px; text-align:center; font-weight:700; font-size:14px; min-height:18px; }
   .message.ok{ color:#0b8482; } .message.err{ color:#c62828; }
 
+  .landing{ display:grid; gap:12px; }
+  .choice{ display:grid; grid-template-columns:auto 1fr; grid-template-rows:auto auto; column-gap:14px; align-items:center;
+    background:var(--c-surface); border:1.5px solid var(--c-line); border-radius:16px; padding:18px; cursor:pointer; text-align:left; box-shadow:var(--shadow); transition:border-color .15s, transform .1s; }
+  .choice:hover{ border-color:var(--c-primary); } .choice:active{ transform:scale(.99); }
+  .choice .ci{ grid-row:1 / 3; font-size:26px; width:52px; height:52px; display:flex; align-items:center; justify-content:center; background:var(--c-bg); border-radius:14px; }
+  .choice .ct{ font-weight:800; color:var(--c-ink); font-size:16px; }
+  .choice .cs{ font-size:12.5px; color:var(--c-muted); }
+  .formHead{ display:flex; align-items:center; gap:10px; margin-bottom:14px; }
+  .formHead span{ font-weight:800; color:var(--c-ink); font-size:16px; }
+  .backBtn{ width:38px; height:38px; border-radius:11px; border:1.5px solid var(--c-line); background:var(--c-surface); color:var(--c-ink); font-size:19px; cursor:pointer; flex:0 0 auto; }
+  .backBtn:hover{ border-color:var(--c-primary); }
+  .searchInput{ width:100%; padding:13px 14px; border:1.5px solid var(--c-line); border-radius:12px; font-size:15px; background:var(--c-surface); color:var(--c-ink); margin-bottom:12px; }
+  .searchInput:focus{ outline:none; border-color:var(--c-primary); box-shadow:0 0 0 3px rgba(14,165,163,.16); }
+  .clientList{ display:flex; flex-direction:column; gap:8px; }
+  .clientRow{ display:flex; justify-content:space-between; align-items:center; gap:10px; background:var(--c-surface); border:1.5px solid var(--c-line); border-radius:12px; padding:13px 15px; cursor:pointer; text-align:left; }
+  .clientRow:hover{ border-color:var(--c-primary); }
+  .clientRow .cn{ font-weight:700; color:var(--c-ink); }
+  .clientRow .cp{ font-size:13px; color:var(--c-muted); }
+  .muted{ text-align:center; color:var(--c-muted); padding:24px; font-size:14px; }
+  input[readonly]{ background:#eef1f7; color:#5b6b7b; }
+
   /* Google Places dropdown above our card */
   .pac-container{ z-index:9999; border-radius:10px; margin-top:2px; box-shadow:var(--shadow); font-family:inherit; }
 </style>
@@ -80,7 +101,21 @@
   </div>
 
   <div class="wrap">
+
+    <div id="landing" class="landing">
+      <button class="choice" onclick="startAdd()"><span class="ci">➕</span><span class="ct">Add New Client</span><span class="cs">Create a brand-new entry</span></button>
+      <button class="choice" onclick="startEditPick()"><span class="ci">✏️</span><span class="ct">Edit Existing Client</span><span class="cs">Find a client and update details</span></button>
+    </div>
+
+    <div id="picker" style="display:none">
+      <div class="formHead"><button class="backBtn" onclick="showLanding()">←</button><span>Pick a client to edit</span></div>
+      <input id="clientSearch" class="searchInput" placeholder="Search by name or phone…" oninput="renderClientList()" autocomplete="off">
+      <div id="clientList" class="clientList"></div>
+    </div>
+
+    <div id="formView" style="display:none">
     <div class="card">
+      <div class="formHead"><button class="backBtn" onclick="showLanding()">←</button><span id="formTitle">Add New Client</span></div>
       <label class="fld">Client name</label>
       <input id="name" placeholder="Full name">
 
@@ -141,15 +176,17 @@
       <button id="saveBtn" class="btn">Save Client</button>
       <div id="message" class="message"></div>
     </div>
+    </div>
   </div>
 
 <script>
   const API = (typeof API_URL !== 'undefined') ? API_URL : '';
   let isSubmitting = false;
   let mapLink1 = '', mapLink2 = '';
+  let MODE = 'add', editPhone = '', ALL_CLIENTS = [];
 
   document.addEventListener('DOMContentLoaded', () => {
-    document.getElementById('saveBtn').addEventListener('click', addClient);
+    document.getElementById('saveBtn').addEventListener('click', saveClient);
 
     document.getElementById('mealTypeBtn').addEventListener('click', (e) => {
       e.stopPropagation();
@@ -233,7 +270,7 @@
     m.innerText = text;
   }
 
-  async function addClient() {
+  async function saveClient() {
     if (isSubmitting) return;
     const saveBtn = document.getElementById('saveBtn');
 
@@ -257,6 +294,7 @@
 
     if (!data.name || !data.phone) { showMessage('Name & phone are required', true); return; }
 
+    const action = (MODE === 'edit') ? 'updateClient' : 'addClient';
     isSubmitting = true;
     saveBtn.disabled = true;
     saveBtn.innerHTML = '<span class="spinner"></span> Saving…';
@@ -265,19 +303,99 @@
       const res = await fetch(API, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({ action: 'addClient', payload: JSON.stringify(data) })
+        body: new URLSearchParams({ action: action, payload: JSON.stringify(data) })
       });
       const result = await res.json();
-      if (result.success) { showMessage('Client added ✅'); clearForm(); }
-      else showMessage(result.message || 'Error saving client', true);
+      if (result.success) {
+        if (MODE === 'edit') showMessage('Client updated ✅');
+        else { showMessage('Client added ✅'); clearForm(); }
+      } else showMessage(result.message || 'Error saving client', true);
     } catch (err) {
       showMessage('Server error', true);
     }
 
     isSubmitting = false;
     saveBtn.disabled = false;
-    saveBtn.innerHTML = 'Save Client';
+    saveBtn.innerHTML = (MODE === 'edit') ? 'Save Changes' : 'Save Client';
   }
+
+  /* ---------- Add / Edit navigation ---------- */
+  function showView(v){
+    document.getElementById('landing').style.display  = (v==='landing') ? 'grid' : 'none';
+    document.getElementById('picker').style.display   = (v==='picker')  ? 'block' : 'none';
+    document.getElementById('formView').style.display = (v==='form')    ? 'block' : 'none';
+  }
+  function showLanding(){ showMessage(''); showView('landing'); }
+  function startAdd(){
+    MODE='add'; editPhone=''; clearForm();
+    document.getElementById('phone').readOnly = false;
+    document.getElementById('formTitle').textContent = 'Add New Client';
+    document.getElementById('saveBtn').textContent = 'Save Client';
+    showMessage(''); showView('form');
+  }
+  async function startEditPick(){
+    showView('picker');
+    document.getElementById('clientSearch').value = '';
+    document.getElementById('clientList').innerHTML = '<div class="muted">Loading clients…</div>';
+    await loadClientList();
+    renderClientList();
+  }
+  async function loadClientList(){
+    try{
+      const res = await fetch(API, { method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:new URLSearchParams({ action:'getMasterClientsAll' }) });
+      const d = await res.json();
+      ALL_CLIENTS = (d && d.clients) ? d.clients : [];
+    }catch(e){ ALL_CLIENTS = []; }
+  }
+  function renderClientList(){
+    const q  = (document.getElementById('clientSearch').value||'').trim().toLowerCase();
+    const qd = q.replace(/\D/g,'');
+    const box = document.getElementById('clientList');
+    if(!ALL_CLIENTS.length){ box.innerHTML = '<div class="muted">No clients found.</div>'; return; }
+    let list = ALL_CLIENTS.filter(c=>{
+      if(!q) return true;
+      const nameHit = (c.name||'').toLowerCase().indexOf(q) !== -1;
+      const phoneHit = qd && (c.phone||'').indexOf(qd) !== -1;
+      return nameHit || phoneHit;
+    }).slice(0, 80);
+    if(!list.length){ box.innerHTML = '<div class="muted">No match.</div>'; return; }
+    box.innerHTML = list.map(c => '<button class="clientRow" onclick="pickClient(\''+c.phone+'\')"><span class="cn">'+esc(c.name)+'</span><span class="cp">'+esc(c.phone)+'</span></button>').join('');
+  }
+  async function pickClient(phone){
+    document.getElementById('clientList').innerHTML = '<div class="muted">Loading details…</div>';
+    let c;
+    try{
+      const res = await fetch(API, { method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:new URLSearchParams({ action:'getClientForEdit', phone:phone }) });
+      c = await res.json();
+    }catch(e){ c = null; }
+    if(!c || !c.found){ document.getElementById('clientList').innerHTML = '<div class="muted">Could not load that client.</div>'; return; }
+    MODE='edit'; editPhone = c.phone;
+    fillForm(c);
+    document.getElementById('formTitle').textContent = 'Editing: ' + (c.name || c.phone);
+    document.getElementById('saveBtn').textContent = 'Save Changes';
+    document.getElementById('phone').readOnly = true;
+    showMessage(''); showView('form');
+  }
+  function fillForm(c){
+    clearForm();
+    document.getElementById('name').value = c.name || '';
+    document.getElementById('phone').value = c.phone || '';
+    document.getElementById('remarks').value = c.remarks || '';
+    document.getElementById('location1').value = c.location1 || '';
+    document.getElementById('location2').value = c.location2 || '';
+    document.getElementById('deliveryPrice').value = (c.deliveryPrice != null ? c.deliveryPrice : '');
+    ensureRouteOption('route1', c.route1); ensureRouteOption('route2', c.route2);
+    setSlot('morning', c.morning); setSlot('afternoon', c.afternoon); setSlot('evening', c.evening);
+    document.querySelectorAll('.mealType').forEach(cb => { cb.checked = ((c.type||'').indexOf(cb.value) !== -1); });
+    updateMealTypeDisplay();
+    // keep existing map pins unless the user searches & picks a new one
+    mapLink1 = c.mapLink1 || ''; mapLink2 = c.mapLink2 || '';
+    document.getElementById('mapInput1').value = '';
+    document.getElementById('mapInput2').value = '';
+  }
+  function setSlot(id, val){ const cb=document.getElementById(id); cb.checked=!!val; cb.closest('.slot-chip').classList.toggle('on', !!val); }
+  function ensureRouteOption(id, val){ const sel=document.getElementById(id); if(val && ![...sel.options].some(o=>o.value===val)){ const o=document.createElement('option'); o.value=val; o.textContent=val; sel.appendChild(o); } sel.value = val || ''; }
+  function esc(x){ return String(x==null?'':x).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
   function clearForm() {
     document.querySelectorAll('.card input').forEach(i => { if (i.type === 'checkbox') i.checked = false; else i.value = ''; });
