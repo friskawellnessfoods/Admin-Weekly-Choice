@@ -307,7 +307,7 @@
       });
       const result = await res.json();
       if (result.success) {
-        if (MODE === 'edit') showMessage('Client updated ✅');
+        if (MODE === 'edit') { showMessage(''); startEditPick(); }
         else { showMessage('Client added ✅'); clearForm(); }
       } else showMessage(result.message || 'Error saving client', true);
     } catch (err) {
