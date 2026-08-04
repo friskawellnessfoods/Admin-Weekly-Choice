@@ -294,6 +294,7 @@
 <script>
 const BIZ={name:"Friska Wellness",tagline:"Healthy Meals",address:"Moti Nagar, Hyderabad, Telangana 500018",gst:"38AAKFF6850B1ZI",fssai:"23624030000435",upi:"friskawellnessllp@idfcbank",acHolder:"FRISKA WELLNESS LLP",acNumber:"50200087206209",ifsc:"HDFC0005486",branch:"LIBERTY CROSS ROADS",acType:"CURRENT",logo:"logo.png"};
 const ADMIN_PRICES_URL="https://script.google.com/macros/s/AKfycbz82SA1y26hBJ_cd5kFBE3vD73djtTMVh4G_dCs43JKdSlVXzLWDR4DPMbUtHyTIa0/exec";
+const BILLS_API_URL="https://script.google.com/macros/s/AKfycbwI8_v36JJrkAXVhfGIAirSC3IUHbe6l-3WLeeTETg1SGRUcn4M_dPjN9azSCbgTBD1/exec";
 const COL={date:0,name:1,phone:2,slot:5,opt1:7,opt2:8,brk:9,snk:10,j1:11,j2:12};
 const MONTH_ABBR=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 const MONTHS={jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
@@ -343,8 +344,17 @@ async function apiCall(action,params){
   let json;try{json=JSON.parse(text);}catch(e){throw new Error("Non-JSON response: "+text.slice(0,160));}
   return json;
 }
+async function billsApiCall(action,params){
+  const body=new URLSearchParams();body.set("action",action);
+  if(params)for(const k in params)body.set(k,params[k]);
+  const res=await fetch(BILLS_API_URL,{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded;charset=UTF-8"},body:body.toString()});
+  const text=await res.text();
+  if(!res.ok)throw new Error("Bills server "+res.status+" — "+text.slice(0,160));
+  let json;try{json=JSON.parse(text);}catch(e){throw new Error("Non-JSON Bills response: "+text.slice(0,160));}
+  return json;
+}
 async function fetchOrders(force){if(ordersCache&&!force)return ordersCache;const j=await apiCall("getOrdersOutputAll");ordersCache=Array.isArray(j)?j:(j.rows||[]);return ordersCache;}
-async function fetchBills(force){if(billsCache&&!force)return billsCache;const j=await apiCall("getBillsAll");billsCache=Array.isArray(j)?j:(j.rows||[]);return billsCache;}
+async function fetchBills(force){if(billsCache&&!force)return billsCache;const j=await billsApiCall("getBillsAll");billsCache=Array.isArray(j)?j:(j.rows||[]);return billsCache;}
 async function fetchMaster(force){if(masterCache&&!force)return masterCache;const j=await apiCall("getMasterClientsAll");masterCache=(j&&j.clients)||[];return masterCache;}
 async function fetchStatus(force){if(statusCache&&!force)return statusCache;const j=await apiCall("getMasterClientStatusAll");statusCache=(j&&j.clients)||[];return statusCache;}
 async function fetchPrices(force){
@@ -672,7 +682,7 @@ async function validateAndSave(meta,lines,t,statusId){
   if(billNoExists(meta.billNo)){setStatus(statusId,`Bill no ${meta.billNo} already exists — choose another.`,"err");return false;}
   setStatus(statusId,"Saving…","info");
   const obj=billObject(meta,lines,t);
-  const res=await apiCall("appendBill",{payload:JSON.stringify(obj)});
+  const res=await billsApiCall("appendBill",{payload:JSON.stringify(obj)});
   if(res&&res.ok){
     if(billsCache&&billsCache.length){const headers=billsCache[0].map(h=>String(h).trim());billsCache.push(headers.map(h=>(h in obj)?obj[h]:""));} // keep cache live so the next number advances
     setStatus(statusId,`Saved bill ${meta.billNo}.`,"ok");
@@ -734,7 +744,7 @@ function bindPills(scopeId){
     const idx=billHeaderIndex(billsCache);const bi=idx["BillNo"],si=idx["PaidStatus"];
     const setLocal=v=>{for(let i=1;i<billsCache.length;i++){if(String(billsCache[i][bi])===String(billNo)){billsCache[i][si]=v;break;}}};
     setLocal(next);cb.disabled=true;                       // optimistic, no re-render → instant
-    try{const res=await apiCall("updateBillStatus",{billNo,status:next});if(!res||!res.ok)throw 0;}
+    try{const res=await billsApiCall("updateBillStatus",{billNo,status:next});if(!res||!res.ok)throw 0;}
     catch(e){cb.checked=!cb.checked;setLocal(cb.checked?"Paid":"Unpaid");}
     finally{cb.disabled=false;}
   };});
