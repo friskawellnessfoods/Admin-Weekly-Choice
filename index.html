@@ -493,6 +493,7 @@ let CLIENT_LOCATION_1 = '';
 let CLIENT_LOCATION_2 = '';
 let CLIENT_DELIVERY = {};
 let MASTER_REMARK = '';
+let SLOT_DEFAULTS = null;   // {"Morning":"loc","Afternoon":"loc",...} or null
 /* ========= CONFIG ========= */
 const ADMIN_MODE = true;              // admin repo = true, client repo = false
 const CUTOFF_HOUR = 0;                // cutoff time (only used when cutoff is active)
@@ -562,11 +563,21 @@ async function fetchClient() {
   CLIENT_LOCATION_1 = client.location1 || '';
   CLIENT_LOCATION_2 = client.location2 || '';
   CLIENT_DELIVERY = client.delivery || {};
+  SLOT_DEFAULTS = client.slotDefaults || null;
 
   const menuRes = await fetch(`${API_URL}?action=getGlideMenu&t=${Date.now()}`, { cache: "no-store" });
   MENU = await menuRes.json() || {};
   DATES = Object.keys(MENU).sort();
   applyCutoff();
+
+  // Multi-slot + 2-location client with no saved defaults → force setup popup
+  const _slots = (CLIENT_DELIVERY.morning?1:0) + (CLIENT_DELIVERY.afternoon?1:0) + (CLIENT_DELIVERY.evening?1:0);
+  const _twoLocs = !!(CLIENT_LOCATION_1 && CLIENT_LOCATION_2);
+  if (_slots > 1 && _twoLocs && !SLOT_DEFAULTS) {
+    openDefaultsPopup();
+    return;   // popup will call finishLogin() after save
+  }
+
   initState();
   renderCurrentDay();
 
@@ -689,10 +700,12 @@ function initState(){
     STATE[date].sections.juice1.slot    = _j1Slot;
     STATE[date].sections.juice2.slot    = _j2Slot;
 
-    // Location default: location1 for every section
+    // Location default: use SLOT_DEFAULTS if set (multi-slot + 2-location clients), else location1
     const _defLoc = CLIENT_LOCATION_1 || CLIENT_LOCATION_2 || '';
     ['breakfast','option1','option2','snack','juice1','juice2'].forEach(sec => {
-      STATE[date].sections[sec].location = _defLoc;
+      const secSlot = STATE[date].sections[sec].slot;
+      STATE[date].sections[sec].location =
+        (SLOT_DEFAULTS && SLOT_DEFAULTS[secSlot]) ? SLOT_DEFAULTS[secSlot] : _defLoc;
     });
 
     // Populate items
@@ -822,6 +835,7 @@ function renderCurrentDay(){
       </label>
     </div>
 
+      ${currentIndex === 0 ? renderDefaultsSection() : ''}
       ${renderBlock(date,'breakfast','Breakfast')}
       ${renderBlock(date,'option1','Option 1')}
       ${renderBlock(date,'option2','Option 2')}
@@ -1063,6 +1077,10 @@ function changeQty(d, cardSlot, label, delta, isAlt){
 function updateSectionSlot(date, section, value) {
   const sec = STATE[date].sections[section];
   sec.slot = value;
+  // if this client has slot-defaults, refresh THIS section's location for the new slot (this day only)
+  if (SLOT_DEFAULTS && SLOT_DEFAULTS[value]) {
+    sec.location = SLOT_DEFAULTS[value];
+  }
   // re-stamp slotFrom on any already-picked items so backend matches the new slot
   ['items', 'altItems'].forEach(store => {
     if (!sec[store]) return;
@@ -1070,8 +1088,8 @@ function updateSectionSlot(date, section, value) {
       if (it && it.qty > 0) it.slotFrom = value;
     });
   });
+  renderCurrentDay();
 }
-
 function updateSectionLocation(date, section, value) {
   STATE[date].sections[section].location = value;
 }
@@ -1771,6 +1789,121 @@ function resolvePermModal(ok){
   if (_permResolve) { _permResolve(ok); _permResolve = null; }
 }
 
+function finishLogin(){
+  initState();
+  renderCurrentDay();
+  document.getElementById("viewPastBtn").style.display = "block";
+}
+
+function openDefaultsPopup(){
+  const modal = document.getElementById('defaultsModal');
+  const body = document.getElementById('defaultsBody');
+  const slots = [];
+  if (CLIENT_DELIVERY.morning)   slots.push('Morning');
+  if (CLIENT_DELIVERY.afternoon) slots.push('Afternoon');
+  if (CLIENT_DELIVERY.evening)   slots.push('Evening');
+
+  body.innerHTML = slots.map(s => `
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px;">
+      <span style="font-weight:600; color:var(--navy); min-width:80px;">${s}</span>
+      <select id="def_${s}" style="flex:1; padding:9px 10px; border-radius:10px; border:1.5px solid #e2e7f1; background:#fbfcfe; font-family:inherit;">
+        <option value="${CLIENT_LOCATION_1}">${CLIENT_LOCATION_1}</option>
+        <option value="${CLIENT_LOCATION_2}">${CLIENT_LOCATION_2}</option>
+      </select>
+    </div>
+  `).join('');
+
+  modal.style.display = 'flex';
+}
+
+async function saveDefaultsFromPopup(){
+  const slots = [];
+  if (CLIENT_DELIVERY.morning)   slots.push('Morning');
+  if (CLIENT_DELIVERY.afternoon) slots.push('Afternoon');
+  if (CLIENT_DELIVERY.evening)   slots.push('Evening');
+
+  const out = {};
+  slots.forEach(s => {
+    const el = document.getElementById('def_' + s);
+    out[s] = el ? el.value : (CLIENT_LOCATION_1 || '');
+  });
+
+  const phone = document.getElementById('phone').value.trim();
+  const p = new URLSearchParams();
+  p.append("action", "saveClientDefaults");
+  p.append("phone", phone);
+  p.append("defaults", JSON.stringify(out));
+
+  const btn = document.getElementById('defaultsSaveBtn');
+  btn.classList.add("loading");
+  try {
+    const r = await fetch(API_URL, { method: "POST", body: p });
+    const j = await r.json();
+    if (!j.success) { alert(j.message || 'Save failed'); btn.classList.remove("loading"); return; }
+  } catch(e) {
+    alert('Network error'); btn.classList.remove("loading"); return;
+  }
+  btn.classList.remove("loading");
+
+  SLOT_DEFAULTS = out;
+  document.getElementById('defaultsModal').style.display = 'none';
+  finishLogin();
+}
+
+// Delivery Defaults section (called by renderCurrentDay on first day only)
+function renderDefaultsSection(){
+  const _slots = (CLIENT_DELIVERY.morning?1:0) + (CLIENT_DELIVERY.afternoon?1:0) + (CLIENT_DELIVERY.evening?1:0);
+  const _twoLocs = !!(CLIENT_LOCATION_1 && CLIENT_LOCATION_2);
+  if (_slots <= 1 || !_twoLocs || !SLOT_DEFAULTS) return '';
+
+  const slots = [];
+  if (CLIENT_DELIVERY.morning)   slots.push('Morning');
+  if (CLIENT_DELIVERY.afternoon) slots.push('Afternoon');
+  if (CLIENT_DELIVERY.evening)   slots.push('Evening');
+
+  const rows = slots.map(s => `
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin:8px 0;">
+      <span style="font-weight:600; color:var(--navy); min-width:80px;">${s}</span>
+      <select onchange="updateSlotDefault('${s}', this.value)"
+        style="flex:1; padding:8px 10px; border-radius:10px; border:1.5px solid #e2e7f1; background:#fbfcfe; font-family:inherit;">
+        <option value="${CLIENT_LOCATION_1}" ${SLOT_DEFAULTS[s] === CLIENT_LOCATION_1 ? 'selected' : ''}>${CLIENT_LOCATION_1}</option>
+        <option value="${CLIENT_LOCATION_2}" ${SLOT_DEFAULTS[s] === CLIENT_LOCATION_2 ? 'selected' : ''}>${CLIENT_LOCATION_2}</option>
+      </select>
+    </div>
+  `).join('');
+
+  return `
+    <div class="box" id="defaultsBox">
+      <details>
+        <summary style="font-weight:600; cursor:pointer;">Delivery Defaults</summary>
+        <div style="padding-top:8px;">${rows}</div>
+      </details>
+    </div>
+  `;
+}
+
+async function updateSlotDefault(slot, newLoc){
+  SLOT_DEFAULTS[slot] = newLoc;
+
+  // propagate to all days: every section whose slot matches, refresh its location
+  Object.keys(STATE).forEach(date => {
+    const secs = STATE[date].sections;
+    Object.keys(secs).forEach(name => {
+      if (secs[name].slot === slot) secs[name].location = newLoc;
+    });
+  });
+
+  // persist
+  const phone = document.getElementById('phone').value.trim();
+  const p = new URLSearchParams();
+  p.append("action", "saveClientDefaults");
+  p.append("phone", phone);
+  p.append("defaults", JSON.stringify(SLOT_DEFAULTS));
+  fetch(API_URL, { method: "POST", body: p }).catch(()=>{});
+
+  renderCurrentDay();
+}
+
 </script>
   </div>
   <div id="summaryModal" class="modal">
@@ -1817,6 +1950,17 @@ function resolvePermModal(ok){
       Your account is currently inactive. Please contact Friska Wellness to place your order.
     </p>
     <button class="btn" style="margin-top:0;" onclick="document.getElementById('inactiveModal').style.display='none'">OK</button>
+  </div>
+</div>
+<div id="defaultsModal" class="modal">
+  <div class="modal-content" style="padding:24px 22px 20px; max-width:400px;">
+    <div style="font-size:30px; text-align:center; margin-bottom:8px;">📍</div>
+    <h3 style="margin:0 0 6px; text-align:center;">Set Delivery Locations</h3>
+    <p style="font-size:13.5px; color:#556; line-height:1.5; margin:0 0 18px; text-align:center;">
+      Choose the delivery location for each of your slots. You can change these later.
+    </p>
+    <div id="defaultsBody"></div>
+    <button id="defaultsSaveBtn" class="btn" style="margin-top:14px;" onclick="saveDefaultsFromPopup()">Save</button>
   </div>
 </div>
 </body>
