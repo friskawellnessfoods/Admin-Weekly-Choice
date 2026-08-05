@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a1a6e">
+<title>Expenses — Friska</title>
+<style>
+  :root{--navy:#0a1a6e;--navy-soft:#eef1fb;--emerald:#10b981;--emerald-soft:#e7f7f1;
+    --ink:#111827;--muted:#6b7280;--line:#e5e7eb;--bg:#f5f6fa;--danger:#b3261e;--danger-soft:#fdeceb;--r:14px}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;font-size:15px;
+    padding-bottom:48px;-webkit-tap-highlight-color:transparent}
+  header{background:var(--navy);color:#fff;padding:calc(14px + env(safe-area-inset-top)) 16px 14px;position:sticky;top:0;z-index:5}
+  header h1{margin:0;font-size:18px;font-weight:700}
+  header .sub{opacity:.7;font-size:12px;margin-top:2px}
+  .wrap{max-width:580px;margin:0 auto;padding:14px}
+  .card{background:#fff;border-radius:var(--r);box-shadow:0 1px 4px rgba(16,24,40,.08);padding:14px;margin-bottom:14px}
+  .card h2{margin:0 0 14px;font-size:12px;text-transform:uppercase;letter-spacing:.7px;color:var(--navy);font-weight:700}
+  label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin:0 0 5px}
+  input,select{width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;
+    font-size:16px;font-family:inherit;background:#fff;color:var(--ink);appearance:none;-webkit-appearance:none}
+  input:focus,select:focus{outline:2px solid var(--emerald);outline-offset:1px;border-color:transparent}
+  input.err,select.err{border-color:var(--danger)}
+  .field{margin-bottom:12px}
+  .amount input{font-size:24px;font-weight:700;letter-spacing:-.5px}
+  button.primary{width:100%;padding:15px;border:0;border-radius:12px;background:var(--emerald);color:#fff;
+    font-size:16px;font-weight:700;cursor:pointer;margin-top:2px}
+  button.primary:disabled{opacity:.5}
+  /* tabs */
+  .tabs{display:flex;gap:8px;margin-bottom:12px}
+  .tab{flex:1;padding:9px;border-radius:10px;border:1px solid var(--line);background:#fff;
+    font-size:13px;font-weight:700;color:var(--muted);cursor:pointer}
+  .tab[aria-selected="true"]{background:var(--navy);border-color:var(--navy);color:#fff}
+  /* date range */
+  .range-row{display:flex;gap:8px;align-items:center;margin-bottom:12px}
+  .range-row input[type=date]{flex:1;padding:9px 10px;font-size:14px}
+  .range-row span{font-size:13px;color:var(--muted);white-space:nowrap}
+  .range-row button{padding:9px 14px;border:1px solid var(--line);border-radius:10px;background:#fff;
+    font-size:13px;font-weight:600;cursor:pointer;color:var(--navy);white-space:nowrap}
+  /* totals */
+  .totals{display:flex;gap:10px;margin-bottom:12px}
+  .tot{flex:1;background:var(--navy-soft);border-radius:12px;padding:10px 12px}
+  .tot .k{font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+  .tot .v{font-size:20px;font-weight:700;color:var(--navy);margin-top:2px}
+  /* list */
+  .item{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--line)}
+  .item:last-child{border-bottom:0}
+  .item .m{flex:1;min-width:0}
+  .item .t{font-weight:600;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .item .s{font-size:12px;color:var(--muted);margin-top:2px}
+  .item .a{font-weight:700;white-space:nowrap;font-size:15px}
+  .del{border:0;background:none;color:var(--muted);font-size:20px;line-height:1;padding:4px;cursor:pointer;flex-shrink:0}
+  .empty{color:var(--muted);font-size:14px;padding:16px 0;text-align:center}
+  .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:20px;background:var(--navy);color:#fff;
+    padding:11px 20px;border-radius:999px;font-size:14px;font-weight:600;opacity:0;transition:opacity .2s;
+    pointer-events:none;z-index:50;max-width:90%;text-align:center}
+  .toast.show{opacity:1}.toast.err{background:var(--danger)}
+</style>
+</head>
+<body>
+<header>
+  <h1>Expenses</h1>
+  <div class="sub">Friska daily spend</div>
+</header>
+<div class="wrap">
+
+  <div class="card">
+    <h2>New expense</h2>
+
+    <div class="field amount">
+      <label for="amount">Amount (₹) *</label>
+      <input id="amount" type="number" inputmode="decimal" step="0.01" min="0.01" placeholder="0">
+    </div>
+
+    <div class="field">
+      <label for="category">Category *</label>
+      <select id="category"></select>
+    </div>
+
+    <div class="field">
+      <label for="description">Description *</label>
+      <input id="description" type="text" placeholder="What was this for?">
+    </div>
+
+    <div class="field">
+      <label for="paidby">Paid by *</label>
+      <input id="paidby" type="text" placeholder="Name or account">
+    </div>
+
+    <div class="field">
+      <label for="method">Payment method *</label>
+      <select id="method">
+        <option value="UPI">UPI</option>
+        <option value="Cash">Cash</option>
+      </select>
+    </div>
+
+    <button class="primary" id="save">Save expense</button>
+  </div>
+
+  <div class="card">
+    <h2>Recent</h2>
+    <div class="tabs">
+      <button class="tab" id="tabToday" aria-selected="true">Today</button>
+      <button class="tab" id="tabRange" aria-selected="false">Date range</button>
+    </div>
+
+    <div id="rangeRow" class="range-row" style="display:none">
+      <input type="date" id="from" placeholder="From">
+      <span>→</span>
+      <input type="date" id="to" placeholder="To (optional)">
+      <button id="runRange">Go</button>
+    </div>
+
+    <div class="totals">
+      <div class="tot"><div class="k">Total</div><div class="v" id="totAll">₹0</div></div>
+      <div class="tot"><div class="k">Entries</div><div class="v" id="totCount">0</div></div>
+    </div>
+
+    <div id="list"><div class="empty">Loading…</div></div>
+  </div>
+
+</div>
+<div class="toast" id="toast"></div>
+<script>
+const API='https://script.google.com/macros/s/AKfycbwI8_v36JJrkAXVhfGIAirSC3IUHbe6l-3WLeeTETg1SGRUcn4M_dPjN9azSCbgTBD1/exec';
+const $=id=>document.getElementById(id);
+let ROWS=[];
+let SCOPE='today';
+let RANGE_FROM='', RANGE_TO='';
+
+async function post(params){
+  const r=await fetch(API,{method:'POST',body:new URLSearchParams(params)});
+  const j=await r.json();
+  if(!j.ok) throw new Error(j.message||'Failed');
+  return j;
+}
+
+function toast(msg,isErr){
+  const t=$('toast');
+  t.textContent=msg; t.className='toast show'+(isErr?' err':'');
+  clearTimeout(toast._t); toast._t=setTimeout(()=>{t.className='toast';},2800);
+}
+
+const money=n=>'₹'+Number(n||0).toLocaleString('en-IN',{maximumFractionDigits:2});
+const todayStr=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
+
+/* ---- meta ---- */
+async function loadMeta(){
+  try{
+    const j=await post({action:'getExpenseMeta'});
+    $('category').innerHTML=j.categories.map(c=>`<option>${esc(c)}</option>`).join('');
+  }catch(e){ $('category').innerHTML='<option>Misc</option>'; toast('Could not load categories',true); }
+}
+
+/* ---- data ---- */
+async function loadExpenses(){
+  try{
+    const j=await post({action:'getExpensesAll'});
+    const rows=j.rows||[];
+    if(!rows.length){ROWS=[];render();return;}
+    const h=rows[0].map(x=>String(x).trim());
+    ROWS=rows.slice(1).map(r=>{const o={};h.forEach((k,i)=>o[k]=r[i]);return o;}).filter(o=>o.ExpenseId);
+    render();
+  }catch(e){$('list').innerHTML='<div class="empty">Could not load.</div>';}
+}
+
+/* ---- filter ---- */
+function inScope(o){
+  const ts=String(o.Timestamp||o.Date||'').slice(0,10);
+  if(SCOPE==='today') return ts===todayStr();
+  // range
+  if(RANGE_FROM && !RANGE_TO) return ts===RANGE_FROM;
+  if(RANGE_FROM && RANGE_TO) return ts>=RANGE_FROM && ts<=RANGE_TO;
+  return false;
+}
+
+/* ---- render ---- */
+function render(){
+  const items=ROWS.filter(inScope).sort((a,b)=>String(b.Timestamp).localeCompare(String(a.Timestamp)));
+  let total=0; items.forEach(o=>total+=Number(o.Amount)||0);
+  $('totAll').textContent=money(total);
+  $('totCount').textContent=items.length;
+  $('list').innerHTML=items.length?items.map(o=>`
+    <div class="item">
+      <div class="m">
+        <div class="t">${esc(o.Description)}</div>
+        <div class="s">${esc(String(o.Timestamp).slice(0,16))} · ${esc(o.Category)} · ${esc(o.PaymentMethod)} · ${esc(o.PaidBy)}</div>
+      </div>
+      <div class="a">${money(o.Amount)}</div>
+      <button class="del" data-id="${esc(o.ExpenseId)}" aria-label="Delete">×</button>
+    </div>`).join(''):'<div class="empty">No entries.</div>';
+  document.querySelectorAll('.del').forEach(b=>b.onclick=()=>del(b.dataset.id));
+}
+
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+
+/* ---- tabs ---- */
+$('tabToday').onclick=()=>{
+  SCOPE='today';
+  $('tabToday').setAttribute('aria-selected','true');
+  $('tabRange').setAttribute('aria-selected','false');
+  $('rangeRow').style.display='none';
+  render();
+};
+$('tabRange').onclick=()=>{
+  SCOPE='range';
+  $('tabRange').setAttribute('aria-selected','true');
+  $('tabToday').setAttribute('aria-selected','false');
+  $('rangeRow').style.display='flex';
+  $('from').value=todayStr();
+  $('to').value='';
+  RANGE_FROM=todayStr(); RANGE_TO='';
+  render();
+};
+$('runRange').onclick=()=>{
+  RANGE_FROM=$('from').value;
+  RANGE_TO=$('to').value;
+  if(!RANGE_FROM){toast('Enter at least a start date',true);return;}
+  render();
+};
+
+/* ---- save ---- */
+$('save').onclick=async()=>{
+  const fields=[
+    ['amount',$('amount').value.trim()],
+    ['category',$('category').value],
+    ['description',$('description').value.trim()],
+    ['paidby',$('paidby').value.trim()],
+    ['method',$('method').value]
+  ];
+  let ok=true;
+  fields.forEach(([id,v])=>{
+    const el=$(id);
+    if(!v||v==='0'){el.classList.add('err');ok=false;}else el.classList.remove('err');
+  });
+  const amt=Number($('amount').value);
+  if(!isFinite(amt)||amt<=0){$('amount').classList.add('err');ok=false;}
+  if(!ok){toast('Fill all required fields',true);return;}
+
+  const btn=$('save');
+  btn.disabled=true;btn.textContent='Saving…';
+  try{
+    const j=await post({action:'appendExpense',payload:JSON.stringify({
+      Amount:amt,
+      Category:$('category').value,
+      Description:$('description').value.trim(),
+      PaidBy:$('paidby').value.trim(),
+      PaymentMethod:$('method').value
+    })});
+    toast('Saved '+j.expenseId);
+    $('amount').value='';$('description').value='';$('paidby').value='';
+    $('method').value='UPI';
+    ['amount','description','paidby','method','category'].forEach(id=>$(id).classList.remove('err'));
+    await loadExpenses();
+  }catch(e){toast(e.message,true);}
+  finally{btn.disabled=false;btn.textContent='Save expense';}
+};
+
+/* ---- delete ---- */
+async function del(id){
+  if(!confirm('Delete '+id+'?'))return;
+  try{await post({action:'deleteExpense',expenseId:id});toast('Deleted');await loadExpenses();}
+  catch(e){toast(e.message,true);}
+}
+
+/* ---- init ---- */
+loadMeta().then(loadExpenses);
+</script>
+</body>
+</html>
