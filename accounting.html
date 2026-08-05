@@ -4,91 +4,169 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0a1a6e">
-<title>Expenses — Friska</title>
+<title>Accounting — Friska</title>
 <style>
-  :root{--navy:#0a1a6e;--navy-soft:#eef1fb;--emerald:#10b981;--emerald-soft:#e7f7f1;
-    --ink:#111827;--muted:#6b7280;--line:#e5e7eb;--bg:#f5f6fa;--danger:#b3261e;--danger-soft:#fdeceb;--r:14px}
-  *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--ink);
-    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;font-size:15px;
-    padding-bottom:48px;-webkit-tap-highlight-color:transparent}
-  header{background:var(--navy);color:#fff;padding:calc(14px + env(safe-area-inset-top)) 16px 14px;position:sticky;top:0;z-index:5}
-  header h1{margin:0;font-size:18px;font-weight:700}
-  header .sub{opacity:.7;font-size:12px;margin-top:2px}
-  .wrap{max-width:580px;margin:0 auto;padding:14px}
-  .card{background:#fff;border-radius:var(--r);box-shadow:0 1px 4px rgba(16,24,40,.08);padding:14px;margin-bottom:14px}
-  .card h2{margin:0 0 14px;font-size:12px;text-transform:uppercase;letter-spacing:.7px;color:var(--navy);font-weight:700}
-  label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin:0 0 5px}
-  input,select{width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;
-    font-size:16px;font-family:inherit;background:#fff;color:var(--ink);appearance:none;-webkit-appearance:none}
-  input:focus,select:focus{outline:2px solid var(--emerald);outline-offset:1px;border-color:transparent}
-  input.err,select.err{border-color:var(--danger)}
-  .field{margin-bottom:12px}
-  .amount input{font-size:24px;font-weight:700;letter-spacing:-.5px}
-  button.primary{width:100%;padding:15px;border:0;border-radius:12px;background:var(--emerald);color:#fff;
-    font-size:16px;font-weight:700;cursor:pointer;margin-top:2px}
-  button.primary:disabled{opacity:.5}
-  /* tabs */
-  .tabs{display:flex;gap:8px;margin-bottom:12px}
-  .tab{flex:1;padding:9px;border-radius:10px;border:1px solid var(--line);background:#fff;
-    font-size:13px;font-weight:700;color:var(--muted);cursor:pointer}
-  .tab[aria-selected="true"]{background:var(--navy);border-color:var(--navy);color:#fff}
-  /* date range */
-  .range-row{display:flex;gap:8px;align-items:center;margin-bottom:12px}
-  .range-row input[type=date]{flex:1;padding:9px 10px;font-size:14px}
-  .range-row span{font-size:13px;color:var(--muted);white-space:nowrap}
-  .range-row button{padding:9px 14px;border:1px solid var(--line);border-radius:10px;background:#fff;
-    font-size:13px;font-weight:600;cursor:pointer;color:var(--navy);white-space:nowrap}
-  /* totals */
-  .totals{display:flex;gap:10px;margin-bottom:12px}
-  .tot{flex:1;background:var(--navy-soft);border-radius:12px;padding:10px 12px}
-  .tot .k{font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px}
-  .tot .v{font-size:20px;font-weight:700;color:var(--navy);margin-top:2px}
-  /* list */
-  .item{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--line)}
-  .item:last-child{border-bottom:0}
-  .item .m{flex:1;min-width:0}
-  .item .t{font-weight:600;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .item .s{font-size:12px;color:var(--muted);margin-top:2px}
-  .item .a{font-weight:700;white-space:nowrap;font-size:15px}
-  .del{border:0;background:none;color:var(--muted);font-size:20px;line-height:1;padding:4px;cursor:pointer;flex-shrink:0}
-  .empty{color:var(--muted);font-size:14px;padding:16px 0;text-align:center}
-  .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:20px;background:var(--navy);color:#fff;
-    padding:11px 20px;border-radius:999px;font-size:14px;font-weight:600;opacity:0;transition:opacity .2s;
-    pointer-events:none;z-index:50;max-width:90%;text-align:center}
-  .toast.show{opacity:1}.toast.err{background:var(--danger)}
+:root{
+  --navy:#0a1a6e;--navy2:#0d2280;--navy-soft:#eef1fb;
+  --emerald:#10b981;--emerald-soft:#e7f7f1;--emerald-dark:#065f46;
+  --ink:#111827;--muted:#6b7280;--line:#e5e7eb;--bg:#f0f2f8;
+  --danger:#b3261e;--danger-soft:#fdeceb;--warn:#d97706;--warn-soft:#fef3c7;
+  --r:14px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  font-size:15px;padding-bottom:60px;-webkit-tap-highlight-color:transparent}
+
+/* ── header ── */
+header{background:var(--navy);color:#fff;padding:calc(14px + env(safe-area-inset-top)) 16px 0;position:sticky;top:0;z-index:10}
+header .top{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+header h1{font-size:18px;font-weight:700}
+header .sub{font-size:11px;opacity:.65;margin-top:1px}
+.nav{display:flex;gap:2px}
+.nav button{flex:1;padding:10px 6px;border:0;background:transparent;color:rgba(255,255,255,.6);
+  font-size:13px;font-weight:600;cursor:pointer;border-bottom:3px solid transparent;transition:all .15s}
+.nav button[aria-selected="true"]{color:#fff;border-bottom-color:var(--emerald)}
+
+/* ── filter bar ── */
+.filter-bar{background:#fff;border-bottom:1px solid var(--line);padding:10px 14px;
+  display:flex;gap:8px;align-items:center;flex-wrap:wrap;position:sticky;top:var(--header-h,105px);z-index:9}
+.fp{display:flex;gap:6px;flex-wrap:wrap}
+.fp button{padding:7px 13px;border-radius:999px;border:1px solid var(--line);background:#fff;
+  font-size:12px;font-weight:700;color:var(--muted);cursor:pointer}
+.fp button[aria-pressed="true"]{background:var(--navy);border-color:var(--navy);color:#fff}
+.range-inputs{display:flex;gap:6px;align-items:center;width:100%}
+.range-inputs input[type=date]{flex:1;padding:7px 10px;border:1px solid var(--line);border-radius:8px;
+  font-size:13px;font-family:inherit;background:#fff}
+.range-inputs span{font-size:12px;color:var(--muted)}
+.range-inputs button{padding:7px 14px;border-radius:8px;border:0;background:var(--navy);
+  color:#fff;font-size:13px;font-weight:700;cursor:pointer}
+
+/* ── panels ── */
+.panel{display:none;padding:14px;max-width:640px;margin:0 auto}
+.panel.active{display:block}
+
+/* ── cards ── */
+.card{background:#fff;border-radius:var(--r);box-shadow:0 1px 4px rgba(16,24,40,.07);padding:14px;margin-bottom:14px}
+.card-title{font-size:12px;text-transform:uppercase;letter-spacing:.7px;color:var(--navy);font-weight:700;margin-bottom:14px}
+
+/* ── stat grid ── */
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.stat{background:var(--navy-soft);border-radius:12px;padding:12px}
+.stat.green{background:var(--emerald-soft)}
+.stat.red{background:var(--danger-soft)}
+.stat.warn{background:var(--warn-soft)}
+.stat .k{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)}
+.stat .v{font-size:20px;font-weight:800;color:var(--navy);margin-top:4px;letter-spacing:-.5px}
+.stat.green .v{color:var(--emerald-dark)}
+.stat.red .v{color:var(--danger)}
+.stat.warn .v{color:var(--warn)}
+.stat .sub{font-size:11px;color:var(--muted);margin-top:2px}
+.stat-full{grid-column:1/-1}
+
+/* ── divider ── */
+.divider{height:1px;background:var(--line);margin:14px 0}
+
+/* ── cat rows ── */
+.cat-row{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--line)}
+.cat-row:last-child{border:0}
+.cat-row .label{font-size:13px;color:var(--ink)}
+.cat-row .val{font-weight:700;font-size:14px}
+
+/* ── flag list ── */
+.flag-item{font-size:13px;padding:6px 0;border-bottom:1px solid var(--line);color:var(--danger)}
+.flag-item:last-child{border:0}
+
+/* ── form (tab1) ── */
+label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin:0 0 5px}
+input[type=text],input[type=number],select{width:100%;padding:12px;border:1px solid var(--line);
+  border-radius:10px;font-size:16px;font-family:inherit;background:#fff;color:var(--ink);
+  appearance:none;-webkit-appearance:none}
+input:focus,select:focus{outline:2px solid var(--emerald);outline-offset:1px;border-color:transparent}
+input.err,select.err{border-color:var(--danger)}
+.field{margin-bottom:12px}
+.amount-input{font-size:24px!important;font-weight:700!important;letter-spacing:-.5px}
+button.primary{width:100%;padding:15px;border:0;border-radius:12px;background:var(--emerald);
+  color:#fff;font-size:16px;font-weight:700;cursor:pointer;margin-top:2px}
+button.primary:disabled{opacity:.5}
+
+/* ── recent list ── */
+.item{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--line)}
+.item:last-child{border:0}
+.item .m{flex:1;min-width:0}
+.item .t{font-weight:600;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.item .s{font-size:12px;color:var(--muted);margin-top:2px}
+.item .a{font-weight:700;white-space:nowrap}
+.del{border:0;background:none;color:var(--muted);font-size:20px;padding:4px;cursor:pointer;flex-shrink:0}
+
+.empty{color:var(--muted);font-size:14px;padding:20px 0;text-align:center}
+.loading{color:var(--muted);font-size:14px;padding:20px 0;text-align:center}
+
+/* ── balance bar ── */
+.balance{border-radius:12px;padding:14px;background:linear-gradient(135deg,var(--navy),var(--navy2));color:#fff;margin-bottom:14px}
+.balance .label{font-size:11px;opacity:.7;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+.balance .value{font-size:28px;font-weight:800;margin-top:6px;letter-spacing:-1px}
+.balance .sub{font-size:12px;opacity:.65;margin-top:4px}
+
+/* ── toast ── */
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:20px;background:var(--navy);
+  color:#fff;padding:11px 20px;border-radius:999px;font-size:14px;font-weight:600;
+  opacity:0;transition:opacity .2s;pointer-events:none;z-index:99;max-width:90%;text-align:center}
+.toast.show{opacity:1}.toast.err{background:var(--danger)}
 </style>
 </head>
 <body>
-<header>
-  <h1>Expenses</h1>
-  <div class="sub">Friska daily spend</div>
-</header>
-<div class="wrap">
 
-  <div class="card">
-    <h2>New expense</h2>
-
-    <div class="field amount">
-      <label for="amount">Amount (₹) *</label>
-      <input id="amount" type="number" inputmode="decimal" step="0.01" min="0.01" placeholder="0">
+<header id="mainHeader">
+  <div class="top">
+    <div>
+      <h1>Accounting</h1>
+      <div class="sub">Friska Wellness Foods</div>
     </div>
+  </div>
+  <nav class="nav">
+    <button aria-selected="true" data-tab="expense">Add Expense</button>
+    <button aria-selected="false" data-tab="ledger">Credits vs Debits</button>
+    <button aria-selected="false" data-tab="summary">Summary</button>
+  </nav>
+</header>
 
+<!-- filter bar (hidden on tab1) -->
+<div class="filter-bar" id="filterBar" style="display:none">
+  <div class="fp">
+    <button aria-pressed="true" data-period="today">Today</button>
+    <button aria-pressed="false" data-period="month">This month</button>
+    <button aria-pressed="false" data-period="3month">3 months</button>
+    <button aria-pressed="false" data-period="range">Range</button>
+  </div>
+  <div class="range-inputs" id="rangeInputs" style="display:none">
+    <input type="date" id="fromDate">
+    <span>→</span>
+    <input type="date" id="toDate" placeholder="To (optional)">
+    <button id="applyRange">Go</button>
+  </div>
+</div>
+
+<!-- TAB 1: Add Expense -->
+<div class="panel active" id="panel-expense">
+  <div class="card">
+    <div class="card-title">New expense</div>
+    <div class="field">
+      <label for="amount">Amount (₹) *</label>
+      <input id="amount" class="amount-input" type="number" inputmode="decimal" step="0.01" min="0.01" placeholder="0">
+    </div>
     <div class="field">
       <label for="category">Category *</label>
       <select id="category"></select>
     </div>
-
     <div class="field">
       <label for="description">Description *</label>
       <input id="description" type="text" placeholder="What was this for?">
     </div>
-
     <div class="field">
       <label for="paidby">Paid by *</label>
       <input id="paidby" type="text" placeholder="Name or account">
     </div>
-
     <div class="field">
       <label for="method">Payment method *</label>
       <select id="method">
@@ -96,178 +174,364 @@
         <option value="Cash">Cash</option>
       </select>
     </div>
-
-    <button class="primary" id="save">Save expense</button>
+    <button class="primary" id="saveBtn">Save expense</button>
   </div>
 
   <div class="card">
-    <h2>Recent</h2>
-    <div class="tabs">
-      <button class="tab" id="tabToday" aria-selected="true">Today</button>
-      <button class="tab" id="tabRange" aria-selected="false">Date range</button>
-    </div>
+    <div class="card-title">Today's expenses</div>
+    <div id="todayList"><div class="loading">Loading…</div></div>
+  </div>
+</div>
 
-    <div id="rangeRow" class="range-row" style="display:none">
-      <input type="date" id="from" placeholder="From">
-      <span>→</span>
-      <input type="date" id="to" placeholder="To (optional)">
-      <button id="runRange">Go</button>
-    </div>
-
-    <div class="totals">
-      <div class="tot"><div class="k">Total</div><div class="v" id="totAll">₹0</div></div>
-      <div class="tot"><div class="k">Entries</div><div class="v" id="totCount">0</div></div>
-    </div>
-
-    <div id="list"><div class="empty">Loading…</div></div>
+<!-- TAB 2: Credits vs Debits -->
+<div class="panel" id="panel-ledger">
+  <div class="balance">
+    <div class="label">Net cash position</div>
+    <div class="value" id="netCash">₹0</div>
+    <div class="sub">Collected − Expenses</div>
   </div>
 
+  <div class="card">
+    <div class="card-title">Credits — Bills</div>
+    <div class="stats">
+      <div class="stat">
+        <div class="k">Total billed</div>
+        <div class="v" id="totalBilled">₹0</div>
+      </div>
+      <div class="stat green">
+        <div class="k">Collected</div>
+        <div class="v" id="totalPaid">₹0</div>
+        <div class="sub" id="paidCount"></div>
+      </div>
+      <div class="stat red stat-full">
+        <div class="k">Outstanding</div>
+        <div class="v" id="totalUnpaid">₹0</div>
+        <div class="sub" id="unpaidCount"></div>
+      </div>
+    </div>
+    <div id="unpaidList"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Debits — Expenses</div>
+    <div class="stats">
+      <div class="stat red stat-full">
+        <div class="k">Total spent</div>
+        <div class="v" id="totalExpenses">₹0</div>
+        <div class="sub" id="expCount"></div>
+      </div>
+    </div>
+    <div id="expCatBreakdown"></div>
+  </div>
 </div>
+
+<!-- TAB 3: Summary -->
+<div class="panel" id="panel-summary">
+  <div class="card">
+    <div class="card-title">Revenue</div>
+    <div class="stats">
+      <div class="stat">
+        <div class="k">Total billed</div>
+        <div class="v" id="s-billed">₹0</div>
+      </div>
+      <div class="stat green">
+        <div class="k">Collected</div>
+        <div class="v" id="s-collected">₹0</div>
+      </div>
+      <div class="stat red">
+        <div class="k">Outstanding</div>
+        <div class="v" id="s-outstanding">₹0</div>
+      </div>
+      <div class="stat">
+        <div class="k">Delivery collected</div>
+        <div class="v" id="s-delivery">₹0</div>
+      </div>
+      <div class="stat warn stat-full">
+        <div class="k">GST collected</div>
+        <div class="v" id="s-gst">₹0</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Expenses</div>
+    <div class="stats">
+      <div class="stat red stat-full">
+        <div class="k">Total expenses</div>
+        <div class="v" id="s-expenses">₹0</div>
+      </div>
+    </div>
+    <div id="s-catBreakdown"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Profit</div>
+    <div class="stats">
+      <div class="stat green stat-full">
+        <div class="k">Gross profit (Collected − Expenses)</div>
+        <div class="v" id="s-gross">₹0</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" id="flagCard">
+    <div class="card-title">⚠ Missing line items</div>
+    <div id="flagList"></div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
+
 <script>
 const API='https://script.google.com/macros/s/AKfycbwI8_v36JJrkAXVhfGIAirSC3IUHbe6l-3WLeeTETg1SGRUcn4M_dPjN9azSCbgTBD1/exec';
-const $=id=>document.getElementById(id);
-let ROWS=[];
-let SCOPE='today';
-let RANGE_FROM='', RANGE_TO='';
 
+/* ── utils ── */
+const $=id=>document.getElementById(id);
+const money=n=>'₹'+Number(n||0).toLocaleString('en-IN',{maximumFractionDigits:2});
+const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function toast(msg,isErr){
+  const t=$('toast');t.textContent=msg;t.className='toast show'+(isErr?' err':'');
+  clearTimeout(toast._t);toast._t=setTimeout(()=>t.className='toast',2800);
+}
 async function post(params){
   const r=await fetch(API,{method:'POST',body:new URLSearchParams(params)});
-  const j=await r.json();
-  if(!j.ok) throw new Error(j.message||'Failed');
-  return j;
+  const j=await r.json();if(!j.ok)throw new Error(j.message||'Failed');return j;
 }
 
-function toast(msg,isErr){
-  const t=$('toast');
-  t.textContent=msg; t.className='toast show'+(isErr?' err':'');
-  clearTimeout(toast._t); toast._t=setTimeout(()=>{t.className='toast';},2800);
-}
-
-const money=n=>'₹'+Number(n||0).toLocaleString('en-IN',{maximumFractionDigits:2});
+/* ── date helpers ── */
 const todayStr=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
+function monthRange(monthsBack){
+  const now=new Date();
+  const from=new Date(now.getFullYear(),now.getMonth()-monthsBack,1);
+  const to=new Date(now.getFullYear(),now.getMonth()+1,0);
+  const fmt=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  return{from:fmt(from),to:fmt(to)};
+}
 
-/* ---- meta ---- */
+/* ── state ── */
+let BILLS=[];   // array of objects keyed by header
+let EXPENSES=[]; // array of objects
+let META={categories:[],paymentMethods:['UPI','Cash']};
+let PERIOD='today';
+let RANGE={from:'',to:''};
+let activeTab='expense';
+
+/* ── filter ── */
+function billDate(b){return String(b.Date||'').slice(0,10);}
+function expDate(e){return String(e.Timestamp||'').slice(0,10);}
+function inPeriod(dateStr){
+  if(!dateStr)return false;
+  const d=dateStr.slice(0,10);
+  if(PERIOD==='today')return d===todayStr();
+  if(PERIOD==='month'){const r=monthRange(0);return d>=r.from&&d<=r.to;}
+  if(PERIOD==='3month'){const r=monthRange(2);return d>=r.from&&d<=r.to;}
+  if(PERIOD==='range'){
+    if(!RANGE.from)return false;
+    if(!RANGE.to)return d===RANGE.from;
+    return d>=RANGE.from&&d<=RANGE.to;
+  }
+  return false;
+}
+const filteredBills=()=>BILLS.filter(b=>inPeriod(billDate(b)));
+const filteredExpenses=()=>EXPENSES.filter(e=>inPeriod(expDate(e)));
+
+/* ── load ── */
+async function loadAll(){
+  try{
+    const [bj,ej]=await Promise.all([
+      post({action:'getBillsAll'}),
+      post({action:'getExpensesAll'})
+    ]);
+    // Bills
+    const br=bj.rows||[];
+    if(br.length){
+      const bh=br[0].map(x=>String(x).trim());
+      BILLS=br.slice(1).map(r=>{const o={};bh.forEach((k,i)=>o[k]=r[i]);return o;}).filter(o=>o.BillNo);
+    }
+    // Expenses
+    const er=ej.rows||[];
+    if(er.length){
+      const eh=er[0].map(x=>String(x).trim());
+      EXPENSES=er.slice(1).map(r=>{const o={};eh.forEach((k,i)=>o[k]=r[i]);return o;}).filter(o=>o.ExpenseId);
+    }
+    renderAll();
+  }catch(e){toast('Load failed: '+e.message,true);}
+}
+
 async function loadMeta(){
   try{
     const j=await post({action:'getExpenseMeta'});
+    META=j;
     $('category').innerHTML=j.categories.map(c=>`<option>${esc(c)}</option>`).join('');
-  }catch(e){ $('category').innerHTML='<option>Misc</option>'; toast('Could not load categories',true); }
+  }catch(e){$('category').innerHTML='<option>Misc</option>';}
 }
 
-/* ---- data ---- */
-async function loadExpenses(){
-  try{
-    const j=await post({action:'getExpensesAll'});
-    const rows=j.rows||[];
-    if(!rows.length){ROWS=[];render();return;}
-    const h=rows[0].map(x=>String(x).trim());
-    ROWS=rows.slice(1).map(r=>{const o={};h.forEach((k,i)=>o[k]=r[i]);return o;}).filter(o=>o.ExpenseId);
-    render();
-  }catch(e){$('list').innerHTML='<div class="empty">Could not load.</div>';}
+/* ── render all ── */
+function renderAll(){
+  renderTodayList();
+  if(activeTab==='ledger')renderLedger();
+  if(activeTab==='summary')renderSummary();
 }
 
-/* ---- filter ---- */
-function inScope(o){
-  const ts=String(o.Timestamp||o.Date||'').slice(0,10);
-  if(SCOPE==='today') return ts===todayStr();
-  // range
-  if(RANGE_FROM && !RANGE_TO) return ts===RANGE_FROM;
-  if(RANGE_FROM && RANGE_TO) return ts>=RANGE_FROM && ts<=RANGE_TO;
-  return false;
-}
-
-/* ---- render ---- */
-function render(){
-  const items=ROWS.filter(inScope).sort((a,b)=>String(b.Timestamp).localeCompare(String(a.Timestamp)));
-  let total=0; items.forEach(o=>total+=Number(o.Amount)||0);
-  $('totAll').textContent=money(total);
-  $('totCount').textContent=items.length;
-  $('list').innerHTML=items.length?items.map(o=>`
+/* ── tab 1: today list ── */
+function renderTodayList(){
+  const items=EXPENSES.filter(e=>expDate(e)===todayStr())
+    .sort((a,b)=>String(b.Timestamp).localeCompare(String(a.Timestamp)));
+  $('todayList').innerHTML=items.length?items.map(e=>`
     <div class="item">
       <div class="m">
-        <div class="t">${esc(o.Description)}</div>
-        <div class="s">${esc(String(o.Timestamp).slice(0,16))} · ${esc(o.Category)} · ${esc(o.PaymentMethod)} · ${esc(o.PaidBy)}</div>
+        <div class="t">${esc(e.Description)}</div>
+        <div class="s">${esc(String(e.Timestamp).slice(11,16))} · ${esc(e.Category)} · ${esc(e.PaymentMethod)} · ${esc(e.PaidBy)}</div>
       </div>
-      <div class="a">${money(o.Amount)}</div>
-      <button class="del" data-id="${esc(o.ExpenseId)}" aria-label="Delete">×</button>
-    </div>`).join(''):'<div class="empty">No entries.</div>';
-  document.querySelectorAll('.del').forEach(b=>b.onclick=()=>del(b.dataset.id));
+      <div class="a">${money(e.Amount)}</div>
+      <button class="del" data-id="${esc(e.ExpenseId)}" aria-label="Delete">×</button>
+    </div>`).join(''):'<div class="empty">No expenses today.</div>';
+  $('todayList').querySelectorAll('.del').forEach(b=>b.onclick=()=>delExpense(b.dataset.id));
 }
 
-function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+/* ── tab 2: ledger ── */
+function renderLedger(){
+  const bills=filteredBills();
+  const exps=filteredExpenses();
 
-/* ---- tabs ---- */
-$('tabToday').onclick=()=>{
-  SCOPE='today';
-  $('tabToday').setAttribute('aria-selected','true');
-  $('tabRange').setAttribute('aria-selected','false');
-  $('rangeRow').style.display='none';
-  render();
-};
-$('tabRange').onclick=()=>{
-  SCOPE='range';
-  $('tabRange').setAttribute('aria-selected','true');
-  $('tabToday').setAttribute('aria-selected','false');
-  $('rangeRow').style.display='flex';
-  $('from').value=todayStr();
-  $('to').value='';
-  RANGE_FROM=todayStr(); RANGE_TO='';
-  render();
-};
-$('runRange').onclick=()=>{
-  RANGE_FROM=$('from').value;
-  RANGE_TO=$('to').value;
-  if(!RANGE_FROM){toast('Enter at least a start date',true);return;}
-  render();
+  const paid=bills.filter(b=>b.PaidStatus==='Paid');
+  const unpaid=bills.filter(b=>b.PaidStatus!=='Paid');
+  const totalBilled=bills.reduce((s,b)=>s+(Number(b.GrandTotal)||0),0);
+  const totalPaid=paid.reduce((s,b)=>s+(Number(b.GrandTotal)||0),0);
+  const totalUnpaid=unpaid.reduce((s,b)=>s+(Number(b.GrandTotal)||0),0);
+  const totalExp=exps.reduce((s,e)=>s+(Number(e.Amount)||0),0);
+  const net=totalPaid-totalExp;
+
+  $('netCash').textContent=money(net);
+  $('totalBilled').textContent=money(totalBilled);
+  $('totalPaid').textContent=money(totalPaid);
+  $('paidCount').textContent=paid.length+' bill'+(paid.length!==1?'s':'');
+  $('totalUnpaid').textContent=money(totalUnpaid);
+  $('unpaidCount').textContent=unpaid.length+' bill'+(unpaid.length!==1?'s':'');
+  $('totalExpenses').textContent=money(totalExp);
+  $('expCount').textContent=exps.length+' entr'+(exps.length!==1?'ies':'y');
+
+  // unpaid bills list
+  $('unpaidList').innerHTML=unpaid.length?'<div class="divider"></div>'+unpaid.map(b=>`
+    <div class="item">
+      <div class="m">
+        <div class="t">${esc(b.Client)}</div>
+        <div class="s">${esc(b.BillNo)} · ${esc(String(b.Date).slice(0,10))}</div>
+      </div>
+      <div class="a">${money(b.GrandTotal)}</div>
+    </div>`).join(''):'';
+
+  // expense category breakdown
+  const catMap={};
+  exps.forEach(e=>{const c=e.Category||'Misc';catMap[c]=(catMap[c]||0)+(Number(e.Amount)||0);});
+  const cats=Object.entries(catMap).sort((a,b)=>b[1]-a[1]);
+  $('expCatBreakdown').innerHTML=cats.length?'<div class="divider"></div>'+cats.map(([c,v])=>`
+    <div class="cat-row"><span class="label">${esc(c)}</span><span class="val">${money(v)}</span></div>`).join(''):'';
+}
+
+/* ── tab 3: summary ── */
+function renderSummary(){
+  const bills=filteredBills();
+  const exps=filteredExpenses();
+
+  const paid=bills.filter(b=>b.PaidStatus==='Paid');
+  const unpaid=bills.filter(b=>b.PaidStatus!=='Paid');
+  const totalBilled=bills.reduce((s,b)=>s+(Number(b.GrandTotal)||0),0);
+  const totalPaid=paid.reduce((s,b)=>s+(Number(b.GrandTotal)||0),0);
+  const totalUnpaid=unpaid.reduce((s,b)=>s+(Number(b.GrandTotal)||0),0);
+  const totalDelivery=bills.reduce((s,b)=>s+(Number(b.Delivery)||0),0);
+  const totalGst=bills.reduce((s,b)=>s+(Number(b.Gst)||0),0);
+  const totalExp=exps.reduce((s,e)=>s+(Number(e.Amount)||0),0);
+  const gross=totalPaid-totalExp;
+
+  $('s-billed').textContent=money(totalBilled);
+  $('s-collected').textContent=money(totalPaid);
+  $('s-outstanding').textContent=money(totalUnpaid);
+  $('s-delivery').textContent=money(totalDelivery);
+  $('s-gst').textContent=money(totalGst);
+  $('s-expenses').textContent=money(totalExp);
+  $('s-gross').textContent=money(gross);
+  $('s-gross').closest('.stat').className='stat stat-full '+(gross>=0?'green':'red');
+
+  // category breakdown
+  const catMap={};
+  exps.forEach(e=>{const c=e.Category||'Misc';catMap[c]=(catMap[c]||0)+(Number(e.Amount)||0);});
+  const cats=Object.entries(catMap).sort((a,b)=>b[1]-a[1]);
+  $('s-catBreakdown').innerHTML=cats.length?'<div class="divider"></div>'+cats.map(([c,v])=>`
+    <div class="cat-row"><span class="label">${esc(c)}</span><span class="val">${money(v)}</span></div>`).join(''):'<div class="empty">No expenses.</div>';
+
+  // missing LineItemsJSON
+  const missing=bills.filter(b=>!b.LineItemsJSON||!String(b.LineItemsJSON).trim()||String(b.LineItemsJSON).trim()==='[]');
+  $('flagCard').style.display=missing.length?'block':'none';
+  $('flagList').innerHTML=missing.map(b=>`
+    <div class="flag-item">${esc(b.BillNo)} — ${esc(b.Client)} — ${esc(String(b.Date).slice(0,10))}</div>`).join('');
+}
+
+/* ── tab switching ── */
+document.querySelectorAll('.nav button').forEach(btn=>{
+  btn.onclick=()=>{
+    activeTab=btn.dataset.tab;
+    document.querySelectorAll('.nav button').forEach(b=>b.setAttribute('aria-selected','false'));
+    btn.setAttribute('aria-selected','true');
+    document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+    $('panel-'+activeTab).classList.add('active');
+    $('filterBar').style.display=activeTab==='expense'?'none':'flex';
+    if(activeTab==='ledger')renderLedger();
+    if(activeTab==='summary')renderSummary();
+  };
+});
+
+/* ── period filter ── */
+document.querySelectorAll('.fp button').forEach(btn=>{
+  btn.onclick=()=>{
+    PERIOD=btn.dataset.period;
+    document.querySelectorAll('.fp button').forEach(b=>b.setAttribute('aria-pressed','false'));
+    btn.setAttribute('aria-pressed','true');
+    $('rangeInputs').style.display=PERIOD==='range'?'flex':'none';
+    if(PERIOD!=='range'){renderLedger();renderSummary();}
+  };
+});
+$('applyRange').onclick=()=>{
+  RANGE.from=$('fromDate').value;
+  RANGE.to=$('toDate').value;
+  if(!RANGE.from){toast('Enter a start date',true);return;}
+  renderLedger();renderSummary();
 };
 
-/* ---- save ---- */
-$('save').onclick=async()=>{
-  const fields=[
-    ['amount',$('amount').value.trim()],
-    ['category',$('category').value],
-    ['description',$('description').value.trim()],
-    ['paidby',$('paidby').value.trim()],
-    ['method',$('method').value]
-  ];
+/* ── save expense ── */
+$('saveBtn').onclick=async()=>{
+  const fields=[['amount',$('amount')],['category',$('category')],
+    ['description',$('description')],['paidby',$('paidby')],['method',$('method')]];
   let ok=true;
-  fields.forEach(([id,v])=>{
-    const el=$(id);
-    if(!v||v==='0'){el.classList.add('err');ok=false;}else el.classList.remove('err');
-  });
+  fields.forEach(([,el])=>{if(!el.value.trim()){el.classList.add('err');ok=false;}else el.classList.remove('err');});
   const amt=Number($('amount').value);
   if(!isFinite(amt)||amt<=0){$('amount').classList.add('err');ok=false;}
-  if(!ok){toast('Fill all required fields',true);return;}
-
-  const btn=$('save');
-  btn.disabled=true;btn.textContent='Saving…';
+  if(!ok){toast('Fill all fields',true);return;}
+  const btn=$('saveBtn');btn.disabled=true;btn.textContent='Saving…';
   try{
     const j=await post({action:'appendExpense',payload:JSON.stringify({
-      Amount:amt,
-      Category:$('category').value,
-      Description:$('description').value.trim(),
-      PaidBy:$('paidby').value.trim(),
-      PaymentMethod:$('method').value
+      Amount:amt,Category:$('category').value,Description:$('description').value.trim(),
+      PaidBy:$('paidby').value.trim(),PaymentMethod:$('method').value
     })});
     toast('Saved '+j.expenseId);
     $('amount').value='';$('description').value='';$('paidby').value='';
     $('method').value='UPI';
-    ['amount','description','paidby','method','category'].forEach(id=>$(id).classList.remove('err'));
-    await loadExpenses();
+    fields.forEach(([,el])=>el.classList.remove('err'));
+    await loadAll();
   }catch(e){toast(e.message,true);}
   finally{btn.disabled=false;btn.textContent='Save expense';}
 };
 
-/* ---- delete ---- */
-async function del(id){
+/* ── delete expense ── */
+async function delExpense(id){
   if(!confirm('Delete '+id+'?'))return;
-  try{await post({action:'deleteExpense',expenseId:id});toast('Deleted');await loadExpenses();}
+  try{await post({action:'deleteExpense',expenseId:id});toast('Deleted');await loadAll();}
   catch(e){toast(e.message,true);}
 }
 
-/* ---- init ---- */
-loadMeta().then(loadExpenses);
+/* ── init ── */
+loadMeta();
+loadAll();
 </script>
 </body>
 </html>
