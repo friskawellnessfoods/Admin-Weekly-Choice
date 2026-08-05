@@ -211,6 +211,7 @@
     });
 
     loadRoutes();
+    prefetchClients();   // warm the edit list in the background
   });
 
   // pull the routes already used in the sheet (Master Client List cols L & M) into both dropdowns
@@ -343,17 +344,23 @@
   async function startEditPick(){
     showView('picker');
     document.getElementById('clientSearch').value = '';
-    document.getElementById('clientList').innerHTML = '<div class="muted">Loading clients…</div>';
-    await loadClientList();
-    renderClientList();
+    if(ALL_CLIENTS.length){ renderClientList(); }        // already prefetched -> instant
+    else{
+      document.getElementById('clientList').innerHTML = '<div class="muted">Loading clients…</div>';
+      await loadClientList();
+      renderClientList();
+    }
   }
-  async function loadClientList(){
-    try{
-      const res = await fetch(API, { method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:new URLSearchParams({ action:'getMasterClientsAll' }) });
-      const d = await res.json();
-      ALL_CLIENTS = (d && d.clients) ? d.clients : [];
-    }catch(e){ ALL_CLIENTS = []; }
+  let clientsPromise = null;
+  function loadClientList(force){
+    if(clientsPromise && !force) return clientsPromise;
+    clientsPromise = fetch(API, { method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:new URLSearchParams({ action:'getMasterClientsAll' }) })
+      .then(r=>r.json())
+      .then(d=>{ ALL_CLIENTS = (d && d.clients) ? d.clients : []; return ALL_CLIENTS; })
+      .catch(()=>{ ALL_CLIENTS = []; clientsPromise = null; return ALL_CLIENTS; }); // allow retry on failure
+    return clientsPromise;
   }
+  function prefetchClients(){ loadClientList(); }
   function renderClientList(){
     const q  = (document.getElementById('clientSearch').value||'').trim().toLowerCase();
     const qd = q.replace(/\D/g,'');
