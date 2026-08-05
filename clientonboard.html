@@ -122,6 +122,11 @@
       <label class="fld">Phone number</label>
       <input id="phone" placeholder="10-digit mobile" inputmode="numeric">
 
+      <div id="statusField" style="display:none">
+        <label class="fld">Status</label>
+        <select id="status"><option value="Active">Active</option><option value="Inactive">Inactive</option></select>
+      </div>
+
       <label class="fld">Meal types</label>
       <div class="dropdown-wrap">
         <button type="button" class="dropdown-btn" id="mealTypeBtn">
@@ -289,7 +294,8 @@
       deliveryPrice: document.getElementById('deliveryPrice').value.trim(),
       morning: document.getElementById('morning').checked,
       afternoon: document.getElementById('afternoon').checked,
-      evening: document.getElementById('evening').checked
+      evening: document.getElementById('evening').checked,
+      status: document.getElementById('status').value
     };
 
     if (!data.name || !data.phone) { showMessage('Name & phone are required', true); return; }
@@ -328,6 +334,7 @@
   function showLanding(){ showMessage(''); showView('landing'); }
   function startAdd(){
     MODE='add'; editPhone=''; clearForm();
+    document.getElementById('statusField').style.display = 'none';
     document.getElementById('phone').readOnly = false;
     document.getElementById('formTitle').textContent = 'Add New Client';
     document.getElementById('saveBtn').textContent = 'Save Client';
@@ -392,6 +399,8 @@
     mapLink1 = c.mapLink1 || ''; mapLink2 = c.mapLink2 || '';
     document.getElementById('mapInput1').value = '';
     document.getElementById('mapInput2').value = '';
+    document.getElementById('statusField').style.display = 'block';
+    document.getElementById('status').value = (String(c.status||'').toLowerCase().indexOf('inact') === 0) ? 'Inactive' : 'Active';
   }
   function setSlot(id, val){ const cb=document.getElementById(id); cb.checked=!!val; cb.closest('.slot-chip').classList.toggle('on', !!val); }
   function ensureRouteOption(id, val){ const sel=document.getElementById(id); if(val && ![...sel.options].some(o=>o.value===val)){ const o=document.createElement('option'); o.value=val; o.textContent=val; sel.appendChild(o); } sel.value = val || ''; }
