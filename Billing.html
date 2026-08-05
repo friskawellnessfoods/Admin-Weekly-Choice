@@ -760,6 +760,13 @@ function openNewBillFor(name,phone,dateKey){
   if(phone)el("n_phone").value=phone;
   if(dateKey){el("n_start").value=dateKey;newDatesFromStart();refreshNum("n_billno","n_start");}
 }
+function openUsageCheckFor(name,dateKey){
+  switchTab("usage");
+  el("u_client").value=name;
+  if(dateKey)el("u_start").value=dateKey;
+  el("u_end").value=keyOf(dateOnly(new Date()));
+  runUsageCheck(false);
+}
 async function loadDashboard(force){setStatus("d_status","Loading bills…","info");try{const bills=await fetchBills(force);let orders=[];try{orders=await fetchOrders(force);}catch(e){}let inactiveSet=new Set();try{const st=await fetchStatus(force);inactiveSet=new Set(st.filter(c=>c.status==="inactive").map(c=>normName(c.name)));}catch(e){}renderDashboard(orders,inactiveSet);try{renderUnbilled(orders,bills);}catch(e){el("d_unbilled").innerHTML='<div class="subtle">Orders load failed.</div>';}setStatus("d_status",`${Math.max(0,bills.length-1)} bills.`,"ok");}catch(err){setStatus("d_status","Error: "+err.message,"err");el("d_followups").innerHTML="";}}
 function unbilledDismissed(){try{return new Set(JSON.parse(localStorage.getItem("friska_unbilled_dismiss")||"[]"));}catch(e){return new Set();}}
 function dismissUnbilled(k){const s=unbilledDismissed();s.add(k);try{localStorage.setItem("friska_unbilled_dismiss",JSON.stringify([...s]));}catch(e){}}
@@ -787,9 +794,21 @@ function renderUnbilled(orders,bills){
     groups[k].sort((a,b)=>a.date-b.date);
     const open=!!unbilledOpen[k];
     html+=`<div style="margin-top:8px"><div style="display:flex;align-items:center;gap:8px"><div class="oldhead" data-mk="${k}" style="flex:1">${open?"▾":"▸"} ${monthLabel_(k)} (${groups[k].length})</div><button class="btn btn-ghost" data-dismm="${k}" style="padding:6px 10px;font-size:.8rem">Dismiss all</button></div><div class="${open?"":"hidden"}" data-wrap="${k}"><div style="overflow-x:auto"><table class="dtable"><thead><tr><th>Client</th><th>Phone</th><th>First order</th><th></th></tr></thead><tbody>`+
-      groups[k].map(r=>`<tr><td><b class="clientlink" data-name="${String(r.name).replace(/"/g,"&quot;")}" data-phone="${r.phone}" data-date="${keyOf(r.date)}" style="cursor:pointer;color:var(--navy);text-decoration:underline">${r.name}</b></td><td>${r.phone}</td><td>${dtstr(r.date)}</td><td><button class="rm" data-dis="${r.key}">×</button></td></tr>`).join("")+`</tbody></table></div></div></div>`;});
+      groups[k].map(r=>`<tr><td><b>${r.name}</b></td><td>${r.phone}</td><td>${dtstr(r.date)}</td><td style="white-space:nowrap"><div class="rowmenu" data-name="${String(r.name).replace(/"/g,"&quot;")}" data-phone="${r.phone}" data-date="${keyOf(r.date)}"><button class="rowmenu-btn" data-ubmenubtn="${r.key}">⋮</button><div class="rowmenu-pop" data-ubmenupop="${r.key}"><button class="rowmenu-item" data-ubnew>Make new bill</button><button class="rowmenu-item" data-ubusage>Check usage</button></div></div><button class="rm" data-dis="${r.key}" style="margin-left:6px">×</button></td></tr>`).join("")+`</tbody></table></div></div></div>`;});
   el("d_unbilled").innerHTML=html;
-  el("d_unbilled").querySelectorAll(".clientlink").forEach(nd=>{nd.onclick=()=>openNewBillFor(nd.dataset.name,nd.dataset.phone,nd.dataset.date);});
+  el("d_unbilled").querySelectorAll("button[data-ubmenubtn]").forEach(function(b){
+    b.onclick=function(e){
+      e.stopPropagation();
+      var pop=el("d_unbilled").querySelector('[data-ubmenupop="'+b.dataset.ubmenubtn+'"]');
+      openRowMenu(b,pop);
+    };
+  });
+  el("d_unbilled").querySelectorAll("button[data-ubnew]").forEach(function(b){
+    b.onclick=function(e){e.stopPropagation();closeAllRowMenus();var w=b.closest(".rowmenu");openNewBillFor(w.dataset.name,w.dataset.phone,w.dataset.date);};
+  });
+  el("d_unbilled").querySelectorAll("button[data-ubusage]").forEach(function(b){
+    b.onclick=function(e){e.stopPropagation();closeAllRowMenus();var w=b.closest(".rowmenu");openUsageCheckFor(w.dataset.name,w.dataset.date);};
+  });
   el("d_unbilled").querySelectorAll("button[data-dis]").forEach(b=>b.onclick=()=>{dismissUnbilled(b.dataset.dis);renderUnbilled(orders,bills);});
   el("d_unbilled").querySelectorAll("button[data-dismm]").forEach(b=>b.onclick=()=>{const k=b.dataset.dismm;if(!confirm(`Dismiss all ${groups[k].length} clients in ${monthLabel_(k)}?`))return;dismissUnbilledMany(groups[k].map(r=>r.key));renderUnbilled(orders,bills);});
   el("d_unbilled").querySelectorAll(".oldhead[data-mk]").forEach(h=>h.onclick=()=>{const k=h.dataset.mk;unbilledOpen[k]=!unbilledOpen[k];renderUnbilled(orders,bills);});
@@ -888,23 +907,26 @@ function applyDashFilter(){
     b.onclick=function(e){
       e.stopPropagation();
       var pop=el("d_table").querySelector('[data-menupop="'+b.dataset.menubtn+'"]');
-      var willOpen=!pop.classList.contains("open");
-      closeAllRowMenus();
-      if(willOpen){
-        var rect=b.getBoundingClientRect();
-        var popW=170;
-        var left=Math.min(Math.max(8,rect.right-popW),window.innerWidth-popW-8);
-        var top=rect.bottom+4;
-        if(top+90>window.innerHeight)top=rect.top-94; // flip above the button if it would overflow the bottom
-        pop.style.left=left+"px";pop.style.top=top+"px";
-        pop.classList.add("open");
-      }
+      openRowMenu(b,pop);
     };
   });
   el("d_table").querySelectorAll("button[data-dl]").forEach(function(b){b.onclick=function(e){e.stopPropagation();closeAllRowMenus();downloadBillImage(b.dataset.dl);};});
   el("d_table").querySelectorAll("button[data-delbill]").forEach(function(b){b.onclick=function(e){e.stopPropagation();closeAllRowMenus();deleteBillPrompt(b.dataset.delbill);};});
 }
 function closeAllRowMenus(except){document.querySelectorAll(".rowmenu-pop.open").forEach(function(p){if(p!==except)p.classList.remove("open");});}
+function openRowMenu(btn,pop){
+  var willOpen=!pop.classList.contains("open");
+  closeAllRowMenus();
+  if(willOpen){
+    var rect=btn.getBoundingClientRect();
+    var popW=170;
+    var left=Math.min(Math.max(8,rect.right-popW),window.innerWidth-popW-8);
+    var top=rect.bottom+4;
+    if(top+90>window.innerHeight)top=rect.top-94; // flip above the button if it would overflow the bottom
+    pop.style.left=left+"px";pop.style.top=top+"px";
+    pop.classList.add("open");
+  }
+}
 window.addEventListener("scroll",function(){closeAllRowMenus();},true);
 document.addEventListener("click",function(){closeAllRowMenus();});
 
