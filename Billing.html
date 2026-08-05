@@ -81,7 +81,7 @@
   .rowmenu{position:relative;display:inline-block}
   .rowmenu-btn{background:none;border:none;color:var(--muted);font-size:1.15rem;font-weight:700;cursor:pointer;padding:2px 9px;border-radius:7px;line-height:1}
   .rowmenu-btn:hover{background:var(--accent-soft)}
-  .rowmenu-pop{position:absolute;right:0;top:100%;z-index:40;background:#fff;border:1.5px solid var(--line);border-radius:10px;box-shadow:0 10px 24px rgba(20,33,62,.14);min-width:160px;padding:6px;display:none}
+  .rowmenu-pop{position:fixed;z-index:200;background:#fff;border:1.5px solid var(--line);border-radius:10px;box-shadow:0 10px 24px rgba(20,33,62,.14);min-width:160px;padding:6px;display:none}
   .rowmenu-pop.open{display:block}
   .rowmenu-item{display:block;width:100%;text-align:left;padding:8px 10px;border-radius:8px;border:none;background:none;font-size:.85rem;font-weight:600;color:var(--ink);cursor:pointer}
   .rowmenu-item:hover{background:var(--accent-soft)}
@@ -111,9 +111,9 @@
 <div class="wrap">
   <div class="topbar"><img src="logo.png" alt="" onerror="this.style.display='none'" /><h1>Friska Billing</h1></div>
   <div class="tabs">
-    <button class="tab active" data-tab="new">New Bill</button>
-    <button class="tab" data-tab="renew">Renew / Reconcile</button>
     <button class="tab" data-tab="dash">Dashboard</button>
+    <button class="tab" data-tab="renew">Renew / Reconcile</button>
+    <button class="tab" data-tab="new">New Bill</button>
     <button class="tab" data-tab="usage">Usage Check</button>
   </div>
 
@@ -753,6 +753,13 @@ async function validateAndSave(meta,lines,t,statusId){
 function followDismissed(){try{return JSON.parse(localStorage.getItem("friska_follow_dismiss")||"{}");}catch(e){return {};}}
 function followDismissSave(o){try{localStorage.setItem("friska_follow_dismiss",JSON.stringify(o));}catch(e){}}
 function openRenewFor(name){switchTab("renew");el("r_client").value=name;runRenew(false);}
+function openNewBillFor(name,phone,dateKey){
+  switchTab("new");
+  el("n_client").value=name;
+  onClientNameChange();
+  if(phone)el("n_phone").value=phone;
+  if(dateKey){el("n_start").value=dateKey;newDatesFromStart();refreshNum("n_billno","n_start");}
+}
 async function loadDashboard(force){setStatus("d_status","Loading bills…","info");try{const bills=await fetchBills(force);let orders=[];try{orders=await fetchOrders(force);}catch(e){}let inactiveSet=new Set();try{const st=await fetchStatus(force);inactiveSet=new Set(st.filter(c=>c.status==="inactive").map(c=>normName(c.name)));}catch(e){}renderDashboard(orders,inactiveSet);try{renderUnbilled(orders,bills);}catch(e){el("d_unbilled").innerHTML='<div class="subtle">Orders load failed.</div>';}setStatus("d_status",`${Math.max(0,bills.length-1)} bills.`,"ok");}catch(err){setStatus("d_status","Error: "+err.message,"err");el("d_followups").innerHTML="";}}
 function unbilledDismissed(){try{return new Set(JSON.parse(localStorage.getItem("friska_unbilled_dismiss")||"[]"));}catch(e){return new Set();}}
 function dismissUnbilled(k){const s=unbilledDismissed();s.add(k);try{localStorage.setItem("friska_unbilled_dismiss",JSON.stringify([...s]));}catch(e){}}
@@ -780,8 +787,9 @@ function renderUnbilled(orders,bills){
     groups[k].sort((a,b)=>a.date-b.date);
     const open=!!unbilledOpen[k];
     html+=`<div style="margin-top:8px"><div style="display:flex;align-items:center;gap:8px"><div class="oldhead" data-mk="${k}" style="flex:1">${open?"▾":"▸"} ${monthLabel_(k)} (${groups[k].length})</div><button class="btn btn-ghost" data-dismm="${k}" style="padding:6px 10px;font-size:.8rem">Dismiss all</button></div><div class="${open?"":"hidden"}" data-wrap="${k}"><div style="overflow-x:auto"><table class="dtable"><thead><tr><th>Client</th><th>Phone</th><th>First order</th><th></th></tr></thead><tbody>`+
-      groups[k].map(r=>`<tr><td><b>${r.name}</b></td><td>${r.phone}</td><td>${dtstr(r.date)}</td><td><button class="rm" data-dis="${r.key}">×</button></td></tr>`).join("")+`</tbody></table></div></div></div>`;});
+      groups[k].map(r=>`<tr><td><b class="clientlink" data-name="${String(r.name).replace(/"/g,"&quot;")}" data-phone="${r.phone}" data-date="${keyOf(r.date)}" style="cursor:pointer;color:var(--navy);text-decoration:underline">${r.name}</b></td><td>${r.phone}</td><td>${dtstr(r.date)}</td><td><button class="rm" data-dis="${r.key}">×</button></td></tr>`).join("")+`</tbody></table></div></div></div>`;});
   el("d_unbilled").innerHTML=html;
+  el("d_unbilled").querySelectorAll(".clientlink").forEach(nd=>{nd.onclick=()=>openNewBillFor(nd.dataset.name,nd.dataset.phone,nd.dataset.date);});
   el("d_unbilled").querySelectorAll("button[data-dis]").forEach(b=>b.onclick=()=>{dismissUnbilled(b.dataset.dis);renderUnbilled(orders,bills);});
   el("d_unbilled").querySelectorAll("button[data-dismm]").forEach(b=>b.onclick=()=>{const k=b.dataset.dismm;if(!confirm(`Dismiss all ${groups[k].length} clients in ${monthLabel_(k)}?`))return;dismissUnbilledMany(groups[k].map(r=>r.key));renderUnbilled(orders,bills);});
   el("d_unbilled").querySelectorAll(".oldhead[data-mk]").forEach(h=>h.onclick=()=>{const k=h.dataset.mk;unbilledOpen[k]=!unbilledOpen[k];renderUnbilled(orders,bills);});
@@ -880,14 +888,24 @@ function applyDashFilter(){
     b.onclick=function(e){
       e.stopPropagation();
       var pop=el("d_table").querySelector('[data-menupop="'+b.dataset.menubtn+'"]');
-      closeAllRowMenus(pop);
-      pop.classList.toggle("open");
+      var willOpen=!pop.classList.contains("open");
+      closeAllRowMenus();
+      if(willOpen){
+        var rect=b.getBoundingClientRect();
+        var popW=170;
+        var left=Math.min(Math.max(8,rect.right-popW),window.innerWidth-popW-8);
+        var top=rect.bottom+4;
+        if(top+90>window.innerHeight)top=rect.top-94; // flip above the button if it would overflow the bottom
+        pop.style.left=left+"px";pop.style.top=top+"px";
+        pop.classList.add("open");
+      }
     };
   });
   el("d_table").querySelectorAll("button[data-dl]").forEach(function(b){b.onclick=function(e){e.stopPropagation();closeAllRowMenus();downloadBillImage(b.dataset.dl);};});
   el("d_table").querySelectorAll("button[data-delbill]").forEach(function(b){b.onclick=function(e){e.stopPropagation();closeAllRowMenus();deleteBillPrompt(b.dataset.delbill);};});
 }
 function closeAllRowMenus(except){document.querySelectorAll(".rowmenu-pop.open").forEach(function(p){if(p!==except)p.classList.remove("open");});}
+window.addEventListener("scroll",function(){closeAllRowMenus();},true);
 document.addEventListener("click",function(){closeAllRowMenus();});
 
 /* ===================== USAGE CHECK ===================== */
@@ -1002,6 +1020,7 @@ el("d_ubHead").addEventListener("click",()=>{const b=el("d_ubBody"),h=el("d_ubHe
 // init
 el("n_billdate").value=keyOf(dateOnly(new Date()));
 updatePlanHead();
+switchTab("dash");
 (async()=>{
   try{await fetchPrices(false);}catch(e){setStatus("n_status","Couldn't load Prices: "+e.message,"err");}
   nRender(true);
