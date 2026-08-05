@@ -87,6 +87,11 @@ input:focus,select:focus{outline:2px solid var(--emerald);outline-offset:1px;bor
 input.err,select.err{border-color:var(--danger)}
 .field{margin-bottom:12px}
 .amount-input{font-size:24px!important;font-weight:700!important;letter-spacing:-.5px}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{padding:9px 16px;border-radius:999px;border:1px solid var(--line);background:#fff;
+  font-size:14px;font-weight:600;color:var(--muted);cursor:pointer;transition:all .12s}
+.chip[aria-pressed="true"]{background:var(--navy);border-color:var(--navy);color:#fff}
+.chip.err-chip{border-color:var(--danger)}
 button.primary{width:100%;padding:15px;border:0;border-radius:12px;background:var(--emerald);
   color:#fff;font-size:16px;font-weight:700;cursor:pointer;margin-top:2px}
 button.primary:disabled{opacity:.5}
@@ -172,8 +177,8 @@ button.primary:disabled{opacity:.5}
       <input id="description" type="text" placeholder="What was this for?">
     </div>
     <div class="field">
-      <label for="paidby">Paid by *</label>
-      <input id="paidby" type="text" placeholder="Name or account">
+      <label>Paid by *</label>
+      <div class="chips" id="paidByChips"></div>
     </div>
     <div class="field">
       <label for="method">Payment method *</label>
@@ -298,6 +303,10 @@ button.primary:disabled{opacity:.5}
 
 <script>
 const API='https://script.google.com/macros/s/AKfycbwI8_v36JJrkAXVhfGIAirSC3IUHbe6l-3WLeeTETg1SGRUcn4M_dPjN9azSCbgTBD1/exec';
+
+/* ━━━ EDIT NAMES HERE ━━━ */
+const PAID_BY_NAMES = ['Parth', 'Umesh'];
+/* ━━━━━━━━━━━━━━━━━━━━━━━ */
 
 /* ── utils ── */
 const $=id=>document.getElementById(id);
@@ -526,21 +535,24 @@ $('applyRange').onclick=()=>{
 /* ── save expense ── */
 $('saveBtn').onclick=async()=>{
   const fields=[['expDate',$('expDate')],['amount',$('amount')],['category',$('category')],
-    ['paidby',$('paidby')],['method',$('method')]];
+    ['method',$('method')]];
   let ok=true;
   fields.forEach(([,el])=>{if(!el.value.trim()){el.classList.add('err');ok=false;}else el.classList.remove('err');});
   const amt=Number($('amount').value);
   if(!isFinite(amt)||amt<=0){$('amount').classList.add('err');ok=false;}
+  const paidBy=getPaidBy();
+  if(!paidBy){$('paidByChips').querySelectorAll('.chip').forEach(c=>c.classList.add('err-chip'));ok=false;}
+  else $('paidByChips').querySelectorAll('.chip').forEach(c=>c.classList.remove('err-chip'));
   if(!ok){toast('Fill all fields',true);return;}
   const btn=$('saveBtn');btn.disabled=true;btn.textContent='Saving…';
   try{
     const j=await post({action:'appendExpense',payload:JSON.stringify({
       Date:$('expDate').value,Amount:amt,Category:$('category').value,
       Description:$('description').value.trim(),
-      PaidBy:$('paidby').value.trim(),PaymentMethod:$('method').value
+      PaidBy:paidBy,PaymentMethod:$('method').value
     })});
     toast('Saved '+j.expenseId);
-    $('amount').value='';$('description').value='';$('paidby').value='';$('expDate').value=todayStr();
+    $('amount').value='';$('description').value='';$('expDate').value=todayStr();
     $('method').value='UPI';
     fields.forEach(([,el])=>el.classList.remove('err'));
     await loadAll();
@@ -566,8 +578,26 @@ function toggleUnpaid(){
   btn.textContent=(open?'▶':'▼')+' '+(open?'Show':'Hide')+' '+n+' unpaid bill'+(n!=='1'?'s':'');
 }
 
+/* ── paid-by chips ── */
+function buildPaidByChips(){
+  $('paidByChips').innerHTML=PAID_BY_NAMES.map((n,i)=>
+    `<button type="button" class="chip" aria-pressed="${i===0?'true':'false'}" data-name="${esc(n)}">${esc(n)}</button>`
+  ).join('');
+  $('paidByChips').querySelectorAll('.chip').forEach(c=>{
+    c.onclick=()=>{
+      $('paidByChips').querySelectorAll('.chip').forEach(x=>{x.setAttribute('aria-pressed','false');x.classList.remove('err-chip');});
+      c.setAttribute('aria-pressed','true');
+    };
+  });
+}
+function getPaidBy(){
+  const sel=$('paidByChips').querySelector('[aria-pressed="true"]');
+  return sel?sel.dataset.name:'';
+}
+
 /* ── init ── */
 $('expDate').value=todayStr();
+buildPaidByChips();
 loadMeta();
 loadAll();
 </script>
