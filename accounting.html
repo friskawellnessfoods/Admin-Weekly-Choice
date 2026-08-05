@@ -408,9 +408,7 @@ function renderTodayList(){
         <div class="s">${esc(String(e.Timestamp).slice(11,16))} · ${esc(e.Category)} · ${esc(e.PaymentMethod)} · ${esc(e.PaidBy)}</div>
       </div>
       <div class="a">${money(e.Amount)}</div>
-      <button class="del" data-id="${esc(e.ExpenseId)}" aria-label="Delete">×</button>
     </div>`).join(''):'<div class="empty">No expenses today.</div>';
-  $('todayList').querySelectorAll('.del').forEach(b=>b.onclick=()=>delExpense(b.dataset.id));
 }
 
 /* ── tab 2: ledger ── */
@@ -561,12 +559,6 @@ $('saveBtn').onclick=async()=>{
 };
 
 /* ── delete expense ── */
-async function delExpense(id){
-  if(!confirm('Delete '+id+'?'))return;
-  try{await post({action:'deleteExpense',expenseId:id});toast('Deleted');await loadAll();}
-  catch(e){toast(e.message,true);}
-}
-
 /* ── collapsible unpaid ── */
 function toggleUnpaid(){
   const list=$('unpaidList');
