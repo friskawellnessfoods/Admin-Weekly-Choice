@@ -78,6 +78,15 @@
   .paidchk{display:inline-flex;align-items:center;gap:6px;font-size:.8rem;font-weight:700;color:var(--muted);cursor:pointer}.paidchk input{width:17px;height:17px;accent-color:var(--accent);cursor:pointer}
   .oldhead{cursor:pointer;font-weight:700;color:var(--navy);padding:9px 2px;font-size:.92rem;user-select:none}
   .rowtag{font-size:.68rem;font-weight:700;padding:2px 8px;border-radius:99px;background:var(--warn-bg);color:var(--warn-ink);margin-left:6px}.rowtag.exp{background:var(--pause-bg);color:var(--pause-ink)}
+  .rowmenu{position:relative;display:inline-block}
+  .rowmenu-btn{background:none;border:none;color:var(--muted);font-size:1.15rem;font-weight:700;cursor:pointer;padding:2px 9px;border-radius:7px;line-height:1}
+  .rowmenu-btn:hover{background:var(--accent-soft)}
+  .rowmenu-pop{position:absolute;right:0;top:100%;z-index:40;background:#fff;border:1.5px solid var(--line);border-radius:10px;box-shadow:0 10px 24px rgba(20,33,62,.14);min-width:160px;padding:6px;display:none}
+  .rowmenu-pop.open{display:block}
+  .rowmenu-item{display:block;width:100%;text-align:left;padding:8px 10px;border-radius:8px;border:none;background:none;font-size:.85rem;font-weight:600;color:var(--ink);cursor:pointer}
+  .rowmenu-item:hover{background:var(--accent-soft)}
+  .rowmenu-item.danger{color:var(--debit)}
+  .rowmenu-item.danger:hover{background:var(--pause-bg)}
   #invoiceWrap{position:fixed;left:-9999px;top:0}
   #invoice{width:760px;background:#fff;color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Arial,sans-serif;border-radius:18px;overflow:hidden;box-shadow:0 0 0 1px #e6e9f2}
   #invoice .ihead{background:linear-gradient(135deg,var(--navy) 0%,#16277f 60%,#0f7a55 160%);color:#fff;display:flex;align-items:center;gap:16px;padding:20px 24px}
@@ -667,6 +676,53 @@ async function sendWhatsApp(meta,t){
   const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=file.name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1500);
 }
 
+/* rebuild invoice meta/lines/totals from an already-saved bill row — used for the dashboard download/delete menu */
+function reconstructInvoiceData(bill){
+  const idx=bill.idx;
+  const g=k=>{const j=idx[k];return (j===undefined||j>=bill.raw.length)?"":bill.raw[j];};
+  const food=parseFloat(g("Food"))||0;
+  const discPct=bill.discPct||0;
+  const discAmt=food*discPct/100;
+  const foodAfter=food-discAmt;
+  const gst=parseFloat(g("Gst"))||0;
+  const delivery=parseFloat(g("Delivery"))||0;
+  const adjustment=parseFloat(g("Adjustment"))||0;
+  const grand=bill.grandTotal;
+  const gstPct=foodAfter>0?Math.round((gst/foodAfter)*1000)/10:0;
+  const t={food,discAmt,foodAfter,gst,delivery,other:0,adjustment,grand};
+  let lines=(bill.lineItems&&bill.lineItems.length)?bill.lineItems.map(l=>({id:l.id,label:l.label,qty:l.qty,rate:l.rate})):[];
+  if(!lines.length){ // old bill saved before LineItemsJSON existed — coarse fallback so the image still totals correctly
+    if(food>0)lines.push({id:"items_summary",label:bill.items||"Items",qty:1,rate:food,food:true});
+    if(delivery>0)lines.push({id:"delivery",label:"Delivery",qty:1,rate:delivery,food:false});
+  }
+  const days=prevDaysOf({start:bill.start,end:bill.end,duration:bill.duration});
+  const meta={billNo:bill.billNo,billDate:toDt(g("Date"))||bill.start||dateOnly(new Date()),client:bill.client,plan:bill.plan,start:bill.start,end:bill.end,days,discPct,gstPct,paidStatus:bill.paid};
+  return {meta,lines,t};
+}
+async function downloadBillImage(billNo){
+  try{
+    if(!billsCache||billsCache.length<2)await fetchBills(false);
+    const idx=billHeaderIndex(billsCache);
+    let raw=null;for(let i=1;i<billsCache.length;i++){if(String(billsCache[i][idx["BillNo"]])===String(billNo)){raw=billsCache[i];break;}}
+    if(!raw){alert("Bill not found — try Reload first.");return;}
+    const bill=parseBillRow(raw,idx);
+    const {meta,lines,t}=reconstructInvoiceData(bill);
+    buildInvoice(meta,lines,t);
+    const blob=await invoiceBlob();
+    const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=`Bill_${billNo}.png`;document.body.appendChild(a);a.click();a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),1500);
+  }catch(e){alert("Couldn't generate image: "+e.message);}
+}
+async function deleteBillPrompt(billNo){
+  if(!confirm(`Delete bill ${billNo}? This cannot be undone.`))return;
+  try{
+    const res=await billsApiCall("deleteBill",{billNo});
+    if(!res||!res.ok){alert("Delete failed: "+(res&&res.message||"unknown"));return;}
+    await fetchBills(true);
+    applyDashFilter();
+  }catch(e){alert("Error: "+e.message);}
+}
+
 /* meta + save */
 function gatherNewMeta(){
   return {billNo:el("n_billno").value.trim(),billDate:readDate("n_billdate")||dateOnly(new Date()),client:el("n_client").value.trim(),phone:el("n_phone").value.trim(),plan:nPlans().map(p=>PLAN_LABEL[p]).join(", "),duration:DUR_LABEL[el("n_dur").value]||el("n_dur").value,days:nDays(),start:readDate("n_start"),end:readDate("n_end"),slots:Array.from(el("n_slots").querySelectorAll("input:checked")).map(c=>c.value).join(", "),discPct:parseFloat(el("n_disc").value)||0,gstPct:parseFloat(el("n_gst").value)||5,paidStatus:"Unpaid"};
@@ -806,20 +862,33 @@ function applyDashFilter(){
   if(dashMonthOpen===null){dashMonthOpen={};if(keys.length)dashMonthOpen[keys[0]]=true;}
   var searching=!!q||f!=="all";
   if(!keys.length){el("d_table").innerHTML=`<div class="subtle">No bills.</div>`;return;}
-  var head=`<thead><tr>${thSort_("billNo","Bill")}${thSort_("client","Client")}${thSort_("plan","Plan")}${thSort_("start","Start")}${thSort_("end","End")}${thSort_("grand","Total")}${thSort_("paid","Status")}</tr></thead>`;
+  var head=`<thead><tr>${thSort_("billNo","Bill")}${thSort_("client","Client")}${thSort_("plan","Plan")}${thSort_("start","Start")}${thSort_("end","End")}${thSort_("grand","Total")}${thSort_("paid","Status")}<th></th></tr></thead>`;
   var html="";
   keys.forEach(function(k){
     var open=searching?true:!!dashMonthOpen[k];
     html+=`<div style="margin-top:8px"><div class="oldhead" data-mk="${k}">${open?"▾":"▸"} ${monthLabel_(k)} (${groups[k].length})</div>`+
       `<div class="monthwrap ${open?"":"hidden"}" data-mw="${k}"><div style="overflow-x:auto"><table class="dtable">${head}<tbody>`+
-      groups[k].map(r=>`<tr><td>${r.billNo}</td><td>${r.client}</td><td>${r.plan||""}</td><td>${dtstr(r.start)}</td><td>${dtstr(r.end)}</td><td>₹${money(r.grand)}</td><td>${pillHtml(r)}</td></tr>`).join("")+
+      groups[k].map(r=>`<tr><td>${r.billNo}</td><td><b class="clientlink" data-name="${String(r.client).replace(/"/g,"&quot;")}" style="cursor:pointer;color:var(--navy);text-decoration:underline">${r.client}</b></td><td>${r.plan||""}</td><td>${dtstr(r.start)}</td><td>${dtstr(r.end)}</td><td>₹${money(r.grand)}</td><td>${pillHtml(r)}</td><td><div class="rowmenu"><button class="rowmenu-btn" data-menubtn="${r.billNo}">⋮</button><div class="rowmenu-pop" data-menupop="${r.billNo}"><button class="rowmenu-item" data-dl="${r.billNo}">Download image</button><button class="rowmenu-item danger" data-delbill="${r.billNo}">Delete bill</button></div></div></td></tr>`).join("")+
       `</tbody></table></div></div></div>`;
   });
   el("d_table").innerHTML=html;
   bindPills("d_table");
   el("d_table").querySelectorAll(".oldhead[data-mk]").forEach(function(h){h.onclick=function(){var k=h.dataset.mk;dashMonthOpen[k]=!(searching?true:dashMonthOpen[k]);applyDashFilter();};});
   el("d_table").querySelectorAll(".sortth").forEach(function(th){th.onclick=function(){var c=th.dataset.col;if(dashSort.col===c)dashSort.dir=dashSort.dir==="asc"?"desc":"asc";else dashSort={col:c,dir:"asc"};applyDashFilter();};});
+  el("d_table").querySelectorAll(".clientlink").forEach(function(nd){nd.onclick=function(){openRenewFor(nd.dataset.name);};});
+  el("d_table").querySelectorAll("button[data-menubtn]").forEach(function(b){
+    b.onclick=function(e){
+      e.stopPropagation();
+      var pop=el("d_table").querySelector('[data-menupop="'+b.dataset.menubtn+'"]');
+      closeAllRowMenus(pop);
+      pop.classList.toggle("open");
+    };
+  });
+  el("d_table").querySelectorAll("button[data-dl]").forEach(function(b){b.onclick=function(e){e.stopPropagation();closeAllRowMenus();downloadBillImage(b.dataset.dl);};});
+  el("d_table").querySelectorAll("button[data-delbill]").forEach(function(b){b.onclick=function(e){e.stopPropagation();closeAllRowMenus();deleteBillPrompt(b.dataset.delbill);};});
 }
+function closeAllRowMenus(except){document.querySelectorAll(".rowmenu-pop.open").forEach(function(p){if(p!==except)p.classList.remove("open");});}
+document.addEventListener("click",function(){closeAllRowMenus();});
 
 /* ===================== USAGE CHECK ===================== */
 async function runUsageCheck(force){
