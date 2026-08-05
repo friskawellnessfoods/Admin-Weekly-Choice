@@ -23,24 +23,25 @@ header{background:var(--navy);color:#fff;padding:calc(14px + env(safe-area-inset
 header .top{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
 header h1{font-size:18px;font-weight:700}
 header .sub{font-size:11px;opacity:.65;margin-top:1px}
-.nav{display:flex;gap:2px}
-.nav button{flex:1;padding:10px 6px;border:0;background:transparent;color:rgba(255,255,255,.6);
-  font-size:13px;font-weight:600;cursor:pointer;border-bottom:3px solid transparent;transition:all .15s}
-.nav button[aria-selected="true"]{color:#fff;border-bottom-color:var(--emerald)}
+.nav{display:flex;justify-content:center;gap:4px;padding-bottom:10px}
+.nav button{padding:8px 18px;border:0;background:rgba(255,255,255,.12);color:rgba(255,255,255,.7);
+  font-size:13px;font-weight:600;cursor:pointer;border-radius:999px;transition:all .15s;white-space:nowrap}
+.nav button[aria-selected="true"]{background:var(--emerald);color:#fff}
 
 /* ── filter bar ── */
 .filter-bar{background:#fff;border-bottom:1px solid var(--line);padding:10px 14px;
-  display:flex;gap:8px;align-items:center;flex-wrap:wrap;position:sticky;top:var(--header-h,105px);z-index:9}
+  position:sticky;top:var(--header-h,105px);z-index:9}
+.filter-inner{max-width:640px;margin:0 auto;display:flex;flex-direction:column;gap:8px}
 .fp{display:flex;gap:6px;flex-wrap:wrap}
-.fp button{padding:7px 13px;border-radius:999px;border:1px solid var(--line);background:#fff;
-  font-size:12px;font-weight:700;color:var(--muted);cursor:pointer}
+.fp button{padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:#fff;
+  font-size:12px;font-weight:700;color:var(--muted);cursor:pointer;white-space:nowrap}
 .fp button[aria-pressed="true"]{background:var(--navy);border-color:var(--navy);color:#fff}
-.range-inputs{display:flex;gap:6px;align-items:center;width:100%}
-.range-inputs input[type=date]{flex:1;padding:7px 10px;border:1px solid var(--line);border-radius:8px;
+.range-inputs{display:flex;gap:6px;align-items:center}
+.range-inputs input[type=date]{width:130px;padding:7px 8px;border:1px solid var(--line);border-radius:8px;
   font-size:13px;font-family:inherit;background:#fff}
-.range-inputs span{font-size:12px;color:var(--muted)}
+.range-inputs span{font-size:12px;color:var(--muted);flex-shrink:0}
 .range-inputs button{padding:7px 14px;border-radius:8px;border:0;background:var(--navy);
-  color:#fff;font-size:13px;font-weight:700;cursor:pointer}
+  color:#fff;font-size:13px;font-weight:700;cursor:pointer;flex-shrink:0}
 
 /* ── panels ── */
 .panel{display:none;padding:14px;max-width:640px;margin:0 auto}
@@ -133,17 +134,20 @@ button.primary:disabled{opacity:.5}
 
 <!-- filter bar (hidden on tab1) -->
 <div class="filter-bar" id="filterBar" style="display:none">
-  <div class="fp">
-    <button aria-pressed="true" data-period="today">Today</button>
-    <button aria-pressed="false" data-period="month">This month</button>
-    <button aria-pressed="false" data-period="3month">3 months</button>
-    <button aria-pressed="false" data-period="range">Range</button>
-  </div>
-  <div class="range-inputs" id="rangeInputs" style="display:none">
-    <input type="date" id="fromDate">
-    <span>→</span>
-    <input type="date" id="toDate" placeholder="To (optional)">
-    <button id="applyRange">Go</button>
+  <div class="filter-inner">
+    <div class="fp">
+      <button aria-pressed="true" data-period="today">Today</button>
+      <button aria-pressed="false" data-period="month">This month</button>
+      <button aria-pressed="false" data-period="lastmonth">Last month</button>
+      <button aria-pressed="false" data-period="3month">3 months</button>
+      <button aria-pressed="false" data-period="range">Range</button>
+    </div>
+    <div class="range-inputs" id="rangeInputs" style="display:none">
+      <input type="date" id="fromDate">
+      <span>→</span>
+      <input type="date" id="toDate" placeholder="To (optional)">
+      <button id="applyRange">Go</button>
+    </div>
   </div>
 </div>
 
@@ -151,6 +155,10 @@ button.primary:disabled{opacity:.5}
 <div class="panel active" id="panel-expense">
   <div class="card">
     <div class="card-title">New expense</div>
+    <div class="field">
+      <label for="expDate">Date *</label>
+      <input id="expDate" type="date">
+    </div>
     <div class="field">
       <label for="amount">Amount (₹) *</label>
       <input id="amount" class="amount-input" type="number" inputmode="decimal" step="0.01" min="0.01" placeholder="0">
@@ -160,7 +168,7 @@ button.primary:disabled{opacity:.5}
       <select id="category"></select>
     </div>
     <div class="field">
-      <label for="description">Description *</label>
+      <label for="description">Description <span style="font-weight:400;color:var(--muted)">(optional)</span></label>
       <input id="description" type="text" placeholder="What was this for?">
     </div>
     <div class="field">
@@ -209,7 +217,13 @@ button.primary:disabled{opacity:.5}
         <div class="sub" id="unpaidCount"></div>
       </div>
     </div>
-    <div id="unpaidList"></div>
+    <div id="unpaidToggle" style="display:none;margin-top:10px">
+      <button onclick="toggleUnpaid()" id="unpaidToggleBtn"
+        style="background:none;border:none;color:var(--navy);font-size:13px;font-weight:700;cursor:pointer;padding:0">
+        ▶ Show unpaid bills
+      </button>
+      <div id="unpaidList" style="display:none"></div>
+    </div>
   </div>
 
   <div class="card">
@@ -325,6 +339,7 @@ function inPeriod(dateStr){
   if(PERIOD==='today')return d===todayStr();
   if(PERIOD==='month'){const r=monthRange(0);return d>=r.from&&d<=r.to;}
   if(PERIOD==='3month'){const r=monthRange(2);return d>=r.from&&d<=r.to;}
+  if(PERIOD==='lastmonth'){const r=monthRange(1);const prev=new Date();prev.setMonth(prev.getMonth()-1);const ym=prev.getFullYear()+'-'+String(prev.getMonth()+1).padStart(2,'0');return d.slice(0,7)===ym;}
   if(PERIOD==='range'){
     if(!RANGE.from)return false;
     if(!RANGE.to)return d===RANGE.from;
@@ -412,14 +427,24 @@ function renderLedger(){
   $('expCount').textContent=exps.length+' entr'+(exps.length!==1?'ies':'y');
 
   // unpaid bills list
-  $('unpaidList').innerHTML=unpaid.length?'<div class="divider"></div>'+unpaid.map(b=>`
-    <div class="item">
-      <div class="m">
-        <div class="t">${esc(b.Client)}</div>
-        <div class="s">${esc(b.BillNo)} · ${esc(String(b.Date).slice(0,10))}</div>
-      </div>
-      <div class="a">${money(b.GrandTotal)}</div>
-    </div>`).join(''):'';
+  const tog=$('unpaidToggle');
+  if(unpaid.length){
+    tog.style.display='block';
+    $('unpaidToggleBtn').textContent='▶ Show ' + unpaid.length + ' unpaid bill' + (unpaid.length!==1?'s':'');
+    $('unpaidList').innerHTML=unpaid.map(b=>`
+      <div class="item">
+        <div class="m">
+          <div class="t">${esc(b.Client)}</div>
+          <div class="s">${esc(b.BillNo)} · ${esc(String(b.Date).slice(0,10))}</div>
+        </div>
+        <div class="a">${money(b.GrandTotal)}</div>
+      </div>`).join('');
+  } else {
+    tog.style.display='none';
+    $('unpaidList').innerHTML='';
+    $('unpaidList').style.display='none';
+    $('unpaidToggleBtn').textContent='▶ Show unpaid bills';
+  }
 
   // expense category breakdown
   const catMap={};
@@ -475,7 +500,7 @@ document.querySelectorAll('.nav button').forEach(btn=>{
     btn.setAttribute('aria-selected','true');
     document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
     $('panel-'+activeTab).classList.add('active');
-    $('filterBar').style.display=activeTab==='expense'?'none':'flex';
+    $('filterBar').style.display=activeTab==='expense'?'none':'block';
     if(activeTab==='ledger')renderLedger();
     if(activeTab==='summary')renderSummary();
   };
@@ -500,8 +525,8 @@ $('applyRange').onclick=()=>{
 
 /* ── save expense ── */
 $('saveBtn').onclick=async()=>{
-  const fields=[['amount',$('amount')],['category',$('category')],
-    ['description',$('description')],['paidby',$('paidby')],['method',$('method')]];
+  const fields=[['expDate',$('expDate')],['amount',$('amount')],['category',$('category')],
+    ['paidby',$('paidby')],['method',$('method')]];
   let ok=true;
   fields.forEach(([,el])=>{if(!el.value.trim()){el.classList.add('err');ok=false;}else el.classList.remove('err');});
   const amt=Number($('amount').value);
@@ -510,11 +535,12 @@ $('saveBtn').onclick=async()=>{
   const btn=$('saveBtn');btn.disabled=true;btn.textContent='Saving…';
   try{
     const j=await post({action:'appendExpense',payload:JSON.stringify({
-      Amount:amt,Category:$('category').value,Description:$('description').value.trim(),
+      Date:$('expDate').value,Amount:amt,Category:$('category').value,
+      Description:$('description').value.trim(),
       PaidBy:$('paidby').value.trim(),PaymentMethod:$('method').value
     })});
     toast('Saved '+j.expenseId);
-    $('amount').value='';$('description').value='';$('paidby').value='';
+    $('amount').value='';$('description').value='';$('paidby').value='';$('expDate').value=todayStr();
     $('method').value='UPI';
     fields.forEach(([,el])=>el.classList.remove('err'));
     await loadAll();
@@ -529,7 +555,19 @@ async function delExpense(id){
   catch(e){toast(e.message,true);}
 }
 
+/* ── collapsible unpaid ── */
+function toggleUnpaid(){
+  const list=$('unpaidList');
+  const btn=$('unpaidToggleBtn');
+  const open=list.style.display==='block';
+  list.style.display=open?'none':'block';
+  const count=btn.textContent.match(/\d+/);
+  const n=count?count[0]:'';
+  btn.textContent=(open?'▶':'▼')+' '+(open?'Show':'Hide')+' '+n+' unpaid bill'+(n!=='1'?'s':'');
+}
+
 /* ── init ── */
+$('expDate').value=todayStr();
 loadMeta();
 loadAll();
 </script>
