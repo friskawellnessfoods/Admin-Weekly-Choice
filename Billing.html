@@ -807,7 +807,7 @@ function renderUnbilled(orders,bills){
     groups[k].sort((a,b)=>a.date-b.date);
     const open=!!unbilledOpen[k];
     html+=`<div style="margin-top:8px"><div style="display:flex;align-items:center;gap:8px"><div class="oldhead" data-mk="${k}" style="flex:1">${open?"▾":"▸"} ${monthLabel_(k)} (${groups[k].length})</div><button class="btn btn-ghost" data-dismm="${k}" style="padding:6px 10px;font-size:.8rem">Dismiss all</button></div><div class="${open?"":"hidden"}" data-wrap="${k}"><div style="overflow-x:auto"><table class="dtable"><thead><tr><th>Client</th><th>Phone</th><th>First order</th><th></th></tr></thead><tbody>`+
-      groups[k].map(r=>`<tr><td><b>${r.name}</b></td><td>${r.phone}</td><td>${dtstr(r.date)}</td><td style="white-space:nowrap"><div class="rowmenu" data-name="${String(r.name).replace(/"/g,"&quot;")}" data-phone="${r.phone}" data-date="${keyOf(r.date)}"><button class="rowmenu-btn" data-ubmenubtn="${r.key}">⋮</button><div class="rowmenu-pop" data-ubmenupop="${r.key}"><button class="rowmenu-item" data-ubnew>Make new bill</button><button class="rowmenu-item" data-ubusage>Check usage</button></div></div><button class="rm" data-dis="${r.key}" style="margin-left:6px">×</button></td></tr>`).join("")+`</tbody></table></div></div></div>`;});
+      groups[k].map(r=>`<tr><td><b>${r.name}</b></td><td>${r.phone}</td><td>${dtstr(r.date)}</td><td style="white-space:nowrap"><div class="rowmenu" data-name="${String(r.name).replace(/"/g,"&quot;")}" data-phone="${r.phone}" data-date="${keyOf(r.date)}"><button class="rowmenu-btn" data-ubmenubtn="${r.key}">⋮</button><div class="rowmenu-pop" data-ubmenupop="${r.key}"><button class="rowmenu-item" data-ubnew>Make new bill</button><button class="rowmenu-item" data-ubusage>Check usage</button><button class="rowmenu-item danger" data-ubdis="${r.key}">Dismiss</button></div></div></td></tr>`).join("")+`</tbody></table></div></div></div>`;});
   el("d_unbilled").innerHTML=html;
   el("d_unbilled").querySelectorAll("button[data-ubmenubtn]").forEach(function(b){
     b.onclick=function(e){
@@ -822,7 +822,9 @@ function renderUnbilled(orders,bills){
   el("d_unbilled").querySelectorAll("button[data-ubusage]").forEach(function(b){
     b.onclick=function(e){e.stopPropagation();closeAllRowMenus();var w=b.closest(".rowmenu");openUsageCheckFor(w.dataset.name,w.dataset.date);};
   });
-  el("d_unbilled").querySelectorAll("button[data-dis]").forEach(b=>b.onclick=()=>{dismissUnbilled(b.dataset.dis);renderUnbilled(orders,bills);});
+  el("d_unbilled").querySelectorAll("button[data-ubdis]").forEach(function(b){
+    b.onclick=function(e){e.stopPropagation();closeAllRowMenus();dismissUnbilled(b.dataset.ubdis);renderUnbilled(orders,bills);};
+  });
   el("d_unbilled").querySelectorAll("button[data-dismm]").forEach(b=>b.onclick=()=>{const k=b.dataset.dismm;if(!confirm(`Dismiss all ${groups[k].length} clients in ${monthLabel_(k)}?`))return;dismissUnbilledMany(groups[k].map(r=>r.key));renderUnbilled(orders,bills);});
   el("d_unbilled").querySelectorAll(".oldhead[data-mk]").forEach(h=>h.onclick=()=>{const k=h.dataset.mk;unbilledOpen[k]=!unbilledOpen[k];renderUnbilled(orders,bills);});
 }
