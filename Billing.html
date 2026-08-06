@@ -78,15 +78,6 @@
   .paidchk{display:inline-flex;align-items:center;gap:6px;font-size:.8rem;font-weight:700;color:var(--muted);cursor:pointer}.paidchk input{width:17px;height:17px;accent-color:var(--accent);cursor:pointer}
   .oldhead{cursor:pointer;font-weight:700;color:var(--navy);padding:9px 2px;font-size:.92rem;user-select:none}
   .rowtag{font-size:.68rem;font-weight:700;padding:2px 8px;border-radius:99px;background:var(--warn-bg);color:var(--warn-ink);margin-left:6px}.rowtag.exp{background:var(--pause-bg);color:var(--pause-ink)}
-  .rowmenu{position:relative;display:inline-block}
-  .rowmenu-btn{background:none;border:none;color:var(--muted);font-size:1.15rem;font-weight:700;cursor:pointer;padding:2px 9px;border-radius:7px;line-height:1}
-  .rowmenu-btn:hover{background:var(--accent-soft)}
-  .rowmenu-pop{position:fixed;z-index:200;background:#fff;border:1.5px solid var(--line);border-radius:10px;box-shadow:0 10px 24px rgba(20,33,62,.14);min-width:160px;padding:6px;display:none}
-  .rowmenu-pop.open{display:block}
-  .rowmenu-item{display:block;width:100%;text-align:left;padding:8px 10px;border-radius:8px;border:none;background:none;font-size:.85rem;font-weight:600;color:var(--ink);cursor:pointer}
-  .rowmenu-item:hover{background:var(--accent-soft)}
-  .rowmenu-item.danger{color:var(--debit)}
-  .rowmenu-item.danger:hover{background:var(--pause-bg)}
   #invoiceWrap{position:fixed;left:-9999px;top:0}
   #invoice{width:760px;background:#fff;color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Arial,sans-serif;border-radius:18px;overflow:hidden;box-shadow:0 0 0 1px #e6e9f2}
   #invoice .ihead{background:linear-gradient(135deg,var(--navy) 0%,#16277f 60%,#0f7a55 160%);color:#fff;display:flex;align-items:center;gap:16px;padding:20px 24px}
@@ -111,9 +102,9 @@
 <div class="wrap">
   <div class="topbar"><img src="logo.png" alt="" onerror="this.style.display='none'" /><h1>Friska Billing</h1></div>
   <div class="tabs">
-    <button class="tab" data-tab="dash">Dashboard</button>
+    <button class="tab active" data-tab="new">New Bill</button>
     <button class="tab" data-tab="renew">Renew / Reconcile</button>
-    <button class="tab" data-tab="new">New Bill</button>
+    <button class="tab" data-tab="dash">Dashboard</button>
     <button class="tab" data-tab="usage">Usage Check</button>
   </div>
 
@@ -302,8 +293,6 @@
 
 <script>
 const BIZ={name:"Friska Wellness",tagline:"Healthy Meals",address:"Moti Nagar, Hyderabad, Telangana 500018",gst:"38AAKFF6850B1ZI",fssai:"23624030000435",upi:"friskawellnessllp@idfcbank",acHolder:"FRISKA WELLNESS LLP",acNumber:"50200087206209",ifsc:"HDFC0005486",branch:"LIBERTY CROSS ROADS",acType:"CURRENT",logo:"logo.png"};
-const ADMIN_PRICES_URL="https://script.google.com/macros/s/AKfycbz82SA1y26hBJ_cd5kFBE3vD73djtTMVh4G_dCs43JKdSlVXzLWDR4DPMbUtHyTIa0/exec";
-const BILLS_API_URL="https://script.google.com/macros/s/AKfycbwI8_v36JJrkAXVhfGIAirSC3IUHbe6l-3WLeeTETg1SGRUcn4M_dPjN9azSCbgTBD1/exec";
 const COL={date:0,name:1,phone:2,slot:5,opt1:7,opt2:8,brk:9,snk:10,j1:11,j2:12};
 const MONTH_ABBR=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 const MONTHS={jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
@@ -347,33 +336,27 @@ async function apiCall(action,params){
   if(typeof API_URL==="undefined"||!API_URL)throw new Error("API_URL not found (config.js).");
   const body=new URLSearchParams();body.set("action",action);
   if(params)for(const k in params)body.set(k,params[k]);
-  const res=await fetch(API_URL,{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded;charset=UTF-8"},body:body.toString()});
-  const text=await res.text();
-  if(!res.ok)throw new Error("Server "+res.status+" — "+text.slice(0,160));
-  let json;try{json=JSON.parse(text);}catch(e){throw new Error("Non-JSON response: "+text.slice(0,160));}
-  return json;
-}
-async function billsApiCall(action,params){
-  const body=new URLSearchParams();body.set("action",action);
-  if(params)for(const k in params)body.set(k,params[k]);
-  const res=await fetch(BILLS_API_URL,{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded;charset=UTF-8"},body:body.toString()});
-  const text=await res.text();
-  if(!res.ok)throw new Error("Bills server "+res.status+" — "+text.slice(0,160));
-  let json;try{json=JSON.parse(text);}catch(e){throw new Error("Non-JSON Bills response: "+text.slice(0,160));}
-  return json;
+  let lastErr;
+  for(let attempt=0;attempt<3;attempt++){
+    try{
+      const res=await fetch(API_URL,{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded;charset=UTF-8"},body:body.toString()});
+      const text=await res.text();
+      if(!res.ok){if((res.status===404||res.status>=500)&&attempt<2){await new Promise(r=>setTimeout(r,400*(attempt+1)));continue;}throw new Error("Server "+res.status+" — "+text.slice(0,160));}
+      if(text.trim().startsWith("<")){if(attempt<2){await new Promise(r=>setTimeout(r,400*(attempt+1)));continue;}throw new Error("Non-JSON response: "+text.slice(0,160));}
+      return JSON.parse(text);
+    }catch(e){lastErr=e;if(attempt<2)await new Promise(r=>setTimeout(r,400*(attempt+1)));}
+  }
+  throw lastErr;
 }
 async function fetchOrders(force){if(ordersCache&&!force)return ordersCache;const j=await apiCall("getOrdersOutputAll");ordersCache=Array.isArray(j)?j:(j.rows||[]);return ordersCache;}
-async function fetchBills(force){if(billsCache&&!force)return billsCache;const j=await billsApiCall("getBillsAll");billsCache=Array.isArray(j)?j:(j.rows||[]);return billsCache;}
+async function fetchBills(force){if(billsCache&&!force)return billsCache;const j=await apiCall("getBillsAll");billsCache=Array.isArray(j)?j:(j.rows||[]);return billsCache;}
 async function fetchMaster(force){if(masterCache&&!force)return masterCache;const j=await apiCall("getMasterClientsAll");masterCache=(j&&j.clients)||[];return masterCache;}
 async function fetchStatus(force){if(statusCache&&!force)return statusCache;const j=await apiCall("getMasterClientStatusAll");statusCache=(j&&j.clients)||[];return statusCache;}
+const PRICES_URL="https://script.google.com/macros/s/AKfycbz82SA1y26hBJ_cd5kFBE3vD73djtTMVh4G_dCs43JKdSlVXzLWDR4DPMbUtHyTIa0/exec";
 async function fetchPrices(force){
   if(priceMap&&!force)return priceMap;
-  const res=await fetch(ADMIN_PRICES_URL+"?t="+Date.now(),{method:"GET",cache:"no-store"});
-  const text=await res.text();
-  let j;try{j=JSON.parse(text);}catch(e){throw new Error("Non-JSON price response: "+text.slice(0,160));}
-  if(j&&j.error)throw new Error(j.error);
-  const map={};
-  for(const k in j){if(!Object.prototype.hasOwnProperty.call(j,k))continue;const num=Number(j[k]);if(!isNaN(num))map[String(k).toLowerCase()]=num;}
+  const res=await fetch(PRICES_URL);const pricing=await res.json();const map={};
+  Object.keys(pricing).forEach(k=>{const n=parseFloat(pricing[k]);if(!isNaN(n))map[String(k).toLowerCase()]=n;});
   priceMap=map;return map;
 }
 function rate(plan,dur,item){const k=(plan+"_"+dur+"_"+item).toLowerCase();return priceMap&&(k in priceMap)?priceMap[k]:0;}
@@ -676,53 +659,6 @@ async function sendWhatsApp(meta,t){
   const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=file.name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1500);
 }
 
-/* rebuild invoice meta/lines/totals from an already-saved bill row — used for the dashboard download/delete menu */
-function reconstructInvoiceData(bill){
-  const idx=bill.idx;
-  const g=k=>{const j=idx[k];return (j===undefined||j>=bill.raw.length)?"":bill.raw[j];};
-  const food=parseFloat(g("Food"))||0;
-  const discPct=bill.discPct||0;
-  const discAmt=food*discPct/100;
-  const foodAfter=food-discAmt;
-  const gst=parseFloat(g("Gst"))||0;
-  const delivery=parseFloat(g("Delivery"))||0;
-  const adjustment=parseFloat(g("Adjustment"))||0;
-  const grand=bill.grandTotal;
-  const gstPct=foodAfter>0?Math.round((gst/foodAfter)*1000)/10:0;
-  const t={food,discAmt,foodAfter,gst,delivery,other:0,adjustment,grand};
-  let lines=(bill.lineItems&&bill.lineItems.length)?bill.lineItems.map(l=>({id:l.id,label:l.label,qty:l.qty,rate:l.rate})):[];
-  if(!lines.length){ // old bill saved before LineItemsJSON existed — coarse fallback so the image still totals correctly
-    if(food>0)lines.push({id:"items_summary",label:bill.items||"Items",qty:1,rate:food,food:true});
-    if(delivery>0)lines.push({id:"delivery",label:"Delivery",qty:1,rate:delivery,food:false});
-  }
-  const days=prevDaysOf({start:bill.start,end:bill.end,duration:bill.duration});
-  const meta={billNo:bill.billNo,billDate:toDt(g("Date"))||bill.start||dateOnly(new Date()),client:bill.client,plan:bill.plan,start:bill.start,end:bill.end,days,discPct,gstPct,paidStatus:bill.paid};
-  return {meta,lines,t};
-}
-async function downloadBillImage(billNo){
-  try{
-    if(!billsCache||billsCache.length<2)await fetchBills(false);
-    const idx=billHeaderIndex(billsCache);
-    let raw=null;for(let i=1;i<billsCache.length;i++){if(String(billsCache[i][idx["BillNo"]])===String(billNo)){raw=billsCache[i];break;}}
-    if(!raw){alert("Bill not found — try Reload first.");return;}
-    const bill=parseBillRow(raw,idx);
-    const {meta,lines,t}=reconstructInvoiceData(bill);
-    buildInvoice(meta,lines,t);
-    const blob=await invoiceBlob();
-    const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=`Bill_${billNo}.png`;document.body.appendChild(a);a.click();a.remove();
-    setTimeout(()=>URL.revokeObjectURL(url),1500);
-  }catch(e){alert("Couldn't generate image: "+e.message);}
-}
-async function deleteBillPrompt(billNo){
-  if(!confirm(`Delete bill ${billNo}? This cannot be undone.`))return;
-  try{
-    const res=await billsApiCall("deleteBill",{billNo});
-    if(!res||!res.ok){alert("Delete failed: "+(res&&res.message||"unknown"));return;}
-    await fetchBills(true);
-    applyDashFilter();
-  }catch(e){alert("Error: "+e.message);}
-}
-
 /* meta + save */
 function gatherNewMeta(){
   return {billNo:el("n_billno").value.trim(),billDate:readDate("n_billdate")||dateOnly(new Date()),client:el("n_client").value.trim(),phone:el("n_phone").value.trim(),plan:nPlans().map(p=>PLAN_LABEL[p]).join(", "),duration:DUR_LABEL[el("n_dur").value]||el("n_dur").value,days:nDays(),start:readDate("n_start"),end:readDate("n_end"),slots:Array.from(el("n_slots").querySelectorAll("input:checked")).map(c=>c.value).join(", "),discPct:parseFloat(el("n_disc").value)||0,gstPct:parseFloat(el("n_gst").value)||5,paidStatus:"Unpaid"};
@@ -738,7 +674,7 @@ async function validateAndSave(meta,lines,t,statusId){
   if(billNoExists(meta.billNo)){setStatus(statusId,`Bill no ${meta.billNo} already exists — choose another.`,"err");return false;}
   setStatus(statusId,"Saving…","info");
   const obj=billObject(meta,lines,t);
-  const res=await billsApiCall("appendBill",{payload:JSON.stringify(obj)});
+  const res=await apiCall("appendBill",{payload:JSON.stringify(obj)});
   if(res&&res.ok){
     if(billsCache&&billsCache.length){const headers=billsCache[0].map(h=>String(h).trim());billsCache.push(headers.map(h=>(h in obj)?obj[h]:""));} // keep cache live so the next number advances
     setStatus(statusId,`Saved bill ${meta.billNo}.`,"ok");
@@ -753,20 +689,6 @@ async function validateAndSave(meta,lines,t,statusId){
 function followDismissed(){try{return JSON.parse(localStorage.getItem("friska_follow_dismiss")||"{}");}catch(e){return {};}}
 function followDismissSave(o){try{localStorage.setItem("friska_follow_dismiss",JSON.stringify(o));}catch(e){}}
 function openRenewFor(name){switchTab("renew");el("r_client").value=name;runRenew(false);}
-function openNewBillFor(name,phone,dateKey){
-  switchTab("new");
-  el("n_client").value=name;
-  onClientNameChange();
-  if(phone)el("n_phone").value=phone;
-  if(dateKey){el("n_start").value=dateKey;newDatesFromStart();refreshNum("n_billno","n_start");}
-}
-function openUsageCheckFor(name,dateKey){
-  switchTab("usage");
-  el("u_client").value=name;
-  if(dateKey)el("u_start").value=dateKey;
-  el("u_end").value=keyOf(dateOnly(new Date()));
-  runUsageCheck(false);
-}
 async function loadDashboard(force){setStatus("d_status","Loading bills…","info");try{const bills=await fetchBills(force);let orders=[];try{orders=await fetchOrders(force);}catch(e){}let inactiveSet=new Set();try{const st=await fetchStatus(force);inactiveSet=new Set(st.filter(c=>c.status==="inactive").map(c=>normName(c.name)));}catch(e){}renderDashboard(orders,inactiveSet);try{renderUnbilled(orders,bills);}catch(e){el("d_unbilled").innerHTML='<div class="subtle">Orders load failed.</div>';}setStatus("d_status",`${Math.max(0,bills.length-1)} bills.`,"ok");}catch(err){setStatus("d_status","Error: "+err.message,"err");el("d_followups").innerHTML="";}}
 function unbilledDismissed(){try{return new Set(JSON.parse(localStorage.getItem("friska_unbilled_dismiss")||"[]"));}catch(e){return new Set();}}
 function dismissUnbilled(k){const s=unbilledDismissed();s.add(k);try{localStorage.setItem("friska_unbilled_dismiss",JSON.stringify([...s]));}catch(e){}}
@@ -794,21 +716,8 @@ function renderUnbilled(orders,bills){
     groups[k].sort((a,b)=>a.date-b.date);
     const open=!!unbilledOpen[k];
     html+=`<div style="margin-top:8px"><div style="display:flex;align-items:center;gap:8px"><div class="oldhead" data-mk="${k}" style="flex:1">${open?"▾":"▸"} ${monthLabel_(k)} (${groups[k].length})</div><button class="btn btn-ghost" data-dismm="${k}" style="padding:6px 10px;font-size:.8rem">Dismiss all</button></div><div class="${open?"":"hidden"}" data-wrap="${k}"><div style="overflow-x:auto"><table class="dtable"><thead><tr><th>Client</th><th>Phone</th><th>First order</th><th></th></tr></thead><tbody>`+
-      groups[k].map(r=>`<tr><td><b>${r.name}</b></td><td>${r.phone}</td><td>${dtstr(r.date)}</td><td style="white-space:nowrap"><div class="rowmenu" data-name="${String(r.name).replace(/"/g,"&quot;")}" data-phone="${r.phone}" data-date="${keyOf(r.date)}"><button class="rowmenu-btn" data-ubmenubtn="${r.key}">⋮</button><div class="rowmenu-pop" data-ubmenupop="${r.key}"><button class="rowmenu-item" data-ubnew>Make new bill</button><button class="rowmenu-item" data-ubusage>Check usage</button></div></div><button class="rm" data-dis="${r.key}" style="margin-left:6px">×</button></td></tr>`).join("")+`</tbody></table></div></div></div>`;});
+      groups[k].map(r=>`<tr><td><b>${r.name}</b></td><td>${r.phone}</td><td>${dtstr(r.date)}</td><td><button class="rm" data-dis="${r.key}">×</button></td></tr>`).join("")+`</tbody></table></div></div></div>`;});
   el("d_unbilled").innerHTML=html;
-  el("d_unbilled").querySelectorAll("button[data-ubmenubtn]").forEach(function(b){
-    b.onclick=function(e){
-      e.stopPropagation();
-      var pop=el("d_unbilled").querySelector('[data-ubmenupop="'+b.dataset.ubmenubtn+'"]');
-      openRowMenu(b,pop);
-    };
-  });
-  el("d_unbilled").querySelectorAll("button[data-ubnew]").forEach(function(b){
-    b.onclick=function(e){e.stopPropagation();closeAllRowMenus();var w=b.closest(".rowmenu");openNewBillFor(w.dataset.name,w.dataset.phone,w.dataset.date);};
-  });
-  el("d_unbilled").querySelectorAll("button[data-ubusage]").forEach(function(b){
-    b.onclick=function(e){e.stopPropagation();closeAllRowMenus();var w=b.closest(".rowmenu");openUsageCheckFor(w.dataset.name,w.dataset.date);};
-  });
   el("d_unbilled").querySelectorAll("button[data-dis]").forEach(b=>b.onclick=()=>{dismissUnbilled(b.dataset.dis);renderUnbilled(orders,bills);});
   el("d_unbilled").querySelectorAll("button[data-dismm]").forEach(b=>b.onclick=()=>{const k=b.dataset.dismm;if(!confirm(`Dismiss all ${groups[k].length} clients in ${monthLabel_(k)}?`))return;dismissUnbilledMany(groups[k].map(r=>r.key));renderUnbilled(orders,bills);});
   el("d_unbilled").querySelectorAll(".oldhead[data-mk]").forEach(h=>h.onclick=()=>{const k=h.dataset.mk;unbilledOpen[k]=!unbilledOpen[k];renderUnbilled(orders,bills);});
@@ -827,7 +736,7 @@ function bindPills(scopeId){
     const idx=billHeaderIndex(billsCache);const bi=idx["BillNo"],si=idx["PaidStatus"];
     const setLocal=v=>{for(let i=1;i<billsCache.length;i++){if(String(billsCache[i][bi])===String(billNo)){billsCache[i][si]=v;break;}}};
     setLocal(next);cb.disabled=true;                       // optimistic, no re-render → instant
-    try{const res=await billsApiCall("updateBillStatus",{billNo,status:next});if(!res||!res.ok)throw 0;}
+    try{const res=await apiCall("updateBillStatus",{billNo,status:next});if(!res||!res.ok)throw 0;}
     catch(e){cb.checked=!cb.checked;setLocal(cb.checked?"Paid":"Unpaid");}
     finally{cb.disabled=false;}
   };});
@@ -889,46 +798,20 @@ function applyDashFilter(){
   if(dashMonthOpen===null){dashMonthOpen={};if(keys.length)dashMonthOpen[keys[0]]=true;}
   var searching=!!q||f!=="all";
   if(!keys.length){el("d_table").innerHTML=`<div class="subtle">No bills.</div>`;return;}
-  var head=`<thead><tr>${thSort_("billNo","Bill")}${thSort_("client","Client")}${thSort_("plan","Plan")}${thSort_("start","Start")}${thSort_("end","End")}${thSort_("grand","Total")}${thSort_("paid","Status")}<th></th></tr></thead>`;
+  var head=`<thead><tr>${thSort_("billNo","Bill")}${thSort_("client","Client")}${thSort_("plan","Plan")}${thSort_("start","Start")}${thSort_("end","End")}${thSort_("grand","Total")}${thSort_("paid","Status")}</tr></thead>`;
   var html="";
   keys.forEach(function(k){
     var open=searching?true:!!dashMonthOpen[k];
     html+=`<div style="margin-top:8px"><div class="oldhead" data-mk="${k}">${open?"▾":"▸"} ${monthLabel_(k)} (${groups[k].length})</div>`+
       `<div class="monthwrap ${open?"":"hidden"}" data-mw="${k}"><div style="overflow-x:auto"><table class="dtable">${head}<tbody>`+
-      groups[k].map(r=>`<tr><td>${r.billNo}</td><td><b class="clientlink" data-name="${String(r.client).replace(/"/g,"&quot;")}" style="cursor:pointer;color:var(--navy);text-decoration:underline">${r.client}</b></td><td>${r.plan||""}</td><td>${dtstr(r.start)}</td><td>${dtstr(r.end)}</td><td>₹${money(r.grand)}</td><td>${pillHtml(r)}</td><td><div class="rowmenu"><button class="rowmenu-btn" data-menubtn="${r.billNo}">⋮</button><div class="rowmenu-pop" data-menupop="${r.billNo}"><button class="rowmenu-item" data-dl="${r.billNo}">Download image</button><button class="rowmenu-item danger" data-delbill="${r.billNo}">Delete bill</button></div></div></td></tr>`).join("")+
+      groups[k].map(r=>`<tr><td>${r.billNo}</td><td>${r.client}</td><td>${r.plan||""}</td><td>${dtstr(r.start)}</td><td>${dtstr(r.end)}</td><td>₹${money(r.grand)}</td><td>${pillHtml(r)}</td></tr>`).join("")+
       `</tbody></table></div></div></div>`;
   });
   el("d_table").innerHTML=html;
   bindPills("d_table");
   el("d_table").querySelectorAll(".oldhead[data-mk]").forEach(function(h){h.onclick=function(){var k=h.dataset.mk;dashMonthOpen[k]=!(searching?true:dashMonthOpen[k]);applyDashFilter();};});
   el("d_table").querySelectorAll(".sortth").forEach(function(th){th.onclick=function(){var c=th.dataset.col;if(dashSort.col===c)dashSort.dir=dashSort.dir==="asc"?"desc":"asc";else dashSort={col:c,dir:"asc"};applyDashFilter();};});
-  el("d_table").querySelectorAll(".clientlink").forEach(function(nd){nd.onclick=function(){openRenewFor(nd.dataset.name);};});
-  el("d_table").querySelectorAll("button[data-menubtn]").forEach(function(b){
-    b.onclick=function(e){
-      e.stopPropagation();
-      var pop=el("d_table").querySelector('[data-menupop="'+b.dataset.menubtn+'"]');
-      openRowMenu(b,pop);
-    };
-  });
-  el("d_table").querySelectorAll("button[data-dl]").forEach(function(b){b.onclick=function(e){e.stopPropagation();closeAllRowMenus();downloadBillImage(b.dataset.dl);};});
-  el("d_table").querySelectorAll("button[data-delbill]").forEach(function(b){b.onclick=function(e){e.stopPropagation();closeAllRowMenus();deleteBillPrompt(b.dataset.delbill);};});
 }
-function closeAllRowMenus(except){document.querySelectorAll(".rowmenu-pop.open").forEach(function(p){if(p!==except)p.classList.remove("open");});}
-function openRowMenu(btn,pop){
-  var willOpen=!pop.classList.contains("open");
-  closeAllRowMenus();
-  if(willOpen){
-    var rect=btn.getBoundingClientRect();
-    var popW=170;
-    var left=Math.min(Math.max(8,rect.right-popW),window.innerWidth-popW-8);
-    var top=rect.bottom+4;
-    if(top+90>window.innerHeight)top=rect.top-94; // flip above the button if it would overflow the bottom
-    pop.style.left=left+"px";pop.style.top=top+"px";
-    pop.classList.add("open");
-  }
-}
-window.addEventListener("scroll",function(){closeAllRowMenus();},true);
-document.addEventListener("click",function(){closeAllRowMenus();});
 
 /* ===================== USAGE CHECK ===================== */
 async function runUsageCheck(force){
@@ -1042,7 +925,6 @@ el("d_ubHead").addEventListener("click",()=>{const b=el("d_ubBody"),h=el("d_ubHe
 // init
 el("n_billdate").value=keyOf(dateOnly(new Date()));
 updatePlanHead();
-switchTab("dash");
 (async()=>{
   try{await fetchPrices(false);}catch(e){setStatus("n_status","Couldn't load Prices: "+e.message,"err");}
   nRender(true);
