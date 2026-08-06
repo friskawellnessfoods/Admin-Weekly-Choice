@@ -69,14 +69,25 @@ header .sub{font-size:11px;opacity:.65;margin-top:1px}
 .divider{height:1px;background:var(--line);margin:14px 0}
 
 /* ── cat rows ── */
+/* ── bar chart ── */
+.chart{margin-top:4px}
+.bar-row{margin-bottom:11px}
+.bar-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px}
+.bar-label{font-size:12.5px;font-weight:600;color:var(--ink)}
+.bar-value{font-size:12.5px;font-weight:700;color:var(--muted)}
+.bar-track{height:9px;background:var(--line);border-radius:999px;overflow:hidden}
+.bar-fill{height:100%;border-radius:999px;transition:width .35s ease}
+.bar-fill.navy{background:var(--navy)}
+.bar-fill.green{background:var(--emerald)}
+.bar-fill.red{background:var(--danger)}
+.bar-fill.warn{background:var(--warn)}
+.chart-empty{color:var(--muted);font-size:13px;padding:14px 0;text-align:center}
 .cat-row{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--line)}
 .cat-row:last-child{border:0}
 .cat-row .label{font-size:13px;color:var(--ink)}
 .cat-row .val{font-weight:700;font-size:14px}
 
 /* ── flag list ── */
-.flag-item{font-size:13px;padding:6px 0;border-bottom:1px solid var(--line);color:var(--danger)}
-.flag-item:last-child{border:0}
 
 /* ── form (tab1) ── */
 label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin:0 0 5px}
@@ -145,9 +156,8 @@ button.primary:disabled{opacity:.5}
       <button aria-pressed="false" data-period="month">This month</button>
       <button aria-pressed="false" data-period="lastmonth">Last month</button>
       <button aria-pressed="false" data-period="3month">3 months</button>
-      <button aria-pressed="false" data-period="range">Range</button>
     </div>
-    <div class="range-inputs" id="rangeInputs" style="display:none">
+    <div class="range-inputs" id="rangeInputs">
       <input type="date" id="fromDate">
       <span>→</span>
       <input type="date" id="toDate" placeholder="To (optional)">
@@ -242,6 +252,16 @@ button.primary:disabled{opacity:.5}
     </div>
     <div id="expCatBreakdown"></div>
   </div>
+
+  <div class="card">
+    <div class="card-title">Chart — money in vs out</div>
+    <div class="chart" id="ledgerChart"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Chart — spend by category</div>
+    <div class="chart" id="ledgerCatChart"></div>
+  </div>
 </div>
 
 <!-- TAB 3: Summary -->
@@ -293,10 +313,17 @@ button.primary:disabled{opacity:.5}
     </div>
   </div>
 
-  <div class="card" id="flagCard">
-    <div class="card-title">⚠ Missing line items</div>
-    <div id="flagList"></div>
+  <div class="card">
+    <div class="card-title">Chart — revenue breakdown</div>
+    <div class="chart" id="sumRevChart"></div>
   </div>
+
+  <div class="card">
+    <div class="card-title">Chart — expenses by category</div>
+    <div class="chart" id="sumCatChart"></div>
+  </div>
+
+
 </div>
 
 <div class="toast" id="toast"></div>
@@ -338,6 +365,24 @@ let META={categories:[],paymentMethods:['UPI','Cash']};
 let PERIOD='today';
 let RANGE={from:'',to:''};
 let activeTab='expense';
+
+/* ── bar chart renderer ── */
+function renderBars(elId, data){
+  const el=$(elId);
+  const rows=data.filter(d=>Number(d.value)>0);
+  if(!rows.length){el.innerHTML='<div class="chart-empty">No data for this period.</div>';return;}
+  const max=Math.max(...rows.map(d=>Number(d.value)));
+  el.innerHTML=rows.map(d=>{
+    const pct=max>0?(Number(d.value)/max*100):0;
+    return `<div class="bar-row">
+      <div class="bar-head">
+        <span class="bar-label">${esc(d.label)}</span>
+        <span class="bar-value">${money(d.value)}</span>
+      </div>
+      <div class="bar-track"><div class="bar-fill ${d.tone||'navy'}" style="width:${pct.toFixed(1)}%"></div></div>
+    </div>`;
+  }).join('');
+}
 
 /* ── filter ── */
 function billDate(b){return String(b.Date||'').slice(0,10);}
@@ -459,6 +504,13 @@ function renderLedger(){
   const cats=Object.entries(catMap).sort((a,b)=>b[1]-a[1]);
   $('expCatBreakdown').innerHTML=cats.length?'<div class="divider"></div>'+cats.map(([c,v])=>`
     <div class="cat-row"><span class="label">${esc(c)}</span><span class="val">${money(v)}</span></div>`).join(''):'';
+
+  renderBars('ledgerChart',[
+    {label:'Collected',   value:totalPaid,   tone:'green'},
+    {label:'Outstanding', value:totalUnpaid, tone:'red'},
+    {label:'Expenses',    value:totalExp,    tone:'warn'}
+  ]);
+  renderBars('ledgerCatChart',cats.map(([c,v])=>({label:c,value:v,tone:'navy'})));
 }
 
 /* ── tab 3: summary ── */
@@ -492,11 +544,17 @@ function renderSummary(){
   $('s-catBreakdown').innerHTML=cats.length?'<div class="divider"></div>'+cats.map(([c,v])=>`
     <div class="cat-row"><span class="label">${esc(c)}</span><span class="val">${money(v)}</span></div>`).join(''):'<div class="empty">No expenses.</div>';
 
-  // missing LineItemsJSON
-  const missing=bills.filter(b=>!b.LineItemsJSON||!String(b.LineItemsJSON).trim()||String(b.LineItemsJSON).trim()==='[]');
-  $('flagCard').style.display=missing.length?'block':'none';
-  $('flagList').innerHTML=missing.map(b=>`
-    <div class="flag-item">${esc(b.BillNo)} — ${esc(b.Client)} — ${esc(String(b.Date).slice(0,10))}</div>`).join('');
+  renderBars('sumRevChart',[
+    {label:'Total billed', value:totalBilled,  tone:'navy'},
+    {label:'Collected',    value:totalPaid,    tone:'green'},
+    {label:'Outstanding',  value:totalUnpaid,  tone:'red'},
+    {label:'Delivery',     value:totalDelivery,tone:'navy'},
+    {label:'GST',          value:totalGst,     tone:'warn'},
+    {label:'Expenses',     value:totalExp,     tone:'red'}
+  ]);
+  renderBars('sumCatChart',cats.map(([c,v])=>({label:c,value:v,tone:'navy'})));
+
+
 }
 
 /* ── tab switching ── */
@@ -519,16 +577,23 @@ document.querySelectorAll('.fp button').forEach(btn=>{
     PERIOD=btn.dataset.period;
     document.querySelectorAll('.fp button').forEach(b=>b.setAttribute('aria-pressed','false'));
     btn.setAttribute('aria-pressed','true');
-    $('rangeInputs').style.display=PERIOD==='range'?'flex':'none';
-    if(PERIOD!=='range'){renderLedger();renderSummary();}
+    renderLedger();renderSummary();
   };
 });
 $('applyRange').onclick=()=>{
   RANGE.from=$('fromDate').value;
   RANGE.to=$('toDate').value;
   if(!RANGE.from){toast('Enter a start date',true);return;}
+  PERIOD='range';
+  document.querySelectorAll('.fp button').forEach(b=>b.setAttribute('aria-pressed','false'));
   renderLedger();renderSummary();
 };
+/* tap anywhere on a date box opens the picker */
+['fromDate','toDate'].forEach(id=>{
+  const el=$(id);
+  el.addEventListener('click',()=>{ try{ el.showPicker(); }catch(err){} });
+  el.addEventListener('focus',()=>{ try{ el.showPicker(); }catch(err){} });
+});
 
 /* ── save expense ── */
 $('saveBtn').onclick=async()=>{
