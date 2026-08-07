@@ -136,6 +136,9 @@
   .auto-bar-fill{ height:100%; width:0%; background:linear-gradient(90deg,var(--grad-a),var(--grad-b));
                    border-radius:999px; transition:width .35s ease; }
   .auto-pct{ font-size:15px; font-weight:800; color:var(--c-primary-d); }
+  .auto-timer{ font-size:12.5px; color:var(--c-muted); text-align:center; padding:0 24px; margin-top:-6px; }
+  .auto-tip{ font-size:13.5px; font-weight:600; color:var(--c-primary-d); text-align:center; padding:0 24px;
+             min-height:18px; }
 
   .tabs{ position:sticky; top:57px; z-index:9; background:var(--c-surface); border-bottom:1px solid var(--c-line);
          padding:8px 12px; display:flex; gap:6px; overflow-x:auto; -webkit-overflow-scrolling:touch;
@@ -398,6 +401,8 @@
     <div class="auto-label" id="autoLabel">Downloading Kitchen List PDF…</div>
     <div class="auto-bar-track"><div class="auto-bar-fill" id="autoBarFill"></div></div>
     <div class="auto-pct" id="autoPct">0%</div>
+    <div class="auto-timer" id="autoTimer">0s elapsed</div>
+    <div class="auto-tip" id="autoTip">Please be patient — this takes a couple of minutes.</div>
   </div>
 
   <div class="tabs">
@@ -522,30 +527,80 @@
   const autoLabelEl   = document.getElementById('autoLabel');
   const autoBarFillEl = document.getElementById('autoBarFill');
   const autoPctEl     = document.getElementById('autoPct');
-  let autoBarPct = 0, autoBarTimer = null;
+  const autoTimerEl   = document.getElementById('autoTimer');
+  const autoTipEl     = document.getElementById('autoTip');
+  let autoBarTimer = null, autoTipTimer = null, autoStart = 0, wakeLock = null;
+
+  const AUTO_TIPS = [
+    'Please be patient — this takes a couple of minutes.',
+    'Please don\u2019t turn off the screen while this runs.',
+    'Processing today\u2019s orders…',
+    'Writing totals into MiseList…',
+    'Building the kitchen list PDF…',
+    'Almost there — hang tight.',
+  ];
+  let autoTipIdx = 0;
+  function rotateAutoTip(){
+    if(!autoTipEl) return;
+    autoTipEl.textContent = AUTO_TIPS[autoTipIdx % AUTO_TIPS.length];
+    autoTipIdx++;
+  }
+
+  // keep the screen on for the whole run (Wake Lock API — supported on Android Chrome/Edge;
+  // silently does nothing on browsers that don't support it, which is fine, non-fatal)
+  async function requestWakeLock(){
+    try{
+      if('wakeLock' in navigator){
+        wakeLock = await navigator.wakeLock.request('screen');
+        wakeLock.addEventListener('release', () => { wakeLock = null; });
+      }
+    }catch(e){ /* not supported / permission denied — safe to ignore */ }
+  }
+  function releaseWakeLock(){
+    try{ if(wakeLock){ wakeLock.release(); wakeLock = null; } }catch(e){}
+  }
+  // re-acquire if the tab regains visibility mid-run (wake locks drop when a tab is hidden)
+  document.addEventListener('visibilitychange', () => {
+    if(document.visibilityState === 'visible' && autoOverlayEl && autoOverlayEl.classList.contains('show') && !wakeLock){
+      requestWakeLock();
+    }
+  });
 
   function showAutoOverlay(label){
-    autoBarPct = 0;
     if(autoLabelEl) autoLabelEl.textContent = label || 'Working…';
     if(autoBarFillEl) autoBarFillEl.style.width = '0%';
     if(autoPctEl) autoPctEl.textContent = '0%';
+    if(autoTimerEl) autoTimerEl.textContent = '0s elapsed';
+    autoTipIdx = 0; rotateAutoTip();
     if(autoOverlayEl) autoOverlayEl.classList.add('show');
-    clearInterval(autoBarTimer);
-    // decelerating climb toward 92% while the real work runs; never claims completion early
+    requestWakeLock();
+    clearInterval(autoBarTimer); clearInterval(autoTipTimer);
+    autoStart = Date.now();
+    // time-based climb: asymptotic curve toward ~96%, so it keeps crawling the whole time
+    // and is never "stuck" at a fixed number no matter how long processing takes.
+    // ~45s elapsed -> ~50%, ~90s -> ~75%, ~3min -> ~90%+ — always still visibly moving.
     autoBarTimer = setInterval(() => {
-      if(autoBarPct >= 92) return;
-      const step = autoBarPct < 40 ? 3 : autoBarPct < 70 ? 1.5 : 0.6;
-      autoBarPct = Math.min(92, autoBarPct + step);
-      if(autoBarFillEl) autoBarFillEl.style.width = autoBarPct + '%';
-      if(autoPctEl) autoPctEl.textContent = Math.round(autoBarPct) + '%';
-    }, 700);
+      const elapsedS = Math.floor((Date.now() - autoStart) / 1000);
+      const pct = 96 * (1 - Math.exp(-(elapsedS * 1000) / 45000));
+      if(autoBarFillEl) autoBarFillEl.style.width = pct.toFixed(1) + '%';
+      if(autoPctEl) autoPctEl.textContent = Math.floor(pct) + '%';
+      if(autoTimerEl) autoTimerEl.textContent = elapsedS + 's elapsed';
+    }, 400);
+    autoTipTimer = setInterval(rotateAutoTip, 4500);
   }
   function finishAutoOverlay(success){
     clearInterval(autoBarTimer); autoBarTimer = null;
+    clearInterval(autoTipTimer); autoTipTimer = null;
+    releaseWakeLock();
     if(autoBarFillEl) autoBarFillEl.style.width = '100%';
     if(autoPctEl) autoPctEl.textContent = '100%';
-    if(autoLabelEl) autoLabelEl.textContent = success ? 'Downloaded!' : 'Something went wrong — open the app to check.';
-    setTimeout(() => { if(autoOverlayEl) autoOverlayEl.classList.remove('show'); }, success ? 1400 : 3000);
+    if(autoLabelEl) autoLabelEl.textContent = success ? 'Downloaded!' : 'Something went wrong.';
+    if(autoTimerEl) autoTimerEl.textContent = '';
+    if(autoTipEl) autoTipEl.textContent = success
+      ? 'The PDF has been saved. You can close this tab now.'
+      : 'Please open the app directly to check what happened.';
+    // deliberately NOT hiding the overlay — the kitchen panel underneath must never be
+    // shown to the employee; this screen stays up as the final state of the auto-run.
   }
 
   (async function autoRunFromTag(){
