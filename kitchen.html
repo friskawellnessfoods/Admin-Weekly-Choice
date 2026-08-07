@@ -411,7 +411,7 @@
     <button data-tab="mise"><input type="checkbox" class="tabchk" data-sec="mise" checked onclick="event.stopPropagation()">Mise List</button>
     <button data-tab="workplan"><input type="checkbox" class="tabchk" data-sec="workplan" checked onclick="event.stopPropagation()">Work Plan</button>
     <button data-tab="delivery"><input type="checkbox" class="tabchk" data-sec="delivery" checked onclick="event.stopPropagation()">Delivery List</button>
-    <button data-tab="overview"><input type="checkbox" class="tabchk" data-sec="overview" onclick="event.stopPropagation()">Meal Overview</button>
+    <button data-tab="overview" id="tabOverviewBtn"><input type="checkbox" class="tabchk" data-sec="overview" onclick="event.stopPropagation()">Meal Overview</button>
     <button data-tab="pause"><input type="checkbox" class="tabchk" data-sec="pause" onclick="event.stopPropagation()">Pause List</button>
     <button data-tab="tags"><input type="checkbox" class="tabchk" data-sec="tags" checked onclick="event.stopPropagation()">Tags</button>
   </div>
@@ -475,6 +475,7 @@
   let overlayTick = null;
 
   let activeTab = 'client';
+  let isAutoMode = false;   // true when opened via ?auto=1 (NFC flow) — changes what Download does
   const loadedView = { tags:false, client:false, meal:false, overview:false, mise:false, workplan:false, delivery:false, pause:false };
   let cache = { date:null, tags:null, client:null, mise:null, workplan:null, delivery:null, pause:null };  // raw data per date
   let showInactive = false;   // pause-list toggle
@@ -588,13 +589,13 @@
     }, 400);
     autoTipTimer = setInterval(rotateAutoTip, 4500);
   }
-  function finishAutoOverlay(success){
+  function finishAutoOverlay(success, failMsg){
     clearInterval(autoBarTimer); autoBarTimer = null;
     clearInterval(autoTipTimer); autoTipTimer = null;
     releaseWakeLock();
     if(autoBarFillEl) autoBarFillEl.style.width = '100%';
     if(autoPctEl) autoPctEl.textContent = '100%';
-    if(autoLabelEl) autoLabelEl.textContent = success ? 'Downloaded!' : 'Something went wrong.';
+    if(autoLabelEl) autoLabelEl.textContent = success ? 'Downloaded!' : (failMsg || 'Something went wrong.');
     if(autoTimerEl) autoTimerEl.textContent = '';
     if(autoTipEl) autoTipEl.textContent = success
       ? 'The PDF has been saved. You can close this tab now.'
@@ -603,24 +604,76 @@
     // shown to the employee; this screen stays up as the final state of the auto-run.
   }
 
-  (async function autoRunFromTag(){
+  // ---- NFC / one-tap flow: open kitchen.html?auto=1 to show today's date (locked)
+  // plus the same tab checkboxes as the normal panel (minus Meal Overview) and a single
+  // Download button. Process + MiseList write always run behind that button; the
+  // checkboxes only choose what goes IN the PDF — same mechanism sectionOn() already uses.
+  function setupAutoMode(){
     const params = new URLSearchParams(location.search);
-    if(!params.get('auto')) return;   // normal visit — do nothing
+    if(!params.get('auto')) return;   // normal visit — leave everything exactly as-is
+    isAutoMode = true;
 
+    // skip the landing hero — go straight to the working layout
+    if(!hasGenerated){
+      hasGenerated = true;
+      document.body.classList.remove('landing');
+      document.body.classList.add('working');
+    }
+
+    // lock today's date — cannot be changed in this flow
     dateEl.value = todayLocalStr();
-    const procChk = document.getElementById('procChk');
-    const miseChk = document.getElementById('miseChk');
-    if(procChk) procChk.checked = true;
-    if(miseChk) miseChk.checked = true;
+    dateEl.disabled = true;
 
+    // hide everything except the tab checkboxes and the Download button
+    const procLabel = document.getElementById('procChk') && document.getElementById('procChk').closest('label');
+    if(procLabel) procLabel.style.display = 'none';
+    const miseLabel = document.getElementById('miseChk') && document.getElementById('miseChk').closest('label');
+    if(miseLabel) miseLabel.style.display = 'none';
+    goBtn.style.display = 'none';
+    refreshBtn.style.display = 'none';
+    const heroSub = document.querySelector('.hero-sub');
+    if(heroSub) heroSub.style.display = 'none';
+
+    // Meal Overview isn't offered in this flow
+    const ovBtn = document.getElementById('tabOverviewBtn');
+    if(ovBtn) ovBtn.style.display = 'none';
+
+    // Download is the single action — enable it and use it to run the whole sequence
+    pdfBtn.disabled = false;
+    pdfBtn.textContent = 'Download Kitchen List';
+  }
+
+  // Runs process -> writes MiseList totals -> builds the PDF from whichever tabs are
+  // currently checked -> downloads it. Process + MiseList write are not user-configurable
+  // here (always run); only the PDF contents are chosen via the tab checkboxes.
+  async function runAutoDownload(){
+    const date = dateEl.value;
+    if(!date) return;
     showAutoOverlay('Downloading Kitchen List PDF\u2026');
     let ok = false;
     try{
-      ok = await runGenerateFlow();
-      if(ok) await downloadKitchenPdf();
+      const result = await runProcess(date);
+      if(!result || !result.success){
+        finishAutoOverlay(false, 'Processing didn\u2019t complete' + (result && result.message ? ' (' + result.message + ')' : '') + '.');
+        return;
+      }
+      invalidate();
+
+      const rows = await ensureClient(date);
+      const counts = computeMealCounts(rows);
+      const miseRes = await writeMiseTotals(date, counts);
+      if(miseRes && miseRes.success){
+        invalidate();
+        await new Promise(r => setTimeout(r, 1200));  // let the sheet's dependent formulas recalculate
+      }
+
+      await downloadKitchenPdf();   // reads the current tab checkboxes itself, via sectionOn()
+      ok = true;
     }catch(e){ ok = false; }
     finishAutoOverlay(ok);
-  })();
+  }
+
+  setupAutoMode();
 
 
   // ---- tabs ----
@@ -705,7 +758,7 @@
     return true;
   }
   goBtn.addEventListener('click', runGenerateFlow);
-  pdfBtn.addEventListener('click', downloadKitchenPdf);
+  pdfBtn.addEventListener('click', () => { if(isAutoMode) runAutoDownload(); else downloadKitchenPdf(); });
 
   // Refresh: re-fetch fresh data for the open tab first, then warm the rest in the background.
   // Does NOT re-run processing or the mise write — purely reloads list data from the sheet.
