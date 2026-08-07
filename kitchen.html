@@ -581,14 +581,14 @@
     refreshBtn.disabled = false;
   });
 
-  // run the Orders_Log -> Orders_Output processing (POST processLogByDate), same as process.html.
+  // run the Orders_Log -> Orders_Output processing (POST processLogForListDate), same as process.html.
   // The actual erase/rewrite logic lives server-side in Apps Script; this only triggers it.
   async function runProcess(date){
     const params = new URLSearchParams();
-    params.append('action', 'processLogByDate');
+    params.append('action', 'processLogForListDate');
     params.append('date', date);
     const res = await fetch(API, { method:'POST', body:params });
-    return await res.json();   // caller hard-stops generation unless this returns success:true
+    return await res.json();
   }
 
   // Prefetch every list's DATA in tab order so switching tabs and building the
