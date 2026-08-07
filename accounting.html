@@ -50,6 +50,12 @@ header .sub{font-size:11px;opacity:.65;margin-top:1px}
 /* ── cards ── */
 .card{background:#fff;border-radius:var(--r);box-shadow:0 1px 4px rgba(16,24,40,.07);padding:14px;margin-bottom:14px}
 .card-title{font-size:12px;text-transform:uppercase;letter-spacing:.7px;color:var(--navy);font-weight:700;margin-bottom:14px}
+.card-title.collapsible-title{cursor:pointer;display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;user-select:none}
+.card.collapsed{padding-bottom:14px}
+.card.collapsed>*:not(.card-title){display:none}
+.card.collapsed .card-title{margin-bottom:0}
+.chevron{font-size:11px;color:var(--muted);transition:transform .15s;margin-left:8px}
+.card.collapsed .chevron{transform:rotate(-90deg)}
 
 /* ── stat grid ── */
 .stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
@@ -637,6 +643,14 @@ $('applyRange').onclick=()=>{
   el.addEventListener('click',()=>{ try{ el.showPicker(); }catch(err){} });
   el.addEventListener('focus',()=>{ try{ el.showPicker(); }catch(err){} });
 });
+/* flight-style: picking a start date seeds + opens the end date on the same month */
+$('fromDate').addEventListener('change',()=>{
+  const v=$('fromDate').value;
+  if(!v)return;
+  $('toDate').min=v;
+  if(!$('toDate').value || $('toDate').value<v) $('toDate').value=v;
+  setTimeout(()=>{ $('toDate').focus(); try{ $('toDate').showPicker(); }catch(err){} },50);
+});
 
 /* ── save expense ── */
 $('saveBtn').onclick=async()=>{
@@ -747,9 +761,25 @@ async function delLegacy(id){
   catch(e){toast(e.message,true);}
 }
 
+/* ── collapsible cards (Credits vs Debits & Summary only) ── */
+function makeCollapsible(scopeSelector){
+  document.querySelectorAll(scopeSelector+' .card').forEach(card=>{
+    const title=card.querySelector('.card-title');
+    if(!title || title.classList.contains('collapsible-title'))return;
+    title.classList.add('collapsible-title');
+    const chevron=document.createElement('span');
+    chevron.className='chevron';
+    chevron.textContent='▾';
+    title.appendChild(chevron);
+    title.addEventListener('click',()=>card.classList.toggle('collapsed'));
+  });
+}
+
 /* ── init ── */
 $('expDate').value=todayStr();
 buildPaidByChips();
+makeCollapsible('#panel-ledger');
+makeCollapsible('#panel-summary');
 loadMeta();
 loadAll();
 </script>
