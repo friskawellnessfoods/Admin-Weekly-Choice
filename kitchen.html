@@ -140,6 +140,25 @@
   .auto-tip{ font-size:13.5px; font-weight:600; color:var(--c-primary-d); text-align:center; padding:0 24px;
              min-height:18px; }
 
+  /* ===== AUTO (NFC) PANEL — centered, mobile-first ===== */
+  body.auto .tabs{
+    display:flex !important; position:static; background:transparent; border-bottom:0;
+    padding:0; margin:4px auto; gap:8px; flex-wrap:wrap; justify-content:center;
+    overflow:visible; width:100%; max-width:340px; }
+  body.auto .tabs button{ flex:0 0 auto; cursor:pointer; }
+  body.auto .tabs button.on{ color:#fff; font-weight:700; border-color:transparent;
+    background:linear-gradient(90deg,var(--grad-a),var(--grad-b)); }
+  body.auto .tabs button.on .tabchk{ accent-color:#fff; }
+  body.auto .auto-date{ font-size:17px; font-weight:800; text-align:center; color:var(--c-ink);
+    background:var(--c-surface); border:1.5px solid var(--c-line); border-radius:var(--radius);
+    padding:13px 16px; width:100%; box-shadow:var(--shadow); }
+  body.auto .auto-cap{ font-size:13px; color:var(--c-muted); text-align:center; margin:2px 0 -4px; }
+  body.auto #pdf{ display:block !important; width:100%; padding:15px 18px; font-size:16px;
+    color:#fff; border:0; background:linear-gradient(90deg,var(--grad-a),var(--grad-b));
+    box-shadow:0 4px 14px rgba(37,99,235,.25); }
+  body.auto .status{ display:none; }
+  body.auto .view{ display:none !important; }
+
   .tabs{ position:sticky; top:57px; z-index:9; background:var(--c-surface); border-bottom:1px solid var(--c-line);
          padding:8px 12px; display:flex; gap:6px; overflow-x:auto; -webkit-overflow-scrolling:touch;
          scrollbar-width:thin; }
@@ -604,31 +623,38 @@
     // shown to the employee; this screen stays up as the final state of the auto-run.
   }
 
-  // ---- NFC / one-tap flow: open kitchen.html?auto=1 to show today's date (locked)
-  // plus the same tab checkboxes as the normal panel (minus Meal Overview) and a single
-  // Download button. Process + MiseList write always run behind that button; the
-  // checkboxes only choose what goes IN the PDF — same mechanism sectionOn() already uses.
+  // ---- NFC / one-tap flow: open kitchen.html?auto=1 to show a clean, centered,
+  // mobile-first panel — today's date (locked), the same tab checkboxes as the normal
+  // panel (minus Meal Overview) as centered chips, and a single Download button.
+  // Process + MiseList write always run behind that button; the checkboxes only choose
+  // what goes IN the PDF — same mechanism sectionOn() already uses.
   function setupAutoMode(){
     const params = new URLSearchParams(location.search);
     if(!params.get('auto')) return;   // normal visit — leave everything exactly as-is
     isAutoMode = true;
 
-    // skip the landing hero — go straight to the working layout
-    if(!hasGenerated){
-      hasGenerated = true;
-      document.body.classList.remove('landing');
-      document.body.classList.add('working');
-    }
+    // stay on the centered landing layout, but flag it as the auto panel
+    hasGenerated = true;
+    document.body.classList.add('auto');
 
-    // lock today's date — cannot be changed in this flow
+    const controls = document.querySelector('.controls');
+
+    // lock today's date and show it as plain centered text instead of a greyed-out input
     dateEl.value = todayLocalStr();
     dateEl.disabled = true;
+    const field = dateEl.closest('.field');
+    if(field) field.style.display = 'none';
+    const dateLine = document.createElement('div');
+    dateLine.className = 'auto-date';
+    dateLine.textContent = new Date(dateEl.value + 'T00:00:00')
+      .toLocaleDateString(undefined, { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+    controls.insertBefore(dateLine, controls.firstChild);
 
-    // hide everything except the tab checkboxes and the Download button
-    const procLabel = document.getElementById('procChk') && document.getElementById('procChk').closest('label');
-    if(procLabel) procLabel.style.display = 'none';
-    const miseLabel = document.getElementById('miseChk') && document.getElementById('miseChk').closest('label');
-    if(miseLabel) miseLabel.style.display = 'none';
+    // hide everything that isn't part of this flow
+    ['procChk','miseChk'].forEach(id => {
+      const el = document.getElementById(id), lbl = el && el.closest('label');
+      if(lbl) lbl.style.display = 'none';
+    });
     goBtn.style.display = 'none';
     refreshBtn.style.display = 'none';
     const heroSub = document.querySelector('.hero-sub');
@@ -637,6 +663,23 @@
     // Meal Overview isn't offered in this flow
     const ovBtn = document.getElementById('tabOverviewBtn');
     if(ovBtn) ovBtn.style.display = 'none';
+
+    // caption + the tab chips, pulled into the centered control stack above Download
+    const cap = document.createElement('div');
+    cap.className = 'auto-cap'; cap.textContent = 'Select what to print';
+    controls.insertBefore(cap, pdfBtn);
+    const tabsEl = document.querySelector('.tabs');
+    if(tabsEl) controls.insertBefore(tabsEl, pdfBtn);
+
+    // chips are PDF-section selectors here — tapping one toggles its checkbox, never switches tabs
+    document.querySelectorAll('.tabs button').forEach(btn => {
+      const cb = btn.querySelector('.tabchk');
+      btn.classList.remove('active');
+      const sync = () => btn.classList.toggle('on', !!(cb && cb.checked));
+      sync();
+      btn.addEventListener('click', () => { if(cb){ cb.checked = !cb.checked; sync(); } });
+      if(cb) cb.addEventListener('change', sync);
+    });
 
     // Download is the single action — enable it and use it to run the whole sequence
     pdfBtn.disabled = false;
@@ -681,6 +724,7 @@
     btn.addEventListener('click', () => switchTab(btn.dataset.tab));
   });
   function switchTab(tab){
+    if(isAutoMode) return;   // auto panel: chips select PDF sections, they don't switch views
     activeTab = tab;
     document.querySelectorAll('.tabs button').forEach(b =>
       b.classList.toggle('active', b.dataset.tab === tab));
