@@ -125,6 +125,18 @@
                    font-size:14px; font-weight:700; color:var(--c-primary-d); }
   .overlay .msg{ font-size:14px; color:var(--c-ink); font-weight:600; }
 
+  /* ===== NFC / one-tap auto-run progress screen — only shown for ?auto=1 ===== */
+  .auto-overlay{ position:fixed; inset:0; z-index:99999; display:none; flex-direction:column;
+                 align-items:center; justify-content:center; gap:18px; background:#fff; }
+  .auto-overlay.show{ display:flex; }
+  .auto-logo{ height:56px; width:auto; margin-bottom:4px; }
+  .auto-label{ font-size:17px; font-weight:700; color:var(--c-ink); text-align:center; padding:0 24px; }
+  .auto-bar-track{ width:280px; max-width:80vw; height:14px; background:var(--c-line);
+                    border-radius:999px; overflow:hidden; }
+  .auto-bar-fill{ height:100%; width:0%; background:linear-gradient(90deg,var(--grad-a),var(--grad-b));
+                   border-radius:999px; transition:width .35s ease; }
+  .auto-pct{ font-size:15px; font-weight:800; color:var(--c-primary-d); }
+
   .tabs{ position:sticky; top:57px; z-index:9; background:var(--c-surface); border-bottom:1px solid var(--c-line);
          padding:8px 12px; display:flex; gap:6px; overflow-x:auto; -webkit-overflow-scrolling:touch;
          scrollbar-width:thin; }
@@ -381,6 +393,13 @@
     </div>
   </div>
 
+  <div class="auto-overlay" id="autoOverlay">
+    <img src="logo.png" alt="Friska Wellness Foods" class="auto-logo">
+    <div class="auto-label" id="autoLabel">Downloading Kitchen List PDF…</div>
+    <div class="auto-bar-track"><div class="auto-bar-fill" id="autoBarFill"></div></div>
+    <div class="auto-pct" id="autoPct">0%</div>
+  </div>
+
   <div class="tabs">
     <button data-tab="client" class="active"><input type="checkbox" class="tabchk" data-sec="client" checked onclick="event.stopPropagation()">Client List</button>
     <button data-tab="meal"><input type="checkbox" class="tabchk" data-sec="meal" checked onclick="event.stopPropagation()">Meal List</button>
@@ -488,6 +507,67 @@
     setStatus(dateEl.value ? 'Press Generate to build the lists.' : 'Pick a date to begin.', false);
   });
 
+  // ---- NFC / one-tap auto-run: open kitchen.html?auto=1 to run today's full flow
+  // (process orders -> write MiseList totals -> generate -> download the Kitchen List PDF)
+  // with no taps inside the page. Meant to be stored on an NFC tag in the kitchen.
+  // Shows one simple full-screen progress bar the whole time — the process/mise/generate
+  // steps run underneath, but the employee just sees "Downloading… X%" climb to 100%.
+  function todayLocalStr(){
+    const d = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+  }
+
+  const autoOverlayEl = document.getElementById('autoOverlay');
+  const autoLabelEl   = document.getElementById('autoLabel');
+  const autoBarFillEl = document.getElementById('autoBarFill');
+  const autoPctEl     = document.getElementById('autoPct');
+  let autoBarPct = 0, autoBarTimer = null;
+
+  function showAutoOverlay(label){
+    autoBarPct = 0;
+    if(autoLabelEl) autoLabelEl.textContent = label || 'Working…';
+    if(autoBarFillEl) autoBarFillEl.style.width = '0%';
+    if(autoPctEl) autoPctEl.textContent = '0%';
+    if(autoOverlayEl) autoOverlayEl.classList.add('show');
+    clearInterval(autoBarTimer);
+    // decelerating climb toward 92% while the real work runs; never claims completion early
+    autoBarTimer = setInterval(() => {
+      if(autoBarPct >= 92) return;
+      const step = autoBarPct < 40 ? 3 : autoBarPct < 70 ? 1.5 : 0.6;
+      autoBarPct = Math.min(92, autoBarPct + step);
+      if(autoBarFillEl) autoBarFillEl.style.width = autoBarPct + '%';
+      if(autoPctEl) autoPctEl.textContent = Math.round(autoBarPct) + '%';
+    }, 700);
+  }
+  function finishAutoOverlay(success){
+    clearInterval(autoBarTimer); autoBarTimer = null;
+    if(autoBarFillEl) autoBarFillEl.style.width = '100%';
+    if(autoPctEl) autoPctEl.textContent = '100%';
+    if(autoLabelEl) autoLabelEl.textContent = success ? 'Downloaded!' : 'Something went wrong — open the app to check.';
+    setTimeout(() => { if(autoOverlayEl) autoOverlayEl.classList.remove('show'); }, success ? 1400 : 3000);
+  }
+
+  (async function autoRunFromTag(){
+    const params = new URLSearchParams(location.search);
+    if(!params.get('auto')) return;   // normal visit — do nothing
+
+    dateEl.value = todayLocalStr();
+    const procChk = document.getElementById('procChk');
+    const miseChk = document.getElementById('miseChk');
+    if(procChk) procChk.checked = true;
+    if(miseChk) miseChk.checked = true;
+
+    showAutoOverlay('Downloading Kitchen List PDF\u2026');
+    let ok = false;
+    try{
+      ok = await runGenerateFlow();
+      if(ok) await downloadKitchenPdf();
+    }catch(e){ ok = false; }
+    finishAutoOverlay(ok);
+  })();
+
+
   // ---- tabs ----
   document.querySelectorAll('.tabs button').forEach(btn => {
     btn.addEventListener('click', () => switchTab(btn.dataset.tab));
@@ -503,8 +583,11 @@
   }
 
   // ---- Generate: the single explicit trigger ----
-  goBtn.addEventListener('click', async () => {
-    if(!dateEl.value){ setStatus('Pick a date first.', false); return; }
+  // The full Generate sequence, extracted so it can be triggered either by the
+  // button click or automatically via the ?auto=1 URL param (for an NFC-tag flow).
+  // Returns true if generation completed and the active tab loaded successfully.
+  async function runGenerateFlow(){
+    if(!dateEl.value){ setStatus('Pick a date first.', false); return false; }
     // shift from landing hero to working layout on first generate
     if(!hasGenerated){
       hasGenerated = true;
@@ -525,7 +608,7 @@
       }catch(e){
         hideOverlay(); goBtn.disabled = false;
         setStatus('Process error: ' + e.message + ' — lists not generated.', false);
-        return;
+        return false;
       }
       hideOverlay();
       // processing erases & rewrites Orders_Output, so it MUST complete cleanly.
@@ -533,7 +616,7 @@
       if(!result || !result.success){
         goBtn.disabled = false;
         setStatus('Processing did not complete' + (result && result.message ? ' (' + result.message + ')' : '') + ' — lists not generated.', false);
-        return;
+        return false;
       }
       // success: drop any cached/prefetched data so lists fetch the fresh output
       invalidate();
@@ -564,7 +647,9 @@
     await load(activeTab);          // render the visible tab first
     refreshBtn.disabled = false;    // refresh available once something is loaded
     await preloadData();            // warm the rest in the background (mise now reads written numbers)
-  });
+    return true;
+  }
+  goBtn.addEventListener('click', runGenerateFlow);
   pdfBtn.addEventListener('click', downloadKitchenPdf);
 
   // Refresh: re-fetch fresh data for the open tab first, then warm the rest in the background.
@@ -588,7 +673,7 @@
     params.append('action', 'processLogForListDate');
     params.append('date', date);
     const res = await fetch(API, { method:'POST', body:params });
-    return await res.json();
+    return await res.json();   // caller hard-stops generation unless this returns success:true
   }
 
   // Prefetch every list's DATA in tab order so switching tabs and building the
@@ -828,16 +913,16 @@
     const table = document.createElement('table'); table.className = 'client';
     const cols = [
       { key:'_num',      label:'#',         width:'3%'  },
-      { key:'name',      label:'Name',      width:'13%' },
-      { key:'breakfast', label:'Breakfast', width:'11%' },
-      { key:'option1',   label:'Option 1',  width:'11%' },
-      { key:'option2',   label:'Option 2',  width:'11%' },
-      { key:'snack',     label:'Snack',     width:'9%'  },
-      { key:'juice1',    label:'Juice 1',   width:'9%'  },
-      { key:'juice2',    label:'Juice 2',   width:'9%'  },
-      { key:'remarks',   label:'Remarks',   width:'17%' },
-      { key:'type',      label:'Type',      width:'5%'  },
-      { key:'slot',      label:'Slot',      width:'2%'  },
+      { key:'name',      label:'Name',      width:'12%' },
+      { key:'breakfast', label:'Breakfast', width:'7%'  },
+      { key:'option1',   label:'Option 1',  width:'7%'  },
+      { key:'option2',   label:'Option 2',  width:'7%'  },
+      { key:'snack',     label:'Snack',     width:'7%'  },
+      { key:'juice1',    label:'Juice 1',   width:'6%'  },
+      { key:'juice2',    label:'Juice 2',   width:'6%'  },
+      { key:'remarks',   label:'Remarks',   width:'30%' },
+      { key:'type',      label:'Type',      width:'8%'  },
+      { key:'slot',      label:'Slot',      width:'7%'  },
     ];
 
     const colgroup = document.createElement('colgroup');
