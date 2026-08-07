@@ -323,6 +323,33 @@ button.primary:disabled{opacity:.5}
     <div class="chart" id="sumCatChart"></div>
   </div>
 
+  <div class="card">
+    <div class="card-title">Add old credit (backfill)</div>
+    <p style="font-size:12.5px;color:var(--muted);margin-bottom:12px">
+      For months with no Bills entries — counts toward Collected/Outstanding above, doesn't touch the Bills sheet.
+    </p>
+    <div class="field">
+      <label for="legDate">Date *</label>
+      <input id="legDate" type="date">
+    </div>
+    <div class="field">
+      <label for="legClient">Client <span style="font-weight:400;color:var(--muted)">(optional)</span></label>
+      <input id="legClient" type="text" placeholder="Client name">
+    </div>
+    <div class="field">
+      <label for="legAmount">Amount (₹) *</label>
+      <input id="legAmount" class="amount-input" type="number" inputmode="decimal" step="0.01" min="0.01" placeholder="0">
+    </div>
+    <div class="field">
+      <label>Status *</label>
+      <div class="chips" id="legStatusChips">
+        <button type="button" class="chip" aria-pressed="false" data-status="Paid">Paid</button>
+        <button type="button" class="chip" aria-pressed="true" data-status="Unpaid">Unpaid</button>
+      </div>
+    </div>
+    <button class="primary" id="legSaveBtn">Save old credit</button>
+    <div id="legacyList" style="margin-top:14px"></div>
+  </div>
 
 </div>
 
@@ -359,7 +386,8 @@ function monthRange(monthsBack){
 }
 
 /* ── state ── */
-let BILLS=[];   // array of objects keyed by header
+let BILLS=[];   // array of objects keyed by header (Bills + LegacyCredits merged)
+let LEGACY=[];  // raw LegacyCredits rows
 let EXPENSES=[]; // array of objects
 let META={categories:[],paymentMethods:['UPI','Cash']};
 let PERIOD='today';
@@ -407,16 +435,30 @@ const filteredExpenses=()=>EXPENSES.filter(e=>inPeriod(expDate(e)));
 /* ── load ── */
 async function loadAll(){
   try{
-    const [bj,ej]=await Promise.all([
+    const [bj,ej,lj]=await Promise.all([
       post({action:'getBillsAll'}),
-      post({action:'getExpensesAll'})
+      post({action:'getExpensesAll'}),
+      post({action:'getLegacyCreditsAll'})
     ]);
     // Bills
     const br=bj.rows||[];
+    let bills=[];
     if(br.length){
       const bh=br[0].map(x=>String(x).trim());
-      BILLS=br.slice(1).map(r=>{const o={};bh.forEach((k,i)=>o[k]=r[i]);return o;}).filter(o=>o.BillNo);
+      bills=br.slice(1).map(r=>{const o={};bh.forEach((k,i)=>o[k]=r[i]);return o;}).filter(o=>o.BillNo);
     }
+    // Legacy credits — normalized into the same shape as Bills, merged for Credits/Summary only
+    const lr=lj.rows||[];
+    LEGACY=[];
+    if(lr.length){
+      const lh=lr[0].map(x=>String(x).trim());
+      LEGACY=lr.slice(1).map(r=>{const o={};lh.forEach((k,i)=>o[k]=r[i]);return o;}).filter(o=>o.LegacyId);
+    }
+    const legacyAsBills=LEGACY.map(l=>({
+      BillNo:l.LegacyId, Date:l.Date, Client:l.Client, GrandTotal:l.Amount,
+      PaidStatus:l.PaidStatus, Delivery:0, Gst:0, _legacy:true
+    }));
+    BILLS=bills.concat(legacyAsBills);
     // Expenses
     const er=ej.rows||[];
     if(er.length){
@@ -553,6 +595,7 @@ function renderSummary(){
     {label:'Expenses',     value:totalExp,     tone:'red'}
   ]);
   renderBars('sumCatChart',cats.map(([c,v])=>({label:c,value:v,tone:'navy'})));
+  renderLegacyList();
 
 
 }
@@ -650,6 +693,58 @@ function buildPaidByChips(){
 function getPaidBy(){
   const sel=$('paidByChips').querySelector('[aria-pressed="true"]');
   return sel?sel.dataset.name:'';
+}
+
+/* ── legacy credit status chips ── */
+document.querySelectorAll('#legStatusChips .chip').forEach(c=>{
+  c.onclick=()=>{
+    document.querySelectorAll('#legStatusChips .chip').forEach(x=>x.setAttribute('aria-pressed','false'));
+    c.setAttribute('aria-pressed','true');
+  };
+});
+function getLegStatus(){
+  const sel=document.querySelector('#legStatusChips [aria-pressed="true"]');
+  return sel?sel.dataset.status:'Unpaid';
+}
+
+$('legSaveBtn').onclick=async()=>{
+  const dateVal=$('legDate').value;
+  const amt=Number($('legAmount').value);
+  let ok=true;
+  if(!dateVal){$('legDate').classList.add('err');ok=false;}else $('legDate').classList.remove('err');
+  if(!isFinite(amt)||amt<=0){$('legAmount').classList.add('err');ok=false;}else $('legAmount').classList.remove('err');
+  if(!ok){toast('Fill required fields',true);return;}
+
+  const btn=$('legSaveBtn');btn.disabled=true;btn.textContent='Saving…';
+  try{
+    await post({action:'appendLegacyCredit',payload:JSON.stringify({
+      Date:dateVal, Client:$('legClient').value.trim(), Amount:amt, PaidStatus:getLegStatus()
+    })});
+    toast('Saved');
+    $('legAmount').value='';$('legClient').value='';
+    await loadAll();
+  }catch(e){toast(e.message,true);}
+  finally{btn.disabled=false;btn.textContent='Save old credit';}
+};
+
+function renderLegacyList(){
+  const items=LEGACY.slice().sort((a,b)=>String(b.Date).localeCompare(String(a.Date)));
+  $('legacyList').innerHTML=items.length?'<div class="divider"></div>'+items.map(l=>`
+    <div class="item">
+      <div class="m">
+        <div class="t">${esc(l.Client||'—')}${l.PaidStatus!=='Paid'?' · Unpaid':''}</div>
+        <div class="s">${esc(String(l.Date).slice(0,10))} · ${esc(l.LegacyId)}</div>
+      </div>
+      <div class="a">${money(l.Amount)}</div>
+      <button class="del" data-id="${esc(l.LegacyId)}" aria-label="Delete">×</button>
+    </div>`).join(''):'';
+  $('legacyList').querySelectorAll('.del').forEach(b=>b.onclick=()=>delLegacy(b.dataset.id));
+}
+
+async function delLegacy(id){
+  if(!confirm('Delete '+id+'?'))return;
+  try{await post({action:'deleteLegacyCredit',legacyId:id});toast('Deleted');await loadAll();}
+  catch(e){toast(e.message,true);}
 }
 
 /* ── init ── */
