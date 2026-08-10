@@ -338,6 +338,7 @@ function normName(s){return String(s||"").replace(/\s+/g," ").trim().toLowerCase
 function readDate(id){const v=el(id).value;if(!v)return null;const [y,m,d]=v.split("-").map(Number);return dateOnly(new Date(y,m-1,d,12));}
 function setDate(id,d){el(id).value=d?keyOf(d):"";}
 function nextServiceDates(afterDay,needed){const out=[];let cur=addDays(afterDay,1);while(out.length<needed){if(!isSunday(cur))out.push(dateOnly(cur));cur=addDays(cur,1);}return out;}
+function computeDaysExclSunday(start,end){if(!start||!end||end<start)return 0;let n=0,c=dateOnly(start);while(c<=end){if(!isSunday(c))n++;c=addDays(c,1);}return n;}
 function money(n){return String(Math.round((Number(n)||0)*100)/100);}
 function el(id){return document.getElementById(id);}
 function setStatus(id,msg,cls){const s=el(id);if(!s)return;s.textContent=msg;s.className="status "+(cls||"info");}
@@ -492,7 +493,7 @@ function nDays(){return parseInt(el("n_days").value)||0;}
 function nPeople(){return Math.max(1,parseInt(el("n_people").value)||1);}
 function mealLabel(plan,both,onlyLunch){return `${PLAN_LABEL[plan]} · `+(both?"Lunch + Dinner":(onlyLunch?"Lunch":"Dinner"));}
 function domLines(tbodyId){const m={};readLines(tbodyId).forEach(l=>m[l.id]=l);return m;}
-function buildNewLines(resetQty,freshMains){
+function buildNewLines(resetQty,freshMains,freshJuice){
   const prev=domLines("n_lines");
   const plans=nPlans(),chosen=nChosen(),dur=el("n_dur").value,days=nDays();
   const hasLunch=chosen.includes("lunch"),hasDinner=chosen.includes("dinner"),both=hasLunch&&hasDinner;
@@ -503,7 +504,7 @@ function buildNewLines(resetQty,freshMains){
   if(chosen.includes("breakfast"))out.push({id:"breakfast",label:"Breakfast",qty:keepQ("breakfast",days),rate:keepR("breakfast",plans.length?rate(plans[0],dur,"breakfast"):gRate("breakfast")),food:true});
   if(chosen.includes("snack"))out.push({id:"snack",label:"Snack",qty:keepQ("snack",days),rate:keepR("snack",plans.length?rate(plans[0],dur,"snack"):gRate("snack")),food:true});
   const jx=chosen.includes("juice2x")?2:(chosen.includes("juice1x")?1:0);
-  if(jx>0)out.push({id:"juices",label:"Juices",qty:keepQ("juices",days*jx),rate:keepR("juices",plans.length?rate(plans[0],dur,"juice1"):gRate("juice1")),food:true});
+  if(jx>0)out.push({id:"juices",label:"Juices",qty:freshJuice?days*jx:keepQ("juices",days*jx),rate:keepR("juices",plans.length?rate(plans[0],dur,"juice1"):gRate("juice1")),food:true});
   if(chosen.includes("seafood"))out.push({id:"seafood",label:"Seafood add-on",qty:keepQ("seafood",days),rate:keepR("seafood",gRate("seafood")),food:true});
   Object.values(prev).filter(l=>l.custom).forEach(l=>out.push(l));
   const delprice=parseFloat(el("n_delprice").value)||0;
@@ -524,7 +525,7 @@ function refreshNewRates(){
   });
   renderLines("n_lines",lines);recalcNew();
 }
-function nRender(resetQty,freshMains){renderLines("n_lines",buildNewLines(resetQty,freshMains));recalcNew();}
+function nRender(resetQty,freshMains,freshJuice){renderLines("n_lines",buildNewLines(resetQty,freshMains,freshJuice));recalcNew();}
 function recalcNew(){renderTotals("n_totals",computeTotals(readLines("n_lines"),parseFloat(el("n_disc").value)||0,parseFloat(el("n_gst").value)||0,0));}
 function newDatesFromStart(){const s=readDate("n_start");const days=nDays();if(s){const f=nextServiceDates(addDays(s,-1),days);setDate("n_end",f[f.length-1]);}}
 function applyDuration(){const dur=el("n_dur").value;if(dur==="custom")el("n_days").removeAttribute("readonly");else{el("n_days").value=DUR_DAYS[dur];el("n_days").setAttribute("readonly","readonly");}nRender(true);refreshNewRates();newDatesFromStart();}
@@ -1011,11 +1012,18 @@ el("n_dur").addEventListener("change",applyDuration);
 el("n_days").addEventListener("input",()=>{nRender(true);newDatesFromStart();});
 el("n_people").addEventListener("input",()=>nRender(true));
 el("n_start").addEventListener("change",()=>{newDatesFromStart();refreshNum("n_billno","n_start");});
+el("n_end").addEventListener("change",()=>{
+  if(el("n_dur").value==="custom"){
+    const s=readDate("n_start"),en=readDate("n_end");
+    if(s&&en&&en>=s){el("n_days").value=computeDaysExclSunday(s,en);nRender(true);}
+  }
+});
 el("n_items").addEventListener("change",e=>{
   const v=e.target.value;
+  const isJuice=(v==="juice1x"||v==="juice2x");
   if(v==="juice2x"&&e.target.checked){const o=el("n_items").querySelector('input[value="juice1x"]');o.checked=false;o.closest(".chk").classList.remove("on");}
   if(v==="juice1x"&&e.target.checked){const o=el("n_items").querySelector('input[value="juice2x"]');o.checked=false;o.closest(".chk").classList.remove("on");}
-  e.target.closest(".chk").classList.toggle("on",e.target.checked);nRender(false,(v==="lunch"||v==="dinner"));
+  e.target.closest(".chk").classList.toggle("on",e.target.checked);nRender(false,(v==="lunch"||v==="dinner"),isJuice);
 });
 el("n_slots").addEventListener("change",e=>{e.target.closest(".chk").classList.toggle("on",e.target.checked);nRender(false);});
 el("n_km").addEventListener("input",()=>{el("n_delprice").value=money((parseFloat(el("n_km").value)||0)*gRate("delivery"));nRender(false);});
