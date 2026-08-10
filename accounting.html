@@ -372,6 +372,9 @@ const PAID_BY_NAMES = ['Parth', 'Umesh'];
 const $=id=>document.getElementById(id);
 const money=n=>'₹'+Number(n||0).toLocaleString('en-IN',{maximumFractionDigits:2});
 const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+/* normalized matching keys used to dedupe legacy credits against real Bills */
+const normName_=s=>String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+const moneyKey_=n=>(Math.round(Number(n||0)*100)/100).toFixed(2);
 function toast(msg,isErr){
   const t=$('toast');t.textContent=msg;t.className='toast show'+(isErr?' err':'');
   clearTimeout(toast._t);toast._t=setTimeout(()=>t.className='toast',2800);
@@ -394,6 +397,7 @@ function monthRange(monthsBack){
 /* ── state ── */
 let BILLS=[];   // array of objects keyed by header (Bills + LegacyCredits merged)
 let LEGACY=[];  // raw LegacyCredits rows
+let DUP_LEGACY_IDS=new Set(); // LegacyIds matched to a real Bill (Client+Amount) — excluded from totals
 let EXPENSES=[]; // array of objects
 let META={categories:[],paymentMethods:['UPI','Cash']};
 let PERIOD='today';
@@ -460,7 +464,22 @@ async function loadAll(){
       const lh=lr[0].map(x=>String(x).trim());
       LEGACY=lr.slice(1).map(r=>{const o={};lh.forEach((k,i)=>o[k]=r[i]);return o;}).filter(o=>o.LegacyId);
     }
-    const legacyAsBills=LEGACY.map(l=>({
+    // Match legacy credits against real Bills by normalized Client + exact Amount
+    // (Bills.GrandTotal). A match means this bank-statement row is the same
+    // payment as an actual bill, so it's excluded to prevent double-counting.
+    // Each Bill can absorb at most one matching legacy row.
+    const billSig=new Map(); // 'name|amount' -> remaining match count
+    bills.forEach(b=>{
+      const key=normName_(b.Client)+'|'+moneyKey_(b.GrandTotal);
+      billSig.set(key,(billSig.get(key)||0)+1);
+    });
+    DUP_LEGACY_IDS=new Set();
+    const legacyAsBills=LEGACY.filter(l=>{
+      const key=normName_(l.Client)+'|'+moneyKey_(l.Amount);
+      const remaining=billSig.get(key)||0;
+      if(remaining>0){ billSig.set(key,remaining-1); DUP_LEGACY_IDS.add(l.LegacyId); return false; }
+      return true;
+    }).map(l=>({
       BillNo:l.LegacyId, Date:l.Date, Client:l.Client, GrandTotal:l.Amount,
       PaidStatus:l.PaidStatus, Delivery:0, Gst:0, _legacy:true
     }));
@@ -743,15 +762,17 @@ $('legSaveBtn').onclick=async()=>{
 
 function renderLegacyList(){
   const items=LEGACY.slice().sort((a,b)=>String(b.Date).localeCompare(String(a.Date)));
-  $('legacyList').innerHTML=items.length?'<div class="divider"></div>'+items.map(l=>`
-    <div class="item">
+  $('legacyList').innerHTML=items.length?'<div class="divider"></div>'+items.map(l=>{
+    const excluded=DUP_LEGACY_IDS.has(l.LegacyId);
+    return `<div class="item"${excluded?' style="opacity:.5"':''}>
       <div class="m">
-        <div class="t">${esc(l.Client||'—')}${l.PaidStatus!=='Paid'?' · Unpaid':''}</div>
+        <div class="t">${esc(l.Client||'—')}${l.PaidStatus!=='Paid'?' · Unpaid':''}${excluded?' · Matched to a real bill (excluded)':''}</div>
         <div class="s">${esc(String(l.Date).slice(0,10))} · ${esc(l.LegacyId)}</div>
       </div>
       <div class="a">${money(l.Amount)}</div>
       <button class="del" data-id="${esc(l.LegacyId)}" aria-label="Delete">×</button>
-    </div>`).join(''):'';
+    </div>`;
+  }).join(''):'';
   $('legacyList').querySelectorAll('.del').forEach(b=>b.onclick=()=>delLegacy(b.dataset.id));
 }
 
