@@ -209,6 +209,7 @@
               display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;
               word-break:break-word; max-width:100%; }
   .cb-slot{ font-weight:600; font-size:15px; margin-top:.15em; text-transform:uppercase; letter-spacing:.5px; }
+  .tslot{ font-weight:600; font-size:14px; margin-top:.25em; text-transform:uppercase; letter-spacing:.5px; }
 
   /* ---------- LISTS (client etc.) ---------- */
   .listwrap{ padding:18px; overflow-x:auto; -webkit-overflow-scrolling:touch; }
@@ -1883,6 +1884,10 @@
       const rem = document.createElement('div'); rem.className = 'remark'; rem.textContent = t.remarks; inner.appendChild(rem);
       const nm = document.createElement('div'); nm.className = 'cname'; nm.textContent = t.clientName || ''; inner.appendChild(nm);
     }
+    const tslot = String(t.slot || '').trim();
+    if(tslot === 'Morning' || tslot === 'Evening'){
+      const s = document.createElement('div'); s.className = 'tslot'; s.textContent = tslot; inner.appendChild(s);
+    }
     el.appendChild(inner);
     return el;
   }
@@ -1934,7 +1939,7 @@
 
   function fitInnerSync(inner){
     const dishEls = inner.querySelectorAll('.dish, .cb-name, .cb-code');   // meal tag has 1 dish; carry tag can have multiple .cb-code lines
-    const secondary = Array.from(inner.querySelectorAll('.type, .remark, .cb-type, .cb-remark, .cb-slot'));
+    const secondary = Array.from(inner.querySelectorAll('.type, .remark, .cb-type, .cb-remark, .cb-slot, .tslot'));
     const nameEls = Array.from(inner.querySelectorAll('.cname'));
 
     // 1) Dish/code lines: highest priority — fit to width only, wrap freely, never shrunk for the remark's sake
