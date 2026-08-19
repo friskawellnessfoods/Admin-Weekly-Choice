@@ -558,7 +558,7 @@ function parseBillRow(row,idx){
   const get=k=>{const j=idx[k];return (j===undefined||j>=row.length)?"":row[j];};
   let lineItems=[];
   try{const raw=get("LineItemsJSON");if(raw)lineItems=JSON.parse(raw);}catch(e){lineItems=[];}
-  return {raw:row,idx,billNo:get("BillNo"),plan:get("Plan"),duration:get("Duration"),slots:get("Slots"),items:get("Items"),client:get("Client"),phone:get("Phone"),start:toDt(get("Start")),end:toDt(get("End")),grandTotal:parseFloat(get("GrandTotal"))||0,deliveryTotal:parseFloat(get("Delivery"))||0,discPct:parseFloat(get("Discount"))||0,gstPct:5,paid:String(get("PaidStatus")||"Unpaid"),lineItems};
+  return {raw:row,idx,billNo:get("BillNo"),plan:get("Plan"),duration:get("Duration"),slots:get("Slots"),items:get("Items"),client:get("Client"),phone:get("Phone"),start:toDt(get("Start")),end:toDt(get("End")),grandTotal:parseFloat(get("GrandTotal"))||0,deliveryTotal:parseFloat(get("Delivery"))||0,discPct:parseFloat(get("Discount"))||0,gstPct:5,paid:String(get("PaidStatus")||"Unpaid"),adjustment:parseFloat(get("Adjustment"))||0,lineItems};
 }
 function allBillsForClient(rows,name){
   if(!rows||rows.length<2)return [];const idx=billHeaderIndex(rows);const ci=idx["Client"];if(ci===undefined)return [];
@@ -642,8 +642,10 @@ function reconstructNextLines(prev,days,slots,op){
 function recalcRenewActual(){
   if(!renewCtx)return;
   const t=computeTotals(readLines("r_lines"),renewCtx.prev.discPct||0,5,0);renderTotals("r_actualTotals",t);
-  const paid=renewCtx.prev.grandTotal;const adj=(Math.round(t.grand*100)/100)-paid;renewCtx.adjustment=adj;
-  el("r_paid").textContent="₹"+money(paid);
+  const paidTotal=renewCtx.prev.grandTotal;
+  const paidBaseline=paidTotal-(renewCtx.prev.adjustment||0); // exclude any carried-forward correction already baked into this bill, so we compare against this cycle's own regular billing only
+  const adj=(Math.round(t.grand*100)/100)-paidBaseline;renewCtx.adjustment=adj;
+  el("r_paid").textContent="₹"+money(paidTotal);
   el("r_adj").innerHTML=adj===0?"₹0":`<span class="${adj<0?'credit':'debit'}">${adj<0?'−':'+'}₹${money(Math.abs(adj))} ${adj<0?'(credit to client)':'(client owes)'}</span>`;
   recalcRenewNext();
 }
@@ -741,8 +743,10 @@ async function deleteBillPrompt(billNo){
 function gatherNewMeta(){
   return {billNo:el("n_billno").value.trim(),billDate:readDate("n_billdate")||dateOnly(new Date()),client:el("n_client").value.trim(),phone:el("n_phone").value.trim(),plan:nPlans().map(p=>PLAN_LABEL[p]).join(", "),duration:DUR_LABEL[el("n_dur").value]||el("n_dur").value,days:nDays(),start:readDate("n_start"),end:readDate("n_end"),slots:Array.from(el("n_slots").querySelectorAll("input:checked")).map(c=>c.value).join(", "),discPct:parseFloat(el("n_disc").value)||0,gstPct:parseFloat(el("n_gst").value)||5,paidStatus:"Unpaid"};
 }
+const MONTH_FULL=["January","February","March","April","May","June","July","August","September","October","November","December"];
+function monthNameOf(d){return d?MONTH_FULL[d.getMonth()]:"";}
 function billObject(meta,lines,t){
-  return {BillNo:meta.billNo,Date:keyOf(meta.billDate),Client:meta.client,Phone:meta.phone,Plan:meta.plan,Duration:meta.duration,Slots:meta.slots,Start:meta.start?keyOf(meta.start):"",End:meta.end?keyOf(meta.end):"",Items:itemsReadable(lines),LineItemsJSON:JSON.stringify(lines.filter(l=>l.qty>0).map(l=>({id:l.id,label:l.label,qty:l.qty,rate:l.rate}))),Food:money(t.food),Discount:meta.discPct,Gst:money(t.gst),Delivery:money(t.delivery),Adjustment:money(t.adjustment),GrandTotal:money(t.grand),PaidStatus:meta.paidStatus};
+  return {BillNo:meta.billNo,Date:keyOf(meta.billDate),Client:meta.client,Phone:meta.phone,Plan:meta.plan,Duration:meta.duration,Slots:meta.slots,Start:meta.start?keyOf(meta.start):"",End:meta.end?keyOf(meta.end):"",Items:itemsReadable(lines),LineItemsJSON:JSON.stringify(lines.filter(l=>l.qty>0).map(l=>({id:l.id,label:l.label,qty:l.qty,rate:l.rate}))),Food:money(t.food),Discount:meta.discPct,Gst:money(t.gst),Delivery:money(t.delivery),Adjustment:money(t.adjustment),GrandTotal:money(t.grand),PaidStatus:meta.paidStatus,Month:monthNameOf(meta.start)};
 }
 async function validateAndSave(meta,lines,t,statusId){
   if(!meta.client){setStatus(statusId,"Enter client name.","err");return false;}
