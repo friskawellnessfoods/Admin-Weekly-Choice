@@ -76,6 +76,7 @@ h1 {
 
 .btn:disabled { opacity: 0.6; cursor: not-allowed; }
 .btn.print { background: #16a34a; }
+.btn.copy  { background: #0f766e; }
 
 .tables-row {
   display: grid;
@@ -94,6 +95,31 @@ h1 {
   box-shadow: 0 2px 8px rgba(0,0,0,0.07);
   overflow: hidden;
 }
+
+/* per-table action strip — screen only */
+.mise-actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+  align-items: center;
+  padding: 5px 6px;
+  background: #f4f6fb;
+  border-bottom: 1px solid #e2e6f0;
+}
+
+.mini-btn {
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  color: #0f766e;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.mini-btn:hover { background: #ecfdf5; border-color: #0f766e; }
+.mini-btn.done { background: #0f766e; color: #fff; border-color: #0f766e; }
 
 .mise-wrap table {
   width: 100%;
@@ -124,6 +150,11 @@ h1 {
   height: 14px;
   line-height: 14px;
   overflow: hidden;
+  font-size: 8px;
+  /* read-only cells are plain text now, so a normal drag-select works
+     across columns and pastes into Sheets as a real grid */
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 /* ingredient col wraps, number cols dont */
@@ -140,6 +171,8 @@ h1 {
   white-space: nowrap;
   text-align: center;
 }
+
+.mise-wrap tbody td.has-formula { color: #1976d2; font-weight: 600; }
 
 .mise-wrap tbody tr:nth-child(even) { background: #f8f9ff; }
 .mise-wrap tbody tr.summary-row { background: #fffbeb; }
@@ -180,6 +213,26 @@ h1 {
   font-size: 13px;
 }
 
+#toast {
+  position: fixed;
+  left: 50%;
+  bottom: 22px;
+  transform: translateX(-50%);
+  background: #0f172a;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 10px 18px;
+  border-radius: 999px;
+  box-shadow: 0 6px 20px rgba(0,0,0,.25);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .2s;
+  z-index: 999;
+}
+
+#toast.show { opacity: 1; }
+
 /* ===== PRINT ===== */
 @media print {
   @page {
@@ -196,6 +249,8 @@ h1 {
 
   h1 { display: none; }
   .top-bar { display: none; }
+  .mise-actions { display: none !important; }
+  #toast { display: none !important; }
 
   /* Hide the row wrapper, show tables one by one */
   .tables-row {
@@ -230,6 +285,9 @@ h1 {
     line-height: 13px;
     padding: 0 2px;
     border: 0.5px solid #999;
+    font-size: 9px;
+    color: #000 !important;
+    font-weight: normal !important;
   }
 
   .mise-wrap tbody td:nth-child(1),
@@ -281,11 +339,13 @@ h1 {
   </div>
 
   <button class="btn" id="fetchBtn" onclick="fetchMise()">Fetch</button>
+  <button class="btn copy" id="copyAllBtn" onclick="copyAll(this)" style="display:none;">Copy all for Sheets</button>
   <button class="btn print" id="printBtn" onclick="window.print()" style="display:none;">Print</button>
 </div>
 
 <div id="status">Select a date and click Fetch.</div>
 <div id="output"></div>
+<div id="toast"></div>
 
 <script>
 // tableData[tableIndex] = 2D array of {val, formula}
@@ -310,6 +370,7 @@ async function fetchMise() {
   btn.textContent = 'Loading...';
   document.getElementById('output').innerHTML = '';
   document.getElementById('printBtn').style.display = 'none';
+  document.getElementById('copyAllBtn').style.display = 'none';
   setStatus('Fetching MiseList...');
 
   try {
@@ -332,6 +393,7 @@ async function fetchMise() {
     renderAll(data.tables);
     setStatus('');
     document.getElementById('printBtn').style.display = 'inline-block';
+    document.getElementById('copyAllBtn').style.display = 'inline-block';
 
   } catch(err) {
     setStatus('Network error. Try again.');
@@ -366,6 +428,18 @@ function renderAll(tables) {
 function buildTable(t, tIdx) {
   const wrap = document.createElement('div');
   wrap.className = 'mise-wrap';
+  wrap.dataset.tIdx = tIdx;
+  wrap.dataset.label = t.dateLabel || '';
+
+  // per-table copy strip (screen only)
+  const act = document.createElement('div');
+  act.className = 'mise-actions';
+  const cbtn = document.createElement('button');
+  cbtn.className = 'mini-btn';
+  cbtn.textContent = 'Copy for Sheets';
+  cbtn.addEventListener('click', () => copyTable(tIdx, cbtn));
+  act.appendChild(cbtn);
+  wrap.appendChild(act);
 
   const table = document.createElement('table');
   const colgroup = document.createElement('colgroup');
@@ -400,32 +474,36 @@ function buildTable(t, tIdx) {
       const td = document.createElement('td');
       const cell = t.table[r][c];
 
-      const input = document.createElement('input');
-      input.type = 'text';
-      input.className = 'cell-input';
-      input.value = cell.val;
-      input.dataset.tIdx = tIdx;
-      input.dataset.row = r;
-      input.dataset.col = c;
+      td.dataset.tIdx = tIdx;
+      td.dataset.row = r;
+      td.dataset.col = c;
 
       if (isSummary) {
-        input.classList.add('editable-num');
+        // summary rows stay editable -> keep the input
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'cell-input editable-num';
+        input.value = cell.val;
+        input.dataset.tIdx = tIdx;
+        input.dataset.row = r;
+        input.dataset.col = c;
         if (cell.formula) {
           input.classList.add('has-formula');
           input.dataset.formula = cell.formula;
+          td.dataset.formula = cell.formula;
         }
         input.addEventListener('input', () => onCellEdit(tIdx));
-      } else if (cell.formula) {
-        input.classList.add('has-formula');
-        input.dataset.formula = cell.formula;
-        input.readOnly = true;
-        input.style.pointerEvents = 'none';
+        td.appendChild(input);
       } else {
-        input.readOnly = true;
-        input.style.pointerEvents = 'none';
+        // read-only cells are now plain text, so the whole grid can be
+        // drag-selected and pasted into Sheets column-by-column
+        td.textContent = cell.val;
+        if (cell.formula) {
+          td.classList.add('has-formula');
+          td.dataset.formula = cell.formula;
+        }
       }
 
-      td.appendChild(input);
       tr.appendChild(td);
     }
 
@@ -437,61 +515,131 @@ function buildTable(t, tIdx) {
   return wrap;
 }
 
-function onCellEdit(tIdx) {
-  // Update tableData with current input values
-  const inputs = document.querySelectorAll(
-    `input[data-t-idx="${tIdx}"]`
-  );
+// read whatever a cell currently shows, input or plain text
+function cellText(td) {
+  const inp = td.querySelector('input');
+  return inp ? inp.value : td.textContent;
+}
+function setCellText(td, v) {
+  const inp = td.querySelector('input');
+  if (inp) inp.value = v; else td.textContent = v;
+}
 
-  inputs.forEach(inp => {
-    const r = parseInt(inp.dataset.row);
-    const c = parseInt(inp.dataset.col);
-    if (!inp.dataset.formula) {
-      tableData[tIdx][r][c].val = inp.value;
+function onCellEdit(tIdx) {
+  document.querySelectorAll(`td[data-t-idx="${tIdx}"]`).forEach(td => {
+    const r = parseInt(td.dataset.row);
+    const c = parseInt(td.dataset.col);
+    if (!td.dataset.formula && tableData[tIdx] && tableData[tIdx][r]) {
+      tableData[tIdx][r][c].val = cellText(td);
     }
   });
-
-  // Recalculate formula cells
   recalcTable(tIdx);
 }
 
 function recalcTable(tIdx) {
-  const data = tableData[tIdx];
-  const inputs = document.querySelectorAll(`input[data-t-idx="${tIdx}"]`);
+  const tds = document.querySelectorAll(`td[data-t-idx="${tIdx}"]`);
 
-  // Build value grid from current inputs
+  // Build value grid from what's currently on screen
   const grid = [];
-  inputs.forEach(inp => {
-    const r = parseInt(inp.dataset.row);
-    const c = parseInt(inp.dataset.col);
+  tds.forEach(td => {
+    const r = parseInt(td.dataset.row);
+    const c = parseInt(td.dataset.col);
     if (!grid[r]) grid[r] = [];
-    grid[r][c] = parseFloat(inp.value) || 0;
+    grid[r][c] = parseFloat(cellText(td)) || 0;
   });
 
   // Recalculate formula cells
-  inputs.forEach(inp => {
-    if (!inp.dataset.formula) return;
-
-    const formula = inp.dataset.formula;
+  tds.forEach(td => {
+    if (!td.dataset.formula) return;
 
     try {
       // Replace [row,col] references with actual values
-      const expr = formula
+      const expr = td.dataset.formula
         .replace(/^=/, '')
         .replace(/\[(\d+),(\d+)\]/g, (match, row, col) => {
           const r = parseInt(row);
           const c = parseInt(col);
-          return (grid[r] && grid[r][c] !== undefined)
-            ? grid[r][c]
-            : 0;
+          return (grid[r] && grid[r][c] !== undefined) ? grid[r][c] : 0;
         });
 
       const result = Function('"use strict"; return (' + expr + ')')();
-      inp.value = isNaN(result) ? inp.value : Math.round(result * 100) / 100;
+      if (!isNaN(result)) setCellText(td, Math.round(result * 100) / 100);
     } catch(e) {
       // Keep existing value if formula fails
     }
   });
+}
+
+// ============================================================
+//  COPY FOR SHEETS
+//  Builds tab-separated text. Sheets splits TSV on tabs, so each
+//  column lands in its own column instead of everything in one.
+// ============================================================
+function clean(v) {
+  return String(v == null ? '' : v).replace(/[\t\r\n]+/g, ' ').trim();
+}
+
+function tsvForTable(tIdx) {
+  const wrap = document.querySelector(`.mise-wrap[data-t-idx="${tIdx}"]`);
+  if (!wrap) return '';
+  const lines = [];
+  const label = clean(wrap.dataset.label);
+  if (label) lines.push(label);
+  wrap.querySelectorAll('tbody tr').forEach(tr => {
+    const cells = [];
+    tr.querySelectorAll('td').forEach(td => cells.push(clean(cellText(td))));
+    if (cells.some(v => v !== '')) lines.push(cells.join('\t'));
+  });
+  return lines.join('\n');
+}
+
+function copyTable(tIdx, btn) {
+  writeClipboard(tsvForTable(tIdx), btn, 'Table copied — paste into Sheets');
+}
+
+function copyAll(btn) {
+  const blocks = [];
+  document.querySelectorAll('.mise-wrap').forEach(w => {
+    const t = tsvForTable(w.dataset.tIdx);
+    if (t) blocks.push(t);
+  });
+  writeClipboard(blocks.join('\n\n'), btn, blocks.length + ' table(s) copied — paste into Sheets');
+}
+
+async function writeClipboard(text, btn, msg) {
+  if (!text) return toast('Nothing to copy.');
+  let ok = false;
+  try {
+    await navigator.clipboard.writeText(text);
+    ok = true;
+  } catch(e) {
+    // fallback for older Android WebViews / non-secure contexts
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.cssText = 'position:fixed;left:-9999px;top:0;';
+      document.body.appendChild(ta);
+      ta.select();
+      ok = document.execCommand('copy');
+      ta.remove();
+    } catch(e2) { ok = false; }
+  }
+  toast(ok ? msg : 'Copy failed — long-press and select instead.');
+  if (ok && btn) {
+    const old = btn.textContent;
+    btn.textContent = 'Copied ✓';
+    btn.classList.add('done');
+    setTimeout(() => { btn.textContent = old; btn.classList.remove('done'); }, 1600);
+  }
+}
+
+let toastTimer = null;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2200);
 }
 
 function setStatus(msg) {
