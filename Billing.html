@@ -236,9 +236,10 @@
       </div>
       <table class="lines" style="margin-top:14px"><thead><tr><th>Item</th><th>Qty</th><th>Rate</th><th>Price</th><th></th></tr></thead><tbody id="r_nextlines"></tbody></table>
       <button class="add-line" id="r_addline">+ Add custom line</button>
-      <div class="grid g2" style="margin-top:16px">
+      <div class="grid g3" style="margin-top:16px">
         <div class="field"><label>Discount %</label><input id="r_disc" type="number" value="0" min="0" /></div>
         <div class="field"><label>GST % (food only)</label><input id="r_gst" type="number" value="5" min="0" /></div>
+        <div class="field"><label>Prev-cycle adjustment (₹) — 0 to omit</label><input id="r_adjinput" type="number" step="0.5" value="0" /><div class="subtle" style="margin-top:4px">Computed: <b id="r_adjcomputed">₹0</b> · <span id="r_adjreset" style="color:var(--accent);font-weight:700;cursor:pointer">reset</span></div></div>
       </div>
       <div class="totals" id="r_nextTotals"></div>
       <div class="grid g2" style="margin-top:16px">
@@ -446,17 +447,21 @@ function computeRenew(data,name,prev){
 }
 
 /* line table */
-function lineRowHtml(line){
-  const lbl=line.custom?`<input class="lbl-in" value="${(line.label||"").replace(/"/g,"&quot;")}" data-f="label">`:`<span style="font-weight:600" data-meal="${line._meal||""}" data-plans="${line._plans||""}" data-dur="${line._dur||""}" data-days="${line._days||""}">${line.label}</span>`;
-  return `<tr data-id="${line.id}" data-food="${line.food===false?0:1}"><td>${lbl}</td><td class="qtycol"><input type="number" min="0" value="${line.qty}" data-f="qty"></td><td class="ratecol"><input type="number" min="0" step="0.5" value="${line.rate}" data-f="rate"></td><td class="pricecol num" data-price>${money(line.qty*line.rate)}</td><td class="rmcol">${line.custom?`<button class="rm" data-rm>×</button>`:""}</td></tr>`;
+function lineRowHtml(line,editable){
+  const editLbl=line.custom||editable;
+  const lbl=editLbl
+    ?`<input class="lbl-in" value="${(line.label||"").replace(/<[^>]*>/g,"").replace(/"/g,"&quot;")}" data-f="label">`
+    :`<span style="font-weight:600" data-meal="${line._meal||""}" data-plans="${line._plans||""}" data-dur="${line._dur||""}" data-days="${line._days||""}">${line.label}</span>`;
+  const rm=(line.custom||editable)?`<button class="rm" data-rm>×</button>`:"";
+  return `<tr data-id="${line.id}" data-food="${line.food===false?0:1}" data-custom="${line.custom?1:0}"><td>${lbl}</td><td class="qtycol"><input type="number" min="0" value="${line.qty}" data-f="qty"></td><td class="ratecol"><input type="number" min="0" step="0.5" value="${line.rate}" data-f="rate"></td><td class="pricecol num" data-price>${money(line.qty*line.rate)}</td><td class="rmcol">${rm}</td></tr>`;
 }
-function renderLines(tbodyId,lines){el(tbodyId).innerHTML=lines.map(lineRowHtml).join("");}
+function renderLines(tbodyId,lines,editable){el(tbodyId).innerHTML=lines.map(l=>lineRowHtml(l,editable)).join("");}
 function readLines(tbodyId){
   const out=[];
   el(tbodyId).querySelectorAll("tr").forEach(tr=>{
     const id=tr.getAttribute("data-id");const get=f=>tr.querySelector(`[data-f="${f}"]`);
     const labelEl=get("label");const label=labelEl?labelEl.value:(tr.querySelector("span")?tr.querySelector("span").textContent:"");
-    out.push({id,label,qty:parseFloat(get("qty").value)||0,rate:parseFloat(get("rate").value)||0,custom:!!labelEl,food:tr.dataset.food!=="0"});
+    out.push({id,label,qty:parseFloat(get("qty").value)||0,rate:parseFloat(get("rate").value)||0,custom:tr.dataset.custom==="1",food:tr.dataset.food!=="0"});
   });
   return out;
 }
@@ -626,12 +631,12 @@ function renderRenew(){
   const newDays=prevDaysOf(prev),slots=Math.max(1,prevSlotCount(prev));
   el("r_days").value=newDays;el("r_disc").value=prev.discPct||0;el("r_gst").value=5;el("r_billdate").value=keyOf(dateOnly(new Date()));
   setDate("r_start",rc.nextStart);setDate("r_end",rc.nextEnd);
-  renderLines("r_nextlines",reconstructNextLines(prev,newDays,slots,op));bindMealToggle();
+  renderLines("r_nextlines",reconstructNextLines(prev,newDays,slots,op),true);
   suggestBillNo("r_billno","r_start");recalcRenewNext();
 }
 function reconstructNextLines(prev,days,slots,op){
   const plans=planCodesOf(prev),dur=durCodeOf(prev),p0=plans[0]||"nb";const out=[];
-  if(op.main){const both=op.main==="both";const pl=plans.length?plans:["nb"];const base=pl.map(p=>PLAN_LABEL[p]).join(" + ");const meal=both?"Lunch + Dinner":(op.main==="lunch"?"Lunch":"Dinner");const label=both?(base+" · "+meal):(base+" · "+meal+` <span class="mealtoggle" data-add="${op.main==="lunch"?"dinner":"lunch"}" style="cursor:pointer;color:var(--accent);font-weight:700;margin-left:6px">+ ${op.main==="lunch"?"Dinner":"Lunch"}</span>`);out.push({id:"main",label,qty:both?days*2:days,rate:lockedRate(prev,"main",both?rate(pl[0],dur,"combo"):rate(pl[0],dur,"lunch")),food:true,_meal:op.main,_plans:pl.join(","),_dur:dur,_days:days});}
+  if(op.main){const both=op.main==="both";const pl=plans.length?plans:["nb"];const base=pl.map(p=>PLAN_LABEL[p]).join(" + ");const meal=both?"Lunch + Dinner":(op.main==="lunch"?"Lunch":"Dinner");const label=base+" · "+meal;out.push({id:"main",label,qty:both?days*2:days,rate:lockedRate(prev,"main",both?rate(pl[0],dur,"combo"):rate(pl[0],dur,"lunch")),food:true,_meal:op.main,_plans:pl.join(","),_dur:dur,_days:days});}
   if(op.breakfast)out.push({id:"breakfast",label:"Breakfast",qty:days,rate:lockedRate(prev,"breakfast",rate(p0,dur,"breakfast")),food:true});
   if(op.snack)out.push({id:"snack",label:"Snack",qty:days,rate:lockedRate(prev,"snack",rate(p0,dur,"snack")),food:true});
   if(op.juices)out.push({id:"juices",label:"Juices",qty:days*op.juices,rate:lockedRate(prev,"juices",rate(p0,dur,"juice1")),food:true});
@@ -644,13 +649,15 @@ function recalcRenewActual(){
   const t=computeTotals(readLines("r_lines"),renewCtx.prev.discPct||0,5,0);renderTotals("r_actualTotals",t);
   const paidTotal=renewCtx.prev.grandTotal;
   const paidBaseline=paidTotal-(renewCtx.prev.adjustment||0); // exclude any carried-forward correction already baked into this bill, so we compare against this cycle's own regular billing only
-  const adj=(Math.round(t.grand*100)/100)-paidBaseline;renewCtx.adjustment=adj;
+  const adj=(Math.round(t.grand*100)/100)-paidBaseline;renewCtx.computedAdj=adj;
   el("r_paid").textContent="₹"+money(paidTotal);
   el("r_adj").innerHTML=adj===0?"₹0":`<span class="${adj<0?'credit':'debit'}">${adj<0?'−':'+'}₹${money(Math.abs(adj))} ${adj<0?'(credit to client)':'(client owes)'}</span>`;
+  el("r_adjcomputed").textContent="₹"+money(adj);
+  el("r_adjinput").value=money(adj);   // seed the editable field; user can override or zero it out
   recalcRenewNext();
 }
-function recalcRenewNext(){if(!renewCtx)return;renderTotals("r_nextTotals",computeTotals(readLines("r_nextlines"),parseFloat(el("r_disc").value)||0,parseFloat(el("r_gst").value)||0,renewCtx.adjustment||0));}
-function bindMealToggle(){el("r_nextlines").querySelectorAll(".mealtoggle").forEach(sp=>sp.onclick=e=>{e.stopPropagation();const tr=sp.closest("tr");const span=tr.querySelector('span[data-meal]');const plans=(span.dataset.plans||"nb").split(",");const dur=span.dataset.dur||"m";const days=parseInt(span.dataset.days)||26;const qi=tr.querySelector('[data-f="qty"]'),ri=tr.querySelector('[data-f="rate"]'),pi=tr.querySelector('[data-price]');qi.value=days*2;ri.value=rate(plans[0],dur,"combo");pi.textContent=money(qi.value*ri.value);span.innerHTML=plans.map(p=>PLAN_LABEL[p]).join(" + ")+" · Lunch + Dinner";recalcRenewNext();});}
+function renewAdj(){const v=parseFloat(el("r_adjinput").value);return isNaN(v)?0:v;}
+function recalcRenewNext(){if(!renewCtx)return;renderTotals("r_nextTotals",computeTotals(readLines("r_nextlines"),parseFloat(el("r_disc").value)||0,parseFloat(el("r_gst").value)||0,renewAdj()));}
 function renewDatesFromStart(){const s=readDate("r_start");const days=parseInt(el("r_days").value)||26;if(s){const f=nextServiceDates(addDays(s,-1),days);setDate("r_end",f[f.length-1]);}}
 
 /* bill number */
@@ -1047,13 +1054,15 @@ el("r_client").addEventListener("keydown",e=>{if(e.key==="Enter")runRenew(false)
 bindLivePrice("r_lines",recalcRenewActual);
 bindLivePrice("r_nextlines",recalcRenewNext);
 el("r_disc").addEventListener("input",recalcRenewNext);el("r_gst").addEventListener("input",recalcRenewNext);
+el("r_adjinput").addEventListener("input",recalcRenewNext);
+el("r_adjreset").addEventListener("click",()=>{if(!renewCtx)return;el("r_adjinput").value=money(renewCtx.computedAdj||0);recalcRenewNext();});
 el("r_start").addEventListener("change",()=>{renewDatesFromStart();refreshNum("r_billno","r_start");});
 el("r_days").addEventListener("input",renewDatesFromStart);
 el("r_addline").addEventListener("click",()=>{el("r_nextlines").insertAdjacentHTML("beforeend",lineRowHtml({id:"custom_"+Date.now(),label:"Custom item",qty:0,rate:0,food:true,custom:true}));recalcRenewNext();});
 el("r_billdate").addEventListener("change",()=>refreshNum("r_billno","r_start"));
 function gatherRenewMeta(){const p=renewCtx.prev;return {billNo:el("r_billno").value.trim(),billDate:readDate("r_billdate")||dateOnly(new Date()),client:p.client||"",phone:p.phone||"",plan:p.plan,duration:p.duration,slots:p.slots,days:parseInt(el("r_days").value)||26,start:readDate("r_start"),end:readDate("r_end"),discPct:parseFloat(el("r_disc").value)||0,gstPct:parseFloat(el("r_gst").value)||5,paidStatus:"Unpaid"};}
-el("r_save").addEventListener("click",async()=>{try{if(!renewCtx)return;const meta=gatherRenewMeta();const lines=readLines("r_nextlines");const t=computeTotals(lines,meta.discPct,meta.gstPct,renewCtx.adjustment||0);await validateAndSave(meta,lines,t,"r_status2");}catch(e){setStatus("r_status2","Error: "+e.message,"err");}});
-el("r_wa").addEventListener("click",async()=>{try{if(!renewCtx)return;const meta=gatherRenewMeta();const lines=readLines("r_nextlines");const t=computeTotals(lines,meta.discPct,meta.gstPct,renewCtx.adjustment||0);if(!await validateAndSave(meta,lines,t,"r_status2"))return;buildInvoice(meta,lines,t);await sendWhatsApp(meta,t);}catch(e){setStatus("r_status2","Error: "+e.message,"err");}});
+el("r_save").addEventListener("click",async()=>{try{if(!renewCtx)return;const meta=gatherRenewMeta();const lines=readLines("r_nextlines");const t=computeTotals(lines,meta.discPct,meta.gstPct,renewAdj());await validateAndSave(meta,lines,t,"r_status2");}catch(e){setStatus("r_status2","Error: "+e.message,"err");}});
+el("r_wa").addEventListener("click",async()=>{try{if(!renewCtx)return;const meta=gatherRenewMeta();const lines=readLines("r_nextlines");const t=computeTotals(lines,meta.discPct,meta.gstPct,renewAdj());if(!await validateAndSave(meta,lines,t,"r_status2"))return;buildInvoice(meta,lines,t);await sendWhatsApp(meta,t);}catch(e){setStatus("r_status2","Error: "+e.message,"err");}});
 
 el("u_fetch").addEventListener("click",()=>runUsageCheck(false));
 el("u_reload").addEventListener("click",()=>runUsageCheck(true));
