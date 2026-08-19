@@ -308,6 +308,18 @@
   a.wa-btn{ display:inline-block; background:#25d366; color:#fff; text-decoration:none;
             font-size:12px; font-weight:600; padding:4px 10px; border-radius:6px; white-space:nowrap; }
   a.wa-btn:hover{ background:#1da851; }
+  a.wa-btn.done{ background:#b0bec5; }
+
+  /* send-all reminder queue (screen only) */
+  .wa-queue{ margin:0 0 14px; text-align:center; }
+  .wa-queue .qstat{ font-size:13px; color:#455a64; margin-bottom:8px; }
+  .wa-queue .qname{ font-weight:800; color:var(--c-ink); }
+  .wa-queue .qrow{ display:flex; gap:8px; justify-content:center; flex-wrap:wrap; }
+  .wa-queue .btn{ padding:10px 16px; font-size:14px; }
+  .wa-queue .qbar{ height:6px; background:var(--c-line); border-radius:999px; overflow:hidden; margin:0 0 8px; }
+  .wa-queue .qbar i{ display:block; height:100%; background:linear-gradient(90deg,var(--grad-a),var(--grad-b)); }
+  table.pause tr.wa-cur td{ background:#fff8e1; }
+  table.pause tr.wa-done td{ color:#90a4ae; }
 
   /* ---------- MEAL OVERVIEW ---------- */
   .ovsheet{ background:#fff; box-shadow:0 2px 10px rgba(0,0,0,.18); margin:0 auto; padding:20px; width:680px; max-width:100%; box-sizing:border-box; }
@@ -367,6 +379,7 @@
     .ovsheet{ box-shadow:none; padding:0; margin:0; width:auto; page:portraitList; }
     .ov-actions{ display:none !important; }
     .pause-toggle{ display:none; }
+    .wa-queue{ display:none !important; }
     a.wa-btn, td.wa-cell{ display:none; }
     table.client{ -webkit-print-color-adjust:exact; print-color-adjust:exact; }
     table.client tr{ page-break-inside:avoid; }
@@ -497,6 +510,35 @@
   const loadedView = { tags:false, client:false, meal:false, overview:false, mise:false, workplan:false, delivery:false, pause:false };
   let cache = { date:null, tags:null, client:null, mise:null, workplan:null, delivery:null, pause:null };  // raw data per date
   let showInactive = false;   // pause-list toggle
+
+  // ---- send-all reminder queue state (pause tab) ----
+  // The browser can't send WhatsApp messages by itself — each one needs a real tap.
+  // The queue removes the hunting: it walks the paused list one client at a time,
+  // and auto-advances when you come back to this tab from WhatsApp.
+  const REMIND_MSG = "Hi! It looks like tomorrow meal choice hasn't been selected yet. Just checking if you'd like to add the meal please use the following link to post your meals- https://friskawellnessfoods.github.io/weekly-choice/";
+  let waSent = new Set();        // phone keys already reminded this session
+  let waQueue = null;            // [{name, phone}] once the queue is started
+  let waIdx = 0;
+  let waAwaitingReturn = false;  // true between launching WhatsApp and coming back
+  let pauseCtx = null;           // {data, date} so the queue can re-render the sheet
+
+  const waKey = phone => String(phone || '').replace(/\D/g,'').slice(-10);
+  function waLink(phone, msg){
+    let p = String(phone || '').replace(/\D/g,'');
+    if(p.length === 10) p = '91' + p;               // default to India country code
+    // hard-target WhatsApp Business (com.whatsapp.w4b) on Android
+    return 'intent://send?phone=' + p + '&text=' + encodeURIComponent(msg) +
+           '#Intent;scheme=whatsapp;package=com.whatsapp.w4b;end';
+  }
+  // coming back from WhatsApp = that client is done; step to the next one
+  document.addEventListener('visibilitychange', () => {
+    if(document.visibilityState !== 'visible' || !waAwaitingReturn) return;
+    waAwaitingReturn = false;
+    const c = waQueue && waQueue[waIdx];
+    if(c) waSent.add(waKey(c.phone));
+    waIdx++;
+    if(pauseCtx) renderPause(pauseCtx.data, pauseCtx.date);
+  });
   let hasGenerated = false;   // becomes true after first Generate (controls landing→working)
 
   // ---- status helpers (preserve the spinner span; only swap the text) ----
@@ -1739,8 +1781,75 @@
   }
 
   function renderPause(data, date){
+    pauseCtx = { data, date };
     pauseWrap.innerHTML = '';
     pauseWrap.appendChild(buildPauseSheet(data, date));
+  }
+
+  // Reminder queue UI. Not shown in print or in the PDF.
+  function buildQueueBar(paused, data, date){
+    const targets = paused.filter(c => c.phone);
+    const box = document.createElement('div'); box.className = 'wa-queue';
+    if(!targets.length) return box;
+
+    const rerender = () => renderPause(data, date);
+    const mkBtn = (label, cls, fn) => {
+      const b = document.createElement('button'); b.className = 'btn' + (cls ? ' ' + cls : '');
+      b.textContent = label; b.addEventListener('click', fn); return b;
+    };
+    const row = document.createElement('div'); row.className = 'qrow';
+
+    // not started yet
+    if(!waQueue){
+      const pending = targets.filter(c => !waSent.has(waKey(c.phone)));
+      const stat = document.createElement('div'); stat.className = 'qstat';
+      stat.textContent = pending.length
+        ? pending.length + ' client' + (pending.length > 1 ? 's' : '') + ' to remind'
+        : 'All ' + targets.length + ' reminded this session.';
+      box.appendChild(stat);
+      if(pending.length){
+        row.appendChild(mkBtn('Send all reminders', '', () => {
+          waQueue = pending; waIdx = 0; rerender();
+        }));
+      }
+      if(waSent.size){
+        row.appendChild(mkBtn('Reset sent marks', 'alt', () => { waSent = new Set(); rerender(); }));
+      }
+      box.appendChild(row);
+      return box;
+    }
+
+    // running
+    const total = waQueue.length;
+    const bar = document.createElement('div'); bar.className = 'qbar';
+    const fill = document.createElement('i');
+    fill.style.width = Math.round((Math.min(waIdx, total) / total) * 100) + '%';
+    bar.appendChild(fill); box.appendChild(bar);
+
+    const stat = document.createElement('div'); stat.className = 'qstat';
+    const current = waQueue[waIdx];
+
+    if(!current){
+      stat.textContent = 'Done \u2014 ' + total + ' reminder' + (total > 1 ? 's' : '') + ' sent.';
+      box.appendChild(stat);
+      row.appendChild(mkBtn('Close', 'alt', () => { waQueue = null; waIdx = 0; rerender(); }));
+      box.appendChild(row);
+      return box;
+    }
+
+    stat.innerHTML = 'Sending ' + (waIdx + 1) + ' of ' + total + ' \u2014 <span class="qname"></span>';
+    stat.querySelector('.qname').textContent = current.name;
+    box.appendChild(stat);
+
+    const open = mkBtn('Open WhatsApp \u2192 ' + current.name, '', () => {
+      waAwaitingReturn = true;                 // visibilitychange advances when we get back
+      location.href = waLink(current.phone, REMIND_MSG);
+    });
+    row.appendChild(open);
+    row.appendChild(mkBtn('Skip', 'alt', () => { waIdx++; rerender(); }));
+    row.appendChild(mkBtn('Stop', 'alt', () => { waQueue = null; waIdx = 0; waAwaitingReturn = false; rerender(); }));
+    box.appendChild(row);
+    return box;
   }
 
   function buildPauseSheet(data, date){
@@ -1750,9 +1859,6 @@
     const paused    = (data.paused || []).map(norm).sort(byName);
     const cancelled = (data.cancelled || []).map(norm).sort(byName);
     const inactive  = (data.pausedInactive || []).map(norm).sort(byName);
-
-    // tomorrow-reminder message for paused clients
-    const REMIND_MSG = "Hi! It looks like tomorrow meal choice hasn't been selected yet. Just checking if you'd like to add the meal please use the following link to post your meals- https://friskawellnessfoods.github.io/weekly-choice/";
 
     const wrap = document.createElement('div'); wrap.className = 'pausesheet';
     const h = document.createElement('h2');
@@ -1768,13 +1874,7 @@
     tg.appendChild(document.createTextNode('Show inactive clients'));
     wrap.appendChild(tg);
 
-    const waLink = (phone, msg) => {
-      let p = String(phone || '').replace(/\D/g,'');
-      if(p.length === 10) p = '91' + p;               // default to India country code
-      // hard-target WhatsApp Business (com.whatsapp.w4b) on Android
-      return 'intent://send?phone=' + p + '&text=' + encodeURIComponent(msg) +
-             '#Intent;scheme=whatsapp;package=com.whatsapp.w4b;end';
-    };
+    wrap.appendChild(buildQueueBar(paused, data, date));
 
     const table = document.createElement('table'); table.className = 'pause';
     let n = 0;
@@ -1783,10 +1883,15 @@
       const num = document.createElement('td'); num.className = 'num'; num.textContent = ++n;
       const nm = document.createElement('td'); nm.textContent = c.name;
       const act = document.createElement('td'); act.className = 'wa-cell';
+      const done = c.phone && waSent.has(waKey(c.phone));
+      const cur  = waQueue && waQueue[waIdx] && c.phone && waKey(waQueue[waIdx].phone) === waKey(c.phone);
+      if(done) tr.className = 'wa-done';
+      if(cur)  tr.className = 'wa-cur';
       if(c.phone){
         const a = document.createElement('a');
-        a.className = 'wa-btn'; a.href = waLink(c.phone, REMIND_MSG);
-        a.rel = 'noopener'; a.textContent = 'WhatsApp';
+        a.className = 'wa-btn' + (done ? ' done' : ''); a.href = waLink(c.phone, REMIND_MSG);
+        a.rel = 'noopener'; a.textContent = done ? 'Sent \u2713' : 'WhatsApp';
+        a.addEventListener('click', () => { waSent.add(waKey(c.phone)); });
         act.appendChild(a);
       }
       tr.appendChild(num); tr.appendChild(nm); tr.appendChild(act); table.appendChild(tr);
@@ -2145,7 +2250,7 @@
       if(needPause && pauseData && ((pauseData.paused && pauseData.paused.length) || (showInactive && pauseData.pausedInactive && pauseData.pausedInactive.length))){
         setOverlay('Rendering pause list…');
         const pauseSheet = buildPauseSheet(pauseData, date);
-        pauseSheet.querySelectorAll('.wa-cell').forEach(el => el.remove());  // no buttons in PDF
+        pauseSheet.querySelectorAll('.wa-cell, .wa-queue').forEach(el => el.remove());  // no buttons in PDF
         pauseSheet.style.padding = '0'; pauseSheet.style.boxShadow = 'none';
         stage.appendChild(pauseSheet);
         pauseCanvas = await html2canvas(pauseSheet, { scale:PDF_SCALE, useCORS:true, backgroundColor:'#ffffff' });
