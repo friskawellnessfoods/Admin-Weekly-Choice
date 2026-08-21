@@ -7,10 +7,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Weekly Menu</title>
 
+<!-- All endpoint settings come from config.js -->
 <script src="config.js"></script>
-
-<!-- PDF LIBRARY -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <style>
 
@@ -179,6 +177,27 @@ background:#d6b85c;
 margin:18px 0;
 }
 
+/* MESSAGE / ERROR STATE */
+
+.menu-msg{
+text-align:center;
+padding:40px 20px;
+font-size:18px;
+line-height:1.6;
+}
+
+.menu-msg button{
+margin-top:14px;
+background:#0a1a6e;
+color:white;
+border:none;
+padding:8px 18px;
+font-weight:bold;
+letter-spacing:1px;
+cursor:pointer;
+font-family:inherit;
+}
+
 /* MOBILE */
 
 @media(max-width:900px){
@@ -239,15 +258,93 @@ Loading menu...
 
 <script>
 
+/* ================= CONFIG =================
+   Everything endpoint-related is read from config.js, so changing the
+   deployment URL (or the action name) there is enough - no edit here.
+
+   config.js must define:   API_URL
+   config.js may optionally define:
+       MENU_ACTION   - defaults to "getGlideMenu"
+   Works whether config.js declares them with const, let or var.
+=========================================== */
+
+function cfgVal(name, fallback){
+try {
+/* covers const/let globals (not on window) and var/window globals */
+const v = eval("typeof " + name + " !== 'undefined' ? " + name + " : undefined");
+return (v === undefined || v === null || v === "") ? fallback : v;
+} catch(e){
+return fallback;
+}
+}
+
+const MENU_ENDPOINT     = cfgVal("API_URL", "");
+const MENU_FETCH_ACTION = cfgVal("MENU_ACTION", "getGlideMenu");
+
 let weeklyMenu = {};
 let activeProtein = "all";
 
+function showMsg(html){
+document.getElementById("menuGrid").innerHTML =
+`<div class="menu-msg">${html}</div>`;
+}
+
 async function loadMenu(){
 
-const res = await fetch(API_URL + "?action=getMenu");
-weeklyMenu = await res.json();
+if(!MENU_ENDPOINT){
+showMsg(`Configuration missing.
+<br><span style="font-size:14px;opacity:0.75;">config.js did not load, or it does not define API_URL.</span>
+<br><button onclick="loadMenu()">RETRY</button>`);
+return;
+}
 
+document.getElementById("menuGrid").innerHTML =
+`<div style="text-align:center;padding:40px;font-size:18px;">Loading menu...</div>`;
+
+try {
+
+const url = MENU_ENDPOINT
++ (MENU_ENDPOINT.indexOf("?") >= 0 ? "&" : "?")
++ "action=" + encodeURIComponent(MENU_FETCH_ACTION)
++ "&t=" + Date.now();
+
+const res = await fetch(url, { cache: "no-store" });
+
+if(!res.ok) throw new Error("HTTP " + res.status);
+
+const text = await res.text();
+
+let data;
+try {
+data = JSON.parse(text);
+} catch(parseErr){
+/* Apps Script returned HTML - a sign-in page or an error page */
+throw new Error("The menu service did not return valid data. Check the deployment URL and its access setting.");
+}
+
+if(data && data.error) throw new Error(String(data.error));
+
+if(!data || typeof data !== "object" || Array.isArray(data))
+throw new Error("Unexpected menu format.");
+
+if(!Object.keys(data).length){
+showMsg(`No menu has been published for this week yet.
+<br><button onclick="loadMenu()">RETRY</button>`);
+return;
+}
+
+weeklyMenu = data;
 renderMenu();
+
+} catch(err){
+
+console.error("loadMenu failed:", err);
+
+showMsg(`Could not load the menu.
+<br><span style="font-size:14px;opacity:0.75;">${String(err.message || err)}</span>
+<br><button onclick="loadMenu()">RETRY</button>`);
+
+}
 
 }
 
@@ -296,6 +393,35 @@ return p===activeProtein;
 
 }
 
+/* Breakfast appears on ALL, VEGETARIAN and CHICKEN only.
+   Menu proteins are "Breakfast" (standard) and "Veg Breakfast".
+   veg tab      -> Veg Breakfast
+   chicken tab  -> Breakfast
+   egg/seafood  -> nothing */
+function filterBreakfast(arr){
+
+if(!arr) return "";
+
+if(activeProtein==="egg" || activeProtein==="seafood") return "";
+
+return arr
+.filter(x=>{
+
+if(activeProtein==="all") return true;
+
+const p=(x.protein||"").toLowerCase();
+
+if(activeProtein==="veg")     return p==="veg breakfast";
+if(activeProtein==="chicken") return p==="breakfast";
+
+return false;
+
+})
+.map(x=>`<div class="dish">${x.label}</div>`)
+.join("");
+
+}
+
 function simpleList(arr){
 
 if(!arr) return "";
@@ -306,17 +432,21 @@ return arr
 
 }
 
+const breakfastHTML = filterBreakfast(d.breakfast);
+
 const card = `
 <div class="day-card">
 
 <h2>${dayName.toUpperCase()}</h2>
 
+${breakfastHTML ? `
 <div class="section">
 <div class="label">BREAKFAST</div>
-${filterProtein(d.breakfast)}
+${breakfastHTML}
 </div>
 
 <div class="divider"></div>
+` : ``}
 
 <div class="section">
 <div class="label">OPTION 1</div>
@@ -358,6 +488,11 @@ grid.innerHTML += card;
 
 async function downloadMenuPDF(){
 
+if(!Object.keys(weeklyMenu).length){
+alert("Menu has not loaded yet.");
+return;
+}
+
 const btn = document.getElementById("downloadBtn");
 const text = document.getElementById("downloadText");
 const spinner = document.getElementById("downloadSpinner");
@@ -381,6 +516,8 @@ const categories = [
 {key:"egg",label:"EGG"},
 {key:"seafood",label:"SEAFOOD"}
 ];
+
+try {
 
 for(let i=0;i<categories.length;i++){
 
@@ -410,7 +547,16 @@ pdf.addImage(imgData,"PNG",5,20,200,pdfHeight);
 
 }
 
-/* RESTORE MOBILE LAYOUT */
+pdf.save("Weekly_Menu.pdf");
+
+} catch(err){
+
+console.error("PDF failed:", err);
+alert("Could not build the PDF. Please try again.");
+
+} finally {
+
+/* RESTORE LAYOUT + ALL TAB */
 
 grid.style.gridTemplateColumns = "";
 grid.style.width = "";
@@ -418,11 +564,14 @@ grid.style.width = "";
 activeProtein="all";
 renderMenu();
 
-pdf.save("Weekly_Menu.pdf");
+document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
+document.querySelector(".tab").classList.add("active");
 
 text.innerText = "DOWNLOAD MENU";
 spinner.style.display = "none";
 btn.disabled = false;
+
+}
 
 }
 
