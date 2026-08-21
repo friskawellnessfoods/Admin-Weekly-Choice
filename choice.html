@@ -491,6 +491,59 @@
     background: var(--accent-soft); color: #0b7a5a; border-radius: 6px;
     padding: 2px 7px; letter-spacing: .3px; text-transform: uppercase;
   }
+
+  /* ===== HOME LAUNCHER ===== */
+  .home-wrap { padding: 0 14px 18px; }
+  .home-greet { text-align: center; margin: 2px 0 16px; }
+  .home-greet h3 { margin: 0 0 4px; font-size: 18px; font-weight: 700; color: var(--navy); }
+  .home-greet p { margin: 0; font-size: 13px; color: var(--muted); }
+
+  .home-grid {
+    display: grid; gap: 12px;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  }
+  .home-card {
+    background: #fff; border: 1px solid rgba(226,231,241,0.9);
+    border-radius: 16px; padding: 18px 14px; text-align: center;
+    box-shadow: var(--shadow); cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    transition: transform .1s ease, border-color .15s;
+    font-family: inherit;
+  }
+  .home-card:active { transform: scale(0.975); border-color: var(--accent); }
+  .home-card .hc-icon {
+    width: 46px; height: 46px; border-radius: 13px;
+    background: var(--accent-soft); color: var(--navy);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; margin-bottom: 4px;
+  }
+  .home-card .hc-title { font-size: 14.5px; font-weight: 700; color: var(--navy); }
+  .home-card .hc-desc { font-size: 11.5px; color: var(--muted); line-height: 1.45; }
+  .home-card.soon { opacity: .5; cursor: default; }
+  .home-card.soon:active { transform: none; border-color: rgba(226,231,241,0.9); }
+  .hc-soon {
+    font-size: 9.5px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase;
+    background: #eef1f7; color: var(--muted); border-radius: 5px; padding: 2px 6px; margin-top: 2px;
+  }
+
+  /* tab bar becomes scrollable as more sections are added */
+  .tabbar { overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+  .tabbar::-webkit-scrollbar { display: none; }
+  .tabbar button { flex: 0 0 auto; min-width: 0; padding: 10px 14px; }
+  .tabbar button.home-chip { color: var(--navy); font-size: 15px; padding: 10px 12px; }
+
+  /* ===== MENU DISH KIND LABEL ===== */
+  .menu-dish { padding: 2px 0; font-size: 13.5px; line-height: 1.55; }
+  .dish-kind {
+    display: inline-block; font-weight: 700; font-size: 11px;
+    letter-spacing: .3px; text-transform: uppercase;
+    margin-right: 7px; padding: 1px 7px; border-radius: 6px;
+    background: #eef1f7; color: var(--navy); vertical-align: 1px;
+  }
+  .dish-kind.k-chicken  { background: #fdeaea; color: #c62828; }
+  .dish-kind.k-veg      { background: #e8f5e9; color: #2e7d32; }
+  .dish-kind.k-egg      { background: #fff4e0; color: #b56a00; }
+  .dish-kind.k-seafood  { background: #e8f0fc; color: #1565c0; }
   </style>
 </head>
 
@@ -583,10 +636,17 @@
     </div>
   </div>
 
-  <div class="tabbar">
-    <button id="tabbtn-order" class="active" onclick="showTab('order')">Order</button>
-    <button id="tabbtn-menu" onclick="showTab('menu')">Weekly Menu</button>
-    <button id="tabbtn-past" onclick="showTab('past')">Past Selections</button>
+  <div class="tabbar" id="tabbar" style="display:none;"></div>
+
+  <!-- ---- HOME LAUNCHER ---- -->
+  <div id="tab-home" class="tabpanel">
+    <div class="home-wrap wrapper">
+      <div class="home-greet">
+        <h3>What would you like to do?</h3>
+        <p>Pick an option below.</p>
+      </div>
+      <div class="home-grid" id="homeGrid"></div>
+    </div>
   </div>
 
   <!-- ---- TAB: MENU ---- -->
@@ -1004,22 +1064,71 @@ async function bootClient(client, menu, phone){
 }
 
 /* ========= APP SHELL + TABS ========= */
+/* ========= NAVIGATION =========
+   Add a new section by adding one entry here and one <div id="tab-<id>">
+   panel in the markup. Set soon:true to show it greyed out as "coming soon". */
+const NAV_ITEMS = [
+  { id: 'order', label: 'Order',            icon: '🍱', desc: 'Choose your meals for the week' },
+  { id: 'menu',  label: 'Menu at Glance',   icon: '📋', desc: "See what's cooking each day" },
+  { id: 'past',  label: 'Past Selections',  icon: '🗂️', desc: 'Review your earlier orders' }
+  // { id: 'track',    label: 'Track Food', icon: '🚚', desc: 'Where your order is',  soon: true },
+  // { id: 'feedback', label: 'Feedback',   icon: '💬', desc: 'Tell us how we did',   soon: true }
+];
+
 function showApp(name, type){
   $id('loginScreen').style.display = 'none';
   $id('appShell').style.display = 'block';
   $id('heroName').textContent = name || 'Welcome';
   $id('heroMeta').textContent = type || 'Weekly Meal Selection';
-  showTab('order');
+  renderNav();
+  showTab('home');
   window.scrollTo(0, 0);
 }
 
+/* builds both the home cards and the top tab bar from NAV_ITEMS */
+function renderNav(){
+
+  const grid = $id('homeGrid');
+  if (grid) {
+    grid.innerHTML = NAV_ITEMS.map(it => {
+      const cls = 'home-card' + (it.soon ? ' soon' : '');
+      const click = it.soon ? '' : ' onclick="showTab(\'' + it.id + '\')"';
+      return '' +
+        '<button class="' + cls + '" type="button"' + click + '>' +
+          '<span class="hc-icon">' + it.icon + '</span>' +
+          '<span class="hc-title">' + esc(it.label) + '</span>' +
+          '<span class="hc-desc">' + esc(it.desc || '') + '</span>' +
+          (it.soon ? '<span class="hc-soon">Coming soon</span>' : '') +
+        '</button>';
+    }).join('');
+  }
+
+  const bar = $id('tabbar');
+  if (bar) {
+    bar.innerHTML =
+      '<button class="home-chip" type="button" title="Home" onclick="showTab(\'home\')">⌂</button>' +
+      NAV_ITEMS.filter(it => !it.soon).map(it =>
+        '<button type="button" id="tabbtn-' + it.id + '" onclick="showTab(\'' + it.id + '\')">' +
+          esc(it.label) +
+        '</button>'
+      ).join('');
+  }
+}
+
 function showTab(name){
-  ['order','menu','past'].forEach(t => {
+
+  const ids = ['home'].concat(NAV_ITEMS.map(it => it.id));
+
+  ids.forEach(t => {
     const panel = $id('tab-' + t);
     const btn   = $id('tabbtn-' + t);
     if (panel) panel.style.display = (t === name) ? 'block' : 'none';
     if (btn) btn.classList.toggle('active', t === name);
   });
+
+  // the launcher shows the options as cards, so the tab bar is hidden there
+  const bar = $id('tabbar');
+  if (bar) bar.style.display = (name === 'home') ? 'none' : 'flex';
 
   if (name === 'menu') renderMenuTab();
 
@@ -1037,6 +1146,33 @@ function showTab(name){
 function esc(s){
   return String(s == null ? '' : s)
     .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+/* colour code the kind label: Chicken / Veg / Egg / Seafood, else neutral */
+function kindClass(kind){
+  const k = String(kind || '').toLowerCase();
+  if (k.indexOf('chicken') >= 0) return 'k-chicken';
+  if (k.indexOf('seafood') >= 0) return 'k-seafood';
+  if (k.indexOf('egg')     >= 0) return 'k-egg';
+  if (k.indexOf('veg')     >= 0) return 'k-veg';   // Veg, Veg Snack, Veg Breakfast
+  return '';
+}
+
+/* menu labels arrive as "Chicken: Grilled chicken" — split the kind off
+   and render it as a distinct heading badge before the dish name */
+function dishHTML(label){
+  const s = String(label == null ? '' : label);
+  const i = s.indexOf(':');
+
+  if (i < 0) return '<div class="menu-dish">' + esc(s) + '</div>';
+
+  const kind = s.slice(0, i).trim();
+  const dish = s.slice(i + 1).trim();
+
+  return '<div class="menu-dish">' +
+           '<span class="dish-kind ' + kindClass(kind) + '">' + esc(kind) + '</span>' +
+           esc(dish) +
+         '</div>';
 }
 
 function todayStr(){
@@ -1073,13 +1209,15 @@ function renderMenuTab(){
 
     const rows = [];
 
-    function row(tag, list){
+    function row(tag, list, plain){
       if (!list || !list.length) return;
       rows.push(
         '<div class="menu-row">' +
           '<div class="menu-tag">' + esc(tag) + '</div>' +
           '<div class="menu-items">' +
-            list.map(x => '<div>' + esc(x) + '</div>').join('') +
+            list.map(x => plain
+              ? '<div class="menu-dish">' + esc(x) + '</div>'
+              : dishHTML(x)).join('') +
           '</div>' +
         '</div>'
       );
@@ -1089,8 +1227,8 @@ function renderMenuTab(){
     row('Option 1',  (day.option1   || []).map(x => x.label));
     row('Option 2',  (day.option2   || []).map(x => x.label));
     row('Snack',     (day.snack     || []).map(x => x.label));
-    row('Juice 1',   (day.juice1    || []));
-    row('Juice 2',   (day.juice2    || []));
+    row('Juice 1',   (day.juice1    || []), true);
+    row('Juice 2',   (day.juice2    || []), true);
 
     if (!rows.length) {
       rows.push('<div class="menu-row"><div class="menu-items" style="color:var(--muted);">No menu published for this day.</div></div>');
