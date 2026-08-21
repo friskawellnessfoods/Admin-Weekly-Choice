@@ -579,6 +579,7 @@ async function fetchClient() {
   }
 
   initState();
+  await restorePastSelections(phone);
   renderCurrentDay();
 
   document.getElementById("viewPastBtn").style.display = "block";
@@ -829,7 +830,7 @@ function renderCurrentDay(){
       </div>
     
       <label class="cancel-wrap">
-        <input type="checkbox"
+        <input type="checkbox" ${STATE[date].cancel ? 'checked' : ''}
           onchange="STATE['${date}'].cancel=this.checked">
         Cancel This Day
       </label>
@@ -1789,8 +1790,9 @@ function resolvePermModal(ok){
   if (_permResolve) { _permResolve(ok); _permResolve = null; }
 }
 
-function finishLogin(){
+async function finishLogin(){
   initState();
+  await restorePastSelections(document.getElementById('phone').value.trim());
   renderCurrentDay();
   document.getElementById("viewPastBtn").style.display = "block";
 }
@@ -1847,7 +1849,7 @@ async function saveDefaultsFromPopup(){
 
   SLOT_DEFAULTS = out;
   document.getElementById('defaultsModal').style.display = 'none';
-  finishLogin();
+  await finishLogin();
 }
 
 // Delivery Defaults section (called by renderCurrentDay on first day only)
@@ -1902,6 +1904,153 @@ async function updateSlotDefault(slot, newLoc){
   fetch(API_URL, { method: "POST", body: p }).catch(()=>{});
 
   renderCurrentDay();
+}
+
+/* ========= ROUND B: PAST-SELECTION RESTORE ========= */
+
+async function restorePastSelections(phone){
+
+  if (!phone || !VISIBLE_DATES.length) return;
+
+  const p = new URLSearchParams();
+  p.append("action", "getClientOrdersByDateRange");
+  p.append("phone", phone);
+  p.append("startDate", VISIBLE_DATES[0]);
+  p.append("endDate", VISIBLE_DATES[VISIBLE_DATES.length - 1]);
+
+  try {
+    const res = await fetch(API_URL, { method: "POST", body: p });
+    const data = await res.json();
+    if (data && data.success && data.rows && data.rows.length) {
+      applyRestoredOrders(data.rows);
+    }
+  } catch (err) {
+    console.warn("restore failed", err);   // blank form is a valid fallback
+  }
+}
+
+function applyRestoredOrders(rows){
+
+  const byDate = {};
+  rows.forEach(r => { (byDate[r.date] = byDate[r.date] || []).push(r); });
+
+  Object.keys(byDate).forEach(date => {
+
+    if (!STATE[date]) return;
+
+    const drows = byDate[date];
+    const secs  = STATE[date].sections;
+
+    // remark from the row (no checkbox tick - client edits normally)
+    const remRow = drows.find(r => String(r.remarks || '').trim());
+    if (remRow) STATE[date].remark = String(remRow.remarks).trim();
+
+    // cancelled day: slot written as N/A
+    if (drows.some(r => r.slot === 'N/A')) {
+      STATE[date].cancel = true;
+      return;
+    }
+
+    /* ---- OPTIONS: col H = "X 1", col I = "X 2", one row per unit ---- */
+    const eMap = {};
+    drows.forEach(r => {
+      ['option1','option2'].forEach(col => {
+        const c = r[col];
+        if (!c || c.toUpperCase() === 'N/A') return;
+        const m = c.match(/^(.+?)\s*([12])$/);
+        if (!m) return;
+        const protein = m[1].trim().toLowerCase();
+        const optNo   = Number(m[2]);
+        const key = optNo + '|' + protein + '|' + r.slot + '|' + r.location;
+        if (!eMap[key]) {
+          eMap[key] = { optNo, protein, slot: r.slot, location: r.location, qty: 0 };
+        }
+        eMap[key].qty++;
+      });
+    });
+
+    let entries = Object.values(eMap);
+
+    const cards = [
+      { name: 'option1', native: 1, sec: secs.option1, taken: false },
+      { name: 'option2', native: 2, sec: secs.option2, taken: false }
+    ].filter(c => !!c.sec);
+
+    function place(entry, card){
+      card.taken = true;
+      const sec = card.sec;
+
+      if (entry.slot)     sec.slot = entry.slot;
+      if (entry.location) sec.location = entry.location;
+
+      const isAlt = entry.optNo !== card.native;
+      sec.view = isAlt
+        ? (card.name === 'option1' ? 'option2' : 'option1')
+        : card.name;
+
+      const store = (isAlt ? sec.altItems : sec.items) || {};
+      const label = Object.keys(store).find(l =>
+        store[l].optNo === entry.optNo &&
+        String(store[l].protein || '').toLowerCase() === entry.protein);
+
+      if (!label) return;   // that code is no longer on this day's menu
+      store[label].qty = entry.qty;
+      store[label].slotFrom = sec.slot;
+    }
+
+    function drain(match){
+      for (let i = entries.length - 1; i >= 0; i--) {
+        const e = entries[i];
+        const c = cards.find(c => !c.taken && match(c, e));
+        if (c) { place(e, c); entries.splice(i, 1); }
+      }
+    }
+
+    drain((c,e) => c.native === e.optNo && c.sec.slot === e.slot);  // exact match
+    drain((c,e) => c.native === e.optNo);                            // same option, other slot
+    drain((c,e) => c.sec.slot === e.slot);                           // same slot -> swapped card
+    drain(() => true);                                               // fallback
+
+    /* ---- BREAKFAST (col J = protein) ---- */
+    restoreSimple(secs.breakfast, drows, 'breakfast',
+      (it, code) => String(it.protein || '').toLowerCase() === code);
+
+    /* ---- SNACK (col K = "Snack" / "Veg Snack") ---- */
+    restoreSimple(secs.snack, drows, 'snack',
+      (it, code) => String(it.type || '').toLowerCase() === code);
+
+    /* ---- JUICES (cols L/M = "Juice 1" / "Juice 2") ---- */
+    restoreSimple(secs.juice1, drows, 'juice1', () => true);
+    restoreSimple(secs.juice2, drows, 'juice2', () => true);
+  });
+}
+
+function restoreSimple(sec, drows, col, matchFn){
+
+  if (!sec) return;
+
+  const map = {};
+  drows.forEach(r => {
+    const v = r[col];
+    if (!v || v.toUpperCase() === 'N/A') return;
+    const k = v.toLowerCase();
+    if (!map[k]) map[k] = { qty: 0, slot: r.slot, location: r.location };
+    map[k].qty++;
+  });
+
+  Object.keys(map).forEach(code => {
+    const e = map[code];
+
+    if (e.slot)     sec.slot = e.slot;
+    if (e.location) sec.location = e.location;
+
+    const store = sec.items || {};
+    const label = Object.keys(store).find(l => matchFn(store[l], code));
+    if (!label) return;
+
+    store[label].qty = e.qty;
+    store[label].slotFrom = sec.slot;
+  });
 }
 
 </script>
