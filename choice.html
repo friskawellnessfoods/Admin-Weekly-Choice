@@ -443,6 +443,54 @@
     border: none; border-radius: 16px; background: #fff;
     box-shadow: var(--shadow); display: block;
   }
+
+  /* ===== CENTERED LOGIN CARD ===== */
+  #loginScreen {
+    min-height: 100vh; min-height: 100dvh;
+    display: flex; align-items: center; justify-content: center;
+    padding: 28px 16px;
+  }
+  .login-card {
+    width: 100%; max-width: 400px; background: #fff;
+    border-radius: 20px; padding: 30px 26px 26px;
+    box-shadow: 0 24px 60px rgba(10,26,110,0.18);
+    border: 1px solid rgba(226,231,241,0.8);
+  }
+  .login-card .login-logo {
+    display: block; margin: 0 auto 20px; max-width: 148px; height: auto;
+  }
+  .login-card label { margin-top: 14px; }
+  .login-card label:first-of-type { margin-top: 0; }
+  @media (max-width: 400px) { .login-card { padding: 26px 20px 22px; border-radius: 18px; } }
+
+  /* ===== BOOT SPLASH ===== */
+  #bootSplash {
+    position: fixed; inset: 0; background: var(--bg);
+    display: none; align-items: center; justify-content: center; z-index: 99998;
+  }
+
+  /* ===== WEEKLY MENU TAB ===== */
+  .menu-day { margin-bottom: 14px; }
+  .menu-day-head {
+    display: flex; align-items: baseline; justify-content: space-between;
+    gap: 10px; margin-bottom: 10px; padding-bottom: 8px;
+    border-bottom: 1.5px solid var(--line);
+  }
+  .menu-day-name { font-size: 16px; font-weight: 700; color: var(--navy); }
+  .menu-day-date { font-size: 12px; color: var(--muted); font-weight: 500; }
+  .menu-row { display: flex; gap: 10px; padding: 8px 0; border-bottom: 1px dashed #eef2f8; }
+  .menu-row:last-child { border-bottom: none; }
+  .menu-tag {
+    flex: none; width: 84px; font-size: 10.5px; font-weight: 700;
+    color: var(--accent); text-transform: uppercase; letter-spacing: .4px; padding-top: 3px;
+  }
+  .menu-items { flex: 1; font-size: 13.5px; line-height: 1.55; color: var(--ink); }
+  .menu-items div { padding: 1px 0; }
+  .menu-today {
+    display: inline-block; margin-left: 8px; font-size: 10px; font-weight: 700;
+    background: var(--accent-soft); color: #0b7a5a; border-radius: 6px;
+    padding: 2px 7px; letter-spacing: .3px; text-transform: uppercase;
+  }
   </style>
 </head>
 
@@ -451,15 +499,8 @@
 
 <!-- ============ LOGIN SCREEN ============ -->
 <div id="loginScreen">
-  <div class="hero">
-    <div class="hero-inner">
-      <img src="logo.png" class="logo" alt="Friska Logo">
-      <h2>Weekly Meal Selection</h2>
-    </div>
-  </div>
-
-  <div class="content wrapper">
-    <div class="box">
+  <div class="login-card">
+      <img src="logo.png" class="login-logo" alt="Friska Wellness">
 
       <div id="adminSearchWrap" style="display:none; position:relative;">
         <label>Search Client (Admin)</label>
@@ -521,7 +562,6 @@
 
       <div class="auth-error" id="authError"></div>
 
-    </div>
   </div>
 </div>
 
@@ -551,8 +591,8 @@
 
   <!-- ---- TAB: MENU ---- -->
   <div id="tab-menu" class="tabpanel" style="display:none;">
-    <div class="frame-wrap wrapper">
-      <iframe id="menuFrame" class="tab-frame" title="Weekly Menu"></iframe>
+    <div class="content wrapper">
+      <div id="menuBody"></div>
     </div>
   </div>
 
@@ -647,6 +687,13 @@
 </div><!-- /appShell -->
 </div><!-- /app -->
 
+<div id="bootSplash">
+  <div style="text-align:center;">
+    <img src="logo.png" alt="Friska" style="max-width:130px; height:auto; margin-bottom:18px;">
+    <div class="spinner" style="margin:0 auto;"></div>
+  </div>
+</div>
+
 <script>
 
 let CLIENT_LOCATION_1 = '';
@@ -700,8 +747,17 @@ async function apiPost(action, fields){
   const p = new URLSearchParams();
   p.append("action", action);
   Object.keys(fields || {}).forEach(k => p.append(k, fields[k]));
+
   const res = await fetch(API_URL, { method: "POST", body: p });
-  return await res.json();
+  const text = await res.text();
+
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    // Apps Script returned HTML (sign-in page / error page) rather than JSON
+    const head = String(text || '').replace(/\s+/g, ' ').slice(0, 120);
+    throw new Error('Server did not return JSON (HTTP ' + res.status + '): ' + head);
+  }
 }
 
 /* ---- step 1: phone ---- */
@@ -826,34 +882,69 @@ async function authSubmit(ev){
 }
 
 /* ---- silent re-login on this device ---- */
+function showSplash(on){
+  const el = $id('bootSplash');
+  if (el) el.style.display = on ? 'flex' : 'none';
+}
+
+let AUTO_LOGIN_ERROR = '';
+
 async function tryAutoLogin(){
+  AUTO_LOGIN_ERROR = '';
+
   if (ADMIN_MODE) return false;
 
   const a = readAuth();
   if (!a || !a.phone || !a.token) return false;
 
-  showLoader();
+  let r;
   try {
-    const r = await apiPost("authToken", { phone: a.phone, token: a.token });
-    hideLoader();
+    r = await apiPost("authToken", { phone: a.phone, token: a.token });
+  } catch (e) {
+    // network / non-JSON response: keep the saved session, it may work next time
+    AUTO_LOGIN_ERROR = e.message || String(e);
+    console.warn('auto-login transport error:', e);
+    return false;
+  }
 
-    if (!r || !r.ok) { clearAuth(); return false; }
+  // Old deployment: doPost falls through to {success:false} with no "ok" field.
+  if (!r || typeof r.ok === 'undefined') {
+    AUTO_LOGIN_ERROR = 'Backend did not recognise "authToken" — code.gs needs to be redeployed (Deploy > Manage deployments > Edit > New version).';
+    console.warn('auto-login:', AUTO_LOGIN_ERROR, r);
+    return false;   // do NOT clear the token: the backend is stale, not the session
+  }
 
+  if (r.ok !== true) {
+    // server explicitly rejected the token (expired, password changed, inactive)
+    AUTO_LOGIN_ERROR = r.inactive ? 'Account is inactive.' : 'Saved session expired — please sign in again.';
+    clearAuth();
+    return false;
+  }
+
+  try {
     $id('phone').value = a.phone;
     saveAuth(a.phone, r.token);        // roll the token forward
     await bootClient(r.client, r.menu, a.phone);
     return true;
-
   } catch (e) {
-    hideLoader();
+    AUTO_LOGIN_ERROR = 'Signed in, but the page failed to load: ' + (e.message || e);
+    console.error('auto-login boot error:', e);
     return false;
   }
 }
 
 function doLogout(){
   clearAuth();
-  location.reload();
+  location.href = location.pathname;   // drop any query string, fresh start
 }
+
+// keep tabs on the same device in sync: signing out in one signs out the rest
+window.addEventListener('storage', function(ev){
+  if (ev.key !== AUTH_KEY) return;
+  if (!ev.newValue && $id('appShell') && $id('appShell').style.display !== 'none') {
+    location.href = location.pathname;
+  }
+});
 
 function openForgotModal(){
   $id('forgotModal').style.display = 'flex';
@@ -930,10 +1021,7 @@ function showTab(name){
     if (btn) btn.classList.toggle('active', t === name);
   });
 
-  if (name === 'menu') {
-    const f = $id('menuFrame');
-    if (f && !f.dataset.loaded) { f.src = 'menu.html'; f.dataset.loaded = '1'; }
-  }
+  if (name === 'menu') renderMenuTab();
 
   if (name === 'past') {
     // always reload — the client may have just submitted
@@ -943,6 +1031,83 @@ function showTab(name){
   }
 
   window.scrollTo(0, 0);
+}
+
+/* ========= WEEKLY MENU TAB (rendered from MENU, no extra request) ========= */
+function esc(s){
+  return String(s == null ? '' : s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function todayStr(){
+  const n = new Date();
+  return n.getFullYear() + '-' +
+    String(n.getMonth() + 1).padStart(2, '0') + '-' +
+    String(n.getDate()).padStart(2, '0');
+}
+
+function renderMenuTab(){
+
+  const host = $id('menuBody');
+  if (!host) return;
+
+  const dates = Object.keys(MENU || {}).sort();
+
+  if (!dates.length) {
+    host.innerHTML = '<div class="box" style="text-align:center; color:var(--muted); font-size:14px;">Menu is not available right now.</div>';
+    return;
+  }
+
+  const today = todayStr();
+
+  host.innerHTML = dates.map(date => {
+
+    const day = MENU[date] || {};
+    const dt  = new Date(date);
+
+    const dayName = dt.toLocaleDateString('en-US', { weekday: 'long' });
+    const nice =
+      String(dt.getDate()).padStart(2, '0') + '-' +
+      dt.toLocaleDateString('en-US', { month: 'short' }) + '-' +
+      dt.getFullYear();
+
+    const rows = [];
+
+    function row(tag, list){
+      if (!list || !list.length) return;
+      rows.push(
+        '<div class="menu-row">' +
+          '<div class="menu-tag">' + esc(tag) + '</div>' +
+          '<div class="menu-items">' +
+            list.map(x => '<div>' + esc(x) + '</div>').join('') +
+          '</div>' +
+        '</div>'
+      );
+    }
+
+    row('Breakfast', (day.breakfast || []).map(x => x.label));
+    row('Option 1',  (day.option1   || []).map(x => x.label));
+    row('Option 2',  (day.option2   || []).map(x => x.label));
+    row('Snack',     (day.snack     || []).map(x => x.label));
+    row('Juice 1',   (day.juice1    || []));
+    row('Juice 2',   (day.juice2    || []));
+
+    if (!rows.length) {
+      rows.push('<div class="menu-row"><div class="menu-items" style="color:var(--muted);">No menu published for this day.</div></div>');
+    }
+
+    return '' +
+      '<div class="box menu-day">' +
+        '<div class="menu-day-head">' +
+          '<div class="menu-day-name">' + esc(dayName) +
+            (date === today ? '<span class="menu-today">Today</span>' : '') +
+          '</div>' +
+          '<div class="menu-day-date">' + esc(nice) + '</div>' +
+        '</div>' +
+        rows.join('') +
+      '</div>';
+
+  }).join('');
 }
 
 function openMenu(){
@@ -1765,11 +1930,13 @@ function closeSummary() {
   document.getElementById("summaryModal").style.display = "none";
 }
 function showLoader() {
-  document.getElementById("loader").style.display = "flex";
+  const el = document.getElementById("loader");
+  if (el) el.style.display = "flex";
 }
 
 function hideLoader() {
-  document.getElementById("loader").style.display = "none";
+  const el = document.getElementById("loader");
+  if (el) el.style.display = "none";
 }
 
 let OPTION_PRESET = { option1: null, option2: null };
@@ -2268,9 +2435,41 @@ async function updateSlotDefault(slot, newLoc){
 }
 
 /* ========= BOOT ========= */
-window.addEventListener('load', function(){
-  tryAutoLogin();
-});
+function runBoot(){
+
+  const stored = ADMIN_MODE ? null : readAuth();
+  const hasToken = !!(stored && stored.phone && stored.token);
+
+  // no saved session -> just show the login card
+  if (!hasToken) return;
+
+  // hide the login card immediately so it never flashes, then verify the token
+  const ls = $id('loginScreen');
+  if (ls) ls.style.display = 'none';
+  showSplash(true);
+
+  (async function(){
+    let ok = false;
+    try { ok = await tryAutoLogin(); } catch (e) { ok = false; }
+
+    showSplash(false);
+
+    if (!ok) {
+      if (ls) ls.style.display = 'flex';       // token dead/expired -> back to login
+      if (AUTO_LOGIN_ERROR) {
+        // pre-fill the number we know, and say why the session didn't resume
+        if (stored && stored.phone) $id('phone').value = stored.phone;
+        authError(AUTO_LOGIN_ERROR);
+      }
+    }
+  })();
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', runBoot);
+} else {
+  runBoot();
+}
 
 /* ========= ROUND B: PAST-SELECTION RESTORE ========= */
 
