@@ -98,6 +98,37 @@
     background:#eef1f7; color:var(--muted); padding:3px 9px; border-radius:999px; white-space:nowrap; }
   .meal-name{ font-size:17px; font-weight:700; color:var(--navy); }
   .slot-sub{ font-size:11.5px; color:var(--muted); font-weight:500; }
+
+  /* full-screen busy overlay so updates are visible wherever you scrolled to */
+  #busy{ position:fixed; inset:0; background:rgba(238,242,249,.72); backdrop-filter:blur(2px);
+    display:none; align-items:center; justify-content:center; z-index:500; }
+  #busy.on{ display:flex; }
+  #busy .box{ background:#fff; border-radius:16px; padding:22px 26px; box-shadow:var(--shadow);
+    display:flex; flex-direction:column; align-items:center; gap:12px; min-width:170px; }
+  #busy .ring{ width:34px; height:34px; border:3.5px solid var(--line); border-top-color:var(--accent);
+    border-radius:50%; animation:spin .7s linear infinite; }
+  #busy .txt{ font-size:13px; font-weight:600; color:var(--navy); }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+
+  /* collapsible delivery partners */
+  .partners{ background:#fff; border-radius:var(--radius); box-shadow:var(--shadow); margin-top:14px;
+    border:1px solid rgba(226,231,241,.7); overflow:hidden; }
+  .partners-head{ display:flex; align-items:center; justify-content:space-between; gap:10px;
+    padding:14px 16px; cursor:pointer; user-select:none; }
+  .partners-head .t{ font-size:14.5px; font-weight:700; color:var(--navy); }
+  .partners-head .s{ font-size:11.5px; color:var(--muted); font-weight:500; margin-top:2px; }
+  .partners-head .arrow{ color:var(--muted); font-size:13px; flex:none; }
+  .partners-body{ padding:0 16px 14px; border-top:1px solid var(--line); }
+  .partners-body.hide{ display:none; }
+  .prow{ display:flex; align-items:center; gap:8px; padding:10px 0; border-bottom:1px dashed var(--line); flex-wrap:wrap; }
+  .prow:last-child{ border-bottom:none; }
+  .prow .rname{ flex:0 0 100%; font-size:12.5px; font-weight:700; color:var(--navy); }
+  .prow input{ flex:1; min-width:100px; padding:9px 11px; border:1.5px solid var(--line);
+    border-radius:10px; font-size:14px; font-family:inherit; background:#fbfcfe; color:var(--ink); }
+  .prow input:focus{ outline:none; border-color:var(--accent); background:#fff; box-shadow:0 0 0 3px rgba(16,185,129,.12); }
+  .prow button{ flex:none; padding:9px 14px; font-size:13px; }
+  .agent-chip{ font-size:11px; color:var(--muted); font-weight:600; }
+  .agent-chip b{ color:var(--navy); }
 </style>
 </head>
 <body>
@@ -124,6 +155,8 @@
   <div id="board"></div>
 </div>
 
+<div id="busy"><div class="box"><div class="ring"></div><div class="txt" id="busyTxt">Updating…</div></div></div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -146,6 +179,7 @@ const META = {
 
 let BOARD = null;
 let busy = false;
+let partnersOpen = false;
 
 const dateEl = document.getElementById('date');
 const boardEl = document.getElementById('board');
@@ -164,6 +198,14 @@ function toast(msg){
 }
 function setLine(msg){ lineEl.textContent = msg; }
 
+/* centred overlay so it is visible no matter where the page is scrolled */
+function showBusy(on, text){
+  const b = document.getElementById('busy');
+  const t = document.getElementById('busyTxt');
+  if(t && text) t.textContent = text;
+  if(b) b.classList.toggle('on', !!on);
+}
+
 async function api(action, params){
   if(!API) throw new Error('config.js did not load or has no API_URL');
   const body = new URLSearchParams(Object.assign({ action }, params || {}));
@@ -175,7 +217,8 @@ async function api(action, params){
 
 async function load(){
   if(!dateEl.value){ setLine('Pick a date first.'); return; }
-  boardEl.innerHTML = '<div class="empty">Loading\u2026</div>';
+  boardEl.innerHTML = '';
+  showBusy(true, 'Loading the day\u2026');
   setLine('Loading ' + dateEl.value + '\u2026');
   try {
     const r = await api('getKitchenBoard', { date: dateEl.value });
@@ -188,7 +231,26 @@ async function load(){
     boardEl.innerHTML = '<div class="empty">Could not load.<br><span style="font-size:12px;opacity:.75;">'
       + esc(err.message||err) + '</span></div>';
     setLine('Error.');
+  } finally {
+    showBusy(false);
   }
+}
+
+/* every distinct route across all slots, so numbers live in one place */
+function allRoutes(){
+  const seen = {}, out = [];
+  (BOARD.slots||[]).forEach(s => (s.routes||[]).forEach(r => {
+    const k = r.route.toLowerCase();
+    if(!seen[k]){ seen[k] = true; out.push({ route:r.route, name:r.agentName, phone:r.agentPhone }); }
+  }));
+  return out.sort((a,b)=>{
+    if(a.route === 'No Route') return 1;
+    if(b.route === 'No Route') return -1;
+    return a.route.localeCompare(b.route, undefined, { numeric:true });
+  });
+}
+function routeId(route){
+  return btoa(unescape(encodeURIComponent(route))).replace(/=/g,'');
 }
 
 function render(){
@@ -196,6 +258,34 @@ function render(){
     boardEl.innerHTML = '<div class="empty">No orders for this date.</div>';
     return;
   }
+
+  /* ---- delivery partners, collapsed by default ---- */
+  const routes = allRoutes();
+  const filled = routes.filter(r => r.phone).length;
+
+  const partners =
+    '<div class="partners">'
+      + '<div class="partners-head" onclick="togglePartners()">'
+        + '<div><div class="t">Delivery partners</div>'
+        + '<div class="s">' + filled + ' of ' + routes.length + ' route(s) have a number saved</div></div>'
+        + '<div class="arrow">' + (partnersOpen ? '\u25B4' : '\u25BE') + '</div>'
+      + '</div>'
+      + '<div class="partners-body' + (partnersOpen ? '' : ' hide') + '">'
+        + routes.map(r => {
+            const id = routeId(r.route);
+            return '<div class="prow">'
+              + '<div class="rname">' + esc(r.route)
+                + (r.name || r.phone
+                    ? ' <span class="agent-chip">\u00b7 <b>' + esc(r.name || '\u2014') + '</b> ' + esc(r.phone || '') + '</span>'
+                    : ' <span class="agent-chip">\u00b7 not set</span>')
+              + '</div>'
+              + '<input type="text" id="an_' + id + '" placeholder="Name" value="' + attr(r.name) + '">'
+              + '<input type="tel" id="ap_' + id + '" inputmode="numeric" placeholder="Phone" value="' + attr(r.phone) + '">'
+              + '<button class="btn ghost" onclick="saveAgent(\'' + attr(r.route) + '\')">Save</button>'
+            + '</div>';
+          }).join('')
+      + '</div>'
+    + '</div>';
 
   /* ---- day-wide cooking ---- */
   const cookCls = 'sbtn' + (BOARD.dayCooking ? ' on' : '');
@@ -229,36 +319,16 @@ function render(){
         + '<span class="ic">' + META.Dispatched.icon + '</span>' + esc(s.meal) + ' Dispatched \u00b7 all'
       + '</button>';
 
-    const routes = s.routes.map(r => {
-      const id = btoa(unescape(encodeURIComponent(s.slot + '|' + r.route))).replace(/=/g,'');
-      const chip = r.dispatched
-        ? '<span class="chip on">Dispatched</span>'
-        : (s.packaging ? '<span class="chip">Packing</span>'
-                       : (BOARD.dayCooking ? '<span class="chip">Cooking</span>' : '<span class="chip">Not started</span>'));
-
+    /* route cards now carry only the dispatch action - numbers live at the top */
+    const routeBtns = s.routes.map(r => {
       const dCls = 'sbtn' + (r.dispatched ? ' on' : '');
       const dTime = r.updated ? String(r.updated).slice(11,16) : '';
-
-      return '<div class="route">'
-        + '<div class="route-head">'
-          + '<div><div class="route-name">' + esc(r.route) + '</div>'
-          + '<div class="route-count">' + r.clients + ' client(s)</div></div>'
-          + chip
-        + '</div>'
-        + '<div class="sub">Delivery partner</div>'
-        + '<div class="agent-row">'
-          + '<input type="text" id="an_' + id + '" placeholder="Name" value="' + attr(r.agentName) + '">'
-          + '<input type="tel" id="ap_' + id + '" inputmode="numeric" placeholder="Phone" value="' + attr(r.agentPhone) + '">'
-          + '<button class="btn ghost" onclick="saveAgent(\'' + attr(r.route) + '\',\'' + id + '\')">Save</button>'
-        + '</div>'
-        + '<div class="saved-note" id="sv_' + id + '">Saved</div>'
-        + '<div class="btn-row">'
-          + '<button class="'+dCls+'" onclick="setStatus(\'' + attr(s.slot) + '\',\'' + attr(r.route) + '\',\'Dispatched\','+(r.dispatched?'true':'false')+')">'
-            + '<span class="ic">' + META.Dispatched.icon + '</span>' + esc(s.meal) + ' Dispatched'
-            + (dTime ? '<span style="font-size:10px;opacity:.8;">' + esc(dTime) + '</span>' : '')
-          + '</button>'
-        + '</div>'
-      + '</div>';
+      const who = r.agentName ? (' \u00b7 ' + r.agentName) : '';
+      return '<button class="'+dCls+'" onclick="setStatus(\'' + attr(s.slot) + '\',\'' + attr(r.route) + '\',\'Dispatched\','+(r.dispatched?'true':'false')+')">'
+        + '<span class="ic">' + META.Dispatched.icon + '</span>'
+        + esc(r.route) + esc(who)
+        + '<span style="font-size:10px;opacity:.75;">' + r.clients + ' client(s)' + (dTime ? ' \u00b7 ' + esc(dTime) : '') + '</span>'
+      + '</button>';
     }).join('');
 
     return '<div class="slot' + (closed ? ' done' : '') + '">'
@@ -269,12 +339,17 @@ function render(){
                   : '<span class="slot-count">clients see this live</span>')
       + '</div>'
       + '<div class="btn-row">' + packBtn + allBtn + '</div>'
-      + '<div class="sub" style="margin-top:16px;">Per delivery route</div>'
-      + routes
+      + '<div class="sub" style="margin-top:16px;">Dispatch by route</div>'
+      + '<div class="btn-row">' + routeBtns + '</div>'
     + '</div>';
   }).join('');
 
-  boardEl.innerHTML = dayBar + slotsHtml;
+  boardEl.innerHTML = partners + dayBar + slotsHtml;
+}
+
+function togglePartners(){
+  partnersOpen = !partnersOpen;
+  render();
 }
 
 /* pressing an active button again clears that level */
@@ -282,6 +357,7 @@ async function setStatus(slot, route, status, isOn){
   if(busy) return;
   busy = true;
   const send = isOn ? '' : status;
+  showBusy(true, send ? ('Setting ' + send + '\u2026') : 'Clearing\u2026');
   setLine('Updating\u2026');
   try {
     const r = await api('setKitchenStatus', { date: dateEl.value, slot, route, status: send });
@@ -295,23 +371,33 @@ async function setStatus(slot, route, status, isOn){
   } catch(err){
     toast('Failed: ' + (err.message || err));
     setLine('Update failed.');
-  } finally { busy = false; }
+  } finally {
+    busy = false;
+    showBusy(false);
+  }
 }
 
-async function saveAgent(route, id){
+async function saveAgent(route){
+  if(busy) return;
+  busy = true;
+  const id = routeId(route);
   const name = (document.getElementById('an_' + id) || {}).value || '';
   const phone = (document.getElementById('ap_' + id) || {}).value || '';
+  showBusy(true, 'Saving\u2026');
   try {
     const r = await api('saveDeliveryAgent', { route, name, agentPhone: phone });
     if(!r || !r.ok) throw new Error((r && r.message) || 'Save failed');
-    const note = document.getElementById('sv_' + id);
-    if(note){ note.style.display = 'block'; setTimeout(()=>{ note.style.display='none'; }, 2200); }
-    toast('Saved for ' + route);
     (BOARD.slots||[]).forEach(s => (s.routes||[]).forEach(x => {
       if(x.route === route){ x.agentName = r.name; x.agentPhone = r.phone; }
     }));
+    partnersOpen = true;      // keep the section open after saving
+    render();
+    toast('Saved for ' + route);
   } catch(err){
     toast('Save failed: ' + (err.message || err));
+  } finally {
+    busy = false;
+    showBusy(false);
   }
 }
 

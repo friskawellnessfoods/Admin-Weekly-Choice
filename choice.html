@@ -633,6 +633,25 @@
   .st-slotname { font-size: 11.5px; font-weight: 600; color: var(--muted); }
   .st-closed { text-align: center; padding: 12px 6px 4px; font-size: 13.5px; color: var(--muted); line-height: 1.6; }
   .st-closed-ic { font-size: 32px; margin-bottom: 8px; }
+
+  /* ===== USAGE CHECK ===== */
+  .us-hero { text-align: center; padding: 6px 4px 2px; }
+  .us-big { font-size: 46px; font-weight: 800; color: var(--navy); line-height: 1; }
+  .us-big.done { color: #b3261e; font-size: 30px; }
+  .us-cap { font-size: 12px; color: var(--muted); font-weight: 600; margin-top: 6px;
+    text-transform: uppercase; letter-spacing: .5px; }
+  .us-bar { height: 10px; border-radius: 99px; background: #eef1f7; overflow: hidden; margin: 18px 0 8px; }
+  .us-fill { height: 100%; border-radius: 99px; background: linear-gradient(90deg,var(--accent),#0b7a5a); transition: width .4s; }
+  .us-bar-lab { display: flex; justify-content: space-between; font-size: 11.5px; color: var(--muted); font-weight: 600; }
+  .us-kv { display: flex; justify-content: space-between; gap: 12px; padding: 9px 0;
+    border-bottom: 1px solid #f0f2f7; font-size: 13.5px; }
+  .us-kv:last-child { border-bottom: none; }
+  .us-kv .k { color: var(--muted); }
+  .us-kv .v { font-weight: 600; text-align: right; }
+  .us-note { border-radius: 12px; padding: 12px 14px; font-size: 13px; line-height: 1.55; margin-top: 14px; }
+  .us-note.ok { background: var(--accent-soft); color: #0b7a5a; }
+  .us-note.warn { background: #fff6e6; border: 1px solid #f0d9a6; color: #8a6112; }
+  .us-note.end { background: #fdecec; border: 1px solid #f6c9c9; color: #b3261e; }
   </style>
 </head>
 
@@ -749,6 +768,13 @@
   <div id="tab-past" class="tabpanel" style="display:none;">
     <div class="frame-wrap wrapper">
       <iframe id="pastFrame" class="tab-frame" title="Past Selections"></iframe>
+    </div>
+  </div>
+
+  <!-- ---- TAB: CHECK USAGE ---- -->
+  <div id="tab-usage" class="tabpanel" style="display:none;">
+    <div class="content wrapper">
+      <div id="usageBody"></div>
     </div>
   </div>
 
@@ -1196,6 +1222,7 @@ const NAV_ITEMS = [
   { id: 'menu',  label: 'Menu at Glance',   icon: '📋', desc: "See what's cooking each day" },
   { id: 'past',  label: 'Past Selections',  icon: '🗂️', desc: 'Review your earlier orders' },
   { id: 'status',   label: 'Order Status', icon: '🚚', desc: "Track today's delivery" },
+  { id: 'usage',    label: 'Check Usage',   icon: '📊', desc: 'Days left in your plan' },
   { id: 'feedback', label: 'Feedback',     icon: '💬', desc: 'Tell us how we did' }
 ];
 
@@ -1267,6 +1294,8 @@ function showTab(name){
 
   if (name === 'status') loadClientStatus();
 
+  if (name === 'usage') loadClientUsage();
+
   if (name === 'past') {
     // always reload — the client may have just submitted
     const f = $id('pastFrame');
@@ -1275,6 +1304,100 @@ function showTab(name){
   }
 
   window.scrollTo(0, 0);
+}
+
+/* ========= CHECK USAGE ========= */
+
+function prettyDate(ymd){
+  if (!ymd) return '';
+  const p = String(ymd).split('-');
+  if (p.length !== 3) return ymd;
+  const d = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+  return String(d.getDate()).padStart(2,'0') + ' ' +
+         d.toLocaleDateString('en-US',{ month:'short' }) + ' ' + d.getFullYear();
+}
+
+async function loadClientUsage(){
+
+  const host = $id('usageBody');
+  if (!host) return;
+
+  const phone = ($id('phone') || {}).value.trim();
+  if (!phone) { host.innerHTML = '<div class="box st-pending">Please sign in again.</div>'; return; }
+
+  host.innerHTML = '<div class="box st-pending">Checking your plan\u2026</div>';
+
+  let d;
+  try {
+    d = await apiPost('getClientUsageSummary', { phone: phone });
+  } catch (e) {
+    host.innerHTML =
+      '<div class="box st-pending">Could not load your plan usage.<br>' +
+      '<span style="font-size:12px;opacity:.75;">' + esc(e.message || e) + '</span></div>';
+    return;
+  }
+
+  if (!d || !d.ok) {
+    host.innerHTML =
+      '<div class="box st-pending">Could not load your plan usage.' +
+      (d && d.message ? '<br><span style="font-size:12px;opacity:.75;">' + esc(d.message) + '</span>' : '') +
+      '</div>';
+    return;
+  }
+
+  if (!d.hasBill) {
+    host.innerHTML =
+      '<div class="box st-pending" style="padding:26px 14px;">' +
+        '<div style="font-size:34px; margin-bottom:8px;">\u{1F9FE}</div>' +
+        'We could not find an active plan for your number.<br>' +
+        'Please contact Friska Wellness if this looks wrong.' +
+      '</div>';
+    return;
+  }
+
+  const opted = d.optedDays || 0;
+  const used  = d.usedDays || 0;
+  const left  = d.daysLeft || 0;
+  const pct   = opted > 0 ? Math.min(100, Math.round((used / opted) * 100)) : 0;
+
+  const hero = d.complete
+    ? '<div class="us-big done">Plan finished</div>' +
+      '<div class="us-cap">Time to renew</div>'
+    : '<div class="us-big">' + left + '</div>' +
+      '<div class="us-cap">' + (left === 1 ? 'day left' : 'days left') + '</div>';
+
+  let note = '';
+  if (d.complete) {
+    note = '<div class="us-note end">You have used all ' + opted + ' days of this plan' +
+           (d.completionDate ? ', finishing on <b>' + esc(prettyDate(d.completionDate)) + '</b>' : '') +
+           '. Please renew to continue your meals.</div>';
+  } else if (left <= 3) {
+    note = '<div class="us-note warn">Only ' + left + ' ' + (left === 1 ? 'day' : 'days') +
+           ' remaining. Please renew soon so your meals continue without a break.</div>';
+  } else {
+    note = '<div class="us-note ok">Your plan is running. Paused days are not lost \u2014 ' +
+           'they simply extend your cycle.</div>';
+  }
+
+  let rows = '';
+  if (d.plan)  rows += '<div class="us-kv"><span class="k">Plan</span><span class="v">' + esc(d.plan) + '</span></div>';
+  if (d.items) rows += '<div class="us-kv"><span class="k">Includes</span><span class="v">' + esc(d.items) + '</span></div>';
+  rows += '<div class="us-kv"><span class="k">Cycle started</span><span class="v">' + esc(prettyDate(d.start)) + '</span></div>';
+  rows += '<div class="us-kv"><span class="k">Days used</span><span class="v">' + used + ' of ' + opted + '</span></div>';
+  if (d.pausedDays > 0)
+    rows += '<div class="us-kv"><span class="k">Days paused</span><span class="v">' + d.pausedDays + '</span></div>';
+  if (d.lastActive)
+    rows += '<div class="us-kv"><span class="k">Last delivery</span><span class="v">' + esc(prettyDate(d.lastActive)) + '</span></div>';
+
+  host.innerHTML =
+    '<div class="box">' +
+      '<div class="us-hero">' + hero + '</div>' +
+      '<div class="us-bar"><div class="us-fill" style="width:' + pct + '%;"></div></div>' +
+      '<div class="us-bar-lab"><span>' + used + ' used</span><span>' + opted + ' total</span></div>' +
+      note +
+    '</div>' +
+    '<div class="box">' + rows + '</div>' +
+    '<button class="btn secondary" onclick="loadClientUsage()">Refresh</button>';
 }
 
 /* ========= ORDER STATUS ========= */
