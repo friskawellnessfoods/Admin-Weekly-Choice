@@ -176,7 +176,7 @@
         <p>Update what clients see</p>
       </div>
     </div>
-    <button class="btn ghost" onclick="load()">Refresh</button>
+    <button class="btn ghost" onclick="load(true)">Refresh</button>
   </div>
 </div>
 
@@ -251,13 +251,13 @@ async function api(action, params){
   catch(e){ throw new Error('Server did not return JSON (HTTP ' + res.status + ')'); }
 }
 
-async function load(){
+async function load(force){
   if(!dateEl.value){ setLine('Pick a date first.'); return; }
   boardEl.innerHTML = '';
   showBusy(true, 'Loading the day\u2026');
   setLine('Loading ' + dateEl.value + '\u2026');
   try {
-    const r = await api('getKitchenBoard', { date: dateEl.value });
+    const r = await api('getKitchenBoard', { date: dateEl.value, fresh: (force ? 'true' : 'false') });
     if(!r || !r.ok) throw new Error((r && r.message) || 'Could not load the day');
     BOARD = r;
     picked = {};
@@ -275,13 +275,22 @@ async function load(){
 }
 
 /* every distinct route across all slots, so numbers live in one place */
+function rkey(r){ return String(r||'').replace(/\s+/g,' ').trim().toLowerCase(); }
+
+/* every saved agent from the sheet, plus any route running today that has none
+   yet - so a number saved earlier always reads back, even on a day that route
+   is not running */
 function allRoutes(){
-  const seen = {}, out = [];
+  const map = {};
+  (BOARD.agents||[]).forEach(a => {
+    map[rkey(a.route)] = { route:a.route, name:a.name, phone:a.phone, today:false };
+  });
   (BOARD.slots||[]).forEach(s => (s.routes||[]).forEach(r => {
-    const k = r.route.toLowerCase();
-    if(!seen[k]){ seen[k] = true; out.push({ route:r.route, name:r.agentName, phone:r.agentPhone }); }
+    const k = rkey(r.route);
+    if(!map[k]) map[k] = { route:r.route, name:r.agentName, phone:r.agentPhone, today:true };
+    else map[k].today = true;
   }));
-  return out.sort((a,b)=>{
+  return Object.keys(map).map(k=>map[k]).sort((a,b)=>{
     if(a.route === 'No Route') return 1;
     if(b.route === 'No Route') return -1;
     return a.route.localeCompare(b.route, undefined, { numeric:true });
@@ -319,6 +328,7 @@ function render(){
                 + (r.name || r.phone
                     ? ' <span class="agent-chip">\u00b7 <b>' + esc(r.name || '\u2014') + '</b> ' + esc(r.phone || '') + '</span>'
                     : ' <span class="agent-chip">\u00b7 not set</span>')
+              + (r.today ? '' : ' <span class="agent-chip" style="opacity:.6;">\u00b7 not running today</span>')
               + '</div>'
               + '<input type="text" id="an_' + id + '" placeholder="Name" value="' + attr(r.name) + '">'
               + '<input type="tel" id="ap_' + id + '" inputmode="numeric" placeholder="Phone" value="' + attr(r.phone) + '">'
@@ -381,13 +391,13 @@ function render(){
       + '<div class="chipwrap">' + chips + '</div>'
       + '<div class="selbar">'
         + '<span class="sellink" onclick="pickAll(\'' + attr(s.slot) + '\',true)">Select all</span>'
-        + '<span class="sellink mute" onclick="pickAll(\'' + attr(s.slot) + '\',false)">Clear</span>'
+        + '<span class="sellink mute" onclick="pickAll(\'' + attr(s.slot) + '\',false)">Untick all</span>'
         + '<span class="selcount">' + nPicked + ' selected</span>'
       + '</div>'
       + '<div class="actrow">'
         + '<button class="btn go" ' + (nPicked ? '' : 'disabled') + ' onclick="dispatchPicked(\'' + attr(s.slot) + '\',false)">'
           + META.Dispatched.icon + '  Dispatch selected</button>'
-        + '<button class="btn ghost" ' + (nPicked ? '' : 'disabled') + ' onclick="dispatchPicked(\'' + attr(s.slot) + '\',true)">Undo selected</button>'
+        + '<button class="btn ghost" ' + (nPicked ? '' : 'disabled') + ' onclick="dispatchPicked(\'' + attr(s.slot) + '\',true)">Mark not dispatched</button>'
       + '</div>';
 
     return '<div class="slot' + (closed ? ' done' : '') + '">'
