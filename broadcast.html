@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Friska — Broadcast</title>
+<script src="config.js"></script>
+<style>
+  :root{
+    --c-bg:#eef2f6; --c-surface:#fff; --c-ink:#1f2a37; --c-muted:#5b6b7b; --c-line:#d7e0ea;
+    --grad-a:#0ea5a3; --grad-b:#2563eb; --c-primary:#0ea5a3; --c-primary-d:#0b8482;
+    --radius:12px; --shadow:0 6px 24px rgba(20,40,70,.10);
+  }
+  *{ box-sizing:border-box; }
+  body{ font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+        margin:0; background:var(--c-bg); color:var(--c-ink); -webkit-text-size-adjust:100%; }
+
+  .bar{ position:sticky; top:0; z-index:10; background:var(--c-surface);
+        border-bottom:1px solid var(--c-line); padding:10px 14px;
+        display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .brand{ display:flex; align-items:center; gap:10px; }
+  .brand img{ height:32px; width:auto; }
+  .brand span{ font-size:16px; font-weight:800;
+    background:linear-gradient(90deg,var(--grad-a),var(--grad-b));
+    -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
+  .status{ font-size:13px; color:var(--c-muted); margin-left:auto; }
+
+  .wrap{ max-width:620px; margin:0 auto; padding:16px 14px 40px; }
+  .card{ background:var(--c-surface); border-radius:var(--radius); box-shadow:var(--shadow);
+         padding:14px; margin-bottom:14px; }
+  .card h3{ margin:0 0 10px; font-size:14px; font-weight:800; color:var(--c-ink); }
+
+  .btn{ padding:11px 16px; border:0; border-radius:var(--radius); font-size:14px; font-weight:700;
+        cursor:pointer; color:#fff; background:linear-gradient(90deg,var(--grad-a),var(--grad-b));
+        box-shadow:0 4px 14px rgba(37,99,235,.25); }
+  .btn:disabled{ opacity:.45; cursor:default; box-shadow:none; }
+  .btn.alt{ background:var(--c-surface); color:var(--c-primary-d); border:1.5px solid var(--c-line); box-shadow:none; }
+  .btn.sm{ padding:7px 12px; font-size:13px; }
+  .btn.danger{ background:var(--c-surface); color:#c62828; border:1.5px solid #f0c4c4; box-shadow:none; }
+
+  textarea, input[type=text]{ width:100%; border:1.5px solid var(--c-line); border-radius:var(--radius);
+    padding:10px 12px; font-size:14px; font-family:inherit; color:var(--c-ink); background:#fff; outline:none; }
+  textarea:focus, input[type=text]:focus{ border-color:var(--c-primary); box-shadow:0 0 0 3px rgba(14,165,163,.16); }
+  textarea{ min-height:120px; resize:vertical; line-height:1.45; }
+  .hint{ font-size:12px; color:var(--c-muted); margin-top:6px; }
+  .hint code{ background:#eef2f6; padding:1px 5px; border-radius:4px; font-size:11.5px; }
+  .preview{ margin-top:10px; background:#f6faf9; border:1px solid #d8ece9; border-radius:10px;
+            padding:10px 12px; font-size:13.5px; white-space:pre-wrap; line-height:1.45; color:#26403c; }
+
+  .row{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .spacer{ flex:1; }
+  .count{ font-size:13px; color:var(--c-muted); }
+  .count b{ color:var(--c-ink); font-size:15px; }
+
+  .toggle{ display:inline-flex; align-items:center; gap:7px; font-size:13px; color:var(--c-muted); cursor:pointer; }
+  .toggle input{ width:16px; height:16px; accent-color:var(--c-primary); cursor:pointer; }
+
+  .list{ max-height:420px; overflow-y:auto; border:1px solid var(--c-line); border-radius:10px; margin-top:10px; }
+  .cl{ display:flex; align-items:center; gap:10px; padding:9px 11px; border-bottom:1px solid #eef2f6; font-size:14px; }
+  .cl:last-child{ border-bottom:0; }
+  .cl input{ width:17px; height:17px; accent-color:var(--c-primary); flex:0 0 auto; cursor:pointer; }
+  .cl .nm{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .cl .ph{ font-size:12px; color:var(--c-muted); flex:0 0 auto; }
+  .cl.done{ background:#f6f8fa; color:#90a4ae; }
+  .cl.cur{ background:#fff8e1; }
+  .cl .tick{ font-size:12px; font-weight:700; color:#0f766e; flex:0 0 auto; }
+  .cl .inact{ font-size:11px; color:#b26a00; background:#fff3e0; padding:1px 6px; border-radius:999px; flex:0 0 auto; }
+
+  .qbar{ height:7px; background:var(--c-line); border-radius:999px; overflow:hidden; margin-bottom:10px; }
+  .qbar i{ display:block; height:100%; background:linear-gradient(90deg,var(--grad-a),var(--grad-b)); transition:width .25s; }
+  .qstat{ font-size:13.5px; color:var(--c-muted); text-align:center; margin-bottom:10px; }
+  .qstat b{ color:var(--c-ink); }
+  .qrow{ display:flex; gap:8px; justify-content:center; flex-wrap:wrap; }
+  .qrow .btn{ flex:1 1 auto; }
+
+  .warn{ font-size:12.5px; color:#8a5a00; background:#fff8e1; border:1px solid #ffe0a3;
+         border-radius:10px; padding:9px 11px; margin-bottom:14px; line-height:1.45; }
+</style>
+</head>
+<body>
+
+<div class="bar">
+  <div class="brand"><img src="logo.png" alt="Friska"><span>Broadcast</span></div>
+  <span class="status" id="status">Load the client list to begin.</span>
+</div>
+
+<div class="wrap">
+
+  <div class="warn">
+    Messages are sent one at a time through WhatsApp Business — tap send, come back, the next client
+    loads automatically. Nothing is sent without your tap.
+  </div>
+
+  <div class="card">
+    <h3>1. Message</h3>
+    <textarea id="msg" placeholder="Type the message to send…"></textarea>
+    <div class="hint">Use <code>{{name}}</code> anywhere to insert the client's name.</div>
+    <div class="preview" id="preview" style="display:none"></div>
+  </div>
+
+  <div class="card">
+    <h3>2. Recipients</h3>
+    <div class="row">
+      <button class="btn sm" id="load">Load clients</button>
+      <label class="toggle"><input type="checkbox" id="showInactive">Include inactive</label>
+      <span class="spacer"></span>
+      <span class="count"><b id="selCount">0</b> selected</span>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <input type="text" id="search" placeholder="Search name or number…" style="flex:1 1 160px">
+      <button class="btn alt sm" id="selAll">All</button>
+      <button class="btn alt sm" id="selNone">None</button>
+    </div>
+    <div class="list" id="list"></div>
+  </div>
+
+  <div class="card" id="sendCard">
+    <h3>3. Send</h3>
+    <div id="sendBody"></div>
+  </div>
+
+</div>
+
+<script>
+  const API = (typeof API_URL !== 'undefined') ? API_URL : '';
+
+  const el = id => document.getElementById(id);
+  const statusEl = el('status'), listEl = el('list'), msgEl = el('msg'),
+        previewEl = el('preview'), searchEl = el('search'), sendBody = el('sendBody');
+
+  let clients = [];            // [{name, phone, active}]
+  let selected = new Set();    // phone keys
+  let sent = new Set();        // phone keys already messaged in this campaign
+  let queue = null, qIdx = 0, awaitingReturn = false;
+
+  const key = p => String(p || '').replace(/\D/g, '').slice(-10);
+  const SENT_STORE = 'friska_broadcast_sent';
+
+  function setStatus(m){ statusEl.textContent = m; }
+
+  // ---- persist progress so a reload mid-broadcast doesn't lose the marks ----
+  function loadSent(){
+    try{
+      const raw = JSON.parse(localStorage.getItem(SENT_STORE) || '{}');
+      if(raw.msg === msgEl.value && Array.isArray(raw.keys)) sent = new Set(raw.keys);
+    }catch(e){}
+  }
+  function saveSent(){
+    try{ localStorage.setItem(SENT_STORE, JSON.stringify({ msg: msgEl.value, keys: [...sent] })); }catch(e){}
+  }
+
+  // ---- WhatsApp Business intent (same as the kitchen panel) ----
+  function waLink(phone, text){
+    let p = String(phone || '').replace(/\D/g, '');
+    if(p.length === 10) p = '91' + p;
+    return 'intent://send?phone=' + p + '&text=' + encodeURIComponent(text) +
+           '#Intent;scheme=whatsapp;package=com.whatsapp.w4b;end';
+  }
+  const personalise = (tpl, name) =>
+    String(tpl || '').replace(/\{\{\s*name\s*\}\}/gi, String(name || '').trim());
+
+  // ---- load the master client list ----
+  el('load').addEventListener('click', async () => {
+    if(!API){ setStatus('No API URL found in config.js.'); return; }
+    el('load').disabled = true; setStatus('Loading clients…');
+    try{
+      const res = await fetch(API + '?action=getAllClients');
+      const data = await res.json();
+      if(!data.success || !data.clients) throw new Error(data.message || 'No client data returned');
+      clients = data.clients
+        .map(c => ({ name: String(c.name || '').trim(),
+                     phone: String(c.phone || '').trim(),
+                     active: c.active !== false }))
+        .filter(c => c.name && key(c.phone).length === 10)
+        .sort((a, b) => a.name.localeCompare(b.name));
+      // default selection: everyone currently visible
+      selected = new Set(visible().map(c => key(c.phone)));
+      loadSent();
+      render();
+      setStatus(clients.length + ' clients loaded.');
+    }catch(e){ setStatus('Load error: ' + e.message); }
+    el('load').disabled = false;
+  });
+
+  function visible(){
+    const q = searchEl.value.trim().toLowerCase();
+    const inc = el('showInactive').checked;
+    return clients.filter(c =>
+      (inc || c.active) &&
+      (!q || c.name.toLowerCase().includes(q) || key(c.phone).includes(q.replace(/\D/g, '')))
+    );
+  }
+
+  // ---- rendering ----
+  function render(){
+    const rows = visible();
+    listEl.innerHTML = '';
+    if(!rows.length){
+      listEl.innerHTML = '<div class="cl" style="color:#90a4ae">No clients to show.</div>';
+    }
+    rows.forEach(c => {
+      const k = key(c.phone);
+      const row = document.createElement('div');
+      row.className = 'cl' + (sent.has(k) ? ' done' : '') +
+                      (queue && queue[qIdx] && key(queue[qIdx].phone) === k ? ' cur' : '');
+      const cb = document.createElement('input');
+      cb.type = 'checkbox'; cb.checked = selected.has(k);
+      cb.addEventListener('change', () => {
+        if(cb.checked) selected.add(k); else selected.delete(k);
+        updateCount(); renderSend();
+      });
+      const nm = document.createElement('div'); nm.className = 'nm'; nm.textContent = c.name;
+      const ph = document.createElement('div'); ph.className = 'ph'; ph.textContent = k;
+      row.appendChild(cb); row.appendChild(nm);
+      if(!c.active){ const b = document.createElement('span'); b.className = 'inact'; b.textContent = 'inactive'; row.appendChild(b); }
+      row.appendChild(ph);
+      if(sent.has(k)){ const t = document.createElement('span'); t.className = 'tick'; t.textContent = 'sent ✓'; row.appendChild(t); }
+      listEl.appendChild(row);
+    });
+    updateCount();
+    renderPreview();
+    renderSend();
+  }
+
+  function updateCount(){ el('selCount').textContent = selected.size; }
+
+  function renderPreview(){
+    const first = clients.find(c => selected.has(key(c.phone)));
+    const txt = msgEl.value.trim();
+    if(!txt || !first){ previewEl.style.display = 'none'; return; }
+    previewEl.style.display = 'block';
+    previewEl.textContent = personalise(txt, first.name.split(' ')[0]);
+  }
+
+  // ---- send panel / queue ----
+  function targets(){
+    return clients.filter(c => selected.has(key(c.phone)));
+  }
+
+  function renderSend(){
+    sendBody.innerHTML = '';
+    const mk = (label, cls, fn) => {
+      const b = document.createElement('button'); b.className = 'btn' + (cls ? ' ' + cls : '');
+      b.textContent = label; b.addEventListener('click', fn); return b;
+    };
+    const row = document.createElement('div'); row.className = 'qrow';
+
+    if(!queue){
+      const pending = targets().filter(c => !sent.has(key(c.phone)));
+      const s = document.createElement('div'); s.className = 'qstat';
+      if(!msgEl.value.trim()) s.textContent = 'Type a message first.';
+      else if(!pending.length) s.innerHTML = selected.size ? 'All selected clients already messaged.' : 'Select at least one client.';
+      else s.innerHTML = 'Ready to send to <b>' + pending.length + '</b> client' + (pending.length > 1 ? 's' : '') + '.';
+      sendBody.appendChild(s);
+      if(msgEl.value.trim() && pending.length){
+        row.appendChild(mk('Start sending', '', () => { queue = pending; qIdx = 0; render(); }));
+      }
+      if(sent.size) row.appendChild(mk('Clear sent marks', 'danger', () => {
+        if(!confirm('Clear the sent marks for this campaign?')) return;
+        sent = new Set(); saveSent(); render();
+      }));
+      sendBody.appendChild(row);
+      return;
+    }
+
+    const total = queue.length;
+    const bar = document.createElement('div'); bar.className = 'qbar';
+    const fill = document.createElement('i');
+    fill.style.width = Math.round((Math.min(qIdx, total) / total) * 100) + '%';
+    bar.appendChild(fill); sendBody.appendChild(bar);
+
+    const cur = queue[qIdx];
+    const s = document.createElement('div'); s.className = 'qstat';
+
+    if(!cur){
+      s.innerHTML = 'Done — <b>' + total + '</b> message' + (total > 1 ? 's' : '') + ' sent.';
+      sendBody.appendChild(s);
+      row.appendChild(mk('Close', 'alt', () => { queue = null; qIdx = 0; render(); }));
+      sendBody.appendChild(row);
+      return;
+    }
+
+    s.innerHTML = 'Sending <b>' + (qIdx + 1) + '</b> of <b>' + total + '</b> — ' + cur.name;
+    sendBody.appendChild(s);
+
+    row.appendChild(mk('Open WhatsApp → ' + cur.name.split(' ')[0], '', () => {
+      awaitingReturn = true;
+      location.href = waLink(cur.phone, personalise(msgEl.value, cur.name.split(' ')[0]));
+    }));
+    row.appendChild(mk('Skip', 'alt', () => { qIdx++; render(); }));
+    row.appendChild(mk('Stop', 'alt', () => { queue = null; qIdx = 0; awaitingReturn = false; render(); }));
+    sendBody.appendChild(row);
+  }
+
+  // coming back from WhatsApp = that client is done, step to the next one.
+  // The 1.2s floor stops Android's app-switcher animation from double-advancing.
+  let leftAt = 0;
+  document.addEventListener('visibilitychange', () => {
+    if(document.visibilityState === 'hidden'){ leftAt = Date.now(); return; }
+    if(!awaitingReturn) return;
+    if(Date.now() - leftAt < 1200) return;      // never actually reached WhatsApp
+    awaitingReturn = false;
+    const c = queue && queue[qIdx];
+    if(c){ sent.add(key(c.phone)); saveSent(); }
+    qIdx++;
+    render();
+  });
+
+  // ---- wiring ----
+  msgEl.addEventListener('input', () => { renderPreview(); renderSend(); });
+  searchEl.addEventListener('input', render);
+  el('showInactive').addEventListener('change', render);
+  el('selAll').addEventListener('click', () => { visible().forEach(c => selected.add(key(c.phone))); render(); });
+  el('selNone').addEventListener('click', () => { visible().forEach(c => selected.delete(key(c.phone))); render(); });
+
+  renderSend();
+</script>
+</body>
+</html>
