@@ -129,6 +129,40 @@
   .prow button{ flex:none; padding:9px 14px; font-size:13px; }
   .agent-chip{ font-size:11px; color:var(--muted); font-weight:600; }
   .agent-chip b{ color:var(--navy); }
+
+  /* cooking: red until pressed, green once on */
+  .sbtn.danger{ background:#dc2626; border-color:#dc2626; color:#fff; box-shadow:0 5px 14px rgba(220,38,38,.26); }
+  .sbtn.danger .ic{ filter:none; }
+
+  /* collapsible slot */
+  .slot-head{ cursor:pointer; user-select:none; }
+  .slot-head .chev{ color:var(--muted); font-size:13px; flex:none; margin-left:8px; }
+  .slot-body.hide{ display:none; }
+
+  /* compact route chips that wrap inline */
+  .chipwrap{ display:flex; flex-wrap:wrap; gap:7px; margin-top:2px; }
+  .rchip{ flex:0 0 auto; display:inline-flex; align-items:center; gap:7px;
+    border:1.5px solid var(--line); background:#fff; color:var(--ink);
+    border-radius:11px; padding:8px 11px; font-family:inherit; font-size:12.5px;
+    font-weight:700; cursor:pointer; transition:all .13s; line-height:1.2; }
+  .rchip:active{ transform:scale(.97); }
+  .rchip .tick{ width:16px; height:16px; border-radius:5px; border:1.6px solid #c8d0e0;
+    background:#fff; flex:none; display:flex; align-items:center; justify-content:center;
+    font-size:11px; color:#fff; }
+  .rchip .cnt{ font-weight:600; color:var(--muted); font-size:11px; }
+  .rchip.sel{ border-color:var(--navy); background:#eef1fb; }
+  .rchip.sel .tick{ background:var(--navy); border-color:var(--navy); }
+  .rchip.done{ border-color:var(--accent); background:var(--accent-soft); color:#0b7a5a; }
+  .rchip.done .tick{ background:var(--accent); border-color:var(--accent); }
+  .rchip.done .cnt{ color:#0b7a5a; }
+  .selbar{ display:flex; align-items:center; gap:10px; margin-top:10px; flex-wrap:wrap; }
+  .sellink{ font-size:11.5px; font-weight:700; color:var(--navy); cursor:pointer; }
+  .sellink.mute{ color:var(--muted); }
+  .selcount{ font-size:11.5px; color:var(--muted); font-weight:600; margin-left:auto; }
+  .actrow{ display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; }
+  .actrow .btn{ flex:1 1 auto; }
+  .btn.go{ background:var(--accent); box-shadow:0 5px 14px rgba(16,185,129,.26); }
+  .btn.go:disabled{ background:#c8d0e0; box-shadow:none; }
 </style>
 </head>
 <body>
@@ -180,6 +214,8 @@ const META = {
 let BOARD = null;
 let busy = false;
 let partnersOpen = false;
+let slotOpen = {};        // slot -> bool
+let picked  = {};         // "slot||route" -> true
 
 const dateEl = document.getElementById('date');
 const boardEl = document.getElementById('board');
@@ -224,6 +260,8 @@ async function load(){
     const r = await api('getKitchenBoard', { date: dateEl.value });
     if(!r || !r.ok) throw new Error((r && r.message) || 'Could not load the day');
     BOARD = r;
+    picked = {};
+    (r.slots||[]).forEach(s => { if(slotOpen[s.slot] === undefined) slotOpen[s.slot] = !s.expired; });
     render();
     const total = (r.slots||[]).reduce((s,x)=>s+x.clients,0);
     setLine(total + ' client(s) across ' + (r.slots||[]).length + ' slot(s) on ' + r.date + '.');
@@ -249,8 +287,11 @@ function allRoutes(){
     return a.route.localeCompare(b.route, undefined, { numeric:true });
   });
 }
-function routeId(route){
-  return btoa(unescape(encodeURIComponent(route))).replace(/=/g,'');
+function routeId(route){ return btoa(unescape(encodeURIComponent(route))).replace(/=/g,''); }
+function pickKey(slot, route){ return slot + '||' + route; }
+function pickedIn(slot){
+  return Object.keys(picked).filter(k => picked[k] && k.indexOf(slot + '||') === 0)
+               .map(k => k.slice(slot.length + 2));
 }
 
 function render(){
@@ -287,16 +328,17 @@ function render(){
       + '</div>'
     + '</div>';
 
-  /* ---- day-wide cooking ---- */
-  const cookCls = 'sbtn' + (BOARD.dayCooking ? ' on' : '');
+  /* ---- day-wide cooking: red until pressed, green once on ---- */
+  const cookCls = 'sbtn ' + (BOARD.dayCooking ? 'on' : 'danger');
   const cookTime = BOARD.dayUpdated ? String(BOARD.dayUpdated).slice(11,16) : '';
   const dayBar =
     '<div class="daybar">'
       + '<div class="sub">Whole day \u00b7 all slots</div>'
       + '<div class="btn-row">'
         + '<button class="'+cookCls+'" onclick="setStatus(\'__DAY__\',\'__ALL__\',\'Cooking\','+(BOARD.dayCooking?'true':'false')+')">'
-          + '<span class="ic">' + META.Cooking.icon + '</span>Cooking Started'
-          + (cookTime ? '<span style="font-size:10px;opacity:.8;">' + esc(cookTime) + '</span>' : '')
+          + '<span class="ic">' + META.Cooking.icon + '</span>'
+          + (BOARD.dayCooking ? 'Cooking Started' : 'Cooking Not Started')
+          + (cookTime && BOARD.dayCooking ? '<span style="font-size:10px;opacity:.85;">' + esc(cookTime) + '</span>' : '')
         + '</button>'
       + '</div>'
       + '<div class="hint">Every client \u2014 morning, afternoon and evening \u2014 sees "Cooking" '
@@ -306,6 +348,7 @@ function render(){
   const slotsHtml = BOARD.slots.map(s => {
 
     const closed = !!s.expired;
+    const open = !!slotOpen[s.slot];
 
     const packCls = 'sbtn' + (s.packaging ? ' on' : '');
     const packBtn =
@@ -313,43 +356,102 @@ function render(){
         + '<span class="ic">' + META.Packaging.icon + '</span>' + esc(s.meal) + ' Packaging'
       + '</button>';
 
-    const allDispatched = s.routes.length && s.routes.every(r => r.dispatched);
-    const allBtn =
-      '<button class="sbtn' + (allDispatched ? ' past' : '') + '" onclick="setStatus(\'' + attr(s.slot) + '\',\'ALL\',\'Dispatched\',false)">'
-        + '<span class="ic">' + META.Dispatched.icon + '</span>' + esc(s.meal) + ' Dispatched \u00b7 all'
-      + '</button>';
+    const doneCount = s.routes.filter(r => r.dispatched).length;
 
-    /* route cards now carry only the dispatch action - numbers live at the top */
-    const routeBtns = s.routes.map(r => {
-      const dCls = 'sbtn' + (r.dispatched ? ' on' : '');
-      const dTime = r.updated ? String(r.updated).slice(11,16) : '';
-      const who = r.agentName ? (' \u00b7 ' + r.agentName) : '';
-      return '<button class="'+dCls+'" onclick="setStatus(\'' + attr(s.slot) + '\',\'' + attr(r.route) + '\',\'Dispatched\','+(r.dispatched?'true':'false')+')">'
-        + '<span class="ic">' + META.Dispatched.icon + '</span>'
-        + esc(r.route) + esc(who)
-        + '<span style="font-size:10px;opacity:.75;">' + r.clients + ' client(s)' + (dTime ? ' \u00b7 ' + esc(dTime) : '') + '</span>'
+    /* compact chips, wrap inline, tick to select */
+    const chips = s.routes.map(r => {
+      const key = pickKey(s.slot, r.route);
+      const sel = !!picked[key];
+      const cls = 'rchip' + (r.dispatched ? ' done' : '') + (sel ? ' sel' : '');
+      const tick = (sel || r.dispatched) ? '\u2713' : '';
+      const t = r.updated ? String(r.updated).slice(11,16) : '';
+      return '<button class="'+cls+'" onclick="togglePick(\'' + attr(s.slot) + '\',\'' + attr(r.route) + '\')">'
+        + '<span class="tick">' + tick + '</span>'
+        + '<span>' + esc(r.route) + '</span>'
+        + '<span class="cnt">' + r.clients + (r.dispatched && t ? ' \u00b7 ' + esc(t) : '') + '</span>'
       + '</button>';
     }).join('');
 
-    return '<div class="slot' + (closed ? ' done' : '') + '">'
-      + '<div class="slot-head">'
-        + '<div><div class="meal-name">' + esc(s.meal) + '</div>'
-        + '<div class="slot-sub">' + esc(s.slot) + ' slot \u00b7 ' + s.clients + ' client(s)</div></div>'
-        + (closed ? '<span class="closed-tag">Closed \u00b7 resets ' + s.resetHour + ':00</span>'
-                  : '<span class="slot-count">clients see this live</span>')
+    const nPicked = pickedIn(s.slot).length;
+
+    const body =
+      '<div class="btn-row">' + packBtn + '</div>'
+      + '<div class="sub" style="margin-top:16px;">Dispatch by route '
+        + '<span style="color:var(--accent);">\u00b7 ' + doneCount + ' of ' + s.routes.length + ' dispatched</span></div>'
+      + '<div class="chipwrap">' + chips + '</div>'
+      + '<div class="selbar">'
+        + '<span class="sellink" onclick="pickAll(\'' + attr(s.slot) + '\',true)">Select all</span>'
+        + '<span class="sellink mute" onclick="pickAll(\'' + attr(s.slot) + '\',false)">Clear</span>'
+        + '<span class="selcount">' + nPicked + ' selected</span>'
       + '</div>'
-      + '<div class="btn-row">' + packBtn + allBtn + '</div>'
-      + '<div class="sub" style="margin-top:16px;">Dispatch by route</div>'
-      + '<div class="btn-row">' + routeBtns + '</div>'
+      + '<div class="actrow">'
+        + '<button class="btn go" ' + (nPicked ? '' : 'disabled') + ' onclick="dispatchPicked(\'' + attr(s.slot) + '\',false)">'
+          + META.Dispatched.icon + '  Dispatch selected</button>'
+        + '<button class="btn ghost" ' + (nPicked ? '' : 'disabled') + ' onclick="dispatchPicked(\'' + attr(s.slot) + '\',true)">Undo selected</button>'
+      + '</div>';
+
+    return '<div class="slot' + (closed ? ' done' : '') + '">'
+      + '<div class="slot-head" onclick="toggleSlot(\'' + attr(s.slot) + '\')">'
+        + '<div><div class="meal-name">' + esc(s.meal) + '</div>'
+        + '<div class="slot-sub">' + esc(s.slot) + ' slot \u00b7 ' + s.clients + ' client(s) \u00b7 '
+          + doneCount + '/' + s.routes.length + ' dispatched</div></div>'
+        + (closed ? '<span class="closed-tag">Closed \u00b7 resets ' + s.resetHour + ':00</span>' : '')
+        + '<span class="chev">' + (open ? '\u25B4' : '\u25BE') + '</span>'
+      + '</div>'
+      + '<div class="slot-body' + (open ? '' : ' hide') + '">' + body + '</div>'
     + '</div>';
   }).join('');
 
   boardEl.innerHTML = partners + dayBar + slotsHtml;
 }
 
-function togglePartners(){
-  partnersOpen = !partnersOpen;
+function togglePartners(){ partnersOpen = !partnersOpen; render(); }
+function toggleSlot(slot){ slotOpen[slot] = !slotOpen[slot]; render(); }
+
+function togglePick(slot, route){
+  const k = pickKey(slot, route);
+  if(picked[k]) delete picked[k]; else picked[k] = true;
   render();
+}
+function pickAll(slot, on){
+  const s = (BOARD.slots||[]).find(x => x.slot === slot);
+  if(!s) return;
+  s.routes.forEach(r => {
+    const k = pickKey(slot, r.route);
+    if(on) picked[k] = true; else delete picked[k];
+  });
+  render();
+}
+
+/* one call for however many routes are ticked */
+async function dispatchPicked(slot, undo){
+  if(busy) return;
+  const list = pickedIn(slot);
+  if(!list.length){ toast('Tick at least one route'); return; }
+
+  busy = true;
+  showBusy(true, undo ? 'Undoing\u2026' : ('Dispatching ' + list.length + ' route(s)\u2026'));
+  setLine('Updating\u2026');
+  try {
+    const r = await api('setKitchenStatus', {
+      date: dateEl.value,
+      slot: slot,
+      route: list.join('||'),
+      status: undo ? '' : 'Dispatched'
+    });
+    if(!r || !r.ok) throw new Error((r && r.message) || 'Update failed');
+    if(r.board){ BOARD = r.board; }
+    list.forEach(rt => delete picked[pickKey(slot, rt)]);
+    render();
+    toast((undo ? 'Cleared ' : 'Dispatched ') + list.length + ' route(s) in ' + slot);
+    setLine((undo ? 'Cleared ' : 'Dispatched ') + list.join(', ') + ' in ' + slot + '.');
+  } catch(err){
+    toast('Failed: ' + (err.message || err));
+    setLine('Update failed.');
+  } finally {
+    busy = false;
+    showBusy(false);
+  }
 }
 
 /* pressing an active button again clears that level */
@@ -390,7 +492,7 @@ async function saveAgent(route){
     (BOARD.slots||[]).forEach(s => (s.routes||[]).forEach(x => {
       if(x.route === route){ x.agentName = r.name; x.agentPhone = r.phone; }
     }));
-    partnersOpen = true;      // keep the section open after saving
+    partnersOpen = true;
     render();
     toast('Saved for ' + route);
   } catch(err){

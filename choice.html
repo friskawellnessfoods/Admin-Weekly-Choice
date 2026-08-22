@@ -1442,7 +1442,6 @@ async function loadClientUsage(){
 
   let rows = '';
   if (d.plan)  rows += '<div class="us-kv"><span class="k">Plan</span><span class="v">' + esc(d.plan) + '</span></div>';
-  if (d.items) rows += '<div class="us-kv"><span class="k">Includes</span><span class="v">' + esc(d.items) + '</span></div>';
   rows += '<div class="us-kv"><span class="k">Cycle started</span><span class="v">' + esc(prettyDate(d.start)) + '</span></div>';
   rows += '<div class="us-kv"><span class="k">Days used</span><span class="v">' + used + ' of ' + opted + '</span></div>';
   if (d.pausedDays > 0)
