@@ -927,6 +927,10 @@ let currentIndex = 0;
 /* ========= AUTH ========= */
 const AUTH_KEY = 'friska_auth_v1';
 let AUTH_NEEDS_SETUP = false;
+let AUTH_CLIENT_NAME = '';
+
+/* where password-reset requests go */
+const SUPPORT_WA = '918400964170';
 
 function $id(id){ return document.getElementById(id); }
 
@@ -1001,7 +1005,8 @@ async function authContinue(ev){
     if (r.status === 'inactive') { $id('inactiveModal').style.display = 'flex'; return; }
 
     AUTH_NEEDS_SETUP = !!r.needsSetup;
-    showAuthStep2(r.clientName || '');
+    AUTH_CLIENT_NAME = r.clientName || '';
+    showAuthStep2(AUTH_CLIENT_NAME);
 
   } catch (e) {
     btn.classList.remove("loading");
@@ -1077,6 +1082,10 @@ async function authSubmit(ev){
     if (!r || !r.ok) {
       if (r && r.inactive) { $id('inactiveModal').style.display = 'flex'; return; }
       if (r && r.needsSetup) { AUTH_NEEDS_SETUP = true; showAuthStep2(''); return authError('Please create a password first.'); }
+      if (r && /password/i.test(String(r.message || ''))) {
+        const fl = $id('forgotLine');
+        if (fl) fl.style.display = 'block';
+      }
       return authError((r && r.message) || 'Sign in failed.');
     }
 
@@ -1157,7 +1166,49 @@ window.addEventListener('storage', function(ev){
 });
 
 function openForgotModal(){
+
+  const phone = ($id('phone') || {}).value.trim();
+  const name  = AUTH_CLIENT_NAME || '';
+
+  const text =
+    'Friska Wellness \u2014 Password Reset Request\n' +
+    'Name: ' + (name || '(not provided)') + '\n' +
+    'Phone: ' + phone + '\n' +
+    'Issue: Forgot password\n\n' +
+    'Please reset my password so I can sign in again.';
+
+  // set as a real link href so the browser never blocks it as a popup
+  const link = $id('forgotWaBtn');
+  if (link) link.href = 'https://wa.me/' + SUPPORT_WA + '?text=' + encodeURIComponent(text);
+
+  const who = $id('forgotWho');
+  if (who) who.textContent = name ? (name + ' \u00b7 ' + phone) : phone;
+
   $id('forgotModal').style.display = 'flex';
+}
+
+/* best-effort log so you have a record even if the client never presses send */
+function logResetRequest(){
+  try {
+    const p = new URLSearchParams();
+    p.append('action', 'submitFeedback');
+    p.append('payload', JSON.stringify({
+      phone: ($id('phone') || {}).value.trim(),
+      name: AUTH_CLIENT_NAME || '',
+      type: 'Forgot Password',
+      message: 'Client requested a password reset from the sign-in screen.',
+      sentTo: SUPPORT_WA
+    }));
+    fetch(API_URL, { method: 'POST', body: p }).catch(()=>{});
+  } catch (e) {}
+
+  closeForgotModal();
+  authError('Reset requested. We will clear your password shortly \u2014 then sign in and create a new one.');
+}
+
+function closeForgotModal(){
+  const m = $id('forgotModal');
+  if (m) m.style.display = 'none';
 }
 
 /* ========= BOOT CLIENT INTO THE APP ========= */
@@ -1351,6 +1402,16 @@ async function loadClientUsage(){
         '<div style="font-size:34px; margin-bottom:8px;">\u{1F9FE}</div>' +
         'We could not find an active plan for your number.<br>' +
         'Please contact Friska Wellness if this looks wrong.' +
+      '</div>';
+    return;
+  }
+
+  if (!d.end) {
+    host.innerHTML =
+      '<div class="box st-pending" style="padding:26px 14px;">' +
+        '<div style="font-size:34px; margin-bottom:8px;">\u{1F9FE}</div>' +
+        'Your latest plan has no end date recorded, so we cannot work out the days left.<br>' +
+        'Please contact Friska Wellness.' +
       '</div>';
     return;
   }
@@ -3325,15 +3386,18 @@ function restoreSimple(sec, drows, col, matchFn){
   </div>
 </div>
 <div id="forgotModal" class="modal">
-  <div class="modal-content" style="text-align:center; padding:28px 24px 22px; max-width:380px;">
+  <div class="modal-content" style="text-align:center; padding:28px 24px 22px; max-width:390px;">
     <div style="font-size:34px; margin-bottom:10px;">🔑</div>
-    <h3 style="margin:0 0 8px;">Password Help</h3>
-    <p style="font-size:14.5px; color:#445; line-height:1.55; margin:0 0 22px;">
-      Please contact Friska Wellness to have your password reset. Once reset,
-      you will be asked to create a new one the next time you sign in.
+    <h3 style="margin:0 0 6px;">Reset your password</h3>
+    <div id="forgotWho" style="font-size:12.5px; color:var(--muted); font-weight:600; margin-bottom:12px;"></div>
+    <p style="font-size:14px; color:#445; line-height:1.6; margin:0 0 20px;">
+      Passwords are stored securely and cannot be looked up, so we clear yours instead.
+      Send us the request below and you will be asked to create a new password
+      the next time you sign in.
     </p>
-    <button class="btn" style="margin-top:0;"
-      onclick="document.getElementById('forgotModal').style.display='none'">OK</button>
+    <a class="wa-btn" id="forgotWaBtn" href="#" target="_blank" rel="noopener"
+       onclick="logResetRequest()">Request Reset on WhatsApp</a>
+    <button class="btn secondary" style="margin-top:10px;" onclick="closeForgotModal()">Cancel</button>
   </div>
 </div>
 <div id="inactiveModal" class="modal">
