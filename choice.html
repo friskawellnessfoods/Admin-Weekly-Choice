@@ -544,6 +544,95 @@
   .dish-kind.k-veg      { background: #e8f5e9; color: #2e7d32; }
   .dish-kind.k-egg      { background: #fff4e0; color: #b56a00; }
   .dish-kind.k-seafood  { background: #e8f0fc; color: #1565c0; }
+
+  /* ===== FEEDBACK ===== */
+  #tab-feedback textarea {
+    width: 100%; padding: 12px 14px; font-size: 15px; border-radius: 12px;
+    border: 1.5px solid var(--line); background: #fbfcfe; color: var(--ink);
+    font-family: inherit; line-height: 1.5; resize: vertical; min-height: 130px;
+    box-sizing: border-box; transition: border-color .15s, box-shadow .15s, background .15s;
+  }
+  #tab-feedback textarea:focus {
+    outline: none; border-color: var(--accent); background: #fff;
+    box-shadow: 0 0 0 3px rgba(16,185,129,0.12);
+  }
+  .fb-note { font-size: 11.5px; color: var(--muted); margin-top: 6px; line-height: 1.5; }
+  .fb-msg {
+    display: none; margin-top: 12px; padding: 11px 13px; border-radius: 10px;
+    font-size: 13px; line-height: 1.45;
+  }
+  .fb-msg.err { display: block; background: #fdecec; border: 1px solid #f6c9c9; color: #b3261e; }
+  .fb-msg.ok  { display: block; background: var(--accent-soft); border: 1px solid #bfe8db; color: #0b7a5a; }
+  .fb-done { text-align: center; padding: 8px 4px 4px; }
+  .fb-done .fb-tick { font-size: 40px; margin-bottom: 8px; }
+  .fb-done h4 { margin: 0 0 6px; font-size: 16px; }
+  .fb-done p { margin: 0 0 16px; font-size: 13.5px; color: var(--muted); line-height: 1.55; }
+  .wa-btn {
+    display: block; width: 100%; padding: 13px; border-radius: 13px; border: none;
+    background: #25D366; color: #fff; font-family: inherit; font-weight: 700; font-size: 15px;
+    text-align: center; text-decoration: none; cursor: pointer;
+    box-shadow: 0 6px 16px rgba(37,211,102,0.28);
+  }
+  .wa-btn:active { background: #1da851; }
+
+  /* ===== ORDER STATUS ===== */
+  .st-card { margin-bottom: 14px; }
+  .st-head {
+    display: flex; align-items: baseline; justify-content: space-between;
+    gap: 10px; margin-bottom: 16px; padding-bottom: 9px;
+    border-bottom: 1.5px solid var(--line);
+  }
+  .st-slot { font-size: 16px; font-weight: 700; color: var(--navy); }
+  .st-loc { font-size: 11.5px; color: var(--muted); font-weight: 500; text-align: right; max-width: 55%; }
+
+  .stepper { display: flex; align-items: flex-start; }
+  .step { flex: 1; text-align: center; position: relative; min-width: 0; }
+  .step .sdot {
+    width: 38px; height: 38px; border-radius: 50%; margin: 0 auto 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 17px; background: #eef1f7; color: #9aa6bb;
+    border: 2px solid #eef1f7; position: relative; z-index: 2;
+    transition: background .2s, color .2s, border-color .2s;
+  }
+  .step .slabel { font-size: 10.5px; font-weight: 600; color: var(--muted); line-height: 1.3; }
+  .step::before {
+    content: ""; position: absolute; top: 19px; left: -50%; width: 100%;
+    height: 2.5px; background: #eef1f7; z-index: 1;
+  }
+  .step:first-child::before { display: none; }
+  .step.done .sdot { background: var(--accent-soft); border-color: var(--accent); color: #0b7a5a; }
+  .step.done .slabel { color: #0b7a5a; }
+  .step.done::before { background: var(--accent); }
+  .step.current .sdot {
+    background: var(--accent); border-color: var(--accent); color: #fff;
+    box-shadow: 0 0 0 5px rgba(16,185,129,0.16);
+  }
+  .step.current .slabel { color: var(--navy); font-weight: 700; }
+
+  .st-foot {
+    margin-top: 15px; padding-top: 12px; border-top: 1px dashed var(--line);
+    font-size: 12.5px; color: var(--muted); line-height: 1.6;
+  }
+  .st-agent {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 10px; margin-top: 12px; padding: 11px 13px;
+    background: var(--accent-soft); border-radius: 12px;
+  }
+  .st-agent .aname { font-size: 13px; font-weight: 700; color: var(--navy); }
+  .st-agent .arole { font-size: 11px; color: #0b7a5a; font-weight: 600; }
+  .st-call {
+    flex: none; background: var(--accent); color: #fff; border-radius: 10px;
+    padding: 9px 15px; font-size: 12.5px; font-weight: 700;
+    text-decoration: none; box-shadow: 0 4px 12px rgba(16,185,129,0.28);
+  }
+  .st-pending {
+    text-align: center; font-size: 13px; color: var(--muted);
+    padding: 6px 4px 0; line-height: 1.6;
+  }
+
+  .st-slotname { font-size: 11.5px; font-weight: 600; color: var(--muted); }
+  .st-closed { text-align: center; padding: 12px 6px 4px; font-size: 13.5px; color: var(--muted); line-height: 1.6; }
+  .st-closed-ic { font-size: 32px; margin-bottom: 8px; }
   </style>
 </head>
 
@@ -660,6 +749,41 @@
   <div id="tab-past" class="tabpanel" style="display:none;">
     <div class="frame-wrap wrapper">
       <iframe id="pastFrame" class="tab-frame" title="Past Selections"></iframe>
+    </div>
+  </div>
+
+  <!-- ---- TAB: ORDER STATUS ---- -->
+  <div id="tab-status" class="tabpanel" style="display:none;">
+    <div class="content wrapper">
+      <div id="statusBody"></div>
+    </div>
+  </div>
+
+  <!-- ---- TAB: FEEDBACK ---- -->
+  <div id="tab-feedback" class="tabpanel" style="display:none;">
+    <div class="content wrapper">
+      <div class="box" id="feedbackBox">
+
+        <div class="login-title" style="text-align:left;">Send us feedback</div>
+        <div class="login-sub" style="text-align:left; margin-bottom:16px;">
+          Tell us what went well or what we should fix.
+        </div>
+
+        <label>Type of feedback</label>
+        <select id="fbType" onchange="onFeedbackTypeChange()">
+          <option value="">Select a type…</option>
+        </select>
+
+        <label style="margin-top:16px;">Your feedback</label>
+        <textarea id="fbMessage" placeholder="Describe the issue or share your thoughts…"
+                  oninput="clearFeedbackMsg()"></textarea>
+        <div class="fb-note" id="fbNote">Choose a type and we will send it to the right team.</div>
+
+        <div class="fb-msg" id="fbMsg"></div>
+
+        <button class="btn" id="fbSubmitBtn" onclick="submitFeedback(event)">Submit Feedback</button>
+
+      </div>
     </div>
   </div>
 
@@ -1070,9 +1194,16 @@ async function bootClient(client, menu, phone){
 const NAV_ITEMS = [
   { id: 'order', label: 'Order',            icon: '🍱', desc: 'Choose your meals for the week' },
   { id: 'menu',  label: 'Menu at Glance',   icon: '📋', desc: "See what's cooking each day" },
-  { id: 'past',  label: 'Past Selections',  icon: '🗂️', desc: 'Review your earlier orders' }
-  // { id: 'track',    label: 'Track Food', icon: '🚚', desc: 'Where your order is',  soon: true },
-  // { id: 'feedback', label: 'Feedback',   icon: '💬', desc: 'Tell us how we did',   soon: true }
+  { id: 'past',  label: 'Past Selections',  icon: '🗂️', desc: 'Review your earlier orders' },
+  { id: 'status',   label: 'Order Status', icon: '🚚', desc: "Track today's delivery" },
+  { id: 'feedback', label: 'Feedback',     icon: '💬', desc: 'Tell us how we did' }
+];
+
+/* Feedback routing — each type goes to its own WhatsApp number (91 = India) */
+const FEEDBACK_TYPES = [
+  { id: 'food',     label: 'Food Related',     phone: '918688207049' },
+  { id: 'delivery', label: 'Delivery Related', phone: '919390097670' },
+  { id: 'other',    label: 'Any Other',        phone: '919390097670' }
 ];
 
 function showApp(name, type){
@@ -1132,6 +1263,10 @@ function showTab(name){
 
   if (name === 'menu') renderMenuTab();
 
+  if (name === 'feedback') resetFeedbackForm();
+
+  if (name === 'status') loadClientStatus();
+
   if (name === 'past') {
     // always reload — the client may have just submitted
     const f = $id('pastFrame');
@@ -1140,6 +1275,279 @@ function showTab(name){
   }
 
   window.scrollTo(0, 0);
+}
+
+/* ========= ORDER STATUS ========= */
+
+const STATUS_META = {
+  'Cooking':    { icon: '\u{1F373}', label: 'Cooking' },
+  'Packaging':  { icon: '\u{1F4E6}', label: 'Packing' },
+  'Dispatched': { icon: '\u{1F6F5}', label: 'On the way' }
+};
+
+async function loadClientStatus(){
+
+  const host = $id('statusBody');
+  if (!host) return;
+
+  const phone = ($id('phone') || {}).value.trim();
+  if (!phone) { host.innerHTML = '<div class="box st-pending">Please sign in again.</div>'; return; }
+
+  host.innerHTML = '<div class="box st-pending">Checking your order\u2026</div>';
+
+  let data;
+  try {
+    data = await apiPost('getClientStatus', { phone: phone, date: todayStr() });
+  } catch (e) {
+    host.innerHTML =
+      '<div class="box st-pending">Could not load your order status.<br>' +
+      '<span style="font-size:12px;opacity:.75;">' + esc(e.message || e) + '</span></div>';
+    return;
+  }
+
+  if (!data || !data.ok) {
+    host.innerHTML = '<div class="box st-pending">Could not load your order status.</div>';
+    return;
+  }
+
+  if (!data.entries || !data.entries.length) {
+    host.innerHTML =
+      '<div class="box st-pending" style="padding:26px 14px;">' +
+        '<div style="font-size:34px; margin-bottom:8px;">\u{1F4C5}</div>' +
+        'You have no delivery scheduled for today.' +
+      '</div>';
+    return;
+  }
+
+  const steps = data.steps || ['Cooking','Packaging','Dispatched'];
+
+  host.innerHTML = data.entries.map(en => {
+
+    const head =
+      '<div class="st-head">' +
+        '<div class="st-slot">' + esc(en.meal || en.slot || 'Delivery') +
+          (en.slot ? ' <span class="st-slotname">' + esc(en.slot) + '</span>' : '') +
+        '</div>' +
+        (en.location ? '<div class="st-loc">' + esc(en.location) + '</div>' : '') +
+      '</div>';
+
+    /* the slot's window has closed for today */
+    if (en.expired) {
+      return '<div class="box st-card">' + head +
+               '<div class="st-closed">' +
+                 '<div class="st-closed-ic">\u{1F319}</div>' +
+                 '<div>Today\u2019s ' + esc((en.meal || en.slot || '').toLowerCase()) +
+                 ' service is done.<br>Waiting for the kitchen to open tomorrow.</div>' +
+               '</div>' +
+             '</div>';
+    }
+
+    const idx = steps.indexOf(en.status);   // -1 = not started yet
+
+    const stepper = steps.map((s, i) => {
+      const meta = STATUS_META[s] || { icon: '\u2022', label: s };
+      let cls = 'step';
+      if (idx >= 0 && i < idx) cls += ' done';
+      if (idx >= 0 && i === idx) cls += ' current';
+      return '<div class="' + cls + '">' +
+               '<div class="sdot">' + meta.icon + '</div>' +
+               '<div class="slabel">' + esc(meta.label) + '</div>' +
+             '</div>';
+    }).join('');
+
+    let foot = '';
+    if (idx < 0) {
+      foot = '<div class="st-foot" style="text-align:center;">' +
+               'Your order is confirmed. We will update this as soon as cooking begins.' +
+             '</div>';
+    } else {
+      const t = en.updated ? String(en.updated).slice(11, 16) : '';
+      let line = esc((STATUS_META[en.status] || {}).label || en.status);
+      if (en.status === 'Dispatched') line = 'On the way to you';
+      foot = '<div class="st-foot" style="text-align:center;">' +
+               line + (t ? ' \u00b7 updated at ' + esc(t) : '') +
+             '</div>';
+    }
+
+    let agent = '';
+    if (en.agentPhone) {
+      agent =
+        '<div class="st-agent">' +
+          '<div>' +
+            '<div class="aname">' + esc(en.agentName || 'Delivery partner') + '</div>' +
+            '<div class="arole">Delivering your ' + esc((en.meal || '').toLowerCase() || 'order') + '</div>' +
+          '</div>' +
+          '<a class="st-call" href="tel:' + esc(en.agentPhone) + '">Call</a>' +
+        '</div>';
+    }
+
+    return '<div class="box st-card">' + head +
+             '<div class="stepper">' + stepper + '</div>' +
+             foot + agent +
+           '</div>';
+
+  }).join('') +
+  '<button class="btn secondary" onclick="loadClientStatus()">Refresh</button>';
+}
+
+/* ========= FEEDBACK ========= */
+
+function feedbackTypeById(id){
+  return FEEDBACK_TYPES.find(t => t.id === id) || null;
+}
+
+function resetFeedbackForm(){
+
+  const box = $id('feedbackBox');
+  if (!box) return;
+
+  // the form is replaced by a confirmation panel after sending — rebuild it on re-entry
+  if (box.dataset.sent === '1') {
+    location.hash = '';
+    box.dataset.sent = '';
+    buildFeedbackForm();
+    return;
+  }
+
+  const sel = $id('fbType');
+  if (sel && sel.options.length <= 1) {
+    sel.innerHTML = '<option value="">Select a type…</option>' +
+      FEEDBACK_TYPES.map(t => '<option value="' + t.id + '">' + esc(t.label) + '</option>').join('');
+  }
+
+  clearFeedbackMsg();
+}
+
+function buildFeedbackForm(){
+
+  const box = $id('feedbackBox');
+  if (!box) return;
+
+  box.innerHTML =
+    '<div class="login-title" style="text-align:left;">Send us feedback</div>' +
+    '<div class="login-sub" style="text-align:left; margin-bottom:16px;">' +
+      'Tell us what went well or what we should fix.' +
+    '</div>' +
+    '<label>Type of feedback</label>' +
+    '<select id="fbType" onchange="onFeedbackTypeChange()">' +
+      '<option value="">Select a type…</option>' +
+      FEEDBACK_TYPES.map(t => '<option value="' + t.id + '">' + esc(t.label) + '</option>').join('') +
+    '</select>' +
+    '<label style="margin-top:16px;">Your feedback</label>' +
+    '<textarea id="fbMessage" placeholder="Describe the issue or share your thoughts…" oninput="clearFeedbackMsg()"></textarea>' +
+    '<div class="fb-note" id="fbNote">Choose a type and we will send it to the right team.</div>' +
+    '<div class="fb-msg" id="fbMsg"></div>' +
+    '<button class="btn" id="fbSubmitBtn" onclick="submitFeedback(event)">Submit Feedback</button>';
+}
+
+function onFeedbackTypeChange(){
+  clearFeedbackMsg();
+  const t = feedbackTypeById(($id('fbType') || {}).value);
+  const note = $id('fbNote');
+  if (!note) return;
+  note.textContent = t
+    ? 'This goes to our ' + t.label.replace(/ Related$/, '').toLowerCase() + ' team on WhatsApp.'
+    : 'Choose a type and we will send it to the right team.';
+}
+
+function clearFeedbackMsg(){
+  const m = $id('fbMsg');
+  if (m) { m.textContent = ''; m.className = 'fb-msg'; }
+}
+
+function feedbackMsg(text, kind){
+  const m = $id('fbMsg');
+  if (!m) return;
+  m.textContent = text;
+  m.className = 'fb-msg ' + (kind || 'err');
+}
+
+function buildFeedbackText(typeLabel, message){
+  const name = ($id('clientName') || {}).value || '';
+  const phone = ($id('phone') || {}).value || '';
+  return 'Friska Wellness — Client Feedback\n' +
+         'Name: ' + name + '\n' +
+         'Phone: ' + phone + '\n' +
+         'Date: ' + todayStr() + '\n' +
+         'Type: ' + typeLabel + '\n\n' +
+         message;
+}
+
+async function submitFeedback(ev){
+
+  clearFeedbackMsg();
+
+  const sel = $id('fbType');
+  const ta  = $id('fbMessage');
+  const btn = $id('fbSubmitBtn');
+
+  const type = feedbackTypeById(sel ? sel.value : '');
+  const message = (ta ? ta.value : '').trim();
+
+  if (!type)    return feedbackMsg('Please choose a type of feedback.');
+  if (!message) return feedbackMsg('Please write your feedback before submitting.');
+
+  const phone = ($id('phone') || {}).value.trim();
+  const name  = ($id('clientName') || {}).value || '';
+  const text  = buildFeedbackText(type.label, message);
+  const waUrl = 'https://wa.me/' + type.phone + '?text=' + encodeURIComponent(text);
+
+  if (btn) btn.classList.add('loading');
+
+  let saved = false, saveErr = '';
+  try {
+    const p = new URLSearchParams();
+    p.append('action', 'submitFeedback');
+    p.append('payload', JSON.stringify({
+      phone: phone,
+      name: name,
+      type: type.label,
+      message: message,
+      sentTo: type.phone
+    }));
+
+    const res = await fetch(API_URL, { method: 'POST', body: p });
+    const txt = await res.text();
+
+    let r = null;
+    try { r = JSON.parse(txt); } catch (e) { r = null; }
+
+    if (r && r.ok) saved = true;
+    else saveErr = (r && r.message) ? r.message : 'could not be saved to our records';
+
+  } catch (e) {
+    saveErr = 'network error while saving';
+  }
+
+  if (btn) btn.classList.remove('loading');
+
+  // Try to open WhatsApp straight away. Browsers may block a popup opened after
+  // an await, so fall back to a button the client can tap.
+  let win = null;
+  try { win = window.open(waUrl, '_blank'); } catch (e) { win = null; }
+
+  showFeedbackDone(waUrl, saved, saveErr, !!win);
+}
+
+function showFeedbackDone(waUrl, saved, saveErr, opened){
+
+  const box = $id('feedbackBox');
+  if (!box) return;
+
+  box.dataset.sent = '1';
+
+  box.innerHTML =
+    '<div class="fb-done">' +
+      '<div class="fb-tick">✅</div>' +
+      '<h4>Thank you for your feedback</h4>' +
+      '<p>' +
+        (saved ? 'We have recorded it.' : 'We could not save it to our records (' + esc(saveErr) + '), but you can still send it on WhatsApp.') +
+        (opened ? ' WhatsApp should have opened in a new tab — press send there to deliver it.'
+                : ' Tap below to send it on WhatsApp.') +
+      '</p>' +
+      '<a class="wa-btn" href="' + waUrl + '" target="_blank" rel="noopener">Send on WhatsApp</a>' +
+      '<button class="btn secondary" style="margin-top:10px;" onclick="resetFeedbackForm()">Send another</button>' +
+    '</div>';
 }
 
 /* ========= WEEKLY MENU TAB (rendered from MENU, no extra request) ========= */

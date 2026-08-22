@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Friska — Kitchen Status</title>
+<script src="config.js"></script>
+<style>
+  :root{
+    --navy:#0a1a6e; --navy-deep:#08155a; --accent:#10b981; --accent-soft:#e7f7f1;
+    --bg:#eef2f9; --ink:#16213e; --muted:#6b7596; --line:#e2e7f1;
+    --radius:16px; --shadow:0 14px 40px rgba(20,33,62,0.12);
+  }
+  *{ box-sizing:border-box; }
+  body{
+    margin:0; background:var(--bg); color:var(--ink); min-height:100vh;
+    font-family:"Poppins",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    -webkit-text-size-adjust:100%;
+  }
+  .hero{ background:linear-gradient(135deg,var(--navy),#13278f); padding:18px 16px 44px; position:relative; overflow:hidden; }
+  .hero::after{ content:""; position:absolute; width:170px; height:170px; border-radius:50%;
+    background:rgba(16,185,129,.22); filter:blur(50px); bottom:-70px; left:-40px; }
+  .hero-in{ position:relative; z-index:1; display:flex; align-items:center; justify-content:space-between; gap:12px;
+    max-width:760px; margin:0 auto; }
+  .hero-brand{ display:flex; align-items:center; gap:10px; }
+  .hero-brand img{ width:40px; height:40px; object-fit:contain; background:#fff; border-radius:10px; padding:5px; }
+  .hero h1{ margin:0; font-size:16px; font-weight:700; color:#fff; }
+  .hero p{ margin:2px 0 0; font-size:11.5px; color:rgba(255,255,255,.72); }
+
+  .wrap{ max-width:760px; margin:0 auto; padding:0 14px 40px; }
+  .toolbar{ margin-top:-28px; position:relative; z-index:2; background:#fff; border-radius:var(--radius);
+    padding:12px; box-shadow:var(--shadow); display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .toolbar input[type=date]{ flex:1; min-width:150px; padding:11px 12px; border:1.5px solid var(--line);
+    border-radius:11px; font-size:15px; font-family:inherit; background:#fbfcfe; color:var(--ink); }
+  .toolbar input[type=date]:focus{ outline:none; border-color:var(--accent); box-shadow:0 0 0 3px rgba(16,185,129,.12); }
+
+  .btn{ border:none; border-radius:11px; padding:11px 16px; font-family:inherit; font-weight:700;
+    font-size:14px; cursor:pointer; background:var(--navy); color:#fff; box-shadow:0 5px 14px rgba(10,26,110,.18); }
+  .btn:active{ transform:scale(.98); background:var(--navy-deep); }
+  .btn.ghost{ background:#fff; color:var(--navy); border:1.5px solid var(--line); box-shadow:none; }
+  .btn:disabled{ opacity:.5; cursor:default; box-shadow:none; }
+
+  .status-line{ font-size:12.5px; color:var(--muted); margin:12px 2px 0; min-height:18px; }
+
+  .slot{ background:#fff; border-radius:var(--radius); box-shadow:var(--shadow); padding:16px; margin-top:14px;
+    border:1px solid rgba(226,231,241,.7); }
+  .slot-head{ display:flex; align-items:baseline; justify-content:space-between; gap:10px;
+    padding-bottom:10px; margin-bottom:12px; border-bottom:1.5px solid var(--line); }
+  .slot-name{ font-size:17px; font-weight:700; color:var(--navy); }
+  .slot-count{ font-size:12px; color:var(--muted); font-weight:500; }
+
+  .sub{ font-size:10.5px; font-weight:700; letter-spacing:.5px; text-transform:uppercase;
+    color:var(--muted); margin:2px 0 8px; }
+
+  .btn-row{ display:flex; gap:8px; flex-wrap:wrap; }
+  .sbtn{ flex:1; min-width:120px; border:1.5px solid var(--line); background:#fff; color:var(--ink);
+    border-radius:12px; padding:12px 8px; font-family:inherit; font-weight:700; font-size:13px; cursor:pointer;
+    display:flex; flex-direction:column; align-items:center; gap:3px; transition:all .15s; }
+  .sbtn .ic{ font-size:19px; }
+  .sbtn:active{ transform:scale(.97); }
+  .sbtn.on{ background:var(--accent); border-color:var(--accent); color:#fff; box-shadow:0 5px 14px rgba(16,185,129,.28); }
+  .sbtn.past{ background:var(--accent-soft); border-color:#bfe8db; color:#0b7a5a; }
+
+  .route{ border:1px solid var(--line); border-radius:13px; padding:12px; margin-top:10px; background:#fbfcfe; }
+  .route-head{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px; }
+  .route-name{ font-size:14.5px; font-weight:700; color:var(--navy); }
+  .route-count{ font-size:11.5px; color:var(--muted); font-weight:500; }
+  .chip{ font-size:10px; font-weight:700; letter-spacing:.4px; text-transform:uppercase;
+    padding:3px 9px; border-radius:999px; background:#eef1f7; color:var(--muted); white-space:nowrap; }
+  .chip.on{ background:var(--accent-soft); color:#0b7a5a; }
+
+  .agent-row{ display:flex; gap:7px; margin-bottom:9px; flex-wrap:wrap; }
+  .agent-row input{ flex:1; min-width:110px; padding:10px 11px; border:1.5px solid var(--line);
+    border-radius:10px; font-size:14px; font-family:inherit; background:#fff; color:var(--ink); }
+  .agent-row input:focus{ outline:none; border-color:var(--accent); box-shadow:0 0 0 3px rgba(16,185,129,.12); }
+  .agent-row button{ flex:none; padding:10px 14px; font-size:13px; }
+  .saved-note{ font-size:11px; color:#0b7a5a; font-weight:600; margin:-4px 0 8px; display:none; }
+
+  .empty{ text-align:center; color:var(--muted); padding:40px 14px; font-size:14px;
+    background:#fff; border-radius:var(--radius); box-shadow:var(--shadow); margin-top:14px; }
+
+  .toast{ position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--navy);
+    color:#fff; padding:11px 20px; border-radius:11px; font-size:13.5px; font-weight:600;
+    opacity:0; transition:opacity .3s; pointer-events:none; z-index:100; max-width:90%; text-align:center; }
+  .toast.show{ opacity:1; }
+
+  @media (max-width:520px){
+    .sbtn{ min-width:0; font-size:11.5px; padding:11px 4px; }
+    .sbtn .ic{ font-size:17px; }
+  }
+
+  .daybar{ background:#fff; border-radius:var(--radius); box-shadow:var(--shadow); padding:14px;
+    margin-top:14px; border:1px solid rgba(226,231,241,.7); }
+  .daybar .sub{ margin-top:0; }
+  .daybar .hint{ font-size:11.5px; color:var(--muted); margin-top:8px; line-height:1.5; }
+  .slot.done{ opacity:.62; }
+  .closed-tag{ font-size:10px; font-weight:700; letter-spacing:.4px; text-transform:uppercase;
+    background:#eef1f7; color:var(--muted); padding:3px 9px; border-radius:999px; white-space:nowrap; }
+  .meal-name{ font-size:17px; font-weight:700; color:var(--navy); }
+  .slot-sub{ font-size:11.5px; color:var(--muted); font-weight:500; }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="hero-in">
+    <div class="hero-brand">
+      <img src="logo.png" alt="Friska">
+      <div>
+        <h1>Kitchen Status</h1>
+        <p>Update what clients see</p>
+      </div>
+    </div>
+    <button class="btn ghost" onclick="load()">Refresh</button>
+  </div>
+</div>
+
+<div class="wrap">
+  <div class="toolbar">
+    <input type="date" id="date">
+    <button class="btn" id="loadBtn" onclick="load()">Load Day</button>
+  </div>
+  <div class="status-line" id="statusLine">Pick a date and press Load Day.</div>
+  <div id="board"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* Endpoint comes from config.js so a redeploy only needs editing there. */
+function cfgVal(name, fallback){
+  try {
+    const v = eval("typeof " + name + " !== 'undefined' ? " + name + " : undefined");
+    return (v === undefined || v === null || v === "") ? fallback : v;
+  } catch(e){ return fallback; }
+}
+const API = cfgVal("API_URL", "");
+
+/* Cooking is day-wide, Packaging is per slot, Dispatched is per route.
+   There is no Delivered step - nobody confirms delivery. */
+const META = {
+  'Cooking':    { icon:'\u{1F373}', label:'Cooking Started' },
+  'Packaging':  { icon:'\u{1F4E6}', label:'Packaging' },
+  'Dispatched': { icon:'\u{1F6F5}', label:'Dispatched' }
+};
+
+let BOARD = null;
+let busy = false;
+
+const dateEl = document.getElementById('date');
+const boardEl = document.getElementById('board');
+const lineEl = document.getElementById('statusLine');
+
+dateEl.valueAsDate = new Date();
+dateEl.addEventListener('click', () => { try{ dateEl.showPicker(); }catch(e){} });
+
+function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function attr(s){ return String(s==null?'':s).replace(/'/g,"\\'").replace(/"/g,'&quot;'); }
+
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 1900);
+}
+function setLine(msg){ lineEl.textContent = msg; }
+
+async function api(action, params){
+  if(!API) throw new Error('config.js did not load or has no API_URL');
+  const body = new URLSearchParams(Object.assign({ action }, params || {}));
+  const res = await fetch(API, { method:'POST', body });
+  const text = await res.text();
+  try { return JSON.parse(text); }
+  catch(e){ throw new Error('Server did not return JSON (HTTP ' + res.status + ')'); }
+}
+
+async function load(){
+  if(!dateEl.value){ setLine('Pick a date first.'); return; }
+  boardEl.innerHTML = '<div class="empty">Loading\u2026</div>';
+  setLine('Loading ' + dateEl.value + '\u2026');
+  try {
+    const r = await api('getKitchenBoard', { date: dateEl.value });
+    if(!r || !r.ok) throw new Error((r && r.message) || 'Could not load the day');
+    BOARD = r;
+    render();
+    const total = (r.slots||[]).reduce((s,x)=>s+x.clients,0);
+    setLine(total + ' client(s) across ' + (r.slots||[]).length + ' slot(s) on ' + r.date + '.');
+  } catch(err){
+    boardEl.innerHTML = '<div class="empty">Could not load.<br><span style="font-size:12px;opacity:.75;">'
+      + esc(err.message||err) + '</span></div>';
+    setLine('Error.');
+  }
+}
+
+function render(){
+  if(!BOARD || !BOARD.slots || !BOARD.slots.length){
+    boardEl.innerHTML = '<div class="empty">No orders for this date.</div>';
+    return;
+  }
+
+  /* ---- day-wide cooking ---- */
+  const cookCls = 'sbtn' + (BOARD.dayCooking ? ' on' : '');
+  const cookTime = BOARD.dayUpdated ? String(BOARD.dayUpdated).slice(11,16) : '';
+  const dayBar =
+    '<div class="daybar">'
+      + '<div class="sub">Whole day \u00b7 all slots</div>'
+      + '<div class="btn-row">'
+        + '<button class="'+cookCls+'" onclick="setStatus(\'__DAY__\',\'__ALL__\',\'Cooking\','+(BOARD.dayCooking?'true':'false')+')">'
+          + '<span class="ic">' + META.Cooking.icon + '</span>Cooking Started'
+          + (cookTime ? '<span style="font-size:10px;opacity:.8;">' + esc(cookTime) + '</span>' : '')
+        + '</button>'
+      + '</div>'
+      + '<div class="hint">Every client \u2014 morning, afternoon and evening \u2014 sees "Cooking" '
+        + 'as soon as this is on. Press again to undo.</div>'
+    + '</div>';
+
+  const slotsHtml = BOARD.slots.map(s => {
+
+    const closed = !!s.expired;
+
+    const packCls = 'sbtn' + (s.packaging ? ' on' : '');
+    const packBtn =
+      '<button class="'+packCls+'" onclick="setStatus(\'' + attr(s.slot) + '\',\'__ALL__\',\'Packaging\','+(s.packaging?'true':'false')+')">'
+        + '<span class="ic">' + META.Packaging.icon + '</span>' + esc(s.meal) + ' Packaging'
+      + '</button>';
+
+    const allDispatched = s.routes.length && s.routes.every(r => r.dispatched);
+    const allBtn =
+      '<button class="sbtn' + (allDispatched ? ' past' : '') + '" onclick="setStatus(\'' + attr(s.slot) + '\',\'ALL\',\'Dispatched\',false)">'
+        + '<span class="ic">' + META.Dispatched.icon + '</span>' + esc(s.meal) + ' Dispatched \u00b7 all'
+      + '</button>';
+
+    const routes = s.routes.map(r => {
+      const id = btoa(unescape(encodeURIComponent(s.slot + '|' + r.route))).replace(/=/g,'');
+      const chip = r.dispatched
+        ? '<span class="chip on">Dispatched</span>'
+        : (s.packaging ? '<span class="chip">Packing</span>'
+                       : (BOARD.dayCooking ? '<span class="chip">Cooking</span>' : '<span class="chip">Not started</span>'));
+
+      const dCls = 'sbtn' + (r.dispatched ? ' on' : '');
+      const dTime = r.updated ? String(r.updated).slice(11,16) : '';
+
+      return '<div class="route">'
+        + '<div class="route-head">'
+          + '<div><div class="route-name">' + esc(r.route) + '</div>'
+          + '<div class="route-count">' + r.clients + ' client(s)</div></div>'
+          + chip
+        + '</div>'
+        + '<div class="sub">Delivery partner</div>'
+        + '<div class="agent-row">'
+          + '<input type="text" id="an_' + id + '" placeholder="Name" value="' + attr(r.agentName) + '">'
+          + '<input type="tel" id="ap_' + id + '" inputmode="numeric" placeholder="Phone" value="' + attr(r.agentPhone) + '">'
+          + '<button class="btn ghost" onclick="saveAgent(\'' + attr(r.route) + '\',\'' + id + '\')">Save</button>'
+        + '</div>'
+        + '<div class="saved-note" id="sv_' + id + '">Saved</div>'
+        + '<div class="btn-row">'
+          + '<button class="'+dCls+'" onclick="setStatus(\'' + attr(s.slot) + '\',\'' + attr(r.route) + '\',\'Dispatched\','+(r.dispatched?'true':'false')+')">'
+            + '<span class="ic">' + META.Dispatched.icon + '</span>' + esc(s.meal) + ' Dispatched'
+            + (dTime ? '<span style="font-size:10px;opacity:.8;">' + esc(dTime) + '</span>' : '')
+          + '</button>'
+        + '</div>'
+      + '</div>';
+    }).join('');
+
+    return '<div class="slot' + (closed ? ' done' : '') + '">'
+      + '<div class="slot-head">'
+        + '<div><div class="meal-name">' + esc(s.meal) + '</div>'
+        + '<div class="slot-sub">' + esc(s.slot) + ' slot \u00b7 ' + s.clients + ' client(s)</div></div>'
+        + (closed ? '<span class="closed-tag">Closed \u00b7 resets ' + s.resetHour + ':00</span>'
+                  : '<span class="slot-count">clients see this live</span>')
+      + '</div>'
+      + '<div class="btn-row">' + packBtn + allBtn + '</div>'
+      + '<div class="sub" style="margin-top:16px;">Per delivery route</div>'
+      + routes
+    + '</div>';
+  }).join('');
+
+  boardEl.innerHTML = dayBar + slotsHtml;
+}
+
+/* pressing an active button again clears that level */
+async function setStatus(slot, route, status, isOn){
+  if(busy) return;
+  busy = true;
+  const send = isOn ? '' : status;
+  setLine('Updating\u2026');
+  try {
+    const r = await api('setKitchenStatus', { date: dateEl.value, slot, route, status: send });
+    if(!r || !r.ok) throw new Error((r && r.message) || 'Update failed');
+    if(r.board) { BOARD = r.board; render(); }
+    const what = (slot === '__DAY__') ? 'Cooking (whole day)'
+               : (route === '__ALL__' || route === 'ALL') ? (slot + ' \u00b7 all routes')
+               : (slot + ' \u00b7 ' + route);
+    toast(send ? (what + ' \u2192 ' + send) : (what + ' cleared'));
+    setLine(send ? ('Set ' + what + ' to ' + send + '.') : ('Cleared ' + what + '.'));
+  } catch(err){
+    toast('Failed: ' + (err.message || err));
+    setLine('Update failed.');
+  } finally { busy = false; }
+}
+
+async function saveAgent(route, id){
+  const name = (document.getElementById('an_' + id) || {}).value || '';
+  const phone = (document.getElementById('ap_' + id) || {}).value || '';
+  try {
+    const r = await api('saveDeliveryAgent', { route, name, agentPhone: phone });
+    if(!r || !r.ok) throw new Error((r && r.message) || 'Save failed');
+    const note = document.getElementById('sv_' + id);
+    if(note){ note.style.display = 'block'; setTimeout(()=>{ note.style.display='none'; }, 2200); }
+    toast('Saved for ' + route);
+    (BOARD.slots||[]).forEach(s => (s.routes||[]).forEach(x => {
+      if(x.route === route){ x.agentName = r.name; x.agentPhone = r.phone; }
+    }));
+  } catch(err){
+    toast('Save failed: ' + (err.message || err));
+  }
+}
+
+load();
+</script>
+
+</body>
+</html>
