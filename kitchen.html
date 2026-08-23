@@ -515,8 +515,7 @@
   // The browser can't send WhatsApp messages by itself — each one needs a real tap.
   // The queue removes the hunting: it walks the paused list one client at a time,
   // and auto-advances when you come back to this tab from WhatsApp.
-  const REMIND_MSG = "Hi! It looks like tomorrow meal choice hasn't been selected yet. Just checking if you'd like to add the meal please use the following link to post your meals- Yes sir. New link is updated. 
-https://friskawellness.com/client/index.html";
+  const REMIND_MSG = "Hi! It looks like tomorrow meal choice hasn't been selected yet. Just checking if you'd like to add the meal please use the following link to post your meals- Yes sir. New link is updated.https://friskawellness.com/client/index.html";
   let waSent = new Set();        // phone keys already reminded this session
   let waQueue = null;            // [{name, phone}] once the queue is started
   let waIdx = 0;
