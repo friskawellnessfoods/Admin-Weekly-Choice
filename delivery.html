@@ -206,6 +206,37 @@
   .lm .lm-row{ display:flex; gap:8px; margin-top:16px; flex-wrap:wrap; }
   .lm .lm-row .btn{ flex:1 1 auto; }
   .pac-container{ z-index:400 !important; }
+
+  /* ===== SLOT OVERVIEW ===== */
+  .ov-back{ position:fixed; inset:0; background:rgba(20,40,70,.45); z-index:350;
+    display:none; align-items:flex-start; justify-content:center; padding:14px; overflow:auto; }
+  .ov-back.on{ display:flex; }
+  .ov{ background:#fff; border-radius:var(--radius); width:100%; max-width:900px;
+    box-shadow:0 24px 60px rgba(20,40,70,.3); padding:18px; }
+  .ov-top{ display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:14px; }
+  .ov-top h3{ margin:0; font-size:18px; }
+  .ov-top .ov-meta{ font-size:12.5px; color:var(--c-muted); margin-top:3px; }
+  .ov-actions{ display:flex; gap:8px; flex-wrap:wrap; }
+  .ov-actions .btn{ padding:9px 14px; font-size:14px; }
+  .ovt{ width:100%; border-collapse:collapse; font-size:13px; }
+  .ovt th{ background:#f2f6fa; text-align:left; font-size:11px; text-transform:uppercase;
+    letter-spacing:.04em; color:var(--c-muted); padding:7px 8px; border:1px solid var(--c-line); }
+  .ovt td{ padding:6px 8px; border:1px solid var(--c-line); vertical-align:middle; }
+  .ovt td.n{ width:34px; text-align:center; color:var(--c-muted); }
+  .ovt tr.rt-first td{ border-top:2px solid #333; }
+  .ovt .nm{ font-weight:600; white-space:nowrap; }
+  .ovt .rt{ white-space:nowrap; font-weight:700; }
+
+  @media print {
+    body * { visibility: hidden !important; }
+    .ov-back, .ov-back * { visibility: visible !important; }
+    .ov-back{ position:absolute !important; inset:0 !important; display:block !important;
+      background:#fff !important; padding:0 !important; overflow:visible !important; }
+    .ov{ box-shadow:none !important; max-width:none !important; padding:0 !important; border-radius:0 !important; }
+    .ov-actions{ display:none !important; }
+    .ovt thead{ display:table-header-group; }
+    .ovt tr{ page-break-inside:avoid; }
+  }
 </style>
 </head>
 <body class="landing">
@@ -226,6 +257,22 @@
   <div id="content" class="content"></div>
 
   <div class="toast" id="toast"></div>
+
+  <div class="ov-back" id="ovModal">
+    <div class="ov">
+      <div class="ov-top">
+        <div>
+          <h3 id="ovTitle">Overview</h3>
+          <div class="ov-meta" id="ovMeta"></div>
+        </div>
+        <div class="ov-actions">
+          <button class="btn" onclick="window.print()">Download / Print</button>
+          <button class="btn alt" onclick="closeOverview()">Close</button>
+        </div>
+      </div>
+      <div id="ovBody"></div>
+    </div>
+  </div>
 
   <div class="lm-back" id="locModal">
     <div class="lm">
@@ -369,6 +416,7 @@ function openSlot(slot) {
   });
   html += `<div class="tile new-route" onclick="openNewRoute('${escapeAttr(slot)}')">➕ New Route</div>`;
   html += `</div>`;
+  html += `<button class="btn full" onclick="openOverview('${escapeAttr(slot)}')">📋 Overview — full ${escapeHtml(slot)} list</button>`;
   content.innerHTML = html;
 }
 
@@ -923,6 +971,65 @@ async function computeRouteTotal() {
     prev = x.coord;
   }
   routeTotalMeters = total;
+}
+
+/* ---- slot overview: every client in the slot, grouped by route ---- */
+function openOverview(slot) {
+
+  if (!slotGroups[slot]) { showToast('Load a date first'); return; }
+
+  const adhocNames = new Set(Object.values(routeAssign));
+  const routes = Object.keys(slotGroups[slot]).sort((a, b) => {
+    if (a === 'No Route') return 1; if (b === 'No Route') return -1;
+    const aa = adhocNames.has(a) ? 1 : 0, bb = adhocNames.has(b) ? 1 : 0;
+    if (aa !== bb) return aa - bb;
+    return a.localeCompare(b, undefined, { numeric: true });
+  });
+
+  let total = 0;
+  let rows = '';
+
+  routes.forEach(route => {
+    const list = slotGroups[slot][route].slice();
+
+    // if this route was auto-ordered in this session, keep that order
+    list.sort((a, b) => {
+      const as = parseInt(stopAssignments[a.phone]), bs = parseInt(stopAssignments[b.phone]);
+      const aH = !isNaN(as), bH = !isNaN(bs);
+      if (aH && bH) return as - bs;
+      if (aH) return -1;
+      if (bH) return 1;
+      return a.name.localeCompare(b.name);
+    });
+
+    list.forEach((c, i) => {
+      total++;
+      rows += `<tr${i === 0 ? ' class="rt-first"' : ''}>
+        <td class="n">${i + 1}</td>
+        <td class="nm">${escapeHtml(c.name)}${c.ovLoc ? ' *' : ''}</td>
+        <td>${escapeHtml(c.location || '')}</td>
+        <td>${escapeHtml(c.slot || '')}</td>
+        <td class="rt">${escapeHtml(route)}</td>
+      </tr>`;
+    });
+  });
+
+  document.getElementById('ovTitle').textContent = `${slot} — full list`;
+  document.getElementById('ovMeta').textContent =
+    `${dateEl.value} · ${total} client(s) · ${routes.length} route(s)` +
+    (Object.keys(routeAssign).length ? '  ·  * = address changed for this day' : '');
+
+  document.getElementById('ovBody').innerHTML = `
+    <table class="ovt">
+      <thead><tr><th>#</th><th>Name</th><th>Location</th><th>Slot</th><th>Route</th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="5">No clients.</td></tr>'}</tbody>
+    </table>`;
+
+  document.getElementById('ovModal').classList.add('on');
+}
+
+function closeOverview() {
+  document.getElementById('ovModal').classList.remove('on');
 }
 
 /* ---- one-day location override ---- */
