@@ -146,6 +146,32 @@
     .field{ flex:1 1 auto; }
     .status{ width:100%; margin:2px 0 0; } body.working .status{ margin-left:0; }
   }
+
+  .saveroute{ background:#f0f7f7; border:1px solid var(--c-primary); border-radius:var(--radius);
+    padding:10px; margin-bottom:12px; }
+  .saveroute .sr-row{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .saveroute input{ flex:1 1 160px; min-width:0; padding:11px 12px; border:1.5px solid var(--c-line);
+    border-radius:var(--radius); font-size:15px; background:var(--c-surface); color:var(--c-ink); }
+  .saveroute input:focus{ outline:none; border-color:var(--c-primary); box-shadow:0 0 0 3px rgba(14,165,163,.16); }
+  .saveroute .btn{ flex:0 0 auto; }
+  .saveroute .sr-note{ font-size:12px; color:var(--c-muted); margin-top:8px; line-height:1.5; }
+  .assigned-tag{ font-size:11px; font-weight:700; color:#fff; background:var(--c-primary);
+    padding:2px 8px; border-radius:999px; margin-left:6px; white-space:nowrap; }
+
+  .copybox{ background:var(--c-surface); border:1px solid var(--c-line); border-radius:var(--radius);
+    padding:12px 14px; margin-bottom:14px; box-shadow:var(--shadow); }
+  .copybox .cb-head{ display:flex; align-items:center; justify-content:space-between; gap:10px;
+    cursor:pointer; user-select:none; }
+  .copybox .cb-t{ font-size:14px; font-weight:800; color:var(--c-ink); }
+  .copybox .cb-s{ font-size:12px; color:var(--c-muted); margin-top:2px; }
+  .copybox .cb-arrow{ color:var(--c-muted); font-size:13px; flex:none; }
+  .copybox .cb-body{ margin-top:10px; border-top:1px solid var(--c-line); padding-top:10px; }
+  .copybox .cb-body.hide{ display:none; }
+  .cb-row{ display:flex; align-items:center; gap:10px; padding:8px 2px; border-bottom:1px solid var(--c-line); }
+  .cb-row:last-of-type{ border-bottom:none; }
+  .cb-row input{ width:19px; height:19px; accent-color:var(--c-primary); flex:none; }
+  .cb-row .cb-n{ font-weight:700; font-size:14px; }
+  .cb-row .cb-m{ font-size:12px; color:var(--c-muted); margin-left:auto; white-space:nowrap; }
 </style>
 </head>
 <body class="landing">
@@ -235,6 +261,8 @@ async function loadOrders() {
     });
     Object.values(slotGroups).forEach(routes => Object.values(routes).forEach(arr => arr.sort((a, b) => a.name.localeCompare(b.name))));
     currentSlot = null; currentView = null; stopAssignments = {};
+    await loadRouteAssignments();
+    await loadPrevRoutes();
     setStatus(allClients.length + ' clients loaded for ' + date + '.', false);
     renderSummary();
   } catch (err) {
@@ -256,19 +284,26 @@ function sortedSlots() {
 function renderSummary() {
   currentSlot = null; currentView = null; stopAssignments = {};
   const slots = sortedSlots();
-  let html = '<div class="section-title">Select Slot</div><div class="tiles">';
+  let html = '<div id="copyPanel"></div>';
+  html += '<div class="section-title">Select Slot</div><div class="tiles">';
   slots.forEach(slot => {
     const totalCount = Object.values(slotGroups[slot]).reduce((s, arr) => s + arr.length, 0);
     html += `<div class="tile" onclick="openSlot('${escapeAttr(slot)}')"><div class="route-name">${escapeHtml(slot)}</div><div class="route-count">${totalCount} client(s)</div></div>`;
   });
   html += '</div>';
   content.innerHTML = html;
+  renderCopyPanel();
 }
 
 function openSlot(slot) {
   currentSlot = slot; currentView = null; stopAssignments = {};
+  // standing routes from the Master list first (in number order), then any
+  // route created for today, then anything unrouted
+  const adhocNames = new Set(Object.values(routeAssign));
   const routes = Object.keys(slotGroups[slot]).sort((a, b) => {
     if (a === 'No Route') return 1; if (b === 'No Route') return -1;
+    const aa = adhocNames.has(a) ? 1 : 0, bb = adhocNames.has(b) ? 1 : 0;
+    if (aa !== bb) return aa - bb;
     return a.localeCompare(b, undefined, { numeric: true });
   });
   let html = `<span class="back-link" onclick="renderSummary()">← Back to slots</span>`;
@@ -339,6 +374,16 @@ function renderClientView(title) {
       <input type="text" id="newSearch" placeholder="Search client…" oninput="filterNewList()" autocomplete="off">
       <button class="btn secondary" onclick="clearSelection()">✕ Clear selection</button>
     </div>`;
+
+    html += `<div class="saveroute">
+      <div class="sr-row">
+        <input type="text" id="newRouteName" placeholder="Name this route, e.g. Porter 1" autocomplete="off">
+        <button class="btn" onclick="saveRouteForDay()">Save route for ${escapeHtml(dateEl.value)}</button>
+      </div>
+      <div class="sr-note">Saving makes this route appear in Kitchen Status for this date, so you can
+      add the rider's number and dispatch it — and the clients on it see that rider in their Order Status.
+      Their permanent route in the Master list is not changed.</div>
+    </div>`;
   }
   if (!isNew) {
     html += `<button class="btn secondary full" style="margin-bottom:10px;" onclick="toggleAddPanel()">➕ Add clients to this route</button>`;
@@ -361,7 +406,9 @@ function renderClientList(clients, withStopSelect) {
     }
     const distLine = (lastDistance[c.phone] != null && isFinite(lastDistance[c.phone]))
       ? `<div class="dist">${(lastDistance[c.phone] / 1000).toFixed(1)} km from previous stop</div>` : '';
-    html += `<div class="client-info"><div class="name">${escapeHtml(c.name)}</div><div class="meta">${escapeHtml(c.phone)} · ${escapeHtml(c.location)}</div>${distLine}</div>`;
+    const _ar = assignedRoute(c);
+    const _arTag = _ar ? `<span class="assigned-tag">${escapeHtml(_ar)}</span>` : '';
+    html += `<div class="client-info"><div class="name">${escapeHtml(c.name)}${_arTag}</div><div class="meta">${escapeHtml(c.phone)} · ${escapeHtml(c.location)}</div>${distLine}</div>`;
     if (withStopSelect) {
       const currentVal = stopAssignments[c.phone] || '-';
       html += `<div class="stop-dropdown" data-phone="${escapeAttr(c.phone)}"><div class="stop-dropdown-btn" onclick="toggleStopMenu(this, event)">${currentVal}</div></div>`;
@@ -378,6 +425,131 @@ function toggleCheck(phone, val) {
   refreshStopOptions();
   maybeRenderMessage();
   computeRouteTotal().then(() => maybeRenderMessage());
+}
+
+let routeAssign = {};        // 'Slot||phone' -> route name, for the loaded date
+let prevRoutes  = null;      // the most recent earlier day that had ad-hoc routes
+let copyOpen    = false;
+
+async function loadPrevRoutes() {
+  try {
+    const r = await apiPost('getPreviousRouteAssignments', { date: dateEl.value });
+    prevRoutes = (r && r.ok && r.found) ? r : null;
+  } catch (e) { prevRoutes = null; }
+}
+
+function renderCopyPanel() {
+  const host = document.getElementById('copyPanel');
+  if (!host) return;
+
+  if (!prevRoutes || !prevRoutes.routes || !Object.keys(prevRoutes.routes).length) {
+    host.innerHTML = '';
+    return;
+  }
+
+  const names = Object.keys(prevRoutes.routes).sort((a, b) =>
+    a.localeCompare(b, undefined, { numeric: true }));
+
+  const already = new Set(Object.values(routeAssign));
+
+  const rows = names.map(n => {
+    const list = prevRoutes.routes[n];
+    const slots = [...new Set(list.map(x => x.slot))].join(', ');
+    const done = already.has(n);
+    return `<label class="cb-row">
+      <input type="checkbox" value="${escapeAttr(n)}" ${done ? 'disabled' : ''}>
+      <span class="cb-n">${escapeHtml(n)}</span>
+      <span class="cb-m">${list.length} client(s) · ${escapeHtml(slots)}${done ? ' · already set' : ''}</span>
+    </label>`;
+  }).join('');
+
+  host.innerHTML = `<div class="copybox">
+    <div class="cb-head" onclick="toggleCopy()">
+      <div>
+        <div class="cb-t">Routes from ${escapeHtml(prevRoutes.date)}</div>
+        <div class="cb-s">${names.length} route(s) · tick the ones to reuse today</div>
+      </div>
+      <div class="cb-arrow">${copyOpen ? '▴' : '▾'}</div>
+    </div>
+    <div class="cb-body${copyOpen ? '' : ' hide'}" id="copyBody">
+      ${rows}
+      <button class="btn full" style="margin-top:10px" onclick="copySelectedRoutes()">Copy selected to ${escapeHtml(dateEl.value)}</button>
+    </div>
+  </div>`;
+}
+
+function toggleCopy() { copyOpen = !copyOpen; renderCopyPanel(); }
+
+async function copySelectedRoutes() {
+  const body = document.getElementById('copyBody');
+  if (!body) return;
+
+  const picked = [...body.querySelectorAll('input[type="checkbox"]:checked')].map(c => c.value);
+  if (!picked.length) { showToast('Tick at least one route'); return; }
+
+  setStatus('Copying routes…', true);
+  try {
+    const res = await apiPost('copyRouteAssignments', {
+      fromDate: prevRoutes.date,
+      toDate: dateEl.value,
+      routes: picked.join('||')
+    });
+
+    if (!res || !res.ok) { setStatus('Copy failed: ' + ((res && res.message) || 'unknown'), false); return; }
+
+    showToast(`Copied ${res.routes} route(s) · ${res.clients} client(s)`);
+    copyOpen = false;
+    await loadOrders();
+  } catch (err) {
+    setStatus('Copy failed: ' + err.message, false);
+  }
+}
+
+
+async function loadRouteAssignments() {
+  try {
+    const res = await apiPost('getRouteAssignments', { date: dateEl.value });
+    routeAssign = {};
+    if (res && res.ok && res.routes) {
+      Object.keys(res.routes).forEach(r => {
+        res.routes[r].forEach(x => { routeAssign[x.slot + '||' + x.phone] = r; });
+      });
+    }
+  } catch (e) { routeAssign = {}; }
+}
+
+function assignedRoute(c) {
+  return routeAssign[(c.slot || '') + '||' + String(c.phone || '')] || '';
+}
+
+async function saveRouteForDay() {
+  const nameEl = document.getElementById('newRouteName');
+  const name = (nameEl ? nameEl.value : '').trim();
+
+  if (!name) { showToast('Give the route a name first'); if (nameEl) nameEl.focus(); return; }
+
+  const picked = currentClients.filter(c => checkedClients[c.phone]);
+  if (!picked.length) { showToast('Tick at least one client'); return; }
+
+  setStatus('Saving route…', true);
+  try {
+    const res = await apiPost('saveRouteAssignment', {
+      date: dateEl.value,
+      slot: currentSlot,
+      route: name,
+      phones: picked.map(c => c.phone).join(',')
+    });
+
+    if (!res || !res.ok) { setStatus('Save failed: ' + ((res && res.message) || 'unknown'), false); return; }
+
+    showToast(`Saved "${name}" · ${picked.length} client(s)`);
+    setStatus(`"${name}" saved for ${dateEl.value}. It is now in Kitchen Status.`, false);
+
+    await loadRouteAssignments();
+    await loadOrders();            // regroup so the new route shows as its own tile
+  } catch (err) {
+    setStatus('Save failed: ' + err.message, false);
+  }
 }
 
 function clearSelection() {
