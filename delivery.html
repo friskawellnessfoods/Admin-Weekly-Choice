@@ -172,6 +172,40 @@
   .cb-row input{ width:19px; height:19px; accent-color:var(--c-primary); flex:none; }
   .cb-row .cb-n{ font-weight:700; font-size:14px; }
   .cb-row .cb-m{ font-size:12px; color:var(--c-muted); margin-left:auto; white-space:nowrap; }
+
+  .saveroute .sr-done{ font-size:12px; font-weight:700; color:var(--c-primary-d);
+    margin-top:8px; line-height:1.5; }
+
+  .client-card.on{ border-color:var(--c-primary); background:#f2fbfb;
+    box-shadow:0 2px 10px rgba(14,165,163,.14); }
+  .client-card.on .name{ color:var(--c-primary-d); }
+  .list-head{ display:flex; align-items:center; gap:8px; margin:12px 2px 6px; }
+  .list-head:first-child{ margin-top:0; }
+  .list-head .lh-t{ font-size:11.5px; font-weight:800; letter-spacing:.05em;
+    text-transform:uppercase; color:var(--c-muted); white-space:nowrap; }
+  .list-head .lh-line{ flex:1; height:1px; background:var(--c-line); }
+  .list-head.sel .lh-t{ color:var(--c-primary-d); }
+
+  .pen{ flex:none; background:none; border:none; cursor:pointer; font-size:15px;
+    color:var(--c-muted); padding:4px 6px; border-radius:8px; line-height:1; }
+  .pen:hover{ background:var(--c-bg); color:var(--c-primary-d); }
+  .loc-tag{ font-size:11px; font-weight:700; color:#fff; background:#7c3aed;
+    padding:2px 8px; border-radius:999px; margin-left:6px; white-space:nowrap; }
+  .lm-back{ position:fixed; inset:0; background:rgba(20,40,70,.45); z-index:300;
+    display:none; align-items:center; justify-content:center; padding:16px; }
+  .lm-back.on{ display:flex; }
+  .lm{ background:var(--c-surface); border-radius:var(--radius); width:100%; max-width:440px;
+    box-shadow:0 24px 60px rgba(20,40,70,.3); padding:18px; }
+  .lm h3{ margin:0 0 4px; font-size:17px; }
+  .lm .lm-sub{ font-size:12.5px; color:var(--c-muted); margin-bottom:14px; line-height:1.5; }
+  .lm label{ display:block; font-size:12px; font-weight:700; color:var(--c-muted); margin:0 0 6px; }
+  .lm input{ width:100%; padding:12px 13px; border:1.5px solid var(--c-line); border-radius:var(--radius);
+    font-size:15px; background:var(--c-surface); color:var(--c-ink); }
+  .lm input:focus{ outline:none; border-color:var(--c-primary); box-shadow:0 0 0 3px rgba(14,165,163,.16); }
+  .lm .lm-cur{ font-size:12.5px; color:var(--c-muted); margin-top:10px; line-height:1.5; }
+  .lm .lm-row{ display:flex; gap:8px; margin-top:16px; flex-wrap:wrap; }
+  .lm .lm-row .btn{ flex:1 1 auto; }
+  .pac-container{ z-index:400 !important; }
 </style>
 </head>
 <body class="landing">
@@ -192,6 +226,21 @@
   <div id="content" class="content"></div>
 
   <div class="toast" id="toast"></div>
+
+  <div class="lm-back" id="locModal">
+    <div class="lm">
+      <h3 id="lmName">Change location</h3>
+      <div class="lm-sub" id="lmSub"></div>
+      <label>New location for this day</label>
+      <input type="text" id="lmInput" placeholder="Start typing an address…" autocomplete="off">
+      <div class="lm-cur" id="lmCur"></div>
+      <div class="lm-row">
+        <button class="btn alt" onclick="closeLocModal()">Cancel</button>
+        <button class="btn alt" id="lmResetBtn" onclick="resetLocOverride()">Use default</button>
+        <button class="btn" onclick="saveLocOverride()">Save for this day</button>
+      </div>
+    </div>
+  </div>
 
 <script>
 const API = (typeof API_URL !== 'undefined') ? API_URL : '';
@@ -253,7 +302,9 @@ async function loadOrders() {
     ordersRes.clients.forEach(c => {
       const slot = String(c.slot || 'Unspecified').trim() || 'Unspecified';
       const route = String(c.route || '').trim() || 'No Route';
-      const clientObj = { phone:c.phone, name:c.name, location:c.location, slot, route, location1:c.location1 || '', location2:c.location2 || '' };
+      const clientObj = { phone:c.phone, name:c.name, location:c.location, slot, route, location1:c.location1 || '', location2:c.location2 || '', route1:c.route1 || '', route2:c.route2 || '',
+        baseLocation:c.location, ovLoc:c.overrideLocation || '', ovLat:(c.overrideLat==null?null:c.overrideLat), ovLng:(c.overrideLng==null?null:c.overrideLng), ovLink:c.overrideLink || '' };
+      if (clientObj.ovLoc) clientObj.location = clientObj.ovLoc;
       allClients.push(clientObj);
       if (!slotGroups[slot]) slotGroups[slot] = {};
       if (!slotGroups[slot][route]) slotGroups[slot][route] = [];
@@ -380,9 +431,11 @@ function renderClientView(title) {
         <input type="text" id="newRouteName" placeholder="Name this route, e.g. Porter 1" autocomplete="off">
         <button class="btn" onclick="saveRouteForDay()">Save route for ${escapeHtml(dateEl.value)}</button>
       </div>
-      <div class="sr-note">Saving makes this route appear in Kitchen Status for this date, so you can
-      add the rider's number and dispatch it — and the clients on it see that rider in their Order Status.
+      <div class="sr-note">Saved instantly — the list stays open so you can tick the next group.
+      The route appears in Kitchen Status for this date, where you add the rider's number and dispatch it.
       Their permanent route in the Master list is not changed.</div>
+      ${todaysRouteSummary() ? `<div class="sr-done">Created today: ${escapeHtml(todaysRouteSummary())}</div>` : ``}
+      <button class="btn secondary full" style="margin-top:10px" onclick="openSlot('${escapeAttr(currentSlot)}')">← Done, back to routes</button>
     </div>`;
   }
   if (!isNew) {
@@ -394,12 +447,58 @@ function renderClientView(title) {
   content.innerHTML = html;
 }
 
+/* While building a new route, ticked clients move to the top so it is obvious
+   who is already in. Numbered stops keep their order; everything else holds
+   its original position. */
+function sortForSelection(clients) {
+  if (currentView !== 'NEW') return clients;
+
+  const pos = {};
+  clients.forEach((c, i) => { pos[c.phone] = i; });
+
+  return clients.slice().sort((a, b) => {
+    const at = checkedClients[a.phone] ? 0 : 1;
+    const bt = checkedClients[b.phone] ? 0 : 1;
+    if (at !== bt) return at - bt;
+
+    const as = parseInt(stopAssignments[a.phone]);
+    const bs = parseInt(stopAssignments[b.phone]);
+    const aHas = !isNaN(as), bHas = !isNaN(bs);
+    if (aHas && bHas && as !== bs) return as - bs;
+    if (aHas && !bHas) return -1;
+    if (!aHas && bHas) return 1;
+
+    return pos[a.phone] - pos[b.phone];
+  });
+}
+
 function renderClientList(clients, withStopSelect) {
   if (!clients.length) return '<div class="empty-state">No clients here.</div>';
+
+  clients = sortForSelection(clients);
+
+  const grouping = (currentView === 'NEW') && withStopSelect;
+  const selCount = grouping ? clients.filter(c => checkedClients[c.phone]).length : 0;
+  let headedSelected = false, headedRest = false;
+
   let html = '';
   clients.forEach(c => {
+
+    if (grouping) {
+      const isOn = !!checkedClients[c.phone];
+      if (isOn && !headedSelected) {
+        headedSelected = true;
+        html += `<div class="list-head sel"><span class="lh-t">In this route · ${selCount}</span><span class="lh-line"></span></div>`;
+      }
+      if (!isOn && !headedRest) {
+        headedRest = true;
+        html += `<div class="list-head"><span class="lh-t">${selCount ? 'Everyone else' : 'Tap to add'}</span><span class="lh-line"></span></div>`;
+      }
+    }
+
+    const on  = withStopSelect && checkedClients[c.phone] ? ' on' : '';
     const off = withStopSelect && !checkedClients[c.phone] ? ' off' : '';
-    html += `<div class="client-card${off}">`;
+    html += `<div class="client-card${on}${off}">`;
     if (withStopSelect) {
       const chk = checkedClients[c.phone] ? 'checked' : '';
       html += `<input type="checkbox" class="route-check" ${chk} onchange="toggleCheck('${escapeAttr(c.phone)}', this.checked)">`;
@@ -408,7 +507,9 @@ function renderClientList(clients, withStopSelect) {
       ? `<div class="dist">${(lastDistance[c.phone] / 1000).toFixed(1)} km from previous stop</div>` : '';
     const _ar = assignedRoute(c);
     const _arTag = _ar ? `<span class="assigned-tag">${escapeHtml(_ar)}</span>` : '';
-    html += `<div class="client-info"><div class="name">${escapeHtml(c.name)}${_arTag}</div><div class="meta">${escapeHtml(c.phone)} · ${escapeHtml(c.location)}</div>${distLine}</div>`;
+    const _ovTag = c.ovLoc ? `<span class="loc-tag">today only</span>` : '';
+    html += `<div class="client-info"><div class="name">${escapeHtml(c.name)}${_arTag}${_ovTag}</div><div class="meta">${escapeHtml(c.phone)} · ${escapeHtml(c.location)}</div>${distLine}</div>`;
+    html += `<button class="pen" title="Change location for this day" onclick="openLocModal('${escapeAttr(c.phone)}','${escapeAttr(c.slot)}')">✏️</button>`;
     if (withStopSelect) {
       const currentVal = stopAssignments[c.phone] || '-';
       html += `<div class="stop-dropdown" data-phone="${escapeAttr(c.phone)}"><div class="stop-dropdown-btn" onclick="toggleStopMenu(this, event)">${currentVal}</div></div>`;
@@ -522,6 +623,64 @@ function assignedRoute(c) {
   return routeAssign[(c.slot || '') + '||' + String(c.phone || '')] || '';
 }
 
+/* the client's standing route from the Master list, used when a client is
+   taken back off a day route */
+function masterRouteOf(c) {
+  if (c.location && c.location2 && c.location === c.location2) return c.route2 || c.route1 || '';
+  return c.route1 || c.route2 || '';
+}
+
+/* rebuild slotGroups from allClients - no network call */
+function rebuildSlotGroups() {
+  slotGroups = {};
+  allClients.forEach(c => {
+    const slot  = c.slot || 'Unspecified';
+    const route = String(c.route || '').trim() || 'No Route';
+    if (!slotGroups[slot]) slotGroups[slot] = {};
+    if (!slotGroups[slot][route]) slotGroups[slot][route] = [];
+    slotGroups[slot][route].push(c);
+  });
+  Object.values(slotGroups).forEach(routes =>
+    Object.values(routes).forEach(arr => arr.sort((a, b) => a.name.localeCompare(b.name))));
+}
+
+/* apply a saved route to the data already in memory, so the screen updates
+   instantly and the whole day does not have to be fetched again */
+function applyAssignmentLocally(slot, route, phones) {
+  const picked = new Set(phones);
+
+  // anyone previously on this route who is no longer ticked comes off it
+  Object.keys(routeAssign).forEach(k => {
+    if (routeAssign[k] !== route) return;
+    if (k.indexOf(slot + '||') !== 0) return;
+    const ph = k.slice(slot.length + 2);
+    if (!picked.has(ph)) delete routeAssign[k];
+  });
+
+  phones.forEach(p => { routeAssign[slot + '||' + p] = route; });
+
+  // recompute every client in this slot from the assignments + Master
+  allClients.forEach(c => {
+    if (c.slot !== slot) return;
+    const ov = routeAssign[slot + '||' + c.phone];
+    c.route = ov || masterRouteOf(c) || 'No Route';
+  });
+
+  rebuildSlotGroups();
+}
+
+/* the day routes already created, for the little progress line */
+function todaysRouteSummary() {
+  const counts = {};
+  Object.keys(routeAssign).forEach(k => {
+    const r = routeAssign[k];
+    counts[r] = (counts[r] || 0) + 1;
+  });
+  const names = Object.keys(counts).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  if (!names.length) return '';
+  return names.map(n => `${n} (${counts[n]})`).join(' · ');
+}
+
 async function saveRouteForDay() {
   const nameEl = document.getElementById('newRouteName');
   const name = (nameEl ? nameEl.value : '').trim();
@@ -542,11 +701,20 @@ async function saveRouteForDay() {
 
     if (!res || !res.ok) { setStatus('Save failed: ' + ((res && res.message) || 'unknown'), false); return; }
 
-    showToast(`Saved "${name}" · ${picked.length} client(s)`);
-    setStatus(`"${name}" saved for ${dateEl.value}. It is now in Kitchen Status.`, false);
+    // written to the sheet AND folded into the data already loaded, so there is
+    // no second fetch - build the next route straight away
+    applyAssignmentLocally(currentSlot, name, picked.map(c => c.phone));
 
-    await loadRouteAssignments();
-    await loadOrders();            // regroup so the new route shows as its own tile
+    checkedClients = {};
+    stopAssignments = {};
+    lastDistance = {};
+    routeTotalMeters = null;
+
+    currentClients = Object.values(slotGroups[currentSlot] || {}).flat();
+    renderClientView(`${currentSlot} — New Route`);
+
+    showToast(`Saved "${name}" · ${picked.length} client(s)`);
+    setStatus(`"${name}" saved. Tick the next group, or go back to see the routes.`, false);
   } catch (err) {
     setStatus('Save failed: ' + err.message, false);
   }
@@ -657,6 +825,8 @@ async function ensureGeo() {
   } catch (e) { return {}; }
 }
 function coordForClient(c, g) {
+  // a one-day address wins for distance too
+  if (c && c.ovLoc && c.ovLat != null && c.ovLng != null) return { lat: c.ovLat, lng: c.ovLng };
   if (!g) return null;
   if (c.location && c.location2 && c.location === c.location2) return g.loc2 || g.loc1;
   return g.loc1 || g.loc2;
@@ -755,8 +925,138 @@ async function computeRouteTotal() {
   routeTotalMeters = total;
 }
 
+/* ---- one-day location override ---- */
+let lmClient = null, lmAuto = null, lmPicked = null;
+
+function findClient(phone, slot) {
+  return allClients.find(c => c.phone === phone && c.slot === slot) || null;
+}
+
+function openLocModal(phone, slot) {
+  const c = findClient(phone, slot);
+  if (!c) return;
+
+  lmClient = c;
+  lmPicked = null;
+
+  document.getElementById('lmName').textContent = c.name;
+  document.getElementById('lmSub').textContent =
+    `${slot} · this changes today\u2019s address only. Their saved address and their route stay as they are.`;
+  document.getElementById('lmCur').innerHTML = c.ovLoc
+    ? `Today: <b>${escapeHtml(c.ovLoc)}</b><br>Default: ${escapeHtml(c.baseLocation || '')}`
+    : `Default: <b>${escapeHtml(c.baseLocation || c.location || '')}</b>`;
+  document.getElementById('lmResetBtn').style.display = c.ovLoc ? '' : 'none';
+
+  const inp = document.getElementById('lmInput');
+  inp.value = '';
+  document.getElementById('locModal').classList.add('on');
+  setTimeout(() => inp.focus(), 60);
+
+  // build the Google picker once the Maps script is ready
+  if (window.google && google.maps && google.maps.places) {
+    if (!lmAuto) {
+      lmAuto = new google.maps.places.Autocomplete(inp, {
+        fields: ['formatted_address', 'name', 'geometry'],
+        componentRestrictions: { country: 'in' }
+      });
+      lmAuto.setBounds(new google.maps.LatLngBounds(
+        new google.maps.LatLng(KITCHEN.lat - 0.35, KITCHEN.lng - 0.35),
+        new google.maps.LatLng(KITCHEN.lat + 0.35, KITCHEN.lng + 0.35)));
+      lmAuto.addListener('place_changed', () => {
+        const pl = lmAuto.getPlace();
+        if (!pl || !pl.geometry) { lmPicked = null; return; }
+        const lat = pl.geometry.location.lat(), lng = pl.geometry.location.lng();
+        const label = [pl.name, pl.formatted_address].filter(Boolean).join(', ');
+        lmPicked = {
+          location: label,
+          lat: lat, lng: lng,
+          link: 'https://www.google.com/maps/search/?api=1&query=' + lat + ',' + lng
+        };
+      });
+    }
+  } else {
+    showToast('Maps still loading — try again in a moment');
+  }
+}
+
+function closeLocModal() {
+  document.getElementById('locModal').classList.remove('on');
+  lmClient = null; lmPicked = null;
+}
+
+async function saveLocOverride() {
+  if (!lmClient) return;
+
+  const typed = (document.getElementById('lmInput').value || '').trim();
+  if (!lmPicked && !typed) { showToast('Pick a location from the list'); return; }
+
+  // typed but never chosen from the dropdown: keep the text, no coordinates
+  const payload = lmPicked || { location: typed, lat: '', lng: '', link: '' };
+
+  setStatus('Saving location…', true);
+  try {
+    const res = await apiPost('saveLocationOverride', {
+      date: dateEl.value,
+      slot: lmClient.slot,
+      phone: lmClient.phone,
+      location: payload.location,
+      lat: payload.lat === '' ? '' : payload.lat,
+      lng: payload.lng === '' ? '' : payload.lng,
+      link: payload.link || ''
+    });
+
+    if (!res || !res.ok) { setStatus('Save failed: ' + ((res && res.message) || 'unknown'), false); return; }
+
+    applyLocOverrideLocally(lmClient, payload);
+    closeLocModal();
+    showToast('Location changed for today');
+    setStatus(`${lmClient ? '' : ''}Location updated. Re-run auto-order if you want the distances redone.`, false);
+  } catch (err) {
+    setStatus('Save failed: ' + err.message, false);
+  }
+}
+
+async function resetLocOverride() {
+  if (!lmClient) return;
+  setStatus('Restoring default…', true);
+  try {
+    const res = await apiPost('saveLocationOverride', {
+      date: dateEl.value, slot: lmClient.slot, phone: lmClient.phone,
+      location: '', lat: '', lng: '', link: ''
+    });
+    if (!res || !res.ok) { setStatus('Failed: ' + ((res && res.message) || 'unknown'), false); return; }
+
+    applyLocOverrideLocally(lmClient, null);
+    closeLocModal();
+    showToast('Back to their default address');
+    setStatus('Default address restored.', false);
+  } catch (err) {
+    setStatus('Failed: ' + err.message, false);
+  }
+}
+
+/* update in place - no refetch */
+function applyLocOverrideLocally(c, payload) {
+  if (payload) {
+    c.ovLoc  = payload.location;
+    c.ovLat  = (payload.lat === '' ? null : Number(payload.lat));
+    c.ovLng  = (payload.lng === '' ? null : Number(payload.lng));
+    c.ovLink = payload.link || '';
+    c.location = payload.location;
+  } else {
+    c.ovLoc = ''; c.ovLat = null; c.ovLng = null; c.ovLink = '';
+    c.location = c.baseLocation || c.location;
+  }
+
+  const cont = document.getElementById('clientListContainer');
+  if (cont) cont.innerHTML = renderClientList(currentClients, true);
+  refreshStopOptions();
+  maybeRenderMessage();
+}
+
 /* ---- message ---- */
 function linkForClient(c) {
+  if (c && c.ovLoc && c.ovLink) return c.ovLink;
   const g = geoMap && geoMap[c.phone];
   if (!g) return '';
   if (c.location && c.location2 && c.location === c.location2) return g.loc2Link || g.loc1Link || '';
@@ -828,7 +1128,7 @@ function escapeHtml(str) { return String(str).replace(/&/g, '&amp;').replace(/</
 function escapeAttr(str) { return String(str).replace(/'/g, "\\'"); }
 </script>
 
-<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCqVJgCfV0C1KBF0u1Jc02p_RHE7K7g1V8" async defer></script>
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCqVJgCfV0C1KBF0u1Jc02p_RHE7K7g1V8&libraries=places" async defer></script>
 
 </body>
 </html>
