@@ -693,10 +693,21 @@ function buildInvoice(meta,lines,t){
     <div class="footnote">*Please read all Terms &amp; Conditions on delivery timings, meal storage &amp; shelf life — refunds, substitutions &amp; cancellation policy on our website.</div>`;
 }
 function invoiceBlob(){return new Promise((resolve,reject)=>{html2canvas(el("invoice"),{scale:2,backgroundColor:"#ffffff"}).then(c=>c.toBlob(b=>b?resolve(b):reject(new Error("image failed")),"image/png")).catch(reject);});}
-async function sendWhatsApp(meta,t){
+function waPhone(p){const d=String(p||"").replace(/\D/g,"");if(!d)return "";return d.length>10?d.slice(-12):("91"+d.slice(-10));}
+function waMessage(client){return `Hi ${client||""}, your bill has been generated. Please process the payment at your earliest convenience. Thank you!`;}
+function showWaChatLink(statusId,meta){
+  const ph=waPhone(meta.phone);
+  const s=el(statusId);if(!s)return;
+  if(!ph){s.innerHTML=`Image ready. <span class="subtle">No phone on file — can't open the chat automatically.</span>`;s.className="status info";return;}
+  const url=`https://wa.me/${ph}?text=${encodeURIComponent(waMessage(meta.client))}`;
+  s.innerHTML=`Image shared. <a href="${url}" target="_blank" rel="noopener" style="color:var(--accent);font-weight:700">Open ${meta.client||"client"}'s WhatsApp chat →</a>`;
+  s.className="status ok";
+}
+async function sendWhatsApp(meta,t,statusId){
   const blob=await invoiceBlob();const file=new File([blob],`Bill_${meta.billNo}.png`,{type:"image/png"});
-  if(navigator.canShare&&navigator.canShare({files:[file]})){try{await navigator.share({files:[file]});return;}catch(e){if(e&&e.name==="AbortError")return;}} // share image only, no text
+  if(navigator.canShare&&navigator.canShare({files:[file]})){try{await navigator.share({files:[file]});if(statusId)showWaChatLink(statusId,meta);return;}catch(e){if(e&&e.name==="AbortError")return;}} // share image only, no text
   const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=file.name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1500);
+  if(statusId)showWaChatLink(statusId,meta);
 }
 
 /* rebuild invoice meta/lines/totals from an already-saved bill row — used for the dashboard download/delete menu */
@@ -1045,7 +1056,7 @@ el("n_addline").addEventListener("click",()=>{el("n_lines").insertAdjacentHTML("
 el("n_suggestno").addEventListener("click",async()=>{try{await fetchBills(true);suggestBillNo("n_billno","n_start");}catch(e){setStatus("n_status","Couldn't load Bills: "+e.message,"err");}});
 el("n_billdate").addEventListener("change",()=>refreshNum("n_billno","n_start"));
 el("n_save").addEventListener("click",async()=>{try{const meta=gatherNewMeta();const lines=readLines("n_lines");const t=computeTotals(lines,meta.discPct,meta.gstPct,0);await validateAndSave(meta,lines,t,"n_status");}catch(e){setStatus("n_status","Error: "+e.message,"err");}});
-el("n_wa").addEventListener("click",async()=>{try{const meta=gatherNewMeta();const lines=readLines("n_lines");const t=computeTotals(lines,meta.discPct,meta.gstPct,0);if(!await validateAndSave(meta,lines,t,"n_status"))return;buildInvoice(meta,lines,t);await sendWhatsApp(meta,t);}catch(e){setStatus("n_status","Error: "+e.message,"err");}});
+el("n_wa").addEventListener("click",async()=>{try{const meta=gatherNewMeta();const lines=readLines("n_lines");const t=computeTotals(lines,meta.discPct,meta.gstPct,0);if(!await validateAndSave(meta,lines,t,"n_status"))return;buildInvoice(meta,lines,t);await sendWhatsApp(meta,t,"n_status");}catch(e){setStatus("n_status","Error: "+e.message,"err");}});
 
 el("r_fetch").addEventListener("click",()=>runRenew(false));
 el("r_reload").addEventListener("click",()=>runRenew(true));
@@ -1062,7 +1073,7 @@ el("r_addline").addEventListener("click",()=>{el("r_nextlines").insertAdjacentHT
 el("r_billdate").addEventListener("change",()=>refreshNum("r_billno","r_start"));
 function gatherRenewMeta(){const p=renewCtx.prev;return {billNo:el("r_billno").value.trim(),billDate:readDate("r_billdate")||dateOnly(new Date()),client:p.client||"",phone:p.phone||"",plan:p.plan,duration:p.duration,slots:p.slots,days:parseInt(el("r_days").value)||26,start:readDate("r_start"),end:readDate("r_end"),discPct:parseFloat(el("r_disc").value)||0,gstPct:parseFloat(el("r_gst").value)||5,paidStatus:"Unpaid"};}
 el("r_save").addEventListener("click",async()=>{try{if(!renewCtx)return;const meta=gatherRenewMeta();const lines=readLines("r_nextlines");const t=computeTotals(lines,meta.discPct,meta.gstPct,renewAdj());await validateAndSave(meta,lines,t,"r_status2");}catch(e){setStatus("r_status2","Error: "+e.message,"err");}});
-el("r_wa").addEventListener("click",async()=>{try{if(!renewCtx)return;const meta=gatherRenewMeta();const lines=readLines("r_nextlines");const t=computeTotals(lines,meta.discPct,meta.gstPct,renewAdj());if(!await validateAndSave(meta,lines,t,"r_status2"))return;buildInvoice(meta,lines,t);await sendWhatsApp(meta,t);}catch(e){setStatus("r_status2","Error: "+e.message,"err");}});
+el("r_wa").addEventListener("click",async()=>{try{if(!renewCtx)return;const meta=gatherRenewMeta();const lines=readLines("r_nextlines");const t=computeTotals(lines,meta.discPct,meta.gstPct,renewAdj());if(!await validateAndSave(meta,lines,t,"r_status2"))return;buildInvoice(meta,lines,t);await sendWhatsApp(meta,t,"r_status2");}catch(e){setStatus("r_status2","Error: "+e.message,"err");}});
 
 el("u_fetch").addEventListener("click",()=>runUsageCheck(false));
 el("u_reload").addEventListener("click",()=>runUsageCheck(true));
