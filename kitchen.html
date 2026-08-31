@@ -177,6 +177,44 @@
   .view{ display:none; }
   .view.active{ display:block; }
 
+  /* ===== HAMBURGER MENU (fixed, works in both landing and working states) ===== */
+  .menu-wrap{ position:fixed; top:12px; right:12px; z-index:1000; }
+  .menu-btn{ width:42px; height:42px; border-radius:12px; border:1.5px solid var(--c-line);
+    background:var(--c-surface); display:flex; flex-direction:column; align-items:center;
+    justify-content:center; gap:4px; cursor:pointer; box-shadow:var(--shadow); }
+  .menu-btn i{ display:block; width:18px; height:2px; background:var(--c-ink); border-radius:2px; }
+  .menu-drop{ display:none; position:absolute; top:50px; right:0; min-width:190px;
+    background:var(--c-surface); border:1px solid var(--c-line); border-radius:12px;
+    box-shadow:var(--shadow); overflow:hidden; }
+  .menu-drop.show{ display:block; }
+  .menu-drop button{ display:block; width:100%; text-align:left; border:0; background:none;
+    padding:12px 16px; font-size:14px; font-weight:600; color:var(--c-ink); cursor:pointer; }
+  .menu-drop button:hover{ background:#f1f5f9; }
+
+  /* ===== CUSTOM TAGS PANEL ===== */
+  .ct{ position:fixed; inset:0; z-index:1100; background:var(--c-bg); overflow-y:auto; display:none; }
+  .ct.show{ display:block; }
+  .ct-bar{ position:sticky; top:0; z-index:2; background:var(--c-surface);
+    border-bottom:1px solid var(--c-line); padding:10px 14px;
+    display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .ct-bar h3{ margin:0 8px 0 0; font-size:16px; font-weight:800; }
+  .ct-bar .btn{ padding:9px 14px; font-size:14px; }
+  .ct-body{ max-width:640px; margin:0 auto; padding:16px 14px 40px; }
+  .ct-row{ background:var(--c-surface); border-radius:12px; box-shadow:var(--shadow);
+    padding:12px; margin-bottom:12px; }
+  .ct-row .fld{ margin-bottom:9px; }
+  .ct-row label{ display:block; font-size:12px; font-weight:700; color:var(--c-muted); margin-bottom:4px; }
+  .ct-row input{ width:100%; border:1.5px solid var(--c-line); border-radius:10px; padding:9px 11px;
+    font-size:14px; font-family:inherit; color:var(--c-ink); outline:none; background:#fff; }
+  .ct-row input:focus{ border-color:var(--c-primary); box-shadow:0 0 0 3px rgba(14,165,163,.16); }
+  .ct-row .two{ display:flex; gap:9px; }
+  .ct-row .two .fld{ flex:1; }
+  .ct-del{ border:0; background:none; color:#c62828; font-size:12.5px; font-weight:700;
+    cursor:pointer; padding:2px 0; }
+  .ct-note{ font-size:12.5px; color:var(--c-muted); margin:0 0 12px; line-height:1.45; }
+  .ct-err{ font-size:13px; color:#c62828; font-weight:600; margin:8px 0; }
+  .ct-count{ font-size:13px; color:var(--c-muted); text-align:center; margin:14px 0 10px; }
+
   /* ---------- TAGS ---------- */
   .pages{ padding:18px; display:flex; flex-direction:column; align-items:center; gap:18px; }
   .page{
@@ -380,6 +418,7 @@
     .ov-actions{ display:none !important; }
     .pause-toggle{ display:none; }
     .wa-queue{ display:none !important; }
+    .menu-wrap, .ct{ display:none !important; }
     a.wa-btn, td.wa-cell{ display:none; }
     table.client{ -webkit-print-color-adjust:exact; print-color-adjust:exact; }
     table.client tr{ page-break-inside:avoid; }
@@ -414,6 +453,31 @@
       <button id="refresh" class="btn alt" disabled>Refresh</button>
       <button id="pdf" class="btn alt" disabled>Download Kitchen List PDF</button>
       <span class="status" id="status"><span class="spinner"></span><span id="statusText">Pick a date to begin.</span></span>
+    </div>
+  </div>
+
+  <div class="menu-wrap" id="menuWrap">
+    <button class="menu-btn" id="menuBtn" aria-label="Menu"><i></i><i></i><i></i></button>
+    <div class="menu-drop" id="menuDrop">
+      <button id="miCustomTags">Custom Tags</button>
+    </div>
+  </div>
+
+  <div class="ct" id="ctPanel">
+    <div class="ct-bar">
+      <h3>Custom Tags</h3>
+      <button class="btn alt" id="ctAdd">Add item</button>
+      <button class="btn" id="ctMake">Generate</button>
+      <button class="btn alt" id="ctPdf" disabled>Download PDF</button>
+      <button class="btn alt" id="ctClose" style="margin-left:auto">Close</button>
+    </div>
+    <div class="ct-body">
+      <p class="ct-note">Dish name and number of tags are required; type and remark are optional.
+        Tags come out identical to the kitchen-list meal tags, 10 per A4 page.</p>
+      <div id="ctRows"></div>
+      <div id="ctErr" class="ct-err" style="display:none"></div>
+      <div id="ctCount" class="ct-count"></div>
+      <div id="ctPreview" class="pages" style="padding:0"></div>
     </div>
   </div>
 
@@ -708,6 +772,10 @@
     const heroSub = document.querySelector('.hero-sub');
     if(heroSub) heroSub.style.display = 'none';
 
+    // the hamburger menu is not part of the one-tap kitchen flow
+    const mw = document.getElementById('menuWrap');
+    if(mw) mw.style.display = 'none';
+
     // Meal Overview isn't offered in this flow
     const ovBtn = document.getElementById('tabOverviewBtn');
     if(ovBtn) ovBtn.style.display = 'none';
@@ -765,6 +833,145 @@
   }
 
   setupAutoMode();
+
+  // land with today's date already filled in — still fully changeable
+  if(!isAutoMode && !dateEl.value){
+    dateEl.value = todayLocalStr();
+    pdfBtn.disabled = false;
+    setStatus('Press Generate to build the lists for today.', false);
+  }
+
+  // ============================================================
+  //  MENU + CUSTOM TAGS
+  //  Ad-hoc tags (staff meals, samples, testing) printed with the exact
+  //  same tag layout as the kitchen list, without touching any sheet.
+  // ============================================================
+  const menuDrop = document.getElementById('menuDrop');
+  document.getElementById('menuBtn').addEventListener('click', e => {
+    e.stopPropagation(); menuDrop.classList.toggle('show');
+  });
+  document.addEventListener('click', () => menuDrop.classList.remove('show'));
+
+  const ctPanel   = document.getElementById('ctPanel');
+  const ctRowsEl  = document.getElementById('ctRows');
+  const ctPreview = document.getElementById('ctPreview');
+  const ctErr     = document.getElementById('ctErr');
+  const ctCount   = document.getElementById('ctCount');
+  const ctPdfBtn  = document.getElementById('ctPdf');
+
+  function ctAddRow(){
+    const row = document.createElement('div'); row.className = 'ct-row';
+    row.innerHTML =
+      '<div class="fld"><label>Dish name *</label>' +
+        '<input class="ct-dish" type="text" placeholder="e.g. Grilled Chicken Salad"></div>' +
+      '<div class="two">' +
+        '<div class="fld"><label>Type</label>' +
+          '<input class="ct-type" type="text" placeholder="optional"></div>' +
+        '<div class="fld"><label>No. of tags *</label>' +
+          '<input class="ct-qty" type="number" min="1" max="300" value="10"></div>' +
+      '</div>' +
+      '<div class="fld"><label>Remark</label>' +
+        '<input class="ct-remark" type="text" placeholder="optional"></div>';
+    const del = document.createElement('button');
+    del.className = 'ct-del'; del.textContent = 'Remove';
+    del.addEventListener('click', () => {
+      row.remove();
+      if(!ctRowsEl.children.length) ctAddRow();
+    });
+    row.appendChild(del);
+    ctRowsEl.appendChild(row);
+  }
+
+  function ctShowErr(msg){ ctErr.textContent = msg; ctErr.style.display = msg ? 'block' : 'none'; }
+
+  function ctCollect(){
+    const items = [];
+    ctRowsEl.querySelectorAll('.ct-row').forEach(r => {
+      items.push({
+        dish:    r.querySelector('.ct-dish').value.trim(),
+        type:    r.querySelector('.ct-type').value.trim(),
+        remarks: r.querySelector('.ct-remark').value.trim(),
+        qty:     parseInt(r.querySelector('.ct-qty').value, 10)
+      });
+    });
+    return items;
+  }
+
+  document.getElementById('miCustomTags').addEventListener('click', () => {
+    menuDrop.classList.remove('show');
+    if(!ctRowsEl.children.length) ctAddRow();
+    ctPanel.classList.add('show');
+  });
+  document.getElementById('ctClose').addEventListener('click', () => ctPanel.classList.remove('show'));
+  document.getElementById('ctAdd').addEventListener('click', ctAddRow);
+
+  document.getElementById('ctMake').addEventListener('click', () => {
+    const items = ctCollect();
+    ctShowErr('');
+    if(!items.length){ ctShowErr('Add at least one item.'); return; }
+    for(const it of items){
+      if(!it.dish){ ctShowErr('Dish name is required on every item.'); return; }
+      if(!it.qty || it.qty < 1){ ctShowErr('Number of tags must be at least 1 for "' + it.dish + '".'); return; }
+    }
+
+    // buildTag() is the same function the kitchen list uses, so a custom tag is
+    // byte-for-byte the same layout — no second renderer to keep in sync.
+    const els = [];
+    items.forEach(it => {
+      for(let i = 0; i < it.qty; i++){
+        els.push(buildTag({ dish:it.dish, type:it.type, remarks:it.remarks,
+                            kind:'meal', clientName:'', slot:'' }));
+      }
+    });
+
+    ctPreview.innerHTML = '';
+    paginateInto(ctPreview, els);
+    fitInners(ctPreview);
+    const pages = ctPreview.querySelectorAll('.page').length;
+    ctCount.textContent = els.length + ' tag' + (els.length > 1 ? 's' : '') +
+                          ' across ' + pages + ' page' + (pages > 1 ? 's' : '') + '.';
+    ctPdfBtn.disabled = false;
+  });
+
+  ctPdfBtn.addEventListener('click', async () => {
+    if(!ctPreview.querySelector('.page')) return;
+    if(!window.jspdf || !window.html2canvas){
+      ctShowErr('PDF libraries not loaded — check your connection.'); return;
+    }
+    ctPdfBtn.disabled = true;
+    ctShowErr('');
+    await holdWake();
+    showOverlay('Building custom tags PDF\u2026');
+
+    const stage = document.createElement('div');
+    stage.style.cssText = 'position:absolute; left:-99999px; top:0; background:#fff;';
+    document.body.appendChild(stage);
+
+    try{
+      const pagesC = document.createElement('div');
+      pagesC.className = 'pages';
+      pagesC.style.cssText = 'padding:0; gap:0;';
+      stage.appendChild(pagesC);
+      ctPreview.querySelectorAll('.page').forEach(pg => pagesC.appendChild(pg.cloneNode(true)));
+      pagesC.querySelectorAll('.inner').forEach(fitInnerSync);
+      await waitForImages(pagesC);
+
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
+      let first = true;
+      for(const page of pagesC.querySelectorAll('.page')){
+        const c = await html2canvas(page, { scale:PDF_SCALE, useCORS:true, backgroundColor:'#ffffff' });
+        if(!first) pdf.addPage('a4', 'portrait');
+        first = false;
+        pdf.addImage(c.toDataURL('image/jpeg', 0.96), 'JPEG', 0, 0, 210, 297);
+      }
+      pdf.save('Custom_Tags_' + todayLocalStr() + '.pdf');
+    }catch(e){
+      ctShowErr('PDF error: ' + e.message);
+    }finally{
+      stage.remove(); hideOverlay(); dropWake(); ctPdfBtn.disabled = false;
+    }
+  });
 
 
   // ---- tabs ----
