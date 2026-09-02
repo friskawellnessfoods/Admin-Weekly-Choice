@@ -185,7 +185,7 @@
       <div class="grid g3" style="margin-top:16px">
         <div class="field"><label>Bill no.</label><input id="n_billno" /></div>
         <div class="field"><label>Bill date</label><input id="n_billdate" type="date" onclick="this.showPicker&&this.showPicker()" /></div>
-        <div class="field"><label>&nbsp;</label><button class="btn btn-ghost" id="n_suggestno" style="width:100%">Refresh no.</button></div>
+        <div class="field"><label>&nbsp;</label><div style="display:flex;gap:8px"><button class="btn btn-ghost" id="n_suggestno" style="flex:1">Refresh no.</button><button class="btn btn-ghost" id="n_clear" style="flex:1">Clear form</button></div></div>
       </div>
       <div class="actions">
         <button class="btn btn-ghost" id="n_save">Save to sheet</button>
@@ -778,7 +778,7 @@ async function validateAndSave(meta,lines,t,statusId){
   if(res&&res.ok){
     if(billsCache&&billsCache.length){const headers=billsCache[0].map(h=>String(h).trim());billsCache.push(headers.map(h=>(h in obj)?obj[h]:""));} // keep cache live so the next number advances
     setStatus(statusId,`Saved bill ${meta.billNo}.`,"ok");
-    if(statusId==="n_status")suggestBillNo("n_billno","n_start");
+    if(statusId==="n_status"){resetNewBill();setStatus(statusId,`Saved bill ${meta.billNo}. Form cleared for the next bill.`,"ok");}
     else if(statusId==="r_status2")suggestBillNo("r_billno","r_start");
     return true;
   }
@@ -789,8 +789,28 @@ async function validateAndSave(meta,lines,t,statusId){
 function followDismissed(){try{return JSON.parse(localStorage.getItem("friska_follow_dismiss")||"{}");}catch(e){return {};}}
 function followDismissSave(o){try{localStorage.setItem("friska_follow_dismiss",JSON.stringify(o));}catch(e){}}
 function openRenewFor(name){switchTab("renew");el("r_client").value=name;runRenew(false);}
+function resetNewBill(){
+  el("n_client").value="";
+  el("n_phone").value="";
+  el("n_phoneSel").classList.add("hidden");el("n_phoneSel").innerHTML="";
+  el("n_clientNames").innerHTML="";
+  el("n_planPanel").querySelectorAll("input").forEach(c=>{c.checked=(c.value==="nb");});
+  updatePlanHead();
+  el("n_dur").value="m";
+  el("n_days").value=DUR_DAYS.m;el("n_days").setAttribute("readonly","readonly");
+  el("n_people").value=1;
+  el("n_start").value="";el("n_end").value="";
+  el("n_items").querySelectorAll("input").forEach(c=>{c.checked=false;c.closest(".chk").classList.remove("on");});
+  el("n_slots").querySelectorAll("input").forEach(c=>{c.checked=false;c.closest(".chk").classList.remove("on");});
+  el("n_km").value=0;el("n_delprice").value=0;
+  el("n_disc").value=0;el("n_gst").value=5;
+  el("n_billdate").value=keyOf(dateOnly(new Date()));
+  nRender(true,true,true);
+  suggestBillNo("n_billno","n_start");
+}
 function openNewBillFor(name,phone,dateKey){
   switchTab("new");
+  resetNewBill();
   el("n_client").value=name;
   onClientNameChange();
   if(phone)el("n_phone").value=phone;
@@ -1055,6 +1075,7 @@ bindLivePrice("n_lines",recalcNew);
 el("n_addline").addEventListener("click",()=>{el("n_lines").insertAdjacentHTML("beforeend",lineRowHtml({id:"custom_"+Date.now(),label:"Custom item",qty:0,rate:0,food:true,custom:true}));recalcNew();});
 el("n_suggestno").addEventListener("click",async()=>{try{await fetchBills(true);suggestBillNo("n_billno","n_start");}catch(e){setStatus("n_status","Couldn't load Bills: "+e.message,"err");}});
 el("n_billdate").addEventListener("change",()=>refreshNum("n_billno","n_start"));
+el("n_clear").addEventListener("click",()=>{resetNewBill();setStatus("n_status","Form cleared.","info");});
 el("n_save").addEventListener("click",async()=>{try{const meta=gatherNewMeta();const lines=readLines("n_lines");const t=computeTotals(lines,meta.discPct,meta.gstPct,0);await validateAndSave(meta,lines,t,"n_status");}catch(e){setStatus("n_status","Error: "+e.message,"err");}});
 el("n_wa").addEventListener("click",async()=>{try{const meta=gatherNewMeta();const lines=readLines("n_lines");const t=computeTotals(lines,meta.discPct,meta.gstPct,0);if(!await validateAndSave(meta,lines,t,"n_status"))return;buildInvoice(meta,lines,t);await sendWhatsApp(meta,t,"n_status");}catch(e){setStatus("n_status","Error: "+e.message,"err");}});
 
