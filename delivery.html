@@ -313,7 +313,15 @@ const goBtn      = document.getElementById('go');
 const statusEl   = document.getElementById('status');
 const statusText = document.getElementById('statusText');
 
-dateEl.valueAsDate = new Date();
+/* Local date, not valueAsDate: that setter reads the date in UTC, so in IST
+   anything before 05:30 would open on yesterday. */
+function todayLocalYmd(){
+  const n = new Date();
+  return n.getFullYear() + '-' +
+    String(n.getMonth() + 1).padStart(2, '0') + '-' +
+    String(n.getDate()).padStart(2, '0');
+}
+dateEl.value = todayLocalYmd();
 
 function setStatus(msg, busy){ statusText.textContent = msg; statusEl.classList.toggle('busy', !!busy); }
 function showToast(msg){ const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 1800); }
