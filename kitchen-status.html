@@ -176,7 +176,7 @@
         <p>Update what clients see</p>
       </div>
     </div>
-    <button class="btn ghost" onclick="load(true)">Refresh</button>
+    <button class="btn ghost" onclick="refreshDay()">Refresh</button>
   </div>
 </div>
 
@@ -221,7 +221,15 @@ const dateEl = document.getElementById('date');
 const boardEl = document.getElementById('board');
 const lineEl = document.getElementById('statusLine');
 
-dateEl.valueAsDate = new Date();
+/* Local date, not valueAsDate: that setter reads the date in UTC, so in IST
+   anything before 05:30 would open on yesterday. */
+function todayLocalYmd(){
+  const n = new Date();
+  return n.getFullYear() + '-' +
+    String(n.getMonth() + 1).padStart(2, '0') + '-' +
+    String(n.getDate()).padStart(2, '0');
+}
+dateEl.value = todayLocalYmd();
 dateEl.addEventListener('click', () => { try{ dateEl.showPicker(); }catch(e){} });
 
 function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
@@ -249,6 +257,11 @@ async function api(action, params){
   const text = await res.text();
   try { return JSON.parse(text); }
   catch(e){ throw new Error('Server did not return JSON (HTTP ' + res.status + ')'); }
+}
+
+function refreshDay(){
+  if (!BOARD) { setLine('Press Load Day first.'); return; }
+  load(true);
 }
 
 async function load(force){
@@ -513,7 +526,13 @@ async function saveAgent(route){
   }
 }
 
-load();
+/* Nothing is fetched until Load Day is pressed. */
+setLine('Pick a date and press Load Day.');
+boardEl.innerHTML =
+  '<div class="empty">' +
+    '<div style="font-size:30px; margin-bottom:8px;">\u{1F4C5}</div>' +
+    'Choose a date above and press <b>Load Day</b>.' +
+  '</div>';
 </script>
 
 </body>
