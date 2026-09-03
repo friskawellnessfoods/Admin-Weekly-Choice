@@ -55,6 +55,20 @@
   .toggle{ display:inline-flex; align-items:center; gap:7px; font-size:13px; color:var(--c-muted); cursor:pointer; }
   .toggle input{ width:16px; height:16px; accent-color:var(--c-primary); cursor:pointer; }
 
+  /* audience source + slot chips */
+  .seg{ display:flex; border:1.5px solid var(--c-line); border-radius:var(--radius); overflow:hidden; width:100%; }
+  .seg button{ flex:1; border:0; background:var(--c-surface); color:var(--c-muted); font-size:13.5px;
+    font-weight:700; padding:10px 8px; cursor:pointer; }
+  .seg button.on{ color:#fff; background:linear-gradient(90deg,var(--grad-a),var(--grad-b)); }
+  .chips{ display:flex; gap:7px; flex-wrap:wrap; }
+  .chip{ border:1.5px solid var(--c-line); background:#f1f5f9; color:var(--c-muted); font-size:13px;
+    font-weight:700; padding:8px 14px; border-radius:999px; cursor:pointer; }
+  .chip.on{ color:#fff; border-color:transparent; background:linear-gradient(90deg,var(--grad-a),var(--grad-b)); }
+  input[type=date]{ border:1.5px solid var(--c-line); border-radius:var(--radius); padding:9px 11px;
+    font-size:14px; font-family:inherit; color:var(--c-ink); background:#fff; outline:none; }
+  input[type=date]:focus{ border-color:var(--c-primary); box-shadow:0 0 0 3px rgba(14,165,163,.16); }
+  .sublbl{ font-size:12px; font-weight:700; color:var(--c-muted); margin:12px 0 6px; }
+
   .list{ max-height:420px; overflow-y:auto; border:1px solid var(--c-line); border-radius:10px; margin-top:10px; }
   .cl{ display:flex; align-items:center; gap:10px; padding:9px 11px; border-bottom:1px solid #eef2f6; font-size:14px; }
   .cl:last-child{ border-bottom:0; }
@@ -100,9 +114,25 @@
 
   <div class="card">
     <h3>2. Recipients</h3>
-    <div class="row">
+    <div class="seg" id="srcSeg">
+      <button data-src="all" class="on">All active clients</button>
+      <button data-src="day">Active on a date</button>
+    </div>
+
+    <div id="dayOpts" style="display:none">
+      <div class="sublbl">Date</div>
+      <div class="row"><input type="date" id="dayDate" style="flex:1 1 160px"></div>
+      <div class="sublbl">Slots — tap to include</div>
+      <div class="chips" id="slotChips">
+        <button class="chip on" data-slot="Morning">Morning</button>
+        <button class="chip on" data-slot="Afternoon">Afternoon</button>
+        <button class="chip on" data-slot="Evening">Evening</button>
+      </div>
+    </div>
+
+    <div class="row" style="margin-top:12px">
       <button class="btn sm" id="load">Load clients</button>
-      <label class="toggle"><input type="checkbox" id="showInactive">Include inactive</label>
+      <label class="toggle" id="inactWrap"><input type="checkbox" id="showInactive">Include inactive</label>
       <span class="spacer"></span>
       <span class="count"><b id="selCount">0</b> selected</span>
     </div>
@@ -132,6 +162,7 @@
   let selected = new Set();    // phone keys
   let sent = new Set();        // phone keys already messaged in this campaign
   let queue = null, qIdx = 0, awaitingReturn = false;
+  let source = 'all';          // 'all' = master list, 'day' = clients with an order on a date
 
   const key = p => String(p || '').replace(/\D/g, '').slice(-10);
   const SENT_STORE = 'friska_broadcast_sent';
@@ -159,25 +190,85 @@
   const personalise = (tpl, name) =>
     String(tpl || '').replace(/\{\{\s*name\s*\}\}/gi, String(name || '').trim());
 
-  // ---- load the master client list ----
+  // ---- audience source ----------------------------------------------------
+  // 'all' -> every client on the Master Client List (status Active unless the
+  //          inactive box is ticked).
+  // 'day' -> only clients with a real order on the chosen date, from the same
+  //          getOrdersForDate the delivery list uses. One client can appear in
+  //          more than one slot, so slots are collected per client and deduped.
+  function todayStr(){
+    const d = new Date(), pad = n => String(n).padStart(2, '0');
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+  }
+
+  function setSource(src){
+    source = src;
+    document.querySelectorAll('#srcSeg button').forEach(b =>
+      b.classList.toggle('on', b.dataset.src === src));
+    el('dayOpts').style.display  = (src === 'day') ? 'block' : 'none';
+    el('inactWrap').style.display = (src === 'day') ? 'none'  : 'inline-flex';
+    clients = []; selected = new Set(); queue = null; qIdx = 0;
+    render();
+    setStatus(src === 'day' ? 'Pick a date, then load.' : 'Load the client list to begin.');
+  }
+  document.querySelectorAll('#srcSeg button').forEach(b =>
+    b.addEventListener('click', () => setSource(b.dataset.src)));
+
+  function activeSlots(){
+    return Array.from(document.querySelectorAll('#slotChips .chip.on')).map(b => b.dataset.slot);
+  }
+  document.querySelectorAll('#slotChips .chip').forEach(b => {
+    b.addEventListener('click', () => {
+      b.classList.toggle('on');
+      if(!activeSlots().length) b.classList.add('on');    // never leave zero slots on
+      selected = new Set(visible().map(c => key(c.phone)));
+      render();
+    });
+  });
+
+  async function loadAll(){
+    const res = await fetch(API + '?action=getAllClients');
+    const data = await res.json();
+    if(!data.success || !data.clients) throw new Error(data.message || 'No client data returned');
+    return data.clients
+      .map(c => ({ name: String(c.name || '').trim(),
+                   phone: String(c.phone || '').trim(),
+                   active: c.active !== false, slots: [] }))
+      .filter(c => c.name && key(c.phone).length === 10);
+  }
+
+  async function loadDay(date){
+    const res = await fetch(API, {
+      method: 'POST',
+      body: new URLSearchParams({ action: 'getOrdersForDate', date: date })
+    });
+    const data = await res.json();
+    if(!data.success) throw new Error(data.message || 'No orders returned');
+    const byPhone = {};
+    (data.clients || []).forEach(c => {
+      const k = key(c.phone);
+      if(k.length !== 10) return;
+      const slot = String(c.slot || '').trim();
+      if(!byPhone[k]) byPhone[k] = { name: String(c.name || '').trim(), phone: k, active: true, slots: [] };
+      if(slot && byPhone[k].slots.indexOf(slot) === -1) byPhone[k].slots.push(slot);
+    });
+    return Object.values(byPhone).filter(c => c.name);
+  }
+
   el('load').addEventListener('click', async () => {
     if(!API){ setStatus('No API URL found in config.js.'); return; }
-    el('load').disabled = true; setStatus('Loading clients…');
+    const date = el('dayDate').value;
+    if(source === 'day' && !date){ setStatus('Pick a date first.'); return; }
+
+    el('load').disabled = true;
+    setStatus(source === 'day' ? 'Loading clients active on ' + date + '…' : 'Loading clients…');
     try{
-      const res = await fetch(API + '?action=getAllClients');
-      const data = await res.json();
-      if(!data.success || !data.clients) throw new Error(data.message || 'No client data returned');
-      clients = data.clients
-        .map(c => ({ name: String(c.name || '').trim(),
-                     phone: String(c.phone || '').trim(),
-                     active: c.active !== false }))
-        .filter(c => c.name && key(c.phone).length === 10)
+      clients = (source === 'day' ? await loadDay(date) : await loadAll())
         .sort((a, b) => a.name.localeCompare(b.name));
-      // default selection: everyone currently visible
       selected = new Set(visible().map(c => key(c.phone)));
       loadSent();
       render();
-      setStatus(clients.length + ' clients loaded.');
+      setStatus(clients.length + (source === 'day' ? ' active on ' + date + '.' : ' clients loaded.'));
     }catch(e){ setStatus('Load error: ' + e.message); }
     el('load').disabled = false;
   });
@@ -185,10 +276,13 @@
   function visible(){
     const q = searchEl.value.trim().toLowerCase();
     const inc = el('showInactive').checked;
-    return clients.filter(c =>
-      (inc || c.active) &&
-      (!q || c.name.toLowerCase().includes(q) || key(c.phone).includes(q.replace(/\D/g, '')))
-    );
+    const slots = activeSlots();
+    return clients.filter(c => {
+      if(source === 'day'){
+        if(!c.slots.some(s => slots.indexOf(s) !== -1)) return false;
+      } else if(!inc && !c.active) return false;
+      return !q || c.name.toLowerCase().includes(q) || key(c.phone).includes(q.replace(/\D/g, ''));
+    });
   }
 
   // ---- rendering ----
@@ -212,7 +306,13 @@
       const nm = document.createElement('div'); nm.className = 'nm'; nm.textContent = c.name;
       const ph = document.createElement('div'); ph.className = 'ph'; ph.textContent = k;
       row.appendChild(cb); row.appendChild(nm);
-      if(!c.active){ const b = document.createElement('span'); b.className = 'inact'; b.textContent = 'inactive'; row.appendChild(b); }
+      if(source === 'day' && c.slots.length){
+        const b = document.createElement('span'); b.className = 'inact';
+        b.style.background = '#e0f2f1'; b.style.color = '#00695c';
+        b.textContent = c.slots.join(' + '); row.appendChild(b);
+      } else if(!c.active){
+        const b = document.createElement('span'); b.className = 'inact'; b.textContent = 'inactive'; row.appendChild(b);
+      }
       row.appendChild(ph);
       if(sent.has(k)){ const t = document.createElement('span'); t.className = 'tick'; t.textContent = 'sent ✓'; row.appendChild(t); }
       listEl.appendChild(row);
@@ -313,6 +413,8 @@
   el('selAll').addEventListener('click', () => { visible().forEach(c => selected.add(key(c.phone))); render(); });
   el('selNone').addEventListener('click', () => { visible().forEach(c => selected.delete(key(c.phone))); render(); });
 
+  el('dayDate').value = todayStr();
+  setSource('all');
   renderSend();
 </script>
 </body>
