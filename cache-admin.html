@@ -29,6 +29,11 @@
       font-size: 22px;
       color: #1f2d3d;
     }
+    h3 {
+      margin: 0 0 4px;
+      font-size: 16px;
+      color: #1f2d3d;
+    }
     .subtitle {
       margin: 0 0 24px;
       font-size: 14px;
@@ -51,8 +56,21 @@
     button:disabled { opacity: 0.55; cursor: default; }
     .btn-menu { background: #2e9e6b; }
     .btn-clients { background: #2f6fb0; }
+    .btn-index { background: #6b5bb0; }
     .btn-check { background: #b0752f; }
     .btn-mark { background: #c0392b; margin-top: 4px; }
+    .btn-week { background: #2f6fb0; }
+    .btn-year { background: #b0752f; }
+    .btn-apply { background: #c0392b; }
+    .btn-small {
+      width: auto;
+      padding: 9px 14px;
+      font-size: 13px;
+      margin: 0;
+      background: #eef1f4;
+      color: #5a6673;
+      border-radius: 9px;
+    }
     #status {
       margin-top: 8px;
       min-height: 22px;
@@ -125,6 +143,47 @@
       color: #9aa4ae;
       white-space: nowrap;
     }
+
+    /* ---- date sections ---- */
+    .fld { margin-bottom: 12px; }
+    .fld label {
+      display: block;
+      font-size: 12px;
+      font-weight: 700;
+      color: #7a8794;
+      margin-bottom: 5px;
+    }
+    .fld input[type=date] {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #dbe1e7;
+      border-radius: 10px;
+      font-size: 15px;
+      font-family: inherit;
+      color: #1f2d3d;
+      background: #fff;
+    }
+    .two { display: flex; gap: 10px; }
+    .two .fld { flex: 1; }
+    .row-btns { display: flex; gap: 8px; margin-bottom: 12px; }
+    .preview {
+      background: #f6f8fa;
+      border: 1px solid #e4e8ec;
+      border-radius: 10px;
+      padding: 11px 13px;
+      font-size: 13px;
+      color: #5a6673;
+      line-height: 1.7;
+      margin-bottom: 14px;
+    }
+    .preview b { color: #1f2d3d; }
+    .preview .warn { color: #c0392b; font-weight: 600; }
+    .note {
+      font-size: 12px;
+      color: #9aa4ae;
+      line-height: 1.5;
+      margin: -4px 0 14px;
+    }
   </style>
 </head>
 <body>
@@ -137,7 +196,53 @@
     <button class="btn-clients" onclick="refresh('refreshClients', this)">
       Refresh Client Cache
     </button>
+    <button class="btn-index" onclick="refresh('refreshBlockIndex', this)">
+      Refresh Date Index
+    </button>
+    <p class="note">Date Index maps each date to its MiseList / Workplan table.
+      Refresh it after editing the date rows by hand.</p>
     <div id="status"></div>
+
+    <hr class="divider">
+
+    <!-- ===== WEEKLY MENU WINDOW (Menu!U2 / V2) ===== -->
+    <h3>Running week</h3>
+    <p class="subtitle" style="margin-bottom:14px">
+      Sets Menu U2 and V2 — the week the client app shows.</p>
+    <div class="two">
+      <div class="fld">
+        <label>Week start</label>
+        <input type="date" id="weekStart">
+      </div>
+      <div class="fld">
+        <label>Week end</label>
+        <input type="date" id="weekEnd">
+      </div>
+    </div>
+    <div class="row-btns">
+      <button class="btn-small" onclick="fillWeek(0)">This week</button>
+      <button class="btn-small" onclick="fillWeek(7)">Next week</button>
+      <button class="btn-small" onclick="loadWeek()">Reload current</button>
+    </div>
+    <button class="btn-week" onclick="saveWeek()">Save running week</button>
+
+    <hr class="divider">
+
+    <!-- ===== YEARLY DATE SETTER ===== -->
+    <h3>Yearly dates</h3>
+    <p class="subtitle" style="margin-bottom:14px">
+      Writes 324 service days (three runs of the 108-day cycle) into Menu columns
+      A, B, C and into rows 2–4 of every MiseList and Workplan table.</p>
+    <div class="fld">
+      <label>First date of run 1</label>
+      <input type="date" id="yearStart">
+    </div>
+    <div id="yearPreview" class="preview hidden"></div>
+    <button class="btn-apply" onclick="applyYear()" id="yearBtn" disabled>
+      Write dates to all sheets
+    </button>
+    <p class="note">Overwrites every date cell in Menu, MiseList and Workplan.
+      Menu and mise content is not touched. Make a copy of the spreadsheet first.</p>
 
     <hr class="divider">
 
@@ -154,6 +259,10 @@
     const statusEl = document.getElementById("status");
     let staleCandidates = [];
 
+    const RUN_DAYS   = 108;   // service days in one menu cycle
+    const RUN_COUNT  = 3;     // Menu columns A, B, C
+    const TOTAL_DAYS = RUN_DAYS * RUN_COUNT;
+
     function setStatus(msg, type) {
       statusEl.textContent = msg;
       statusEl.className = type || "";
@@ -161,38 +270,146 @@
 
     function setButtonsDisabled(v) {
       document.querySelectorAll("button").forEach(b => b.disabled = v);
+      if (!v) syncYearBtn();
+    }
+
+    function post(params) {
+      return fetch(API_URL + "?t=" + Date.now(), {
+        method: "POST",
+        cache: "no-store",
+        body: new URLSearchParams(params)
+      }).then(res => res.json());
     }
 
     function refresh(action, btn) {
       setButtonsDisabled(true);
       setStatus("Refreshing…", "");
-      fetch(API_URL + "?t=" + Date.now(), {
-        method: "POST",
-        cache: "no-store",
-        body: new URLSearchParams({ action })
-      })
-      .then(res => res.json())
-      .then(data => {
-        setStatus(data.message || "Done", "success");
-      })
-      .catch(() => {
-        setStatus("Error occurred. Please try again.", "error");
-      })
-      .finally(() => {
-        setButtonsDisabled(false);
-      });
+      post({ action })
+        .then(data => setStatus(data.message || "Done", "success"))
+        .catch(() => setStatus("Error occurred. Please try again.", "error"))
+        .finally(() => setButtonsDisabled(false));
     }
 
+    // ---- date helpers -------------------------------------------------
+    const pad = n => String(n).padStart(2, "0");
+    const ymd = d => d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+    const parseYmd = s => new Date(s + "T12:00:00");
+    const pretty = d => d.toLocaleDateString(undefined,
+      { weekday: "short", day: "numeric", month: "short", year: "numeric" });
+
+    // n consecutive service days (Mon-Sat, Sundays skipped) starting at startYmd
+    function serviceDays(startYmd, n) {
+      const out = [];
+      const d = parseYmd(startYmd);
+      while (out.length < n) {
+        if (d.getDay() !== 0) out.push(new Date(d));
+        d.setDate(d.getDate() + 1);
+      }
+      return out;
+    }
+
+    // ---- running week (Menu U2 / V2) ----------------------------------
+    function fillWeek(offsetDays) {
+      const now = new Date();
+      const day = now.getDay();                       // 0 Sun .. 6 Sat
+      const mondayOffset = (day === 0) ? 1 : 1 - day; // Sunday rolls to tomorrow
+      const mon = new Date(now);
+      mon.setDate(now.getDate() + mondayOffset + offsetDays);
+      const sat = new Date(mon);
+      sat.setDate(mon.getDate() + 5);
+      document.getElementById("weekStart").value = ymd(mon);
+      document.getElementById("weekEnd").value   = ymd(sat);
+    }
+
+    function loadWeek() {
+      setStatus("Loading current week…", "");
+      fetch(API_URL + "?action=getWeekDates&t=" + Date.now(), { cache: "no-store" })
+        .then(r => r.json())
+        .then(d => {
+          if (!d.success) { setStatus(d.message || "Could not read the week.", "error"); return; }
+          if (d.start) document.getElementById("weekStart").value = d.start;
+          if (d.end)   document.getElementById("weekEnd").value   = d.end;
+          setStatus("Current week loaded.", "success");
+        })
+        .catch(() => setStatus("Error occurred. Please try again.", "error"));
+    }
+
+    function saveWeek() {
+      const start = document.getElementById("weekStart").value;
+      const end   = document.getElementById("weekEnd").value;
+      if (!start || !end) { setStatus("Pick both dates.", "error"); return; }
+      if (start > end)    { setStatus("Start must be before end.", "error"); return; }
+      setButtonsDisabled(true);
+      setStatus("Saving week…", "");
+      post({ action: "setWeekDates", start, end })
+        .then(d => setStatus(d.success ? (d.message || "Week updated.") : (d.message || "Failed."),
+                             d.success ? "success" : "error"))
+        .catch(() => setStatus("Error occurred. Please try again.", "error"))
+        .finally(() => setButtonsDisabled(false));
+    }
+
+    // ---- yearly dates -------------------------------------------------
+    function syncYearBtn() {
+      document.getElementById("yearBtn").disabled =
+        !document.getElementById("yearStart").value;
+    }
+
+    document.getElementById("yearStart").addEventListener("change", () => {
+      renderYearPreview();
+      syncYearBtn();
+    });
+
+    function renderYearPreview() {
+      const start = document.getElementById("yearStart").value;
+      const box = document.getElementById("yearPreview");
+      if (!start) { box.classList.add("hidden"); return; }
+
+      const days = serviceDays(start, TOTAL_DAYS);
+      const runs = [];
+      for (let r = 0; r < RUN_COUNT; r++) {
+        runs.push([days[r * RUN_DAYS], days[(r + 1) * RUN_DAYS - 1]]);
+      }
+      const span = Math.round((days[TOTAL_DAYS - 1] - days[0]) / 86400000) + 1;
+      const notMonday = parseYmd(start).getDay() !== 1;
+
+      box.classList.remove("hidden");
+      box.innerHTML =
+        runs.map((r, i) =>
+          `Run ${i + 1} <b>(col ${"ABC"[i]})</b>: ${pretty(r[0])} → ${pretty(r[1])}`
+        ).join("<br>") +
+        `<br>${TOTAL_DAYS} service days across ${span} calendar days.` +
+        (notMonday
+          ? `<br><span class="warn">Start is not a Monday — the cycle expects one.</span>`
+          : "");
+    }
+
+    function applyYear() {
+      const start = document.getElementById("yearStart").value;
+      if (!start) { setStatus("Pick a start date.", "error"); return; }
+      const days = serviceDays(start, TOTAL_DAYS);
+      const msg = "Write " + TOTAL_DAYS + " dates?\n\n" +
+        "Run 1 starts " + pretty(days[0]) + "\n" +
+        "Run 3 ends " + pretty(days[TOTAL_DAYS - 1]) + "\n\n" +
+        "This overwrites every date cell in Menu, MiseList and Workplan.";
+      if (!confirm(msg)) return;
+
+      setButtonsDisabled(true);
+      setStatus("Writing dates… this takes a few seconds.", "");
+      post({ action: "setYearlyDates", start })
+        .then(d => {
+          setStatus(d.success ? (d.message || "Dates written.") : (d.message || "Failed."),
+                    d.success ? "success" : "error");
+        })
+        .catch(() => setStatus("Error occurred. Please try again.", "error"))
+        .finally(() => setButtonsDisabled(false));
+    }
+
+    // ---- stale clients ------------------------------------------------
     function checkStale() {
       const days = parseInt(document.getElementById("staleDays").value) || 15;
       setButtonsDisabled(true);
       setStatus("Checking…", "");
-      fetch(API_URL + "?t=" + Date.now(), {
-        method: "POST",
-        cache: "no-store",
-        body: new URLSearchParams({ action: "getStaleActiveClients", days })
-      })
-      .then(res => res.json())
+      post({ action: "getStaleActiveClients", days })
       .then(data => {
         if (!data.ok) { setStatus("Error checking clients.", "error"); return; }
         staleCandidates = data.stale || [];
@@ -237,12 +454,7 @@
       if (!confirm(`Mark ${rows.length} client(s) Inactive? This updates the Master Client List.`)) return;
       setButtonsDisabled(true);
       setStatus("Updating…", "");
-      fetch(API_URL + "?t=" + Date.now(), {
-        method: "POST",
-        cache: "no-store",
-        body: new URLSearchParams({ action: "markClientsInactive", rows: JSON.stringify(rows) })
-      })
-      .then(res => res.json())
+      post({ action: "markClientsInactive", rows: JSON.stringify(rows) })
       .then(data => {
         setStatus(data.ok ? `Marked ${data.updated} client(s) inactive.` : "Update failed.", data.ok ? "success" : "error");
         if (data.ok) {
@@ -253,6 +465,11 @@
       .catch(() => setStatus("Error occurred. Please try again.", "error"))
       .finally(() => setButtonsDisabled(false));
     }
+
+    // ---- init ----
+    fillWeek(0);
+    loadWeek();
+    syncYearBtn();
   </script>
 </body>
 </html>
