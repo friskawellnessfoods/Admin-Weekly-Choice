@@ -288,7 +288,7 @@ async function load(){
     const geo   = (boot.geo && boot.geo.geo) || {};
     roadCache   = (boot.road && boot.road.pairs) || {};
     zoneMap     = (boot.zones && boot.zones.zones) || {};
-    agents      = (boot.agents && boot.agents.agents) || [];
+    agents      = normAgents((boot.agents && boot.agents.agents) || []);
 
     const all = ((boot.orders && boot.orders.clients) || [])
       .filter(c => String(c.slot||'').trim() === $('slot').value);
@@ -326,8 +326,8 @@ async function load(){
     }
 
     routes = packRoutes(clients);
-    render();
     ['measure','rebuild','save'].forEach(b=>$(b).disabled=false);
+    render();
     if (!$('status').textContent) setStatus('Built ' + routes.length + ' routes from ' + clients.length + ' parcels.');
 
   } catch(e){ setStatus('Error: '+e.message); }
@@ -488,8 +488,9 @@ function render(){
     '</table><div class="hint">Self-pickup clients belong here. Anything else needs its Master location fixed.</div></div>'
   ) : '';
 
-  const agentOpts = ['<option value="">— agent —</option>']
-    .concat(agents.map(a=>'<option value="'+esc(a.name||a)+'">'+esc(a.name||a)+'</option>'))
+  const agentOptsFor = sel => ['<option value="">— agent —</option>']
+    .concat(agents.map(a=>'<option value="'+esc(a.name)+'"'+
+       (a.name===sel?' selected':'')+'>'+esc(a.name)+'</option>'))
     .concat('<option value="__new">+ new agent</option>').join('');
 
   $('routes').innerHTML = routes.map((r,i)=>{
@@ -503,8 +504,7 @@ function render(){
         chip('last '+m.lastKm.toFixed(1)+' km', m.lastKm>num('maxKm'))+
         chip(m.kmpp.toFixed(2)+' km/p')+
         '<span class="spacer"></span>'+
-        '<select onchange="pickAgent('+i+',this)">'+agentOpts.replace(
-           'value="'+esc(r.agent)+'"','value="'+esc(r.agent)+'" selected')+'</select>'+
+        '<select onchange="pickAgent('+i+',this)">'+agentOptsFor(r.agent)+'</select>'+
         '<div class="split">'+
           '<button onclick="autoSplit('+i+',4)">Split /4</button>'+
           '<button onclick="manualSplit('+i+')">Split picked</button>'+
@@ -529,13 +529,28 @@ function pickAgent(i, sel){
   if (sel.value === '__new'){
     const nm = prompt('New agent name'); if (!nm){ sel.value=routes[i].agent||''; return; }
     const ph = prompt('Agent phone') || '';
-    agents.push({ name:nm, phone:ph });
+    agents.push({ name:nm, phone:ph }); agents.sort((x,y)=>x.name.localeCompare(y.name));
     routes[i].agent = nm; routes[i].agentPhone = ph;
     render(); return;
   }
   routes[i].agent = sel.value;
   const a = agents.find(x=>(x.name||x)===sel.value);
   routes[i].agentPhone = (a && a.phone) || '';
+}
+
+/* readAgents_ returns an object keyed by route, and one person can cover
+   several routes, so flatten to a unique list of people. */
+function normAgents(raw){
+  const list = Array.isArray(raw) ? raw : Object.keys(raw||{}).map(k=>raw[k]);
+  const seen = {}, out = [];
+  list.forEach(a=>{
+    if (!a) return;
+    const name = String((typeof a === 'string') ? a : (a.name||'')).trim();
+    if (!name || seen[name.toLowerCase()]) return;
+    seen[name.toLowerCase()] = 1;
+    out.push({ name, phone: String((a && a.phone) || '') });
+  });
+  return out.sort((x,y)=>x.name.localeCompare(y.name));
 }
 
 const chip = (t,bad) => '<span class="chip'+(bad?' bad':'')+'">'+t+'</span>';
