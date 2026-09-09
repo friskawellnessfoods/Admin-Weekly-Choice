@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Route builder</title>
+<style>
+  :root{
+    --bg:#0f1115; --panel:#171a21; --panel2:#1d222b; --line:#272c36;
+    --ink:#e6e9ef; --dim:#8b93a3; --acc:#4ade80; --warn:#fbbf24;
+    --bad:#f87171; --info:#60a5fa;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);padding:18px;
+    font:14px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+  h1{font-size:17px;margin:0 0 2px;font-weight:600}
+  .sub{color:var(--dim);font-size:12px;margin-bottom:16px}
+  .bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+  input,select,button{font:inherit;background:var(--panel);color:var(--ink);
+    border:1px solid var(--line);border-radius:6px;padding:7px 10px}
+  input[type=number]{width:74px}
+  button{cursor:pointer;border-color:#3a4150}
+  button:hover:not(:disabled){border-color:#4d5666}
+  button.go{background:var(--acc);color:#08130c;border-color:var(--acc);font-weight:600}
+  button.warn{background:var(--warn);color:#241a02;border-color:var(--warn);font-weight:600}
+  button:disabled{opacity:.45;cursor:default}
+  .limits{display:flex;gap:8px;flex-wrap:wrap;align-items:center;
+    background:var(--panel);border:1px solid var(--line);border-radius:8px;
+    padding:9px 12px;margin-bottom:12px;font-size:12px;color:var(--dim)}
+  .limits label{display:flex;gap:5px;align-items:center;color:var(--ink)}
+  .status{color:var(--dim);font-size:12px;min-height:18px;margin-bottom:12px}
+  .cards{display:flex;gap:9px;flex-wrap:wrap;margin-bottom:16px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:9px 13px;min-width:96px}
+  .card .n{font-size:19px;font-weight:600}
+  .card .l{font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:.05em}
+  .card.bad .n{color:var(--bad)} .card.ok .n{color:var(--acc)} .card.info .n{color:var(--info)}
+
+  .route{background:var(--panel);border:1px solid var(--line);border-radius:9px;margin-bottom:11px;overflow:hidden}
+  .route.over{border-color:var(--bad)}
+  .rhead{display:flex;gap:10px;align-items:center;flex-wrap:wrap;
+    padding:10px 13px;background:var(--panel2);border-bottom:1px solid var(--line)}
+  .rname{font-weight:600;font-size:14px;min-width:88px}
+  .chip{font-size:11px;color:var(--dim);background:var(--bg);
+    border:1px solid var(--line);border-radius:20px;padding:2px 9px}
+  .chip.bad{color:var(--bad);border-color:var(--bad)}
+  .rhead .spacer{flex:1}
+  .rhead select,.rhead input{padding:5px 8px;font-size:12px}
+  .rbody{padding:9px 13px}
+  table{border-collapse:collapse;width:100%;font-size:12px}
+  th,td{border-bottom:1px solid var(--line);padding:4px 7px;text-align:left}
+  th{color:var(--dim);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:.04em}
+  tr:last-child td{border-bottom:none}
+  td.num{text-align:right;font-variant-numeric:tabular-nums}
+  .pill{display:inline-block;font-size:10px;padding:1px 6px;border-radius:10px;
+    background:var(--bg);border:1px solid var(--line);color:var(--dim)}
+  .notrouted{background:var(--panel);border:1px solid var(--warn);
+    border-radius:9px;padding:11px 14px;margin-bottom:14px}
+  .notrouted h3{margin:0 0 7px;font-size:12px;color:var(--warn);
+    text-transform:uppercase;letter-spacing:.05em}
+  h2{font-size:12px;color:var(--dim);text-transform:uppercase;
+    letter-spacing:.05em;font-weight:600;margin:20px 0 9px}
+  .hint{color:var(--dim);font-size:11px;margin-top:4px}
+  .split{display:flex;gap:5px;align-items:center}
+  .sel td{background:rgba(96,165,250,.09)}
+  input[type=checkbox]{width:14px;height:14px;accent-color:var(--info)}
+</style>
+</head>
+<body>
+
+<h1>Route builder</h1>
+<div class="sub">Standalone. Builds routes from coordinates. Writes only to RouteAssign, RouteZones and RoadCache when you press Save.</div>
+
+<div class="bar">
+  <input type="text" id="api" placeholder="Apps Script /exec URL" style="min-width:300px">
+  <input type="date" id="date">
+  <select id="slot"><option>Afternoon</option><option>Morning</option><option>Evening</option></select>
+  <button class="go" id="load">Load &amp; build</button>
+  <button id="measure" disabled>Measure real distances</button>
+  <button class="warn" id="rebuild" disabled>Rebuild zones</button>
+  <button id="save" disabled>Save routes</button>
+</div>
+
+<div class="limits">
+  <label>max parcels <input type="number" id="maxP" value="20" min="1"></label>
+  <label>max km to last <input type="number" id="maxKm" value="35" min="1"></label>
+  <label>max minutes <input type="number" id="maxMin" value="180" min="10"></label>
+  <label>min/stop <input type="number" id="stopMin" value="2" min="0" step="0.5"></label>
+  <label>km/h <input type="number" id="speed" value="25" min="5"></label>
+  <label>road factor <input type="number" id="rf" value="1.35" min="1" step="0.01"></label>
+  <label>zone radius km <input type="number" id="zr" value="2.5" min="0.2" step="0.1"></label>
+</div>
+
+<div class="status" id="status"></div>
+<div class="cards" id="cards"></div>
+<div id="notRouted"></div>
+<div id="routes"></div>
+
+<script src="config.js" onerror="void 0"></script>
+<script>
+const KITCHEN = { lat: 17.452623115758335, lng: 78.41967516576499 };
+const BOUNDS  = { latMin:17.0, latMax:17.8, lngMin:78.0, lngMax:78.8 };
+const SECTORS = ['N','NE','E','SE','S','SW','W','NW'];
+
+const $ = id => document.getElementById(id);
+let clients = [], notRouted = [], routes = [], zoneMap = {}, roadCache = {},
+    agents = [], measured = null, dirtyRoad = {};
+
+$('api').value = (typeof API_URL !== 'undefined' && API_URL) ? API_URL
+               : (localStorage.getItem('rb_api') || '');
+const n = new Date();
+$('date').value = n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');
+
+const setStatus = m => $('status').textContent = m;
+const num = id => parseFloat($(id).value) || 0;
+
+async function api(action, params={}) {
+  const body = new URLSearchParams({ action, ...params });
+  const res = await fetch($('api').value.trim(), { method:'POST', body, redirect:'follow' });
+  return res.json();
+}
+
+/* ---------- geometry ---------- */
+const toRad = d => d*Math.PI/180;
+function hv(a,b){
+  const dLat=toRad(b.lat-a.lat), dLng=toRad(b.lng-a.lng);
+  const s=Math.sin(dLat/2)**2+Math.cos(toRad(a.lat))*Math.cos(toRad(b.lat))*Math.sin(dLng/2)**2;
+  return 6371*2*Math.atan2(Math.sqrt(s),Math.sqrt(1-s));
+}
+function bearing(a,b){
+  const y=Math.sin(toRad(b.lng-a.lng))*Math.cos(toRad(b.lat));
+  const x=Math.cos(toRad(a.lat))*Math.sin(toRad(b.lat))-Math.sin(toRad(a.lat))*Math.cos(toRad(b.lat))*Math.cos(toRad(b.lng-a.lng));
+  return (Math.atan2(y,x)*180/Math.PI+360)%360;
+}
+const sectorOf = d => SECTORS[Math.round(d/45)%8];
+const inBounds = c => c && c.lat!=null && c.lng!=null &&
+  c.lat>=BOUNDS.latMin && c.lat<=BOUNDS.latMax && c.lng>=BOUNDS.lngMin && c.lng<=BOUNDS.lngMax;
+const ptKey = c => c.lat.toFixed(5)+','+c.lng.toFixed(5);
+const roadKey = (a,b) => a.lat.toFixed(6)+','+a.lng.toFixed(6)+'>'+b.lat.toFixed(6)+','+b.lng.toFixed(6);
+
+/* real road km from kitchen if we measured it, else haversine x factor */
+function kmFromKitchen(c){
+  const hit = roadCache[roadKey(KITCHEN,c)];
+  if (hit) return hit.km;
+  return hv(KITCHEN,c)*num('rf');
+}
+function minFromKitchen(c){
+  const hit = roadCache[roadKey(KITCHEN,c)];
+  if (hit) return hit.min;
+  return kmFromKitchen(c)/num('speed')*60;
+}
+
+/* open path from kitchen, nearest neighbour then 2-opt */
+function tour(pts){
+  if (!pts.length) return { km:0, last:KITCHEN, order:[] };
+  let rem = pts.slice(), cur = KITCHEN, order = [];
+  while (rem.length){
+    let j=0, best=Infinity;
+    rem.forEach((p,i)=>{ const d=hv(cur,p); if(d<best){best=d;j=i;} });
+    cur = rem[j]; order.push(cur); rem.splice(j,1);
+  }
+  let path = [KITCHEN, ...order], improved = true, guard = 0;
+  while (improved && guard++ < 60){
+    improved = false;
+    for (let i=1;i<path.length-1;i++){
+      for (let j=i+1;j<path.length;j++){
+        const a=path[i-1], b=path[i], c=path[j], d=path[j+1];
+        if (!d){
+          const cand=[...path.slice(0,i),...path.slice(i).reverse()];
+          if (len(cand)<len(path)-1e-9){ path=cand; improved=true; }
+        } else if (hv(a,c)+hv(b,d) < hv(a,b)+hv(c,d)-1e-9){
+          path=[...path.slice(0,i),...path.slice(i,j+1).reverse(),...path.slice(j+1)];
+          improved=true;
+        }
+      }
+    }
+  }
+  function len(p){ let t=0; for(let k=0;k<p.length-1;k++) t+=hv(p[k],p[k+1]); return t; }
+  return { km: len(path)*num('rf'), last: path[path.length-1], order: path.slice(1) };
+}
+
+function measure(rows){
+  const pts = uniqPts(rows);
+  const t = tour(pts);
+  const drive = t.km / num('speed') * 60;
+  const stop  = rows.length * num('stopMin');
+  return {
+    parcels: rows.length, points: pts.length,
+    km: t.km, drive, stop, total: drive+stop,
+    lastKm: kmFromKitchen(t.last), kmpp: rows.length ? t.km/rows.length : 0,
+    order: t.order
+  };
+}
+function uniqPts(rows){
+  const seen={}, out=[];
+  rows.forEach(r=>{ const k=ptKey(r.coord); if(!seen[k]){seen[k]=1;out.push(r.coord);} });
+  return out;
+}
+function fits(m){
+  return m.parcels <= num('maxP') && m.lastKm <= num('maxKm') && m.total <= num('maxMin');
+}
+
+/* ---------- zones: stable clusters of points ---------- */
+function buildZones(points){
+  // points: [{lat,lng}] distinct. Cluster within sector by radius.
+  const bySec = {};
+  points.forEach(p=>{
+    const s = sectorOf(bearing(KITCHEN,p));
+    (bySec[s] = bySec[s] || []).push(p);
+  });
+
+  const map = {};
+  Object.keys(bySec).sort().forEach(sec=>{
+    // farthest-first seeding keeps clusters stable as clients are added
+    let rem = bySec[sec].slice().sort((a,b)=>kmFromKitchen(b)-kmFromKitchen(a));
+    let idx = 0;
+    while (rem.length){
+      const seed = rem.shift();
+      const members = [seed];
+      for (let i=rem.length-1;i>=0;i--){
+        if (hv(seed,rem[i]) <= num('zr')){ members.push(rem[i]); rem.splice(i,1); }
+      }
+      const zone = sec + (++idx);
+      members.forEach(m=>{ map[ptKey(m)] = { zone, sector:sec, km:+kmFromKitchen(m).toFixed(2) }; });
+    }
+  });
+  return map;
+}
+
+/* ---------- pack zones into routes, sweeping the compass ---------- */
+function packRoutes(rows){
+  const byZone = {};
+  rows.forEach(r=>{
+    const z = (zoneMap[ptKey(r.coord)] || {}).zone || 'Z?';
+    (byZone[z] = byZone[z] || []).push(r);
+  });
+
+  // order zones by bearing then distance, so a sweep stays on one side
+  const zones = Object.keys(byZone).map(z=>{
+    const pts = uniqPts(byZone[z]);
+    const c = pts.reduce((a,p)=>({lat:a.lat+p.lat/pts.length, lng:a.lng+p.lng/pts.length}),{lat:0,lng:0});
+    return { zone:z, rows:byZone[z], brg:bearing(KITCHEN,c), km:kmFromKitchen(c) };
+  }).sort((a,b)=> a.brg-b.brg || a.km-b.km);
+
+  const out = [];
+  let cur = [];
+  zones.forEach(z=>{
+    const trial = cur.concat(z.rows);
+    if (cur.length && !fits(measure(trial))){
+      out.push(cur); cur = z.rows.slice();
+    } else {
+      cur = trial;
+    }
+    // a single zone bigger than the limits has to be broken up on its own
+    while (!fits(measure(cur)) && cur.length > 1){
+      const overflow = cur.pop();
+      if (!out.spill) out.spill = [];
+      out.spill.push(overflow);
+    }
+  });
+  if (cur.length) out.push(cur);
+
+  if (out.spill && out.spill.length) out.push(out.spill);
+  delete out.spill;
+
+  return out.map((rows,i)=>({
+    name: 'R' + (i+1),
+    rows,
+    agent: '',
+    agentPhone: '',
+    m: measure(rows)
+  }));
+}
+
+/* ---------- load ---------- */
+$('load').addEventListener('click', load);
+
+async function load(){
+  const url = $('api').value.trim();
+  if (!url){ setStatus('Paste the web app URL first.'); return; }
+  localStorage.setItem('rb_api', url);
+  $('load').disabled = true;
+  setStatus('Loading…');
+
+  try {
+    const boot = await api('getRouteBootstrap', { date: $('date').value });
+    if (!boot || !boot.ok){ setStatus('Bootstrap failed: '+JSON.stringify(boot)); $('load').disabled=false; return; }
+
+    const geo   = (boot.geo && boot.geo.geo) || {};
+    roadCache   = (boot.road && boot.road.pairs) || {};
+    zoneMap     = (boot.zones && boot.zones.zones) || {};
+    agents      = (boot.agents && boot.agents.agents) || [];
+
+    const all = ((boot.orders && boot.orders.clients) || [])
+      .filter(c => String(c.slot||'').trim() === $('slot').value);
+
+    clients = []; notRouted = [];
+
+    all.forEach(c=>{
+      const phone = String(c.phone||'').replace(/\D/g,'').slice(-10);
+      const g = geo[phone] || {};
+      const loc = String(c.location||'').trim();
+      const l1  = String(c.location1||'').trim();
+      const l2  = String(c.location2||'').trim();
+
+      // self pickup is a category, not a failure
+      if (!loc || /^\s*(self|pick\s*up|pickup|takeaway|take\s*away)/i.test(loc)){
+        notRouted.push({ ...c, phone, why:'self pickup' }); return;
+      }
+
+      let coord = null;
+      if (c.overrideLat != null && c.overrideLng != null) coord = { lat:+c.overrideLat, lng:+c.overrideLng };
+      else if (loc && l2 && loc === l2) coord = g.loc2;
+      else if (loc && l1 && loc === l1) coord = g.loc1;
+      else coord = g.loc1 || g.loc2;
+
+      if (!inBounds(coord)){
+        notRouted.push({ ...c, phone, why: coord ? 'coordinates outside Hyderabad' : 'no coordinates' });
+        return;
+      }
+      clients.push({ ...c, phone, coord: { lat:+coord.lat, lng:+coord.lng } });
+    });
+
+    if (!Object.keys(zoneMap).length){
+      zoneMap = buildZones(uniqPts(clients));
+      setStatus('No saved zones — built a fresh set from today. Press Rebuild zones to persist them.');
+    }
+
+    routes = packRoutes(clients);
+    render();
+    ['measure','rebuild','save'].forEach(b=>$(b).disabled=false);
+    if (!$('status').textContent) setStatus('Built ' + routes.length + ' routes from ' + clients.length + ' parcels.');
+
+  } catch(e){ setStatus('Error: '+e.message); }
+  $('load').disabled = false;
+}
+
+/* ---------- measure real distances (kitchen -> each point) ---------- */
+$('measure').addEventListener('click', async () => {
+  if (!window.google || !google.maps || !google.maps.DistanceMatrixService){
+    setStatus('Google Maps still loading — try again in a moment.'); return;
+  }
+  const pts = uniqPts(clients).filter(p => !roadCache[roadKey(KITCHEN,p)]);
+  if (!pts.length){ setStatus('All points already measured and cached.'); calibrate(); return; }
+
+  $('measure').disabled = true;
+  setStatus('Measuring '+pts.length+' points against Google…');
+
+  const svc = new google.maps.DistanceMatrixService();
+  const fresh = {};
+  for (let i=0;i<pts.length;i+=25){
+    const chunk = pts.slice(i,i+25);
+    await new Promise(res=>{
+      svc.getDistanceMatrix(
+        { origins:[KITCHEN], destinations:chunk, travelMode: google.maps.TravelMode.DRIVING },
+        (r,st)=>{
+          if (st==='OK' && r.rows[0]) r.rows[0].elements.forEach((el,j)=>{
+            if (el.status==='OK'){
+              const k = roadKey(KITCHEN, chunk[j]);
+              const v = { km: el.distance.value/1000, min: el.duration.value/60 };
+              roadCache[k] = v; fresh[k] = v;
+            }
+          });
+          else setStatus('Distance Matrix returned '+st);
+          res();
+        });
+    });
+  }
+
+  const saved = await api('saveRoadCache', { pairs: JSON.stringify(fresh) });
+  calibrate();
+  routes = packRoutes(clients);
+  render();
+  setStatus('Measured '+Object.keys(fresh).length+' points, cached '+(saved.added||0)+'. '+measured);
+  $('measure').disabled = false;
+});
+
+/* derive the real road factor and real average speed from measured points */
+function calibrate(){
+  const pts = uniqPts(clients).filter(p=>roadCache[roadKey(KITCHEN,p)]);
+  if (pts.length < 3){ measured = ''; return; }
+  let rfSum=0, spdSum=0, k=0;
+  pts.forEach(p=>{
+    const r = roadCache[roadKey(KITCHEN,p)];
+    const straight = hv(KITCHEN,p);
+    if (straight > 0.3 && r.min > 0){ rfSum += r.km/straight; spdSum += r.km/(r.min/60); k++; }
+  });
+  if (!k){ measured=''; return; }
+  const rf = rfSum/k, spd = spdSum/k;
+  $('rf').value = rf.toFixed(2);
+  $('speed').value = spd.toFixed(0);
+  measured = 'Measured road factor '+rf.toFixed(2)+', avg speed '+spd.toFixed(0)+' km/h.';
+}
+
+/* ---------- rebuild + save ---------- */
+$('rebuild').addEventListener('click', async () => {
+  if (!confirm('Rebuild the zone map from the points in this slot?\n\nClients in other slots keep their existing zones only if their point also appears here. Rebuild when you have added clients, not daily.')) return;
+  const merged = { ...zoneMap, ...buildZones(uniqPts(clients)) };
+  const r = await api('saveRouteZones', { zones: JSON.stringify(merged) });
+  if (r && r.ok){ zoneMap = merged; routes = packRoutes(clients); render();
+    setStatus('Zone map saved — '+r.written+' points.'); }
+  else setStatus('Zone save failed: '+JSON.stringify(r));
+});
+
+$('save').addEventListener('click', async () => {
+  const date = $('date').value, slot = $('slot').value;
+  if (!confirm('Write '+routes.length+' routes to RouteAssign for '+date+' '+slot+'?')) return;
+  $('save').disabled = true;
+  let ok=0, fail=0;
+  for (const r of routes){
+    const res = await api('saveRouteAssignment', {
+      date, slot, route: r.name, phones: r.rows.map(x=>x.phone).join(',')
+    });
+    if (res && res.ok) ok++; else fail++;
+    if (r.agent){
+      await api('saveDeliveryAgent', { route:r.name, name:r.agent, agentPhone:r.agentPhone||'' });
+    }
+  }
+  setStatus('Saved '+ok+' routes'+(fail?', '+fail+' failed':'')+'.');
+  $('save').disabled = false;
+});
+
+/* ---------- split ---------- */
+function autoSplit(ri, size){
+  const r = routes[ri];
+  const pts = r.m.order;
+  const ordered = [];
+  pts.forEach(p=>{ r.rows.forEach(x=>{ if (ptKey(x.coord)===ptKey(p)) ordered.push(x); }); });
+  r.rows.forEach(x=>{ if (!ordered.includes(x)) ordered.push(x); });
+
+  const nGroups = Math.ceil(ordered.length/size);
+  const per = Math.ceil(ordered.length/nGroups);   // balanced, so 5 -> 3+2 not 4+1
+  const chunks = [];
+  for (let i=0;i<ordered.length;i+=per) chunks.push(ordered.slice(i,i+per));
+
+  routes.splice(ri, 1, ...chunks.map((rows,i)=>({
+    name: r.name+'-'+String.fromCharCode(97+i), rows,
+    agent:r.agent, agentPhone:r.agentPhone, m: measure(rows)
+  })));
+  renumber(); render();
+}
+
+function manualSplit(ri){
+  const picked = [...document.querySelectorAll('input.pick[data-r="'+ri+'"]:checked')]
+    .map(el=>el.dataset.p);
+  if (!picked.length){ setStatus('Tick the clients to move out first.'); return; }
+  const r = routes[ri];
+  const out = r.rows.filter(x=>picked.includes(x.phone));
+  const stay = r.rows.filter(x=>!picked.includes(x.phone));
+  if (!stay.length){ setStatus('That would empty the route.'); return; }
+  routes.splice(ri, 1,
+    { ...r, rows:stay, m:measure(stay) },
+    { name:r.name+'-b', rows:out, agent:'', agentPhone:'', m:measure(out) });
+  renumber(); render();
+}
+
+function mergeUp(ri){
+  if (ri===0) return;
+  const a=routes[ri-1], b=routes[ri];
+  const rows=a.rows.concat(b.rows);
+  routes.splice(ri-1,2,{ ...a, rows, m:measure(rows) });
+  renumber(); render();
+}
+
+function renumber(){
+  routes.forEach((r,i)=>{ if(!/-/.test(r.name)) r.name='R'+(i+1); });
+}
+
+/* ---------- render ---------- */
+function render(){
+  const totKm = routes.reduce((s,r)=>s+r.m.km,0);
+  const totP  = routes.reduce((s,r)=>s+r.m.parcels,0);
+  const over  = routes.filter(r=>!fits(r.m)).length;
+
+  $('cards').innerHTML = [
+    cardEl(routes.length,'routes', over?'bad':'ok'),
+    cardEl(totP,'parcels'),
+    cardEl(totKm.toFixed(1)+' km','total'),
+    cardEl(totP?(totKm/totP).toFixed(2):'0','km / parcel','info'),
+    cardEl(notRouted.length,'not routed', notRouted.length?'bad':''),
+    cardEl(over,'over limit', over?'bad':'ok')
+  ].join('');
+
+  $('notRouted').innerHTML = notRouted.length ? (
+    '<div class="notrouted"><h3>Not routed &mdash; '+notRouted.length+'</h3><table>'+
+    '<tr><th>name</th><th>phone</th><th>location</th><th>reason</th></tr>'+
+    notRouted.map(c=>'<tr><td>'+esc(c.name)+'</td><td>'+c.phone+'</td><td>'+
+      esc(c.location||'—')+'</td><td><span class="pill">'+c.why+'</span></td></tr>').join('')+
+    '</table><div class="hint">Self-pickup clients belong here. Anything else needs its Master location fixed.</div></div>'
+  ) : '';
+
+  const agentOpts = ['<option value="">— agent —</option>']
+    .concat(agents.map(a=>'<option value="'+esc(a.name||a)+'">'+esc(a.name||a)+'</option>'))
+    .concat('<option value="__new">+ new agent</option>').join('');
+
+  $('routes').innerHTML = routes.map((r,i)=>{
+    const m=r.m, bad=!fits(m);
+    return '<div class="route'+(bad?' over':'')+'">'+
+      '<div class="rhead">'+
+        '<span class="rname">'+r.name+'</span>'+
+        chip(m.parcels+' parcels', m.parcels>num('maxP'))+
+        chip(m.km.toFixed(1)+' km')+
+        chip(Math.round(m.total)+' min', m.total>num('maxMin'))+
+        chip('last '+m.lastKm.toFixed(1)+' km', m.lastKm>num('maxKm'))+
+        chip(m.kmpp.toFixed(2)+' km/p')+
+        '<span class="spacer"></span>'+
+        '<select onchange="pickAgent('+i+',this)">'+agentOpts.replace(
+           'value="'+esc(r.agent)+'"','value="'+esc(r.agent)+'" selected')+'</select>'+
+        '<div class="split">'+
+          '<button onclick="autoSplit('+i+',4)">Split /4</button>'+
+          '<button onclick="manualSplit('+i+')">Split picked</button>'+
+          (i>0?'<button onclick="mergeUp('+i+')">Merge up</button>':'')+
+        '</div>'+
+      '</div>'+
+      '<div class="rbody"><table>'+
+        '<tr><th></th><th>name</th><th>phone</th><th>zone</th><th class="num">km</th><th>location</th></tr>'+
+        r.rows.slice().sort((a,b)=>kmFromKitchen(a.coord)-kmFromKitchen(b.coord)).map(c=>{
+          const z=(zoneMap[ptKey(c.coord)]||{}).zone||'—';
+          return '<tr><td><input type="checkbox" class="pick" data-r="'+i+'" data-p="'+c.phone+'"></td>'+
+            '<td>'+esc(c.name)+'</td><td>'+c.phone+'</td>'+
+            '<td><span class="pill">'+z+'</span></td>'+
+            '<td class="num">'+kmFromKitchen(c.coord).toFixed(1)+'</td>'+
+            '<td>'+esc(c.location||'')+'</td></tr>';
+        }).join('')+
+      '</table></div></div>';
+  }).join('');
+}
+
+function pickAgent(i, sel){
+  if (sel.value === '__new'){
+    const nm = prompt('New agent name'); if (!nm){ sel.value=routes[i].agent||''; return; }
+    const ph = prompt('Agent phone') || '';
+    agents.push({ name:nm, phone:ph });
+    routes[i].agent = nm; routes[i].agentPhone = ph;
+    render(); return;
+  }
+  routes[i].agent = sel.value;
+  const a = agents.find(x=>(x.name||x)===sel.value);
+  routes[i].agentPhone = (a && a.phone) || '';
+}
+
+const chip = (t,bad) => '<span class="chip'+(bad?' bad':'')+'">'+t+'</span>';
+const cardEl = (n,l,cls) => '<div class="card '+(cls||'')+'"><div class="n">'+n+'</div><div class="l">'+l+'</div></div>';
+const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+</script>
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCqVJgCfV0C1KBF0u1Jc02p_RHE7K7g1V8" async defer></script>
+</body>
+</html>
