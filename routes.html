@@ -131,7 +131,22 @@ const KITCHEN = { lat: 17.452623115758335, lng: 78.41967516576499 };
 const BOUNDS  = { latMin:17.0, latMax:17.8, lngMin:78.0, lngMax:78.8 };
 const SECTORS = ['N','NE','E','SE','S','SW','W','NW'];
 
+const LS_KEY = 'friska_roadcache_v1';
+
+function lsLoad(){
+  try { return JSON.parse(localStorage.getItem(LS_KEY) || '{}'); } catch(e){ return {}; }
+}
+function lsMerge(pairs){
+  try {
+    const cur = lsLoad();
+    Object.keys(pairs).forEach(k=>cur[k]=pairs[k]);
+    localStorage.setItem(LS_KEY, JSON.stringify(cur));
+    return Object.keys(cur).length;
+  } catch(e){ return -1; }   // quota full or private mode
+}
+
 const $ = id => document.getElementById(id);
+let cacheNote = '', autoMeasured = false;
 let clients = [], notRouted = [], routes = [], zoneMap = {}, roadCache = {},
     agents = [], measured = null, unassigned = [], addOpen = null, addFilter = '';
 
@@ -139,6 +154,9 @@ $('api').value = (typeof API_URL !== 'undefined' && API_URL) ? API_URL
                : (localStorage.getItem('rb_api') || '');
 const n = new Date();
 $('date').value = n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');
+/* Measure needs the day's client list, so it loads first if you have not. */
+$('date').addEventListener('change', ()=>{ $('measure').disabled = false; });
+$('measure').disabled = false;
 
 const setStatus = m => $('status').textContent = m;
 const num = id => parseFloat($(id).value) || 0;
@@ -458,10 +476,24 @@ async function load(){
 
     // only the legs among today's points, so the payload never grows unbounded
     const keys = uniqPts(clients).map(ptKey).concat([ptKey(KITCHEN)]);
-    const rp = await api('getRoadPairsFor', { points: JSON.stringify(keys) });
-    roadCache = (rp && rp.pairs) || {};
+    let fromSheet = {}, sheetErr = '';
+    try {
+      const rp = await api('getRoadPairsFor', { points: JSON.stringify(keys) });
+      if (rp && rp.ok) fromSheet = rp.pairs || {};
+      else sheetErr = 'RoadCache unreachable — check the getRoadPairsFor line in doPost and redeploy.';
+    } catch(e){ sheetErr = 'RoadCache call failed: '+e.message; }
+
+    const fromBrowser = lsLoad();
+    roadCache = { ...fromBrowser, ...fromSheet };
+
+    const nSheet = Object.keys(fromSheet).length;
+    const nLocal = Object.keys(fromBrowser).length;
+    cacheNote = nSheet + ' legs from sheet, ' + nLocal + ' held in this browser.'
+              + (sheetErr ? '  ' + sheetErr : '');
+    if (sheetErr) console.warn(sheetErr);
 
     unassigned = []; addOpen = null; addFilter = '';
+    autoMeasured = false;
     history = []; $('undo').disabled = true;
     routes = [];
     $('measure').disabled = false;
@@ -495,8 +527,13 @@ function buildAndRender(){
       + 'Press <b>Measure distances</b> to fetch them from Google — they are cached '
       + 'permanently, so this is a one-time cost for these locations.<br><br>'
       + 'Only legs within <b>' + num('nearKm') + ' km</b> or inside the same zone are bought. '
-      + 'Raising that number measures more and costs more.</div>';
-    setStatus(clients.length + ' parcels loaded. ' + need.length + ' legs need measuring.');
+      + 'Raising that number measures more and costs more.<br><br>'
+      + '<button class="go" onclick="document.getElementById(\'measure\').click()">Measure now</button>'
+      + '</div>';
+    setStatus(clients.length + ' parcels loaded. ' + need.length + ' legs need measuring.  ' + cacheNote);
+    // one click instead of two: ask about measuring right away, but only once
+    // per load so a declined prompt does not keep reappearing
+    if (!autoMeasured){ autoMeasured = true; setTimeout(()=>$('measure').click(), 250); }
     return;
   }
 
@@ -504,7 +541,8 @@ function buildAndRender(){
   $('rebuild').disabled = false;
   $('save').disabled = false;
   render();
-  setStatus('Built ' + routes.length + ' routes from ' + clients.length + ' parcels, all distances measured.'
+  setStatus('Built ' + routes.length + ' routes from ' + clients.length + ' parcels, nothing measured this run.  '
+    + cacheNote
     + (newlyZoned ? '  ' + newlyZoned + ' new location(s) placed into zones — press Rebuild zones to keep that.' : ''));
 }
 
@@ -513,6 +551,7 @@ $('measure').addEventListener('click', async () => {
   if (!window.google || !google.maps || !google.maps.DistanceMatrixService){
     setStatus('Google Maps still loading — try again in a moment.'); return;
   }
+  if (!clients.length){ await load(); if (!clients.length) return; }
 
   const need = missingPairs(uniqPts(clients));
   if (!need.length){ setStatus('Every leg already measured and cached.'); buildAndRender(); return; }
@@ -559,7 +598,22 @@ $('measure').addEventListener('click', async () => {
     }
   }
 
-  const saved = await api('saveRoadCache', { pairs: JSON.stringify(fresh) });
+  const nLocal = lsMerge(fresh);
+
+  let saved = null, saveErr = '';
+  try { saved = await api('saveRoadCache', { pairs: JSON.stringify(fresh) }); }
+  catch(e){ saveErr = e.message; }
+
+  if (!saved || !saved.ok){
+    $('modeNote').insertAdjacentHTML('afterbegin',
+      '<div class="note live"><b>RoadCache did not save.</b> These measurements are held in '
+      + 'this browser only, so another device would pay for them again. '
+      + (saveErr ? 'Error: '+esc(saveErr)+'. ' : '')
+      + 'Check the saveRoadCache line in doPost and that you deployed a new version.</div>');
+  }
+  cacheNote = (saved && saved.ok ? (saved.added||0)+' legs written to the sheet' : 'sheet write FAILED')
+            + (nLocal >= 0 ? ', '+nLocal+' held in this browser.' : '.');
+
   buildAndRender();
   setStatus('Measured '+Object.keys(fresh).length+' legs, cached '+(saved.added||0)+
             (failed?', '+failed+' failed':'')+'.');
