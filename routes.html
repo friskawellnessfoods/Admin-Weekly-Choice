@@ -108,12 +108,12 @@
 
 <div class="limits">
   <label>max parcels <input type="number" id="maxP" value="20" min="1"></label>
-  <label>max km to last <input type="number" id="maxKm" value="35" min="1"></label>
+  <label title="kitchen to the final parcel. 0 = no limit">max km reach* <input type="number" id="maxKm" value="0" min="0"></label>
+  <label title="total driving across the whole route. 0 = no limit">max km driven <input type="number" id="maxTotKm" value="40" min="0"></label>
   <label>max minutes <input type="number" id="maxMin" value="180" min="10"></label>
   <label>min/stop <input type="number" id="stopMin" value="2" min="0" step="0.5"></label>
-  <label title="fallback only, for legs not yet measured">km/h* <input type="number" id="speed" value="25" min="5"></label>
-  <label title="fallback only, for legs not yet measured">road factor* <input type="number" id="rf" value="1.35" min="1" step="0.01"></label>
-  <label>zone radius km <input type="number" id="zr" value="2.5" min="0.2" step="0.1"></label>
+  <label title="points closer than this ride together in one zone">zone radius km <input type="number" id="zr" value="2.5" min="0.2" step="0.1"></label>
+  <label title="only measure legs between zones this close. Keeps the Google bill small.">measure within km <input type="number" id="nearKm" value="6" min="1" step="0.5"></label>
   <span id="cover"></span>
 </div>
 
@@ -167,14 +167,44 @@ const ptKey = c => c.lat.toFixed(5)+','+c.lng.toFixed(5);
 const roadKey = (a,b) => a.lat.toFixed(6)+','+a.lng.toFixed(6)+'>'+b.lat.toFixed(6)+','+b.lng.toFixed(6);
 
 /* ---------- distance: real pairwise where measured, estimate otherwise ---------- */
-let legReal = 0, legTotal = 0;   // coverage counters, reset per measure() pass
+let legReal = 0, legTotal = 0, missingLegs = 0;   // coverage counters
 
 function roadPair(a, b){
   const hit = roadCache[roadKey(a,b)] || roadCache[roadKey(b,a)];
   legTotal++;
   if (hit){ legReal++; return { km: hit.km, min: hit.min, real: true }; }
-  const km = hv(a,b) * num('rf');
-  return { km, min: km / num('speed') * 60, real: false };
+  missingLegs++;
+  return { km: Infinity, min: Infinity, real: false };
+}
+
+/* Which legs are worth buying.
+   Always: kitchen to every point — that is how a route starts and how we
+   know how far out a client is.
+   Between points: only if they are in the same zone, or in zones close
+   enough that the chain could plausibly hop between them. A leg across the
+   city is never chosen by a nearest-neighbour chain, so paying for it is
+   waste. See usablePair(). */
+function usablePair(a, b){
+  if (hv(a,b) <= num('nearKm')) return true;          // simply close together
+  const za = (zoneMap[ptKey(a)]||{}).zone, zb = (zoneMap[ptKey(b)]||{}).zone;
+  return !!(za && zb && za === zb);                    // or same zone regardless
+}
+
+function missingPairs(pts){
+  const need = [];
+  const have = (a,b) => roadCache[roadKey(a,b)] || roadCache[roadKey(b,a)];
+
+  pts.forEach(p=>{
+    if (!have(KITCHEN,p)) need.push([KITCHEN,p]);
+    if (!have(p,KITCHEN)) need.push([p,KITCHEN]);
+  });
+
+  for (let i=0;i<pts.length;i++) for (let j=0;j<pts.length;j++){
+    if (i===j) continue;
+    if (!usablePair(pts[i],pts[j])) continue;
+    if (!have(pts[i],pts[j])) need.push([pts[i],pts[j]]);
+  }
+  return need;
 }
 function kmFromKitchen(c){ return roadPair(KITCHEN, c).km; }
 
@@ -197,7 +227,8 @@ function tour(pts){
         if (!d){
           const cand=[...path.slice(0,i),...path.slice(i).reverse()];
           if (len(cand)<len(path)-1e-9){ path=cand; improved=true; }
-        } else if (roadPair(a,c).km+roadPair(b,d).km < roadPair(a,b).km+roadPair(c,d).km-1e-9){
+        } else if (isFinite(roadPair(a,c).km) && isFinite(roadPair(b,d).km) &&
+                   roadPair(a,c).km+roadPair(b,d).km < roadPair(a,b).km+roadPair(c,d).km-1e-9){
           path=[...path.slice(0,i),...path.slice(i,j+1).reverse(),...path.slice(j+1)];
           improved=true;
         }
@@ -227,7 +258,11 @@ function uniqPts(rows){
   return out;
 }
 function fits(m){
-  return m.parcels <= num('maxP') && m.lastKm <= num('maxKm') && m.total <= num('maxMin');
+  const cap = num('maxTotKm'), reach = num('maxKm');
+  return m.parcels <= num('maxP')
+      && m.total <= num('maxMin')
+      && (cap   <= 0 || m.km     <= cap)
+      && (reach <= 0 || m.lastKm <= reach);
 }
 
 /* ---------- zones: stable clusters of points ---------- */
@@ -242,7 +277,7 @@ function buildZones(points){
   const map = {};
   Object.keys(bySec).sort().forEach(sec=>{
     // farthest-first seeding keeps clusters stable as clients are added
-    let rem = bySec[sec].slice().sort((a,b)=>kmFromKitchen(b)-kmFromKitchen(a));
+    let rem = bySec[sec].slice().sort((a,b)=>hv(KITCHEN,b)-hv(KITCHEN,a));
     let idx = 0;
     while (rem.length){
       const seed = rem.shift();
@@ -251,53 +286,117 @@ function buildZones(points){
         if (hv(seed,rem[i]) <= num('zr')){ members.push(rem[i]); rem.splice(i,1); }
       }
       const zone = sec + (++idx);
-      members.forEach(m=>{ map[ptKey(m)] = { zone, sector:sec, km:+kmFromKitchen(m).toFixed(2) }; });
+      members.forEach(m=>{ const d=roadPair(KITCHEN,m).km;
+        map[ptKey(m)] = { zone, sector:sec, km: isFinite(d) ? +d.toFixed(2) : 0 }; });
     }
   });
   return map;
 }
 
-/* ---------- pack zones into routes, sweeping the compass ---------- */
+/* A point we have never seen before — a client's first order to their office,
+   or a brand new client — must join the zone it actually belongs to, not
+   become a lone zone and therefore a route of its own. Slots it into the
+   nearest existing zone when one is close enough, otherwise starts a new one.
+   Returns how many were newly placed. */
+function ensureZones(pts){
+  const unknown = pts.filter(p=>!zoneMap[ptKey(p)]);
+  if (!unknown.length) return 0;
+
+  // centroid of every zone we already know
+  const acc = {};
+  Object.keys(zoneMap).forEach(k=>{
+    const z = zoneMap[k].zone;
+    const [la,ln] = k.split(',').map(Number);
+    if (!acc[z]) acc[z] = { lat:0, lng:0, n:0, sector: zoneMap[k].sector };
+    acc[z].lat += la; acc[z].lng += ln; acc[z].n++;
+  });
+  const centres = Object.keys(acc).map(z=>({
+    zone:z, sector:acc[z].sector,
+    lat:acc[z].lat/acc[z].n, lng:acc[z].lng/acc[z].n
+  }));
+
+  let placed = 0;
+  unknown.forEach(p=>{
+    let best=null, bestD=Infinity;
+    centres.forEach(c=>{ const d=hv(p,c); if (d<bestD){ bestD=d; best=c; } });
+
+    if (best && bestD <= num('zr')){
+      zoneMap[ptKey(p)] = { zone: best.zone, sector: best.sector, km: 0 };
+    } else {
+      const sec = sectorOf(bearing(KITCHEN,p));
+      let n = 1;
+      while (Object.keys(acc).indexOf(sec+n) >= 0 ||
+             Object.values(zoneMap).some(v=>v.zone === sec+n)) n++;
+      zoneMap[ptKey(p)] = { zone: sec+n, sector: sec, km: 0 };
+      centres.push({ zone:sec+n, sector:sec, lat:p.lat, lng:p.lng });
+      acc[sec+n] = { n:1 };
+    }
+    placed++;
+  });
+  return placed;
+}
+
+/* ---------- pack: chain from the kitchen, nearest zone next ---------- *
+ * Start at the kitchen. Take the nearest zone, then the zone nearest to where
+ * that left off, and so on. When parcels / km / minutes would breach, close the
+ * route and start a fresh one from the kitchen. A zone that alone breaks the
+ * limits becomes its own route rather than dragging a good route over.
+ * ------------------------------------------------------------------ */
 function packRoutes(rows){
   const byZone = {};
   rows.forEach(r=>{
-    const z = (zoneMap[ptKey(r.coord)] || {}).zone || 'Z?';
+    const z = (zoneMap[ptKey(r.coord)] || {}).zone || ('P'+ptKey(r.coord));
     (byZone[z] = byZone[z] || []).push(r);
   });
 
-  // order zones by bearing then distance, so a sweep stays on one side
-  const zones = Object.keys(byZone).map(z=>{
-    const pts = uniqPts(byZone[z]);
-    const c = pts.reduce((a,p)=>({lat:a.lat+p.lat/pts.length, lng:a.lng+p.lng/pts.length}),{lat:0,lng:0});
-    return { zone:z, rows:byZone[z], brg:bearing(KITCHEN,c), km:kmFromKitchen(c) };
-  }).sort((a,b)=> a.brg-b.brg || a.km-b.km);
-
+  const left = new Set(Object.keys(byZone));
   const out = [];
-  let cur = [];
-  zones.forEach(z=>{
-    const trial = cur.concat(z.rows);
-    if (cur.length && !fits(measure(trial))){
-      out.push(cur); cur = z.rows.slice();
-    } else {
-      cur = trial;
-    }
-    // a single zone bigger than the limits has to be broken up on its own
-    while (!fits(measure(cur)) && cur.length > 1){
-      const overflow = cur.pop();
-      if (!out.spill) out.spill = [];
-      out.spill.push(overflow);
-    }
-  });
-  if (cur.length) out.push(cur);
+  let cur = [], from = KITCHEN, guard = 0;
 
-  if (out.spill && out.spill.length) out.push(out.spill);
-  delete out.spill;
+  while (left.size && guard++ < 500){
+
+    // nearest remaining zone, measured to its closest point
+    let bestZone = null, bestD = Infinity;
+    left.forEach(z=>{
+      byZone[z].forEach(r=>{
+        const d = roadPair(from, r.coord).km;
+        if (isFinite(d) && d < bestD){ bestD = d; bestZone = z; }
+      });
+    });
+
+    // nothing measured within reach of where we are: that is a genuinely
+    // isolated stop, so close this route and start again from the kitchen
+    // rather than guessing a distance across the city
+    if (!bestZone){
+      if (cur.length){ out.push(cur); cur = []; from = KITCHEN; continue; }
+      left.forEach(z=>{
+        byZone[z].forEach(r=>{
+          const d = roadPair(KITCHEN, r.coord).km;
+          if (isFinite(d) && d < bestD){ bestD = d; bestZone = z; }
+        });
+      });
+      if (!bestZone) break;
+    }
+
+    const trial = cur.concat(byZone[bestZone]);
+
+    if (cur.length && !fits(measure(trial))){
+      out.push(cur);            // close this route
+      cur = []; from = KITCHEN; // and retry the same zone on a fresh one
+      continue;
+    }
+
+    cur = trial;
+    left.delete(bestZone);
+    const m = measure(cur);
+    from = m.order[m.order.length-1] || from;   // carry on from the last stop
+  }
+
+  if (cur.length) out.push(cur);
 
   return out.map((rows,i)=>({
     name: 'R' + (i+1),
-    rows,
-    agent: '',
-    agentPhone: '',
+    rows, agent: '', agentPhone: '',
     m: measure(rows)
   }));
 }
@@ -317,7 +416,6 @@ async function load(){
     if (!boot || !boot.ok){ setStatus('Bootstrap failed: '+JSON.stringify(boot)); $('load').disabled=false; return; }
 
     const geo   = (boot.geo && boot.geo.geo) || {};
-    roadCache   = (boot.road && boot.road.pairs) || {};
     zoneMap     = (boot.zones && boot.zones.zones) || {};
     agents      = normAgents((boot.agents && boot.agents.agents) || []);
 
@@ -351,20 +449,56 @@ async function load(){
       clients.push({ ...c, phone, coord: { lat:+coord.lat, lng:+coord.lng } });
     });
 
-    if (!Object.keys(zoneMap).length){
-      zoneMap = buildZones(uniqPts(clients));
-      setStatus('No saved zones — built a fresh set from today. Press Rebuild zones to persist them.');
-    }
+    // only the legs among today's points, so the payload never grows unbounded
+    const keys = uniqPts(clients).map(ptKey).concat([ptKey(KITCHEN)]);
+    const rp = await api('getRoadPairsFor', { points: JSON.stringify(keys) });
+    roadCache = (rp && rp.pairs) || {};
 
-    routes = packRoutes(clients);
     unassigned = []; addOpen = null; addFilter = '';
     history = []; $('undo').disabled = true;
-    ['measure','rebuild','save'].forEach(b=>$(b).disabled=false);
-    render();
-    if (!$('status').textContent) setStatus('Built ' + routes.length + ' routes from ' + clients.length + ' parcels.');
+    routes = [];
+    $('measure').disabled = false;
+    $('rebuild').disabled = true;
+    $('save').disabled = true;
+
+    buildAndRender();
 
   } catch(e){ setStatus('Error: '+e.message); }
   $('load').disabled = false;
+}
+
+/* Routes are built only when every leg is a real Google measurement.
+   An unmeasured leg would be a guess, and a guess routes a rider wrongly. */
+function buildAndRender(){
+  const pts = uniqPts(clients);
+  // zones decide which legs are worth measuring, so they come first
+  let newlyZoned = 0;
+  if (!Object.keys(zoneMap).length) zoneMap = buildZones(pts);
+  else newlyZoned = ensureZones(pts);
+  const need = missingPairs(pts);
+
+  if (need.length){
+    routes = [];
+    render();
+    $('rebuild').disabled = true;
+    $('save').disabled = true;
+    $('routes').innerHTML =
+      '<div class="note live"><b>' + need.length + ' legs not measured.</b> '
+      + 'Routes are not built from estimates, so nothing is shown yet. '
+      + 'Press <b>Measure distances</b> to fetch them from Google — they are cached '
+      + 'permanently, so this is a one-time cost for these locations.<br><br>'
+      + 'Only legs within <b>' + num('nearKm') + ' km</b> or inside the same zone are bought. '
+      + 'Raising that number measures more and costs more.</div>';
+    setStatus(clients.length + ' parcels loaded. ' + need.length + ' legs need measuring.');
+    return;
+  }
+
+  routes = packRoutes(clients);
+  $('rebuild').disabled = false;
+  $('save').disabled = false;
+  render();
+  setStatus('Built ' + routes.length + ' routes from ' + clients.length + ' parcels, all distances measured.'
+    + (newlyZoned ? '  ' + newlyZoned + ' new location(s) placed into zones — press Rebuild zones to keep that.' : ''));
 }
 
 /* ---------- measure: full pairwise matrix, cached forever ---------- */
@@ -373,13 +507,8 @@ $('measure').addEventListener('click', async () => {
     setStatus('Google Maps still loading — try again in a moment.'); return;
   }
 
-  const pts = [KITCHEN, ...uniqPts(clients)];
-  const need = [];
-  for (const a of pts) for (const b of pts){
-    if (a === b) continue;
-    if (!roadCache[roadKey(a,b)]) need.push([a,b]);
-  }
-  if (!need.length){ setStatus('Every leg already measured and cached.'); return; }
+  const need = missingPairs(uniqPts(clients));
+  if (!need.length){ setStatus('Every leg already measured and cached.'); buildAndRender(); return; }
 
   if (!confirm(need.length + ' legs are not yet measured.\n\nFetch them from Google now? '
     + 'They are cached permanently, so this cost is paid once.')) return;
@@ -424,33 +553,11 @@ $('measure').addEventListener('click', async () => {
   }
 
   const saved = await api('saveRoadCache', { pairs: JSON.stringify(fresh) });
-  calibrate();
-  routes = packRoutes(clients);
-  render();
+  buildAndRender();
   setStatus('Measured '+Object.keys(fresh).length+' legs, cached '+(saved.added||0)+
-            (failed?', '+failed+' failed':'')+'. '+measured);
+            (failed?', '+failed+' failed':'')+'.');
   $('measure').disabled = false;
 });
-
-/* fallback constants, derived from whatever has been measured, so uncached
-   legs are estimated with your real numbers rather than my guesses */
-function calibrate(){
-  const keys = Object.keys(roadCache);
-  if (keys.length < 3){ measured = ''; return; }
-  let rfSum=0, spdSum=0, k=0;
-  keys.forEach(key=>{
-    const [aS,bS] = key.split('>');
-    const a = { lat:+aS.split(',')[0], lng:+aS.split(',')[1] };
-    const b = { lat:+bS.split(',')[0], lng:+bS.split(',')[1] };
-    const straight = hv(a,b), r = roadCache[key];
-    if (straight > 0.3 && r.min > 0){ rfSum += r.km/straight; spdSum += r.km/(r.min/60); k++; }
-  });
-  if (!k){ measured=''; return; }
-  const rf = rfSum/k, spd = spdSum/k;
-  $('rf').value = rf.toFixed(2);
-  $('speed').value = spd.toFixed(0);
-  measured = 'Measured road factor '+rf.toFixed(2)+', avg speed '+spd.toFixed(0)+' km/h.';
-}
 
 /* ---------- rebuild + save ---------- */
 $('rebuild').addEventListener('click', async () => {
@@ -672,11 +779,11 @@ function renumber(){
 
 /* ---------- render ---------- */
 function render(){
-  legReal = 0; legTotal = 0;
+  legReal = 0; legTotal = 0; missingLegs = 0;
   routes.forEach(r=>{ r.m = measure(r.rows); });
   const pct = legTotal ? Math.round(legReal/legTotal*100) : 0;
   $('cover').innerHTML = legTotal
-    ? '<span class="chip'+(pct<100?' bad':'')+'">'+pct+'% real distances</span>' : '';
+    ? '<span class="chip'+(pct<100?' bad':'')+'">'+pct+'% measured</span>' : '';
   const totKm = routes.reduce((s,r)=>s+r.m.km,0);
   const totP  = routes.reduce((s,r)=>s+r.m.parcels,0);
   const over  = routes.filter(r=>!fits(r.m)).length;
@@ -684,7 +791,7 @@ function render(){
   $('cards').innerHTML = [
     cardEl(routes.length,'routes', over?'bad':'ok'),
     cardEl(totP,'parcels'),
-    cardEl(totKm.toFixed(1)+' km','total'),
+    cardEl(totKm.toFixed(1)+' km','km driven'),
     cardEl(totP?(totKm/totP).toFixed(2):'0','km / parcel','info'),
     cardEl(notRouted.length,'not routed', notRouted.length?'bad':''),
     cardEl(over,'over limit', over?'bad':'ok')
@@ -724,9 +831,9 @@ function render(){
       '<div class="rhead">'+
         '<span class="rname">'+r.name+'</span>'+
         chip(m.parcels+' parcels', m.parcels>num('maxP'))+
-        chip(m.km.toFixed(1)+' km')+
+        chip(m.km.toFixed(1)+' km driven', num('maxTotKm')>0 && m.km>num('maxTotKm'))+
         chip(Math.round(m.total)+' min', m.total>num('maxMin'))+
-        chip('last '+m.lastKm.toFixed(1)+' km', m.lastKm>num('maxKm'))+
+        chip('reaches '+m.lastKm.toFixed(1)+' km', num('maxKm')>0 && m.lastKm>num('maxKm'))+
         chip(m.kmpp.toFixed(2)+' km/p')+
         '<span class="spacer"></span>'+
         '<select onchange="pickAgent('+i+',this)">'+agentOptsFor(r.agent)+'</select>'+
