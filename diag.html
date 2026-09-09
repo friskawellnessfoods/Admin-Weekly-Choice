@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Route data diagnostic</title>
+<style>
+  :root{
+    --bg:#0f1115; --panel:#171a21; --line:#272c36; --ink:#e6e9ef;
+    --dim:#8b93a3; --acc:#4ade80; --warn:#fbbf24; --bad:#f87171;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font:14px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;padding:20px}
+  h1{font-size:16px;margin:0 0 4px;font-weight:600}
+  .sub{color:var(--dim);font-size:12px;margin-bottom:18px}
+  .bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
+  input,select,button{font:inherit;background:var(--panel);color:var(--ink);
+       border:1px solid var(--line);border-radius:6px;padding:8px 10px}
+  input[type=text]{min-width:340px}
+  button{cursor:pointer;border-color:#3a4150}
+  button.go{background:var(--acc);color:#08130c;border-color:var(--acc);font-weight:600}
+  button:disabled{opacity:.5;cursor:default}
+  .status{color:var(--dim);font-size:12px;margin-bottom:14px;min-height:18px}
+  .cards{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:8px;
+        padding:10px 14px;min-width:110px}
+  .card .n{font-size:20px;font-weight:600}
+  .card .l{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.04em}
+  .card.warn .n{color:var(--warn)} .card.bad .n{color:var(--bad)}
+  table{border-collapse:collapse;width:100%;font-size:12px;margin-bottom:18px}
+  th,td{border-bottom:1px solid var(--line);padding:5px 8px;text-align:left;white-space:nowrap}
+  th{color:var(--dim);font-weight:500;position:sticky;top:0;background:var(--bg)}
+  .wrap{max-height:340px;overflow:auto;border:1px solid var(--line);border-radius:8px;margin-bottom:18px}
+  .prob{color:var(--bad)}
+  textarea{width:100%;height:260px;background:var(--panel);color:var(--ink);
+    border:1px solid var(--line);border-radius:8px;padding:12px;font:12px/1.45 ui-monospace,monospace;resize:vertical}
+  .hint{color:var(--dim);font-size:12px;margin:6px 0 20px}
+  h2{font-size:13px;color:var(--dim);text-transform:uppercase;letter-spacing:.05em;
+     font-weight:600;margin:22px 0 8px}
+</style>
+</head>
+<body>
+
+<h1>Route data diagnostic</h1>
+<div class="sub">Read-only. Calls getOrdersForDate + getClientGeo. Writes nothing.</div>
+
+<div class="bar">
+  <input type="text" id="api" placeholder="Apps Script web app URL (/exec)">
+  <input type="date" id="date">
+  <select id="slot">
+    <option value="">All slots</option>
+    <option>Morning</option>
+    <option>Afternoon</option>
+    <option>Evening</option>
+  </select>
+  <button class="go" id="run">Run</button>
+</div>
+
+<div class="status" id="status"></div>
+<div class="cards" id="cards"></div>
+<div id="tableArea"></div>
+
+<h2>Copy this and send it back</h2>
+<textarea id="out" readonly placeholder="Output appears here after you press Run."></textarea>
+<div class="bar" style="margin-top:8px">
+  <button id="copy">Copy JSON</button>
+  <button id="dl">Download .json</button>
+</div>
+<div class="hint">No names or phone numbers are included &mdash; each client is a short id only.</div>
+
+<script src="config.js" onerror="void 0"></script>
+<script>
+const KITCHEN = { lat: 17.452623115758335, lng: 78.41967516576499 };
+
+const $ = id => document.getElementById(id);
+const apiEl = $('api'), dateEl = $('date'), slotEl = $('slot');
+const statusEl = $('status'), cardsEl = $('cards'), tableArea = $('tableArea'), outEl = $('out');
+
+// pick up API_URL from config.js if it loaded, else remember what was typed
+const saved = localStorage.getItem('diag_api') || '';
+apiEl.value = (typeof API_URL !== 'undefined' && API_URL) ? API_URL : saved;
+
+const n = new Date();
+dateEl.value = n.getFullYear() + '-' + String(n.getMonth()+1).padStart(2,'0') + '-' + String(n.getDate()).padStart(2,'0');
+
+function setStatus(m){ statusEl.textContent = m; }
+
+async function apiPost(action, params = {}) {
+  const body = new URLSearchParams({ action, ...params });
+  const res = await fetch(apiEl.value.trim(), { method:'POST', body, redirect:'follow' });
+  return res.json();
+}
+
+function toRad(d){ return d * Math.PI / 180; }
+
+function haversineKm(a, b){
+  const R = 6371;
+  const dLat = toRad(b.lat - a.lat), dLng = toRad(b.lng - a.lng);
+  const s = Math.sin(dLat/2)**2 +
+            Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(s), Math.sqrt(1-s));
+}
+
+function bearingDeg(a, b){
+  const y = Math.sin(toRad(b.lng-a.lng)) * Math.cos(toRad(b.lat));
+  const x = Math.cos(toRad(a.lat))*Math.sin(toRad(b.lat)) -
+            Math.sin(toRad(a.lat))*Math.cos(toRad(b.lat))*Math.cos(toRad(b.lng-a.lng));
+  return (Math.atan2(y, x) * 180/Math.PI + 360) % 360;
+}
+
+const SECTORS = ['N','NE','E','SE','S','SW','W','NW'];
+function sectorOf(deg){ return SECTORS[Math.round(deg/45) % 8]; }
+
+function round(v, p){ const m = Math.pow(10,p); return Math.round(v*m)/m; }
+
+$('run').addEventListener('click', run);
+
+async function run(){
+  const url = apiEl.value.trim();
+  if (!url){ setStatus('Paste the web app URL first.'); return; }
+  if (!dateEl.value){ setStatus('Pick a date.'); return; }
+  localStorage.setItem('diag_api', url);
+
+  $('run').disabled = true;
+  cardsEl.innerHTML = ''; tableArea.innerHTML = ''; outEl.value = '';
+  setStatus('Loading orders and geo cache…');
+
+  try {
+    const [ord, geoRes] = await Promise.all([
+      apiPost('getOrdersForDate', { date: dateEl.value }),
+      apiPost('getClientGeo')
+    ]);
+
+    if (!ord || !ord.success){ setStatus('getOrdersForDate failed: ' + JSON.stringify(ord)); $('run').disabled = false; return; }
+    const geo = (geoRes && geoRes.ok && geoRes.geo) ? geoRes.geo : {};
+
+    let clients = ord.clients || [];
+    if (slotEl.value) clients = clients.filter(c => String(c.slot||'').trim() === slotEl.value);
+
+    const rows = [], problems = [];
+    let idSeq = 0;
+    const idByKey = {};
+
+    clients.forEach(c => {
+      const phone = String(c.phone||'').replace(/\D/g,'').slice(-10);
+      const g = geo[phone] || {};
+      const loc  = String(c.location  || '').trim();
+      const l1   = String(c.location1 || '').trim();
+      const l2   = String(c.location2 || '').trim();
+
+      // which of the two saved locations did they order to?
+      let which = null, coord = null;
+      if (c.overrideLat != null && c.overrideLng != null) {
+        which = 'override';
+        coord = { lat: +c.overrideLat, lng: +c.overrideLng };
+      } else if (loc && l2 && loc === l2) {
+        which = 'loc2'; coord = g.loc2 || null;
+      } else if (loc && l1 && loc === l1) {
+        which = 'loc1'; coord = g.loc1 || null;
+      } else {
+        which = 'unmatched'; coord = g.loc1 || g.loc2 || null;
+      }
+
+      // stable short id, one per phone+which so two slots at one address share it
+      const key = phone + '|' + which;
+      if (!idByKey[key]) idByKey[key] = 'c' + (++idSeq);
+      const id = idByKey[key];
+
+      const bad = [];
+      if (which === 'unmatched') bad.push('ordered location matches neither Location 1 nor Location 2');
+      if (!coord || coord.lat == null || coord.lng == null) bad.push('no coordinates resolved from maps link');
+
+      if (bad.length){
+        problems.push({ id, slot: c.slot||'', which, issues: bad,
+                        loc: loc.slice(0,60), l1: l1.slice(0,60), l2: l2.slice(0,60) });
+      }
+
+      if (coord && coord.lat != null && coord.lng != null){
+        const km  = haversineKm(KITCHEN, coord);
+        const brg = bearingDeg(KITCHEN, coord);
+        rows.push({
+          id, slot: String(c.slot||'').trim(), which,
+          lat: round(coord.lat, 6), lng: round(coord.lng, 6),
+          kmDirect: round(km, 2), bearing: round(brg, 1), sector: sectorOf(brg),
+          routeNow: String(c.route||'').trim()
+        });
+      }
+    });
+
+    rows.sort((a,b) => a.sector.localeCompare(b.sector) || a.kmDirect - b.kmDirect);
+
+    const bySlot = {}, bySector = {};
+    rows.forEach(r => {
+      bySlot[r.slot||'?']   = (bySlot[r.slot||'?']||0) + 1;
+      bySector[r.sector]    = (bySector[r.sector]||0) + 1;
+    });
+
+    const uniqueCoords = new Set(rows.map(r => r.lat + ',' + r.lng)).size;
+    const maxKm = rows.length ? Math.max(...rows.map(r => r.kmDirect)) : 0;
+
+    cardsEl.innerHTML = [
+      card(clients.length, 'orders'),
+      card(rows.length, 'geocoded'),
+      card(uniqueCoords, 'distinct pts'),
+      card(round(maxKm,1) + ' km', 'furthest'),
+      card(Object.keys(bySector).length, 'sectors'),
+      card(problems.length, 'problems', problems.length ? 'bad' : '')
+    ].join('');
+
+    tableArea.innerHTML =
+      '<div class="wrap"><table><thead><tr>' +
+      '<th>id</th><th>slot</th><th>which</th><th>sector</th><th>km</th><th>brg</th><th>lat</th><th>lng</th><th>route now</th>' +
+      '</tr></thead><tbody>' +
+      rows.map(r => '<tr><td>'+r.id+'</td><td>'+r.slot+'</td><td>'+r.which+'</td><td>'+r.sector+
+        '</td><td>'+r.kmDirect+'</td><td>'+r.bearing+'</td><td>'+r.lat+'</td><td>'+r.lng+
+        '</td><td>'+(r.routeNow||'—')+'</td></tr>').join('') +
+      '</tbody></table></div>' +
+      (problems.length ? '<h2>Problems</h2><div class="wrap"><table><thead><tr>' +
+        '<th>id</th><th>slot</th><th>issue</th><th>ordered location</th></tr></thead><tbody>' +
+        problems.map(p => '<tr><td>'+p.id+'</td><td>'+p.slot+'</td><td class="prob">'+
+          p.issues.join('; ')+'</td><td>'+esc(p.loc)+'</td></tr>').join('') +
+        '</tbody></table></div>' : '');
+
+    outEl.value = JSON.stringify({
+      date: dateEl.value,
+      slotFilter: slotEl.value || 'all',
+      kitchen: KITCHEN,
+      counts: {
+        orders: clients.length,
+        geocoded: rows.length,
+        distinctPoints: uniqueCoords,
+        bySlot, bySector,
+        problems: problems.length
+      },
+      furthestKmDirect: round(maxKm, 2),
+      points: rows,
+      problems: problems
+    }, null, 1);
+
+    setStatus('Done. ' + rows.length + ' of ' + clients.length + ' orders have coordinates.' +
+      (problems.length ? '  ' + problems.length + ' need attention.' : ''));
+
+  } catch (err) {
+    setStatus('Error: ' + err.message);
+  }
+  $('run').disabled = false;
+}
+
+function card(n, l, cls){
+  return '<div class="card '+(cls||'')+'"><div class="n">'+n+'</div><div class="l">'+l+'</div></div>';
+}
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+$('copy').addEventListener('click', () => {
+  if (!outEl.value) return;
+  outEl.select();
+  navigator.clipboard.writeText(outEl.value)
+    .then(() => setStatus('Copied.'))
+    .catch(() => { document.execCommand('copy'); setStatus('Copied.'); });
+});
+
+$('dl').addEventListener('click', () => {
+  if (!outEl.value) return;
+  const b = new Blob([outEl.value], { type:'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(b);
+  a.download = 'route-diag-' + dateEl.value + '.json';
+  a.click();
+});
+</script>
+</body>
+</html>
