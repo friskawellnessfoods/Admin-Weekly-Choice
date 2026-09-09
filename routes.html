@@ -65,6 +65,7 @@
   .note.draft{background:rgba(96,165,250,.09);border:1px solid var(--info);color:var(--info)}
   .note.live{background:rgba(248,113,113,.09);border:1px solid var(--bad);color:var(--bad)}
   .sel td{background:rgba(96,165,250,.09)}
+  tr.same td{color:var(--dim)}
   input[type=checkbox]{width:14px;height:14px;accent-color:var(--info)}
   button.x{background:none;border:none;color:var(--dim);font-size:16px;
     line-height:1;padding:0 5px;cursor:pointer}
@@ -213,8 +214,14 @@ function tour(pts){
   if (!pts.length) return { km:0, min:0, last:KITCHEN, order:[] };
   let rem = pts.slice(), cur = KITCHEN, order = [];
   while (rem.length){
-    let j=0, best=Infinity;
-    rem.forEach((p,i)=>{ const d=roadPair(cur,p).km; if(d<best){best=d;j=i;} });
+    let j=-1, best=Infinity;
+    rem.forEach((p,i)=>{ const d=roadPair(cur,p).km; if(isFinite(d) && d<best){best=d;j=i;} });
+    if (j < 0){
+      // nothing measured from here — fall back to distance from the kitchen,
+      // which is always measured, rather than picking an arbitrary point
+      rem.forEach((p,i)=>{ const d=roadPair(KITCHEN,p).km; if(isFinite(d) && d<best){best=d;j=i;} });
+      if (j < 0) j = 0;
+    }
     cur = rem[j]; order.push(cur); rem.splice(j,1);
   }
   const len = p => { let t=0; for(let k=0;k<p.length-1;k++) t+=roadPair(p[k],p[k+1]).km; return t; };
@@ -852,18 +859,50 @@ function render(){
            '<input id="addSearch" placeholder="search name or phone…" oninput="onAddFilter(this.value)">'+
            '<div id="addList" class="addlist">'+addListHtml(i)+'</div></div>' : '')+
         '<table>'+
-        '<tr><th></th><th>name</th><th>phone</th><th>zone</th><th class="num">km</th><th>location</th><th></th></tr>'+
-        r.rows.slice().sort((a,b)=>roadPair(KITCHEN,a.coord).km-roadPair(KITCHEN,b.coord).km).map(c=>{
-          const z=(zoneMap[ptKey(c.coord)]||{}).zone||'—';
-          return '<tr><td><input type="checkbox" class="pick" data-r="'+i+'" data-p="'+c.phone+'"></td>'+
+        '<tr><th class="num">#</th><th></th><th>name</th><th>phone</th><th>zone</th>'+
+        '<th class="num">leg km</th><th class="num">from kitchen</th><th>location</th><th></th></tr>'+
+        inDriveOrder(r).map(x=>{
+          const c=x.c, z=(zoneMap[ptKey(c.coord)]||{}).zone||'—';
+          return '<tr'+(x.same?' class="same"':'')+'>'+
+            '<td class="num">'+(x.same?'&#8226;':x.stop)+'</td>'+
+            '<td><input type="checkbox" class="pick" data-r="'+i+'" data-p="'+c.phone+'"></td>'+
             '<td>'+esc(c.name)+'</td><td>'+c.phone+'</td>'+
             '<td><span class="pill">'+z+'</span></td>'+
+            '<td class="num">'+(x.same?'—':x.legKm.toFixed(1))+'</td>'+
             '<td class="num">'+roadPair(KITCHEN,c.coord).km.toFixed(1)+'</td>'+
             '<td>'+esc(c.location||'')+'</td>'+
             '<td><button class="x" title="remove from route" onclick="removeClient('+i+',\''+c.phone+'\')">&times;</button></td></tr>';
         }).join('')+
       '</table></div></div>';
   }).join('');
+}
+
+/* Rows in the order the rider actually drives them. Several parcels at one
+   building share a stop number, and only the first carries the leg distance —
+   you drive to the building once. */
+function inDriveOrder(r){
+  const order = r.m.order || [];
+  const byPt = {};
+  r.rows.forEach(c=>{ const k=ptKey(c.coord); (byPt[k]=byPt[k]||[]).push(c); });
+
+  const out = [];
+  let prev = KITCHEN, stop = 0;
+
+  order.forEach(p=>{
+    const k = ptKey(p), group = byPt[k];
+    if (!group) return;
+    stop++;
+    const legKm = roadPair(prev, p).km;
+    group.forEach((c,gi)=> out.push({ c, stop, legKm, same: gi>0 }));
+    delete byPt[k];
+    prev = p;
+  });
+
+  // anything the tour did not place, so it can never be silently dropped
+  Object.keys(byPt).forEach(k=>{
+    byPt[k].forEach((c,gi)=> out.push({ c, stop:'?', legKm:0, same: gi>0 }));
+  });
+  return out;
 }
 
 function pickAgent(i, sel){
