@@ -36,7 +36,9 @@
   .rname{font-weight:600;font-size:14px;min-width:88px;cursor:text;
     border-bottom:1px dashed transparent;padding:1px 3px;border-radius:3px}
   .rname:hover{border-bottom-color:var(--dim);background:var(--bg)}
-  .status{color:var(--dim);font-size:12px;min-height:18px;margin-bottom:12px}
+  .statusrow{display:flex;gap:9px;align-items:center;flex-wrap:wrap;
+    min-height:20px;margin-bottom:12px}
+  .status{color:var(--dim);font-size:12px}
   .cards{display:flex;gap:9px;flex-wrap:wrap;margin-bottom:16px}
   .card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:9px 13px;min-width:96px}
   .card .n{font-size:19px;font-weight:600}
@@ -140,7 +142,7 @@
 </div>
 
 <div id="modeNote"></div>
-<div class="status" id="status"></div>
+<div class="statusrow"><span class="status" id="status"></span><span id="cover"></span></div>
 <div class="cards" id="cards"></div>
 <div id="notRouted"></div>
 <div id="pool"></div>
@@ -155,7 +157,13 @@ const SLOT_ORDER  = ['Morning','Afternoon','Evening'];
 const SLOT_PREFIX = { Morning:'M', Afternoon:'A', Evening:'E' };
 const slotsWanted = () => $('slot').value ? [$('slot').value] : SLOT_ORDER;
 
-const $ = id => document.getElementById(id);
+/* A missing element used to throw and blank the page. Return a harmless stub
+   instead, so a UI change can never take the whole tool down. */
+const $ = id => document.getElementById(id) || {
+  value:'', textContent:'', innerHTML:'', disabled:false, hidden:true,
+  classList:{ add(){}, remove(){}, toggle(){} },
+  addEventListener(){}, insertAdjacentHTML(){}, focus(){}, click(){}, select(){}
+};
 let cacheNote = '', autoMeasured = false;
 let clients = [], notRouted = [], routes = [], zoneMap = {}, roadCache = {},
     agents = [], measured = null, unassigned = [], addOpen = null, addFilter = '';
