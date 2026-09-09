@@ -61,8 +61,29 @@
     letter-spacing:.05em;font-weight:600;margin:20px 0 9px}
   .hint{color:var(--dim);font-size:11px;margin-top:4px}
   .split{display:flex;gap:5px;align-items:center}
+  .note{border-radius:8px;padding:8px 12px;margin-bottom:11px;font-size:12px}
+  .note.draft{background:rgba(96,165,250,.09);border:1px solid var(--info);color:var(--info)}
+  .note.live{background:rgba(248,113,113,.09);border:1px solid var(--bad);color:var(--bad)}
   .sel td{background:rgba(96,165,250,.09)}
   input[type=checkbox]{width:14px;height:14px;accent-color:var(--info)}
+  button.x{background:none;border:none;color:var(--dim);font-size:16px;
+    line-height:1;padding:0 5px;cursor:pointer}
+  button.x:hover{color:var(--bad)}
+  .addpanel{background:var(--panel2);border:1px solid var(--line);
+    border-radius:7px;padding:9px;margin-bottom:9px}
+  .addpanel input{width:100%;margin-bottom:7px}
+  .addlist{max-height:190px;overflow:auto}
+  .addrow{display:flex;gap:9px;align-items:center;padding:5px 7px;
+    border-radius:5px;cursor:pointer;font-size:12px}
+  .addrow:hover{background:var(--bg)}
+  .addrow span:first-child{flex:1}
+  .dim{color:var(--dim);font-size:11px}
+  .pool{background:var(--panel);border:1px solid var(--info);
+    border-radius:9px;padding:11px 14px;margin-bottom:14px}
+  .pool h3{margin:0 0 7px;font-size:12px;color:var(--info);
+    text-transform:uppercase;letter-spacing:.05em}
+  .pool select{padding:3px 6px;font-size:11px}
+  .pool button{padding:3px 8px;font-size:11px}
 </style>
 </head>
 <body>
@@ -75,8 +96,13 @@
   <input type="date" id="date">
   <select id="slot"><option>Afternoon</option><option>Morning</option><option>Evening</option></select>
   <button class="go" id="load">Load &amp; build</button>
-  <button id="measure" disabled>Measure real distances</button>
+  <button id="measure" disabled>Measure distances</button>
+  <button id="undo" disabled>Undo</button>
   <button class="warn" id="rebuild" disabled>Rebuild zones</button>
+  <select id="mode" title="Draft writes to a sheet nothing reads. Live overrides Master Client List.">
+    <option value="draft">Draft (safe)</option>
+    <option value="live">Live — overrides Master</option>
+  </select>
   <button id="save" disabled>Save routes</button>
 </div>
 
@@ -85,14 +111,17 @@
   <label>max km to last <input type="number" id="maxKm" value="35" min="1"></label>
   <label>max minutes <input type="number" id="maxMin" value="180" min="10"></label>
   <label>min/stop <input type="number" id="stopMin" value="2" min="0" step="0.5"></label>
-  <label>km/h <input type="number" id="speed" value="25" min="5"></label>
-  <label>road factor <input type="number" id="rf" value="1.35" min="1" step="0.01"></label>
+  <label title="fallback only, for legs not yet measured">km/h* <input type="number" id="speed" value="25" min="5"></label>
+  <label title="fallback only, for legs not yet measured">road factor* <input type="number" id="rf" value="1.35" min="1" step="0.01"></label>
   <label>zone radius km <input type="number" id="zr" value="2.5" min="0.2" step="0.1"></label>
+  <span id="cover"></span>
 </div>
 
+<div id="modeNote"></div>
 <div class="status" id="status"></div>
 <div class="cards" id="cards"></div>
 <div id="notRouted"></div>
+<div id="pool"></div>
 <div id="routes"></div>
 
 <script src="config.js" onerror="void 0"></script>
@@ -103,7 +132,7 @@ const SECTORS = ['N','NE','E','SE','S','SW','W','NW'];
 
 const $ = id => document.getElementById(id);
 let clients = [], notRouted = [], routes = [], zoneMap = {}, roadCache = {},
-    agents = [], measured = null, dirtyRoad = {};
+    agents = [], measured = null, unassigned = [], addOpen = null, addFilter = '';
 
 $('api').value = (typeof API_URL !== 'undefined' && API_URL) ? API_URL
                : (localStorage.getItem('rb_api') || '');
@@ -137,29 +166,30 @@ const inBounds = c => c && c.lat!=null && c.lng!=null &&
 const ptKey = c => c.lat.toFixed(5)+','+c.lng.toFixed(5);
 const roadKey = (a,b) => a.lat.toFixed(6)+','+a.lng.toFixed(6)+'>'+b.lat.toFixed(6)+','+b.lng.toFixed(6);
 
-/* real road km from kitchen if we measured it, else haversine x factor */
-function kmFromKitchen(c){
-  const hit = roadCache[roadKey(KITCHEN,c)];
-  if (hit) return hit.km;
-  return hv(KITCHEN,c)*num('rf');
-}
-function minFromKitchen(c){
-  const hit = roadCache[roadKey(KITCHEN,c)];
-  if (hit) return hit.min;
-  return kmFromKitchen(c)/num('speed')*60;
-}
+/* ---------- distance: real pairwise where measured, estimate otherwise ---------- */
+let legReal = 0, legTotal = 0;   // coverage counters, reset per measure() pass
 
-/* open path from kitchen, nearest neighbour then 2-opt */
+function roadPair(a, b){
+  const hit = roadCache[roadKey(a,b)] || roadCache[roadKey(b,a)];
+  legTotal++;
+  if (hit){ legReal++; return { km: hit.km, min: hit.min, real: true }; }
+  const km = hv(a,b) * num('rf');
+  return { km, min: km / num('speed') * 60, real: false };
+}
+function kmFromKitchen(c){ return roadPair(KITCHEN, c).km; }
+
+/* open path from kitchen, nearest neighbour then 2-opt, on real road km */
 function tour(pts){
-  if (!pts.length) return { km:0, last:KITCHEN, order:[] };
+  if (!pts.length) return { km:0, min:0, last:KITCHEN, order:[] };
   let rem = pts.slice(), cur = KITCHEN, order = [];
   while (rem.length){
     let j=0, best=Infinity;
-    rem.forEach((p,i)=>{ const d=hv(cur,p); if(d<best){best=d;j=i;} });
+    rem.forEach((p,i)=>{ const d=roadPair(cur,p).km; if(d<best){best=d;j=i;} });
     cur = rem[j]; order.push(cur); rem.splice(j,1);
   }
+  const len = p => { let t=0; for(let k=0;k<p.length-1;k++) t+=roadPair(p[k],p[k+1]).km; return t; };
   let path = [KITCHEN, ...order], improved = true, guard = 0;
-  while (improved && guard++ < 60){
+  while (improved && guard++ < 40){
     improved = false;
     for (let i=1;i<path.length-1;i++){
       for (let j=i+1;j<path.length;j++){
@@ -167,26 +197,27 @@ function tour(pts){
         if (!d){
           const cand=[...path.slice(0,i),...path.slice(i).reverse()];
           if (len(cand)<len(path)-1e-9){ path=cand; improved=true; }
-        } else if (hv(a,c)+hv(b,d) < hv(a,b)+hv(c,d)-1e-9){
+        } else if (roadPair(a,c).km+roadPair(b,d).km < roadPair(a,b).km+roadPair(c,d).km-1e-9){
           path=[...path.slice(0,i),...path.slice(i,j+1).reverse(),...path.slice(j+1)];
           improved=true;
         }
       }
     }
   }
-  function len(p){ let t=0; for(let k=0;k<p.length-1;k++) t+=hv(p[k],p[k+1]); return t; }
-  return { km: len(path)*num('rf'), last: path[path.length-1], order: path.slice(1) };
+  let km=0, min=0;
+  for (let k=0;k<path.length-1;k++){ const l=roadPair(path[k],path[k+1]); km+=l.km; min+=l.min; }
+  return { km, min, last: path[path.length-1], order: path.slice(1) };
 }
 
 function measure(rows){
   const pts = uniqPts(rows);
   const t = tour(pts);
-  const drive = t.km / num('speed') * 60;
-  const stop  = rows.length * num('stopMin');
+  const stop = rows.length * num('stopMin');
   return {
     parcels: rows.length, points: pts.length,
-    km: t.km, drive, stop, total: drive+stop,
-    lastKm: kmFromKitchen(t.last), kmpp: rows.length ? t.km/rows.length : 0,
+    km: t.km, drive: t.min, stop, total: t.min + stop,
+    lastKm: roadPair(KITCHEN, t.last).km,
+    kmpp: rows.length ? t.km/rows.length : 0,
     order: t.order
   };
 }
@@ -326,6 +357,8 @@ async function load(){
     }
 
     routes = packRoutes(clients);
+    unassigned = []; addOpen = null; addFilter = '';
+    history = []; $('undo').disabled = true;
     ['measure','rebuild','save'].forEach(b=>$(b).disabled=false);
     render();
     if (!$('status').textContent) setStatus('Built ' + routes.length + ' routes from ' + clients.length + ' parcels.');
@@ -334,54 +367,82 @@ async function load(){
   $('load').disabled = false;
 }
 
-/* ---------- measure real distances (kitchen -> each point) ---------- */
+/* ---------- measure: full pairwise matrix, cached forever ---------- */
 $('measure').addEventListener('click', async () => {
   if (!window.google || !google.maps || !google.maps.DistanceMatrixService){
     setStatus('Google Maps still loading — try again in a moment.'); return;
   }
-  const pts = uniqPts(clients).filter(p => !roadCache[roadKey(KITCHEN,p)]);
-  if (!pts.length){ setStatus('All points already measured and cached.'); calibrate(); return; }
+
+  const pts = [KITCHEN, ...uniqPts(clients)];
+  const need = [];
+  for (const a of pts) for (const b of pts){
+    if (a === b) continue;
+    if (!roadCache[roadKey(a,b)]) need.push([a,b]);
+  }
+  if (!need.length){ setStatus('Every leg already measured and cached.'); return; }
+
+  if (!confirm(need.length + ' legs are not yet measured.\n\nFetch them from Google now? '
+    + 'They are cached permanently, so this cost is paid once.')) return;
 
   $('measure').disabled = true;
-  setStatus('Measuring '+pts.length+' points against Google…');
+
+  // group by origin so each request is one origin against <=25 destinations
+  const byOrigin = new Map();
+  need.forEach(([a,b])=>{
+    const k = ptKey(a);
+    if (!byOrigin.has(k)) byOrigin.set(k, { origin:a, dests:[] });
+    byOrigin.get(k).dests.push(b);
+  });
 
   const svc = new google.maps.DistanceMatrixService();
   const fresh = {};
-  for (let i=0;i<pts.length;i+=25){
-    const chunk = pts.slice(i,i+25);
-    await new Promise(res=>{
-      svc.getDistanceMatrix(
-        { origins:[KITCHEN], destinations:chunk, travelMode: google.maps.TravelMode.DRIVING },
-        (r,st)=>{
-          if (st==='OK' && r.rows[0]) r.rows[0].elements.forEach((el,j)=>{
-            if (el.status==='OK'){
-              const k = roadKey(KITCHEN, chunk[j]);
-              const v = { km: el.distance.value/1000, min: el.duration.value/60 };
-              roadCache[k] = v; fresh[k] = v;
-            }
+  let done = 0, failed = 0;
+
+  for (const { origin, dests } of byOrigin.values()){
+    for (let i=0;i<dests.length;i+=25){
+      const chunk = dests.slice(i,i+25);
+      await new Promise(res=>{
+        svc.getDistanceMatrix(
+          { origins:[origin], destinations:chunk, travelMode: google.maps.TravelMode.DRIVING },
+          (r,st)=>{
+            if (st==='OK' && r.rows[0]){
+              r.rows[0].elements.forEach((el,j)=>{
+                if (el.status==='OK'){
+                  const k = roadKey(origin, chunk[j]);
+                  const v = { km: el.distance.value/1000, min: el.duration.value/60 };
+                  roadCache[k] = v; fresh[k] = v;
+                } else failed++;
+              });
+            } else { failed += chunk.length; setStatus('Distance Matrix returned '+st); }
+            res();
           });
-          else setStatus('Distance Matrix returned '+st);
-          res();
-        });
-    });
+      });
+      done += chunk.length;
+      setStatus('Measured '+done+' of '+need.length+' legs…');
+      await new Promise(r=>setTimeout(r,120));   // stay under the rate limit
+    }
   }
 
   const saved = await api('saveRoadCache', { pairs: JSON.stringify(fresh) });
   calibrate();
   routes = packRoutes(clients);
   render();
-  setStatus('Measured '+Object.keys(fresh).length+' points, cached '+(saved.added||0)+'. '+measured);
+  setStatus('Measured '+Object.keys(fresh).length+' legs, cached '+(saved.added||0)+
+            (failed?', '+failed+' failed':'')+'. '+measured);
   $('measure').disabled = false;
 });
 
-/* derive the real road factor and real average speed from measured points */
+/* fallback constants, derived from whatever has been measured, so uncached
+   legs are estimated with your real numbers rather than my guesses */
 function calibrate(){
-  const pts = uniqPts(clients).filter(p=>roadCache[roadKey(KITCHEN,p)]);
-  if (pts.length < 3){ measured = ''; return; }
+  const keys = Object.keys(roadCache);
+  if (keys.length < 3){ measured = ''; return; }
   let rfSum=0, spdSum=0, k=0;
-  pts.forEach(p=>{
-    const r = roadCache[roadKey(KITCHEN,p)];
-    const straight = hv(KITCHEN,p);
+  keys.forEach(key=>{
+    const [aS,bS] = key.split('>');
+    const a = { lat:+aS.split(',')[0], lng:+aS.split(',')[1] };
+    const b = { lat:+bS.split(',')[0], lng:+bS.split(',')[1] };
+    const straight = hv(a,b), r = roadCache[key];
     if (straight > 0.3 && r.min > 0){ rfSum += r.km/straight; spdSum += r.km/(r.min/60); k++; }
   });
   if (!k){ measured=''; return; }
@@ -402,25 +463,60 @@ $('rebuild').addEventListener('click', async () => {
 });
 
 $('save').addEventListener('click', async () => {
-  const date = $('date').value, slot = $('slot').value;
-  if (!confirm('Write '+routes.length+' routes to RouteAssign for '+date+' '+slot+'?')) return;
-  $('save').disabled = true;
-  let ok=0, fail=0;
-  for (const r of routes){
-    const res = await api('saveRouteAssignment', {
-      date, slot, route: r.name, phones: r.rows.map(x=>x.phone).join(',')
-    });
-    if (res && res.ok) ok++; else fail++;
-    if (r.agent){
-      await api('saveDeliveryAgent', { route:r.name, name:r.agent, agentPhone:r.agentPhone||'' });
-    }
+  const date = $('date').value, slot = $('slot').value, live = $('mode').value === 'live';
+
+  if (unassigned.length && !confirm(unassigned.length+' client(s) are still unassigned and will NOT be saved.\n\nContinue anyway?')) return;
+
+  if (live){
+    if (!confirm('LIVE SAVE\n\nThis writes RouteAssign, which overrides Master Client List. '
+      + 'delivery.html and kitchen-status.html will immediately show these routes for '
+      + date + ' ' + slot + '.\n\nProceed?')) return;
+  } else {
+    if (!confirm('Save '+routes.length+' routes as a DRAFT for '+date+' '+slot+'?\n\n'
+      + 'Nothing reads the draft sheet, so delivery stays on Master Client List.')) return;
   }
-  setStatus('Saved '+ok+' routes'+(fail?', '+fail+' failed':'')+'.');
+
+  $('save').disabled = true;
+  try {
+    if (!live){
+      const payload = routes.map(r=>({
+        name: r.name, agent: r.agent||'', agentPhone: r.agentPhone||'',
+        phones: r.rows.map(x=>x.phone)
+      }));
+      const res = await api('saveRouteDraft', { date, slot, routes: JSON.stringify(payload) });
+      setStatus(res && res.ok
+        ? 'Draft saved — '+res.routes+' routes, '+res.clients+' clients. Live delivery unchanged.'
+        : 'Draft save failed: '+JSON.stringify(res));
+    } else {
+      let ok=0, fail=0;
+      for (const r of routes){
+        const res = await api('saveRouteAssignment', {
+          date, slot, route: r.name, phones: r.rows.map(x=>x.phone).join(',')
+        });
+        if (res && res.ok) ok++; else fail++;
+        if (r.agent) await api('saveDeliveryAgent', { route:r.name, name:r.agent, agentPhone:r.agentPhone||'' });
+      }
+      setStatus('Saved LIVE: '+ok+' routes'+(fail?', '+fail+' failed':'')+'.');
+    }
+  } catch(e){ setStatus('Save error: '+e.message); }
   $('save').disabled = false;
 });
 
+function renderMode(){
+  const live = $('mode').value === 'live';
+  $('modeNote').innerHTML = live
+    ? '<div class="note live"><b>Live mode.</b> Saving writes RouteAssign and DeliveryAgents. '
+      + 'These override Master Client List, so delivery.html and kitchen-status.html will show '
+      + 'these routes immediately.</div>'
+    : '<div class="note draft"><b>Draft mode.</b> Saving writes RouteAssignDraft, which nothing reads. '
+      + 'delivery.html keeps running off Master Client List exactly as before.</div>';
+}
+$('mode').addEventListener('change', renderMode);
+renderMode();
+
 /* ---------- split ---------- */
 function autoSplit(ri, size){
+  snapshot();
   const r = routes[ri];
   const pts = r.m.order;
   const ordered = [];
@@ -443,6 +539,7 @@ function manualSplit(ri){
   const picked = [...document.querySelectorAll('input.pick[data-r="'+ri+'"]:checked')]
     .map(el=>el.dataset.p);
   if (!picked.length){ setStatus('Tick the clients to move out first.'); return; }
+  snapshot();
   const r = routes[ri];
   const out = r.rows.filter(x=>picked.includes(x.phone));
   const stay = r.rows.filter(x=>!picked.includes(x.phone));
@@ -453,12 +550,120 @@ function manualSplit(ri){
   renumber(); render();
 }
 
-function mergeUp(ri){
-  if (ri===0) return;
-  const a=routes[ri-1], b=routes[ri];
-  const rows=a.rows.concat(b.rows);
-  routes.splice(ri-1,2,{ ...a, rows, m:measure(rows) });
+function mergeInto(ri, sel){
+  const ti = parseInt(sel.value);
+  sel.value = '';
+  if (isNaN(ti) || ti === ri) return;
+  snapshot();
+  const target = routes[ti], src = routes[ri];
+  const rows = target.rows.concat(src.rows);
+  routes[ti] = { ...target, rows, m: measure(rows) };
+  routes.splice(ri, 1);
   renumber(); render();
+  setStatus('Merged into ' + routes[ti > ri ? ti-1 : ti].name + '. Undo is available.');
+}
+
+/* ---------- undo ---------- */
+let history = [];
+function snapshot(){
+  history.push(routes.map(r=>({ ...r, rows: r.rows.slice() })));
+  if (history.length > 30) history.shift();
+  $('undo').disabled = false;
+}
+$('undo').addEventListener('click', () => {
+  if (!history.length) return;
+  routes = history.pop();
+  $('undo').disabled = !history.length;
+  render();
+  setStatus('Reverted.');
+});
+
+function removeClient(ri, phone){
+  snapshot();
+  const r = routes[ri];
+  const idx = r.rows.findIndex(x=>x.phone===phone);
+  if (idx < 0) return;
+  unassigned.push(r.rows[idx]);
+  r.rows.splice(idx,1);
+  if (!r.rows.length) routes.splice(ri,1); else r.m = measure(r.rows);
+  renumber(); render();
+}
+
+/* pull a client into route ri from the unassigned pool or another route */
+function addClient(ri, phone){
+  snapshot();
+  let c = null;
+  const ui = unassigned.findIndex(x=>x.phone===phone);
+  if (ui >= 0) c = unassigned.splice(ui,1)[0];
+  else {
+    for (let i=0;i<routes.length;i++){
+      const j = routes[i].rows.findIndex(x=>x.phone===phone);
+      if (j >= 0){
+        c = routes[i].rows.splice(j,1)[0];
+        if (!routes[i].rows.length){ routes.splice(i,1); if (i < ri) ri--; }
+        else routes[i].m = measure(routes[i].rows);
+        break;
+      }
+    }
+  }
+  if (!c) return;
+  routes[ri].rows.push(c);
+  routes[ri].m = measure(routes[ri].rows);
+  renumber(); render();
+}
+
+/* send an unassigned client to a route chosen from the dropdown */
+function assignFromPool(phone, sel){
+  const ri = parseInt(sel.value);
+  sel.value = '';
+  if (isNaN(ri)) return;
+  addClient(ri, phone);
+}
+
+/* an unassigned client can also become a route of its own */
+function poolToNewRoute(phone){
+  snapshot();
+  const i = unassigned.findIndex(x=>x.phone===phone);
+  if (i < 0) return;
+  const c = unassigned.splice(i,1)[0];
+  routes.push({ name:'R'+(routes.length+1), rows:[c], agent:'', agentPhone:'', m:measure([c]) });
+  renumber(); render();
+}
+
+function toggleAdd(ri){
+  addOpen = (addOpen === ri) ? null : ri;
+  addFilter = '';
+  render();
+  const box = document.getElementById('addSearch');
+  if (box) box.focus();
+}
+function onAddFilter(v){
+  addFilter = v;
+  const list = document.getElementById('addList');
+  if (list) list.innerHTML = addListHtml(addOpen);
+}
+
+function addListHtml(ri){
+  const inRoute = {};
+  routes[ri].rows.forEach(x=>inRoute[x.phone]=1);
+  const f = addFilter.trim().toLowerCase();
+
+  const pool = unassigned.map(c=>({ c, from:'unassigned' }));
+  const others = [];
+  routes.forEach((r,i)=>{ if (i!==ri) r.rows.forEach(c=>others.push({ c, from:r.name })); });
+
+  const rows = pool.concat(others)
+    .filter(x=>!inRoute[x.c.phone])
+    .filter(x=>!f || String(x.c.name||'').toLowerCase().includes(f) || x.c.phone.includes(f));
+
+  if (!rows.length) return '<div class="hint">Nothing matches.</div>';
+
+  return rows.map(x=>
+    '<div class="addrow" onclick="addClient('+ri+',\''+x.c.phone+'\')">'+
+      '<span>'+esc(x.c.name)+'</span>'+
+      '<span class="pill">'+x.from+'</span>'+
+      '<span class="dim">'+roadPair(KITCHEN,x.c.coord).km.toFixed(1)+' km</span>'+
+    '</div>').join('');
 }
 
 function renumber(){
@@ -467,6 +672,11 @@ function renumber(){
 
 /* ---------- render ---------- */
 function render(){
+  legReal = 0; legTotal = 0;
+  routes.forEach(r=>{ r.m = measure(r.rows); });
+  const pct = legTotal ? Math.round(legReal/legTotal*100) : 0;
+  $('cover').innerHTML = legTotal
+    ? '<span class="chip'+(pct<100?' bad':'')+'">'+pct+'% real distances</span>' : '';
   const totKm = routes.reduce((s,r)=>s+r.m.km,0);
   const totP  = routes.reduce((s,r)=>s+r.m.parcels,0);
   const over  = routes.filter(r=>!fits(r.m)).length;
@@ -493,6 +703,21 @@ function render(){
        (a.name===sel?' selected':'')+'>'+esc(a.name)+'</option>'))
     .concat('<option value="__new">+ new agent</option>').join('');
 
+  $('pool').innerHTML = unassigned.length ? (
+    '<div class="pool"><h3>Unassigned &mdash; '+unassigned.length+
+    ' <span class="dim">(these will NOT be saved)</span></h3><table>'+
+    '<tr><th>name</th><th>phone</th><th class="num">km</th><th>location</th><th>send to</th></tr>'+
+    unassigned.slice().sort((a,b)=>roadPair(KITCHEN,a.coord).km-roadPair(KITCHEN,b.coord).km)
+      .map(c=>'<tr><td>'+esc(c.name)+'</td><td>'+c.phone+'</td>'+
+        '<td class="num">'+roadPair(KITCHEN,c.coord).km.toFixed(1)+'</td>'+
+        '<td>'+esc(c.location||'')+'</td>'+
+        '<td><select onchange="assignFromPool(\''+c.phone+'\',this)">'+
+          '<option value="">route…</option>'+
+          routes.map((o,oi)=>'<option value="'+oi+'">'+esc(o.name)+'</option>').join('')+
+        '</select> <button onclick="poolToNewRoute(\''+c.phone+'\')">new route</button></td></tr>').join('')+
+    '</table></div>'
+  ) : '';
+
   $('routes').innerHTML = routes.map((r,i)=>{
     const m=r.m, bad=!fits(m);
     return '<div class="route'+(bad?' over':'')+'">'+
@@ -506,20 +731,29 @@ function render(){
         '<span class="spacer"></span>'+
         '<select onchange="pickAgent('+i+',this)">'+agentOptsFor(r.agent)+'</select>'+
         '<div class="split">'+
+          '<button onclick="toggleAdd('+i+')">'+(addOpen===i?'Close':'+ Add')+'</button>'+
           '<button onclick="autoSplit('+i+',4)">Split /4</button>'+
           '<button onclick="manualSplit('+i+')">Split picked</button>'+
-          (i>0?'<button onclick="mergeUp('+i+')">Merge up</button>':'')+
+          (routes.length>1 ? '<select onchange="mergeInto('+i+',this)">'+
+             '<option value="">merge into…</option>'+
+             routes.map((o,oi)=>oi===i?'':'<option value="'+oi+'">'+esc(o.name)+'</option>').join('')+
+           '</select>' : '')+
         '</div>'+
       '</div>'+
-      '<div class="rbody"><table>'+
-        '<tr><th></th><th>name</th><th>phone</th><th>zone</th><th class="num">km</th><th>location</th></tr>'+
-        r.rows.slice().sort((a,b)=>kmFromKitchen(a.coord)-kmFromKitchen(b.coord)).map(c=>{
+      '<div class="rbody">'+
+        (addOpen===i ? '<div class="addpanel">'+
+           '<input id="addSearch" placeholder="search name or phone…" oninput="onAddFilter(this.value)">'+
+           '<div id="addList" class="addlist">'+addListHtml(i)+'</div></div>' : '')+
+        '<table>'+
+        '<tr><th></th><th>name</th><th>phone</th><th>zone</th><th class="num">km</th><th>location</th><th></th></tr>'+
+        r.rows.slice().sort((a,b)=>roadPair(KITCHEN,a.coord).km-roadPair(KITCHEN,b.coord).km).map(c=>{
           const z=(zoneMap[ptKey(c.coord)]||{}).zone||'—';
           return '<tr><td><input type="checkbox" class="pick" data-r="'+i+'" data-p="'+c.phone+'"></td>'+
             '<td>'+esc(c.name)+'</td><td>'+c.phone+'</td>'+
             '<td><span class="pill">'+z+'</span></td>'+
-            '<td class="num">'+kmFromKitchen(c.coord).toFixed(1)+'</td>'+
-            '<td>'+esc(c.location||'')+'</td></tr>';
+            '<td class="num">'+roadPair(KITCHEN,c.coord).km.toFixed(1)+'</td>'+
+            '<td>'+esc(c.location||'')+'</td>'+
+            '<td><button class="x" title="remove from route" onclick="removeClient('+i+',\''+c.phone+'\')">&times;</button></td></tr>';
         }).join('')+
       '</table></div></div>';
   }).join('');
