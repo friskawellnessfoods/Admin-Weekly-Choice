@@ -64,6 +64,9 @@
     border-radius:9px;padding:11px 14px;margin-bottom:14px}
   .notrouted h3{margin:0 0 7px;font-size:12px;color:var(--warn);
     text-transform:uppercase;letter-spacing:.05em}
+  h2.slothead{font-size:13px;color:var(--acc);text-transform:uppercase;
+    letter-spacing:.06em;font-weight:600;margin:22px 0 9px;
+    border-bottom:1px solid var(--line);padding-bottom:5px}
   h2{font-size:12px;color:var(--dim);text-transform:uppercase;
     letter-spacing:.05em;font-weight:600;margin:20px 0 9px}
   .hint{color:var(--dim);font-size:11px;margin-top:4px}
@@ -101,7 +104,10 @@
 
 <div class="bar">
   <input type="date" id="date">
-  <select id="slot"><option>Afternoon</option><option>Morning</option><option>Evening</option></select>
+  <select id="slot">
+    <option value="">All slots</option>
+    <option>Morning</option><option>Afternoon</option><option>Evening</option>
+  </select>
   <button class="go" id="load">Build routes</button>
   <select id="mode" title="Draft writes to a sheet nothing reads. Live is what delivery.html and kitchen.html read.">
     <option value="draft">Draft (safe)</option>
@@ -145,6 +151,9 @@
 const KITCHEN = { lat: 17.452623115758335, lng: 78.41967516576499 };
 const BOUNDS  = { latMin:17.0, latMax:17.8, lngMin:78.0, lngMax:78.8 };
 const SECTORS = ['N','NE','E','SE','S','SW','W','NW'];
+const SLOT_ORDER  = ['Morning','Afternoon','Evening'];
+const SLOT_PREFIX = { Morning:'M', Afternoon:'A', Evening:'E' };
+const slotsWanted = () => $('slot').value ? [$('slot').value] : SLOT_ORDER;
 
 const $ = id => document.getElementById(id);
 let cacheNote = '', autoMeasured = false;
@@ -376,7 +385,24 @@ function ensureZones(pts){
  * route and start a fresh one from the kitchen. A zone that alone breaks the
  * limits becomes its own route rather than dragging a good route over.
  * ------------------------------------------------------------------ */
-function packRoutes(rows){
+/* RouteAssign is keyed by date + slot + route, and a rider runs one slot at a
+   time, so each slot is packed on its own. Names are prefixed M / A / E so a
+   route is identifiable at a glance in kitchen.html and delivery.html. */
+function packRoutes(allRows){
+  const out = [];
+  SLOT_ORDER.forEach(slot=>{
+    const rows = allRows.filter(c=>String(c.slot||'').trim() === slot);
+    if (!rows.length) return;
+    packOneSlot(rows).forEach((r,i)=>{
+      r.slot = slot;
+      r.name = SLOT_PREFIX[slot] + (i+1);
+      out.push(r);
+    });
+  });
+  return out;
+}
+
+function packOneSlot(rows){
   const byZone = {};
   rows.forEach(r=>{
     const z = (zoneMap[ptKey(r.coord)] || {}).zone || ('P'+ptKey(r.coord));
@@ -428,9 +454,8 @@ function packRoutes(rows){
 
   if (cur.length) out.push(cur);
 
-  return out.map((rows,i)=>({
-    name: 'R' + (i+1),
-    rows, agent: '', agentPhone: '',
+  return out.map(rows=>({
+    name: '', slot: '', rows, agent: '', agentPhone: '',
     m: measure(rows)
   }));
 }
@@ -452,8 +477,9 @@ async function load(){
     zoneMap     = (boot.zones && boot.zones.zones) || {};
     agents      = normAgents((boot.agents && boot.agents.agents) || []);
 
+    const want = slotsWanted();
     const all = ((boot.orders && boot.orders.clients) || [])
-      .filter(c => String(c.slot||'').trim() === $('slot').value);
+      .filter(c => want.indexOf(String(c.slot||'').trim()) >= 0);
 
     clients = []; notRouted = [];
 
@@ -634,40 +660,49 @@ $('rebuild').addEventListener('click', async () => {
 });
 
 $('save').addEventListener('click', async () => {
-  const date = $('date').value, slot = $('slot').value, live = $('mode').value === 'live';
+  const date = $('date').value, live = $('mode').value === 'live';
+  const slotsHere = [...new Set(routes.map(r=>r.slot).filter(Boolean))];
 
   if (unassigned.length && !confirm(unassigned.length+' client(s) are still unassigned and will NOT be saved.\n\nContinue anyway?')) return;
 
+  if (!slotsHere.length){ setStatus('Nothing to save.'); return; }
+
   if (live){
     if (!confirm('LIVE SAVE\n\nThis writes RouteAssign, which overrides Master Client List. '
-      + 'delivery.html and kitchen-status.html will immediately show these routes for '
-      + date + ' ' + slot + '.\n\nProceed?')) return;
+      + 'delivery.html and kitchen.html will immediately show these routes for '
+      + date + ' — ' + slotsHere.join(', ') + '.\n\nProceed?')) return;
   } else {
-    if (!confirm('Save '+routes.length+' routes as a DRAFT for '+date+' '+slot+'?\n\n'
+    if (!confirm('Save '+routes.length+' routes as a DRAFT for '+date+'\n('
+      + slotsHere.join(', ') + ')?\n\n'
       + 'Nothing reads the draft sheet, so delivery stays on Master Client List.')) return;
   }
 
   $('save').disabled = true;
   try {
     if (!live){
-      const payload = routes.map(r=>({
-        name: r.name, agent: r.agent||'', agentPhone: r.agentPhone||'',
-        phones: r.rows.map(x=>x.phone)
-      }));
-      const res = await api('saveRouteDraft', { date, slot, routes: JSON.stringify(payload) });
-      setStatus(res && res.ok
-        ? 'Draft saved — '+res.routes+' routes, '+res.clients+' clients. Live delivery unchanged.'
-        : 'Draft save failed: '+JSON.stringify(res));
+      let routeCount = 0, clientCount = 0, bad = '';
+      for (const sl of slotsHere){
+        const payload = routes.filter(r=>r.slot === sl).map(r=>({
+          name: r.name, agent: r.agent||'', agentPhone: r.agentPhone||'',
+          phones: r.rows.map(x=>x.phone)
+        }));
+        const res = await api('saveRouteDraft', { date, slot: sl, routes: JSON.stringify(payload) });
+        if (res && res.ok){ routeCount += res.routes; clientCount += res.clients; }
+        else bad += ' ' + sl + ' failed.';
+      }
+      setStatus('Draft saved — '+routeCount+' routes, '+clientCount+' clients across '
+        + slotsHere.join(', ') + '. Live delivery unchanged.' + bad);
     } else {
       let ok=0, fail=0;
       for (const r of routes){
         const res = await api('saveRouteAssignment', {
-          date, slot, route: r.name, phones: r.rows.map(x=>x.phone).join(',')
+          date, slot: r.slot, route: r.name, phones: r.rows.map(x=>x.phone).join(',')
         });
         if (res && res.ok) ok++; else fail++;
         if (r.agent) await api('saveDeliveryAgent', { route:r.name, name:r.agent, agentPhone:r.agentPhone||'' });
       }
-      setStatus('Saved LIVE: '+ok+' routes'+(fail?', '+fail+' failed':'')+'.');
+      setStatus('Saved LIVE: '+ok+' routes across '+slotsHere.join(', ')
+        + (fail?', '+fail+' failed':'')+'.');
     }
   } catch(e){ setStatus('Save error: '+e.message); }
   $('save').disabled = false;
@@ -798,7 +833,8 @@ function poolToNewRoute(phone){
   const i = unassigned.findIndex(x=>x.phone===phone);
   if (i < 0) return;
   const c = unassigned.splice(i,1)[0];
-  routes.push({ name:'R'+(routes.length+1), rows:[c], agent:'', agentPhone:'', m:measure([c]) });
+  routes.push({ name:'', slot:String(c.slot||'').trim(), rows:[c],
+                agent:'', agentPhone:'', m:measure([c]) });
   renumber(); render();
 }
 
@@ -854,7 +890,12 @@ function renameRoute(i){
 }
 
 function renumber(){
-  routes.forEach((r,i)=>{ if(!r.renamed && !/-/.test(r.name)) r.name='R'+(i+1); });
+  const seen = {};
+  routes.forEach(r=>{
+    const p = SLOT_PREFIX[r.slot] || 'R';
+    seen[p] = (seen[p] || 0) + 1;
+    if (!r.renamed && !/-/.test(r.name)) r.name = p + seen[p];
+  });
 }
 
 /* ---------- render ---------- */
@@ -883,6 +924,7 @@ function render(){
 
   $('cards').innerHTML = [
     cardEl(routes.length,'routes', over?'bad':'ok'),
+    cardEl([...new Set(routes.map(r=>r.slot))].length,'slots'),
     cardEl(totP,'parcels'),
     cardEl(totKm.toFixed(1)+' km','km driven'),
     cardEl(totP?(totKm/totP).toFixed(2):'0','km / parcel','info'),
@@ -918,9 +960,17 @@ function render(){
     '</table></div>'
   ) : '';
 
+  let lastSlot = null;
   $('routes').innerHTML = routes.map((r,i)=>{
     const m=r.m, bad=!fits(m);
-    return '<div class="route'+(bad?' over':'')+'">'+
+    let head = '';
+    if (r.slot !== lastSlot){
+      const n = routes.filter(x=>x.slot===r.slot).reduce((s,x)=>s+x.m.parcels,0);
+      head = '<h2 class="slothead">'+esc(r.slot||'Unassigned slot')+
+             ' &mdash; '+routes.filter(x=>x.slot===r.slot).length+' routes, '+n+' parcels</h2>';
+      lastSlot = r.slot;
+    }
+    return head + '<div class="route'+(bad?' over':'')+'">'+
       '<div class="rhead">'+
         '<span class="rname" title="click to rename" onclick="renameRoute('+i+')">'+esc(r.name)+'</span>'+
         chip(m.parcels+' parcels', m.parcels>num('maxP'))+
