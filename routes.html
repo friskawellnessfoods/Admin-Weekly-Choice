@@ -164,7 +164,7 @@ const $ = id => document.getElementById(id) || {
   classList:{ add(){}, remove(){}, toggle(){} },
   addEventListener(){}, insertAdjacentHTML(){}, focus(){}, click(){}, select(){}
 };
-let cacheNote = '', autoMeasured = false;
+let cacheNote = '', autoMeasured = false, refined = false;
 let clients = [], notRouted = [], routes = [], zoneMap = {}, roadCache = {},
     agents = [], measured = null, unassigned = [], addOpen = null, addFilter = '';
 
@@ -235,6 +235,22 @@ function usablePair(a, b){
   return !!(za && zb && za === zb);                    // or same zone regardless
 }
 
+/* Every pair inside a route, however far apart. These are the legs the rider
+   actually drives, so the optimiser must be able to compare all of them —
+   otherwise 2-opt silently skips the swap that would have shortened the run. */
+function missingRoutePairs(){
+  const need = [];
+  const have = (a,b) => roadCache[roadKey(a,b)] || roadCache[roadKey(b,a)];
+  routes.forEach(r=>{
+    const pts = uniqPts(r.rows);
+    for (let i=0;i<pts.length;i++) for (let j=0;j<pts.length;j++){
+      if (i===j) continue;
+      if (!have(pts[i],pts[j])) need.push([pts[i],pts[j]]);
+    }
+  });
+  return need;
+}
+
 function missingPairs(pts){
   const need = [];
   const have = (a,b) => roadCache[roadKey(a,b)] || roadCache[roadKey(b,a)];
@@ -270,7 +286,7 @@ function tour(pts){
   }
   const len = p => { let t=0; for(let k=0;k<p.length-1;k++) t+=roadPair(p[k],p[k+1]).km; return t; };
   let path = [KITCHEN, ...order], improved = true, guard = 0;
-  while (improved && guard++ < 40){
+  while (improved && guard++ < 200){
     improved = false;
     for (let i=1;i<path.length-1;i++){
       for (let j=i+1;j<path.length;j++){
@@ -531,7 +547,7 @@ async function load(){
     if (sheetErr) console.warn(sheetErr);
 
     unassigned = []; addOpen = null; addFilter = '';
-    autoMeasured = false;
+    autoMeasured = false; refined = false;
     history = []; $('undo').disabled = true;
     routes = [];
     $('measure').disabled = false;
@@ -576,6 +592,21 @@ function buildAndRender(){
   }
 
   routes = packRoutes(clients);
+
+  // Second pass: the packer decided WHO travels together using nearby legs
+  // only. Now buy every leg inside each route so the order within it can be
+  // optimised properly, then pack once more on the fuller picture.
+  if (!refined){
+    const inner = missingRoutePairs();
+    if (inner.length){
+      refined = true;
+      setStatus('Routes drafted. Measuring ' + inner.length + ' legs inside them to optimise the order…');
+      measureLegs(inner).then(()=>{ buildAndRender(); });
+      return;
+    }
+    refined = true;
+  }
+
   $('rebuild').disabled = false;
   $('save').disabled = false;
   render();
@@ -585,21 +616,11 @@ function buildAndRender(){
 }
 
 /* ---------- measure: full pairwise matrix, cached forever ---------- */
-$('measure').addEventListener('click', async () => {
-  if (!window.google || !google.maps || !google.maps.DistanceMatrixService){
-    setStatus('Google Maps still loading — try again in a moment.'); return;
-  }
-  if (!clients.length){ await load(); if (!clients.length) return; }
+/* Fetch a list of legs from Google and persist them for everyone. */
+async function measureLegs(need){
+  if (!need.length) return 0;
 
-  const need = missingPairs(uniqPts(clients));
-  if (!need.length){ setStatus('Every leg already measured and cached.'); buildAndRender(); return; }
-
-  if (!confirm(need.length + ' legs are not yet measured.\n\nFetch them from Google now? '
-    + 'They are cached permanently, so this cost is paid once.')) return;
-
-  $('measure').disabled = true;
-
-  // group by origin so each request is one origin against <=25 destinations
+  // group by origin so each request is one origin against up to 25 destinations
   const byOrigin = new Map();
   need.forEach(([a,b])=>{
     const k = ptKey(a);
@@ -632,7 +653,7 @@ $('measure').addEventListener('click', async () => {
       });
       done += chunk.length;
       setStatus('Measured '+done+' of '+need.length+' legs…');
-      await new Promise(r=>setTimeout(r,120));   // stay under the rate limit
+      await new Promise(r=>setTimeout(r,120));
     }
   }
 
@@ -649,12 +670,25 @@ $('measure').addEventListener('click', async () => {
   }
   cacheNote = (saved && saved.ok
     ? (saved.added||0) + ' new legs saved for everyone.'
-    : 'SHEET WRITE FAILED — nothing was saved.');
+    : 'SHEET WRITE FAILED — nothing was saved.')
+    + (failed ? '  ' + failed + ' legs could not be measured.' : '');
 
-  buildAndRender();
-  setStatus('Measured '+Object.keys(fresh).length+' legs, cached '+(saved.added||0)+
-            (failed?', '+failed+' failed':'')+'.');
+  return Object.keys(fresh).length;
+}
+
+$('measure').addEventListener('click', async () => {
+  if (!window.google || !google.maps || !google.maps.DistanceMatrixService){
+    setStatus('Google Maps still loading — try again in a moment.'); return;
+  }
+  if (!clients.length){ await load(); if (!clients.length) return; }
+
+  const need = missingPairs(uniqPts(clients));
+  if (!need.length){ setStatus('Every leg already measured.'); buildAndRender(); return; }
+
+  $('measure').disabled = true;
+  await measureLegs(need);
   $('measure').disabled = false;
+  buildAndRender();
 });
 
 /* ---------- rebuild + save ---------- */
