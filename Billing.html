@@ -269,7 +269,7 @@
     </div>
     <div class="card">
       <h2 class="sec" style="cursor:pointer;user-select:none" id="d_ubHead">▾ Unbilled clients</h2>
-      <div id="d_ubBody"><p class="subtle" style="margin-top:0">Any month a client had orders but no bill covering it — including returning clients after a gap. Use the ⋮ menu to bill, check usage, or dismiss.</p>
+      <div id="d_ubBody"><p class="subtle" style="margin-top:0">Clients with orders but no bill at all in the system, listed under each month they ordered. Clients who already have bills appear in Follow-ups instead. Use the ⋮ menu to bill, check usage, or dismiss.</p>
       <div id="d_unbilled"><div class="subtle">Loading…</div></div></div>
     </div>
   </section>
@@ -836,18 +836,17 @@ function renderUnbilled(orders,bills){
     if(!act[k])act[k]={name:nm,phone:ph,months:{}};
     if(!act[k].phone&&ph)act[k].phone=ph;
     if(!act[k].months[mk]||d<act[k].months[mk])act[k].months[mk]=d;}
-  const billedMonths={};
-  if(billsCache&&billsCache.length>1){const idx=billHeaderIndex(billsCache);const ci=idx["Client"],si=idx["Start"],ei=idx["End"];
-    for(let i=1;i<billsCache.length;i++){const r=billsCache[i];const nm=normName(r[ci]);if(!nm)continue;const st=toDt(r[si]),en=toDt(r[ei]);if(!st)continue;const end=en||st;
-      (billedMonths[nm]=billedMonths[nm]||new Set());let c=new Date(st.getFullYear(),st.getMonth(),1);const stop=new Date(end.getFullYear(),end.getMonth(),1);
-      while(c<=stop){billedMonths[nm].add(c.getFullYear()+"-"+String(c.getMonth()+1).padStart(2,"0"));c.setMonth(c.getMonth()+1);}}}
+  const everBilled=new Set();
+  if(billsCache&&billsCache.length>1){const idx=billHeaderIndex(billsCache);const ci=idx["Client"];
+    if(ci!==undefined)for(let i=1;i<billsCache.length;i++){const nm=normName(billsCache[i][ci]);if(nm)everBilled.add(nm);}}
   const dismissed=unbilledDismissed();
   const rows=[];
-  for(const k in act){const a=act[k];
+  for(const k in act){
+    if(everBilled.has(k))continue;   // has a bill on record — renewal is Follow-ups' job, not Unbilled's
+    const a=act[k];
     for(const mk in a.months){
       const dk=k+"|"+mk;
       if(dismissed.has(dk))continue;
-      if(billedMonths[k]&&billedMonths[k].has(mk))continue;
       rows.push({key:dk,name:a.name,phone:a.phone,date:a.months[mk],mk});
     }}
   if(!rows.length){el("d_unbilled").innerHTML='<div class="subtle">All clients billed.</div>';return;}
