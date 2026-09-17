@@ -269,7 +269,7 @@
     </div>
     <div class="card">
       <h2 class="sec" style="cursor:pointer;user-select:none" id="d_ubHead">▾ Unbilled clients</h2>
-      <div id="d_ubBody"><p class="subtle" style="margin-top:0">Clients with orders but no bill covering their first-order month. Tap ✕ to dismiss.</p>
+      <div id="d_ubBody"><p class="subtle" style="margin-top:0">Any month a client had orders but no bill covering it — including returning clients after a gap. Use the ⋮ menu to bill, check usage, or dismiss.</p>
       <div id="d_unbilled"><div class="subtle">Loading…</div></div></div>
     </div>
   </section>
@@ -829,11 +829,13 @@ function dismissUnbilled(k){const s=unbilledDismissed();s.add(k);try{localStorag
 function dismissUnbilledMany(ks){const s=unbilledDismissed();ks.forEach(k=>s.add(k));try{localStorage.setItem("friska_unbilled_dismiss",JSON.stringify([...s]));}catch(e){}}
 let unbilledOpen={};
 function renderUnbilled(orders,bills){
-  const first={};
+  const act={}; // client -> { name, phone, months: { 'yyyy-MM': earliest order date that month } }
   for(const row of orders){if(!row||row.length<2)continue;const dt=toDt(row[COL.date]);if(!dt)continue;const nm=String(row[COL.name]||"").trim();if(!nm)continue;
     let has=false;for(const i of[7,8,9,10,11,12])if(i<row.length){const v=String(row[i]).trim();if(v&&v!=="N/A"){has=true;break;}} if(!has)continue;
-    const k=normName(nm);const ph=String(row[COL.phone]||"").trim();
-    if(!first[k]||dt<first[k].date)first[k]={date:dateOnly(dt),name:nm,phone:ph};else if(!first[k].phone&&ph)first[k].phone=ph;}
+    const k=normName(nm);const ph=String(row[COL.phone]||"").trim();const d=dateOnly(dt);const mk=monthKey_(d);
+    if(!act[k])act[k]={name:nm,phone:ph,months:{}};
+    if(!act[k].phone&&ph)act[k].phone=ph;
+    if(!act[k].months[mk]||d<act[k].months[mk])act[k].months[mk]=d;}
   const billedMonths={};
   if(billsCache&&billsCache.length>1){const idx=billHeaderIndex(billsCache);const ci=idx["Client"],si=idx["Start"],ei=idx["End"];
     for(let i=1;i<billsCache.length;i++){const r=billsCache[i];const nm=normName(r[ci]);if(!nm)continue;const st=toDt(r[si]),en=toDt(r[ei]);if(!st)continue;const end=en||st;
@@ -841,7 +843,13 @@ function renderUnbilled(orders,bills){
       while(c<=stop){billedMonths[nm].add(c.getFullYear()+"-"+String(c.getMonth()+1).padStart(2,"0"));c.setMonth(c.getMonth()+1);}}}
   const dismissed=unbilledDismissed();
   const rows=[];
-  for(const k in first){const f=first[k];const mk=monthKey_(f.date);const dk=k+"|"+mk;if(dismissed.has(dk))continue;if(billedMonths[k]&&billedMonths[k].has(mk))continue;rows.push({key:dk,name:f.name,phone:f.phone,date:f.date,mk});}
+  for(const k in act){const a=act[k];
+    for(const mk in a.months){
+      const dk=k+"|"+mk;
+      if(dismissed.has(dk))continue;
+      if(billedMonths[k]&&billedMonths[k].has(mk))continue;
+      rows.push({key:dk,name:a.name,phone:a.phone,date:a.months[mk],mk});
+    }}
   if(!rows.length){el("d_unbilled").innerHTML='<div class="subtle">All clients billed.</div>';return;}
   const groups={};rows.forEach(r=>(groups[r.mk]=groups[r.mk]||[]).push(r));
   const keys=Object.keys(groups).sort().reverse();
@@ -849,7 +857,7 @@ function renderUnbilled(orders,bills){
   let html="";keys.forEach(k=>{
     groups[k].sort((a,b)=>a.date-b.date);
     const open=!!unbilledOpen[k];
-    html+=`<div style="margin-top:8px"><div style="display:flex;align-items:center;gap:8px"><div class="oldhead" data-mk="${k}" style="flex:1">${open?"▾":"▸"} ${monthLabel_(k)} (${groups[k].length})</div><button class="btn btn-ghost" data-dismm="${k}" style="padding:6px 10px;font-size:.8rem">Dismiss all</button></div><div class="${open?"":"hidden"}" data-wrap="${k}"><div style="overflow-x:auto"><table class="dtable"><thead><tr><th>Client</th><th>Phone</th><th>First order</th><th></th></tr></thead><tbody>`+
+    html+=`<div style="margin-top:8px"><div style="display:flex;align-items:center;gap:8px"><div class="oldhead" data-mk="${k}" style="flex:1">${open?"▾":"▸"} ${monthLabel_(k)} (${groups[k].length})</div><button class="btn btn-ghost" data-dismm="${k}" style="padding:6px 10px;font-size:.8rem">Dismiss all</button></div><div class="${open?"":"hidden"}" data-wrap="${k}"><div style="overflow-x:auto"><table class="dtable"><thead><tr><th>Client</th><th>Phone</th><th>First order in month</th><th></th></tr></thead><tbody>`+
       groups[k].map(r=>`<tr><td><b>${r.name}</b></td><td>${r.phone}</td><td>${dtstr(r.date)}</td><td style="white-space:nowrap"><div class="rowmenu" data-name="${String(r.name).replace(/"/g,"&quot;")}" data-phone="${r.phone}" data-date="${keyOf(r.date)}"><button class="rowmenu-btn" data-ubmenubtn="${r.key}">⋮</button><div class="rowmenu-pop" data-ubmenupop="${r.key}"><button class="rowmenu-item" data-ubnew>Make new bill</button><button class="rowmenu-item" data-ubusage>Check usage</button><button class="rowmenu-item danger" data-ubdis="${r.key}">Dismiss</button></div></div></td></tr>`).join("")+`</tbody></table></div></div></div>`;});
   el("d_unbilled").innerHTML=html;
   el("d_unbilled").querySelectorAll("button[data-ubmenubtn]").forEach(function(b){
