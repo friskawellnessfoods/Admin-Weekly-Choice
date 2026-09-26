@@ -31,7 +31,7 @@ header{background:linear-gradient(135deg,var(--navy),var(--navy2));color:#fff;pa
 .hwrap{max-width:1180px;margin:0 auto}
 .htop{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
 .brand{display:flex;align-items:center;gap:10px;min-width:0}
-.logo{width:34px;height:34px;border-radius:10px;background:#fff;color:var(--navy);display:grid;place-items:center;font-weight:800;font-size:17px;flex-shrink:0}
+.logo{width:38px;height:38px;border-radius:10px;background:#fff;object-fit:contain;padding:3px;flex-shrink:0}
 .brand h1{font-size:16px;font-weight:700;letter-spacing:-.2px;white-space:nowrap}
 .brand .sub{font-size:11.5px;opacity:.7}
 .hact{display:flex;gap:6px}
@@ -225,7 +225,7 @@ label.f{display:block;font-size:12px;font-weight:600;color:var(--muted);margin:0
   <div class="hwrap">
     <div class="htop">
       <div class="brand">
-        <div class="logo">F</div>
+        <img class="logo" src="logo.png" alt="Friska">
         <div><h1>Friska Wellness · Financials</h1><div class="sub">Friska Wellness LLP · Hyderabad</div></div>
       </div>
       <div class="hact">
@@ -248,11 +248,6 @@ label.f{display:block;font-size:12px;font-weight:600;color:var(--muted);margin:0
       <select id="mFrom" aria-label="From month"></select><span>→</span><select id="mTo" aria-label="To month"></select>
     </div>
     <div class="chips" id="quick">
-      <button class="chip" data-q="this">This month</button>
-      <button class="chip" data-q="last">Last month</button>
-      <button class="chip" data-q="3">Last 3M</button>
-      <button class="chip" data-q="6">Last 6M</button>
-      <button class="chip" data-q="fy">FY</button>
       <button class="chip" data-q="all" aria-pressed="true">All time</button>
     </div>
   </div>
@@ -264,15 +259,14 @@ label.f{display:block;font-size:12px;font-weight:600;color:var(--muted);margin:0
   <div class="printhead"><div><h2>Friska Wellness LLP — Financial Summary</h2><div class="muted" id="phPeriod"></div></div><div class="muted" id="phDate"></div></div>
 
   <div class="grid g3">
-    <div class="card kpi" style="--acc:var(--in)"><div class="k">Credits (sales)</div><div class="v num" id="kCred">—</div><div class="s" id="kCredS"></div>
-      <button class="more" data-split="ov" aria-expanded="false"><span class="cv">▶</span>Paid &amp; outstanding</button><div class="split" id="split-ov" hidden></div></div>
+    <div class="card kpi" style="--acc:var(--in)"><div class="k">Credits (received)</div><div class="v num" id="kCred">—</div><div class="s" id="kCredS"></div></div>
     <div class="card kpi" style="--acc:var(--out)"><div class="k">Debits (expenses)</div><div class="v num" id="kExp">—</div><div class="s" id="kExpS"></div></div>
     <div class="card kpi hero"><div class="k">Net profit</div><div class="v num" id="kNet">—</div><div class="s" id="kNetS"></div></div>
   </div>
 
   <div class="grid g3 mt">
     <div class="card span2">
-      <div class="ch"><div><div class="ct">Credit vs debit by month</div><div class="cs">Sales billed vs money spent</div></div>
+      <div class="ch"><div><div class="ct">Credit vs debit by month</div><div class="cs">Money received vs money spent</div></div>
         <div class="legend"><span><i style="background:var(--in)"></i>Credit</span><span><i style="background:var(--out)"></i>Debit</span></div></div>
       <div class="chart" id="chInOut"></div>
     </div>
@@ -294,7 +288,7 @@ label.f{display:block;font-size:12px;font-weight:600;color:var(--muted);margin:0
   </div>
 
   <div class="card mt">
-    <div class="ch"><div><div class="ct">Monthly P&amp;L</div><div class="cs">Credits = all bills (paid + outstanding) by bill date</div></div>
+    <div class="ch"><div><div class="ct">Monthly P&amp;L</div><div class="cs">Credits = money received in the bank (from statements)</div></div>
       <button class="btn noprint" id="csvPL">Export CSV</button></div>
     <div class="tw" id="plTable"></div>
   </div>
@@ -341,42 +335,24 @@ label.f{display:block;font-size:12px;font-weight:600;color:var(--muted);margin:0
 <!-- ═════════ CREDITS ═════════ -->
 <section class="panel" id="panel-credits">
   <div class="grid g4">
-    <div class="card kpi" style="--acc:var(--in)"><div class="k">Total credits</div><div class="v num" id="rBilled">—</div><div class="s" id="rBilledS"></div>
-      <button class="more" data-split="cr" aria-expanded="false"><span class="cv">▶</span>Paid &amp; outstanding</button><div class="split" id="split-cr" hidden></div></div>
-    <div class="card kpi"><div class="k">Bills raised</div><div class="v num" id="rCnt">—</div><div class="s" id="rCntS"></div></div>
-    <div class="card kpi"><div class="k">Avg bill value</div><div class="v num" id="rAvg">—</div><div class="s" id="rAvgS"></div></div>
-    <div class="card kpi"><div class="k">Clients billed</div><div class="v num" id="rCli">—</div><div class="s" id="rCliS"></div></div>
-  </div>
-
-  <div class="grid g2 mt">
-    <div class="card">
-      <div class="ch"><div><div class="ct">Credits by plan</div><div class="cs">Billed amount</div></div></div>
-      <div id="rPlan"></div>
-    </div>
-    <div class="card">
-      <div class="ch"><div><div class="ct">Top clients</div><div class="cs">By billed amount</div></div></div>
-      <div id="rTop"></div>
-    </div>
+    <div class="card kpi" style="--acc:var(--in)"><div class="k">Total credits</div><div class="v num" id="rBilled">—</div><div class="s" id="rBilledS"></div></div>
+    <div class="card kpi"><div class="k">Credit entries</div><div class="v num" id="rCnt">—</div><div class="s" id="rCntS"></div></div>
+    <div class="card kpi"><div class="k">Avg per credit</div><div class="v num" id="rAvg">—</div><div class="s" id="rAvgS"></div></div>
+    <div class="card kpi"><div class="k">Avg per month</div><div class="v num" id="rCli">—</div><div class="s" id="rCliS"></div></div>
   </div>
 
   <div class="card mt">
-    <div class="ch"><div><div class="ct">What makes up credits</div><div class="cs">Components of the billed total</div></div></div>
-    <div id="rComp"></div>
-  </div>
-
-  <div class="card mt">
-    <div class="ch"><div><div class="ct">All credits</div><div class="cs">Open a group to see each entry</div></div></div>
-    <div class="tb"><input class="inp" id="rSearch" placeholder="Search client, bill no, amount…" style="flex:1;min-width:200px"><button class="btn" id="rCsv">Export CSV</button></div>
+    <div class="ch"><div><div class="ct">All credits</div><div class="cs">Money received in the bank · open a month to see each entry</div></div></div>
+    <div class="tb"><input class="inp" id="rSearch" placeholder="Search name, amount, ref…" style="flex:1;min-width:200px"><button class="btn" id="rCsv">Export CSV</button></div>
     <div id="rAcc"></div>
   </div>
 
   <div class="card mt">
-    <div class="ch"><div><div class="ct">Add single credit</div><div class="cs">One-off backfill (doesn't touch the Bills sheet)</div></div></div>
-    <div class="grid g4">
+    <div class="ch"><div><div class="ct">Add single credit</div><div class="cs">One-off entry — monthly bank credits are imported from the sheet</div></div></div>
+    <div class="grid g3">
       <div><label class="f" for="lgDate">Date</label><input class="inp" id="lgDate" type="date" style="width:100%"></div>
       <div><label class="f" for="lgClient">Client / description</label><input class="inp" id="lgClient" style="width:100%"></div>
       <div><label class="f" for="lgAmt">Amount (₹)</label><input class="inp" id="lgAmt" type="number" inputmode="decimal" min="0" step="0.01" style="width:100%"></div>
-      <div><label class="f" for="lgStatus">Status</label><select class="inp" id="lgStatus" style="width:100%"><option>Paid</option><option>Unpaid</option></select></div>
     </div>
     <div class="tb mt"><button class="btn go" id="lgSave">Save credit</button></div>
   </div>
@@ -385,8 +361,7 @@ label.f{display:block;font-size:12px;font-weight:600;color:var(--muted);margin:0
 <!-- ═════════ CASH FLOW ═════════ -->
 <section class="panel" id="panel-cashflow">
   <div class="grid g3">
-    <div class="card kpi" style="--acc:var(--in)"><div class="k">Total credit</div><div class="v num" id="cIn">—</div><div class="s" id="cInS"></div>
-      <button class="more" data-split="cf" aria-expanded="false"><span class="cv">▶</span>Paid &amp; outstanding</button><div class="split" id="split-cf" hidden></div></div>
+    <div class="card kpi" style="--acc:var(--in)"><div class="k">Total credit</div><div class="v num" id="cIn">—</div><div class="s" id="cInS"></div></div>
     <div class="card kpi" style="--acc:var(--out)"><div class="k">Total debit</div><div class="v num" id="cOut">—</div><div class="s" id="cOutS"></div></div>
     <div class="card kpi hero"><div class="k">Net position</div><div class="v num" id="cNet">—</div><div class="s" id="cNetS"></div></div>
   </div>
@@ -400,6 +375,25 @@ label.f{display:block;font-size:12px;font-weight:600;color:var(--muted);margin:0
   </div>
 </section>
 
+<!-- ═════════ INTERNAL: BILLS vs CREDITS (hidden — open with #recon or Shift+B) ═════════ -->
+<section class="panel" id="panel-recon">
+  <div class="card" style="background:var(--warn-soft);border-color:#f3e2bf;padding:12px 16px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;gap:10px">
+    <div><b style="color:var(--warn)">Internal view</b> <span class="muted" style="font-size:12.5px">— bills raised vs money actually received. Not shown in tabs or the investor report.</span></div>
+    <button class="btn" id="reconClose">Close</button>
+  </div>
+  <div class="grid g4">
+    <div class="card kpi" style="--acc:var(--navy)"><div class="k">Bills raised</div><div class="v num" id="qBills">—</div><div class="s" id="qBillsS"></div></div>
+    <div class="card kpi" style="--acc:var(--in)"><div class="k">Credits received</div><div class="v num" id="qCred">—</div><div class="s" id="qCredS"></div></div>
+    <div class="card kpi" style="--acc:var(--warn)"><div class="k">Difference</div><div class="v num" id="qGap">—</div><div class="s" id="qGapS"></div></div>
+    <div class="card kpi" style="--acc:var(--neg)"><div class="k">Unpaid bills</div><div class="v num" id="qUnpaid">—</div><div class="s" id="qUnpaidS"></div></div>
+  </div>
+  <div class="card mt">
+    <div class="ch"><div><div class="ct">Month by month</div><div class="cs">Bill value excludes adjustments · open a month to see its bills</div></div>
+      <button class="btn" id="qCsv">Export CSV</button></div>
+    <div class="tw" id="qTable"></div>
+    <div class="mt" id="qAcc"></div>
+  </div>
+</section>
 </main>
 
 <div id="tip"></div>
@@ -443,8 +437,7 @@ async function post(params){
 const loading=on=>$('loading').style.display=on?'grid':'none';
 
 /* ───────── state ───────── */
-let BILLS=[], LEGACY_RAW=[], EXP=[], CATS=[];
-let DUP_LEG=new Set();
+let BILLS=[], BILLDOCS=[], LEGACY_RAW=[], EXP=[], CATS=[];
 let P={from:'',to:''}, TAB='overview';
 const OPEN=new Set(); // open accordion keys
 
@@ -456,18 +449,13 @@ async function loadAll(){
   try{
     const j=await post({action:'getAll'});
     CATS=j.categories||[];
-    const bills=table2obj(j.bills).filter(b=>b.BillNo!==''&&dstr(b.Date)).map(b=>({
+    BILLDOCS=table2obj(j.bills).filter(b=>b.BillNo!==''&&dstr(b.Date)).map(b=>({
       id:String(b.BillNo).replace(/\.0$/,''),date:dstr(b.Date),client:String(b.Client||'').trim(),plan:String(b.Plan||'').trim()||'—',
-      duration:b.Duration||'',amount:N(b.GrandTotal),paid:String(b.PaidStatus).trim()==='Paid',
-      food:N(b.Food),delivery:N(b.Delivery),gst:N(b.Gst),discount:N(b.Discount),adj:N(b.Adjustment),items:b.Items||'',src:'bill'}));
+      duration:b.Duration||'',amount:N(b.GrandTotal)-N(b.Adjustment),adj:N(b.Adjustment),paid:String(b.PaidStatus).trim()==='Paid'}));
+    // Credits = bank-statement credits (LegacyCredits) only
     LEGACY_RAW=table2obj(j.legacy).filter(l=>l.LegacyId&&dstr(l.Date)).map(l=>({
-      id:l.LegacyId,date:dstr(l.Date),client:String(l.Client||'').trim(),amount:N(l.Amount),paid:String(l.PaidStatus).trim()==='Paid',batch:String(l.Batch||'')}));
-    // dedupe bank credits vs real bills by client+amount (each bill absorbs one)
-    const sig=new Map();bills.forEach(b=>{const k=normName(b.client)+'|'+mkey(b.amount);sig.set(k,(sig.get(k)||0)+1);});
-    DUP_LEG=new Set();
-    const leg=LEGACY_RAW.filter(l=>{const k=normName(l.client)+'|'+mkey(l.amount);const r=sig.get(k)||0;if(r>0){sig.set(k,r-1);DUP_LEG.add(l.id);return false;}return true;})
-      .map(l=>({id:l.id,date:l.date,client:l.client||'Bank credit',plan:'Bank credit',amount:l.amount,paid:l.paid,food:l.amount,delivery:0,gst:0,discount:0,adj:0,src:'bank',batch:l.batch}));
-    BILLS=bills.concat(leg);
+      id:l.LegacyId,date:dstr(l.Date),client:String(l.Client||'').trim()||'Bank credit',amount:N(l.Amount),paid:true,src:'bank',batch:String(l.Batch||'')}));
+    BILLS=LEGACY_RAW;
     EXP=table2obj(j.expenses).filter(e=>e.ExpenseId&&dstr(e.Timestamp)).map(e=>({
       id:e.ExpenseId,date:dstr(e.Timestamp),amount:N(e.Amount),cat:String(e.Category||'Misc').trim()||'Misc',
       desc:String(e.Description||'').trim(),by:e.PaidBy||'',method:e.PaymentMethod||'',batch:String(e.Batch||'')}));
@@ -480,16 +468,16 @@ async function loadAll(){
 
 /* ───────── period ───────── */
 function dataMonths(){
-  const s=new Set();BILLS.forEach(b=>s.add(b.date.slice(0,7)));EXP.forEach(e=>s.add(e.date.slice(0,7)));
+  const s=new Set();BILLS.forEach(b=>s.add(b.date.slice(0,7)));BILLDOCS.forEach(b=>s.add(b.date.slice(0,7)));EXP.forEach(e=>s.add(e.date.slice(0,7)));
   const a=[...s].sort();if(!a.length)return[nowYm()];
   const out=[];let m=a[0];const end=a[a.length-1]>nowYm()?a[a.length-1]:nowYm();
   while(m<=end){out.push(m);m=ymAdd(m,1);}return out;
 }
 function buildMonthSelects(){
   const ms=dataMonths();
-  const opts=ms.slice().reverse().map(m=>`<option value="${m}">${ymLong(m)}</option>`).join('');
+  const opts=ms.map(m=>`<option value="${m}">${ymLong(m)}</option>`).join('');
   $('mFrom').innerHTML=opts;$('mTo').innerHTML=opts;
-  if(!P.from){applyQuick(localStorageGet('acctQ')||'all');}
+  if(!P.from){applyQuick('all');}
   else{ $('mFrom').value=P.from;$('mTo').value=P.to; }
 }
 function localStorageGet(k){try{return localStorage.getItem(k);}catch(e){return null;}}
@@ -504,7 +492,6 @@ function applyQuick(q){
   if(P.from<ms[0])P.from=ms[0];
   document.querySelectorAll('#quick .chip').forEach(c=>c.setAttribute('aria-pressed',c.dataset.q===q?'true':'false'));
   $('mFrom').value=P.from;$('mTo').value=P.to;
-  localStorageSet('acctQ',q);
 }
 function months(){const o=[];let m=P.from;while(m<=P.to){o.push(m);m=ymAdd(m,1);}return o;}
 const inP=d=>{const m=d.slice(0,7);return m>=P.from&&m<=P.to;};
@@ -600,29 +587,12 @@ function hbars(el,rows,total,opts={}){
   el.innerHTML=rows.map(([l,v,extra])=>`<div class="hb"><div class="l" title="${esc(l)}">${esc(l)}</div><div class="t"><div class="f" style="width:${(v/max*100).toFixed(1)}%;${opts.color?'background:'+opts.color:''}"></div></div><div class="r num">${short(v)}<small>${extra!=null?extra:pct(v,total).toFixed(1)+'%'}</small></div></div>`).join('');
 }
 
-/* ───────── paid / outstanding split ───────── */
-function splitHTML(bills){
-  const p=bills.filter(b=>b.paid),u=bills.filter(b=>!b.paid);
-  const pv=p.reduce((s,b)=>s+b.amount,0),uv=u.reduce((s,b)=>s+b.amount,0),t=pv+uv||1;
-  return `<div class="sb"><i style="width:${(pv/t*100).toFixed(1)}%;background:var(--in)"></i><i style="width:${(uv/t*100).toFixed(1)}%;background:var(--neg)"></i></div>
-    <div class="sr"><span><i style="background:var(--in)"></i>Paid · ${p.length}</span><b>${inr(pv)} <small class="muted">${pct(pv,t).toFixed(0)}%</small></b></div>
-    <div class="sr"><span><i style="background:var(--neg)"></i>Outstanding · ${u.length}</span><b>${inr(uv)} <small class="muted">${pct(uv,t).toFixed(0)}%</small></b></div>`;
-}
-const SPLIT_OPEN=new Set();
-function setSplit(key,bills){
-  const el=$('split-'+key),btn=document.querySelector(`[data-split="${key}"]`);if(!el)return;
-  el.innerHTML=splitHTML(bills);el.hidden=!SPLIT_OPEN.has(key);btn.setAttribute('aria-expanded',SPLIT_OPEN.has(key));
-}
-document.querySelectorAll('[data-split]').forEach(b=>b.onclick=()=>{const k=b.dataset.split;SPLIT_OPEN.has(k)?SPLIT_OPEN.delete(k):SPLIT_OPEN.add(k);
-  const el=$('split-'+k);el.hidden=!SPLIT_OPEN.has(k);b.setAttribute('aria-expanded',SPLIT_OPEN.has(k));});
-
 /* ───────── render: overview ───────── */
 function renderOverview(){
   const A=agg(P.from,P.to),pr=prevRange(),B=agg(pr.from,pr.to),hasPrev=B.b.length||B.e.length;
   const vs=hasPrev?(months().length===1?' vs prev month':' vs prev period'):'';
   $('kCred').textContent=short(A.billed);
-  $('kCredS').innerHTML=(hasPrev?deltaChip(A.billed,B.billed)+vs+' · ':'')+`${A.b.length} entries`;
-  setSplit('ov',A.b);
+  $('kCredS').innerHTML=(hasPrev?deltaChip(A.billed,B.billed)+vs+' · ':'')+`${A.b.length} credit entries`;
   $('kExp').textContent=short(A.exp);
   $('kExpS').innerHTML=(hasPrev?deltaChip(A.exp,B.exp,false)+vs+' · ':'')+`${A.e.length} transactions`;
   $('kNet').textContent=short(A.net);
@@ -640,16 +610,14 @@ function renderOverview(){
 
   const nMo=ms.length||1;
   const bestM=ms.slice().sort((a,b)=>(M[b].billed-M[b].exp)-(M[a].billed-M[a].exp))[0];
-  const real=A.b.filter(b=>b.src==='bill');
-  const clients=new Set(real.map(b=>normName(b.client))).size;
   const foodCost=cats.filter(c=>['Hyperpure','Local Purchase'].includes(c[0])).reduce((s,c)=>s+c[1],0);
   const r=[
     ['Net margin',pct(A.net,A.billed).toFixed(1)+'%'],
     ['Food cost (Hyperpure + local)',pct(foodCost,A.billed).toFixed(1)+'% of credits'],
     ['Avg monthly credits',inr(A.billed/nMo)],
     ['Avg monthly debits',inr(A.exp/nMo)],
-    ['Avg bill value',real.length?inr(real.reduce((s,b)=>s+b.amount,0)/real.length):'—'],
-    ['Unique billed clients',clients],
+    ['Credit entries',A.b.length],
+    ['Avg credit size',A.b.length?inr(A.billed/A.b.length):'—'],
     ['Best month (net)',bestM?ymLong(bestM)+' · '+signed(M[bestM].billed-M[bestM].exp):'—'],
   ];
   $('ratios').innerHTML='<table>'+r.map(([k,v])=>`<tr><td class="muted">${k}</td><td class="n" style="font-weight:700">${v}</td></tr>`).join('')+'</table>';
@@ -750,54 +718,33 @@ async function delLeg(id){
 /* ───────── render: credits ───────── */
 function billMatch(b,q){if(!q)return true;q=q.toLowerCase();return (b.client+' '+b.id+' '+b.plan+' '+b.amount+' '+b.date).toLowerCase().includes(q);}
 function renderCredits(){
-  const A=agg(P.from,P.to),q=$('rSearch').value.trim(),pr=prevRange(),B=agg(pr.from,pr.to);
-  const real=A.b.filter(b=>b.src==='bill'),bank=A.b.filter(b=>b.src==='bank');
+  const A=agg(P.from,P.to),q=$('rSearch').value.trim(),pr=prevRange(),B=agg(pr.from,pr.to),nMo=months().length||1;
   $('rBilled').textContent=short(A.billed);$('rBilledS').innerHTML=(B.billed?deltaChip(A.billed,B.billed)+' vs prev · ':'')+periodText();
-  setSplit('cr',A.b);
-  $('rCnt').textContent=real.length;$('rCntS').textContent=bank.length?`+ ${bank.length} bank credits`:'from billing';
-  const avg=real.length?real.reduce((s,b)=>s+b.amount,0)/real.length:0;
-  $('rAvg').textContent=short(avg);$('rAvgS').textContent='per bill';
-  $('rCli').textContent=new Set(real.map(b=>normName(b.client))).size;$('rCliS').textContent='unique clients';
-
-  const plan={};A.b.forEach(b=>plan[b.plan]=(plan[b.plan]||0)+b.amount);
-  hbars($('rPlan'),Object.entries(plan).sort((a,b)=>b[1]-a[1]).slice(0,10),A.billed,{color:'var(--in)'});
-  const cl={};A.b.forEach(b=>{const k=b.client||'—';cl[k]=cl[k]||{v:0,n:0};cl[k].v+=b.amount;cl[k].n++;});
-  hbars($('rTop'),Object.entries(cl).sort((a,b)=>b[1].v-a[1].v).slice(0,10).map(([k,o])=>[k,o.v,o.n+' bill'+(o.n>1?'s':'')]),A.billed,{color:'var(--navy)'});
-
-  const food=real.reduce((s,b)=>s+b.food,0),del=real.reduce((s,b)=>s+b.delivery,0),gst=real.reduce((s,b)=>s+b.gst,0),
-    disc=real.reduce((s,b)=>s+b.discount,0),adj=real.reduce((s,b)=>s+b.adj,0),bk=bank.reduce((s,b)=>s+b.amount,0);
-  $('rComp').innerHTML=`<div class="tw"><table><tbody>
-    <tr><td>Food / meal plans</td><td class="n">${inr(food)}</td></tr>
-    <tr><td>Delivery charges</td><td class="n">${inr(del)}</td></tr>
-    <tr><td>GST</td><td class="n">${inr(gst)}</td></tr>
-    <tr><td>Discounts given</td><td class="n negv">${disc?'−'+inr(Math.abs(disc)):inr(0)}</td></tr>
-    ${adj?`<tr><td>Adjustments</td><td class="n">${signed(adj)}</td></tr>`:''}
-    <tr><td>Bank-statement credits (no bill)</td><td class="n">${inr(bk)}</td></tr>
-    <tr class="tot"><td>Total credits</td><td class="n">${inr(A.billed)}</td></tr></tbody></table></div>`;
+  $('rCnt').textContent=A.b.length;$('rCntS').textContent='bank credits';
+  $('rAvg').textContent=short(A.b.length?A.billed/A.b.length:0);$('rAvgS').textContent='per entry';
+  $('rCli').textContent=short(A.billed/nMo);$('rCliS').textContent='over '+nMo+' month'+(nMo>1?'s':'');
 
   const list=A.b.filter(b=>billMatch(b,q));
   const byM={};list.forEach(b=>(byM[b.date.slice(0,7)]=byM[b.date.slice(0,7)]||[]).push(b));
   const keys=Object.keys(byM).sort().reverse();
-  $('rAcc').innerHTML=keys.length?keys.map(m=>{const arr=byM[m],t=arr.reduce((s,b)=>s+b.amount,0),u=arr.filter(b=>!b.paid);
-    return accHTML('cr:'+m,ymLong(m),`${arr.length} entr${arr.length===1?'y':'ies'}`+(u.length?` · ${u.length} outstanding`:''),inr(t),'',A.billed?t/A.billed*100:0);}).join('')
+  $('rAcc').innerHTML=keys.length?keys.map(m=>{const arr=byM[m],t=arr.reduce((s,b)=>s+b.amount,0);
+    return accHTML('cr:'+m,ymLong(m),`${arr.length} entr${arr.length===1?'y':'ies'}`,inr(t),'',A.billed?t/A.billed*100:0);}).join('')
     :'<div class="empty">No credits'+(q?' match "'+esc(q)+'"':' in this period')+'.</div>';
   wireAcc($('rAcc'),k=>billBody(byM[k.slice(3)]||[]));
 }
 function billBody(arr){
   if(!arr.length)return '<div class="empty">Nothing here.</div>';
   arr=arr.slice().sort((a,b)=>b.date.localeCompare(a.date)||b.amount-a.amount);
-  const pv=arr.filter(b=>b.paid).reduce((s,b)=>s+b.amount,0),uv=arr.filter(b=>!b.paid).reduce((s,b)=>s+b.amount,0);
-  return `<div class="split" style="border:0;margin:0;padding:12px 10px 4px;max-width:420px">${splitHTML(arr)}</div><div class="tw"><table><thead><tr><th>Date</th><th>Client</th><th>Plan</th><th>Ref</th><th>Status</th><th class="n">Amount</th><th></th></tr></thead><tbody>`+
+  return `<div class="tw"><table><thead><tr><th>Date</th><th>Received from / description</th><th>Ref</th><th class="n">Amount</th><th></th></tr></thead><tbody>`+
     arr.map(b=>`<tr><td class="num" style="white-space:nowrap">${dLabel(b.date)}</td><td style="font-weight:600">${esc(b.client)}</td>
-      <td class="muted">${b.src==='bank'?'<span class="pill bank">bank credit</span>':esc(b.plan)+(b.duration?' · '+esc(b.duration):'')}</td><td class="muted">${b.src==='bank'?esc(b.id):'#'+esc(b.id)}</td>
-      <td><span class="pill ${b.paid?'paid':'unpaid'}">${b.paid?'Paid':'Outstanding'}</span></td><td class="n" style="font-weight:700">${inr(b.amount,2)}</td>
-      <td>${b.src==='bank'?`<button class="x" data-dleg="${esc(b.id)}" title="Delete">×</button>`:''}</td></tr>`).join('')+'</tbody></table></div>';
+      <td class="muted" style="font-size:11.5px">${esc(b.id)}${b.batch?' · '+esc(b.batch):''}</td><td class="n" style="font-weight:700">${inr(b.amount,2)}</td>
+      <td><button class="x" data-dleg="${esc(b.id)}" title="Delete">×</button></td></tr>`).join('')+'</tbody></table></div>';
 }
 
 /* ───────── render: cash flow ───────── */
 function renderCashflow(){
   const A=agg(P.from,P.to),M=byMonth(),ms=months();
-  $('cIn').textContent=short(A.billed);$('cInS').textContent=`${A.b.length} credits`;setSplit('cf',A.b);
+  $('cIn').textContent=short(A.billed);$('cInS').textContent=`${A.b.length} credits`;
   $('cOut').textContent=short(A.exp);$('cOutS').textContent=`${A.e.length} debits`;
   $('cNet').textContent=short(A.net);$('cNetS').textContent=`Credit covers ${A.exp?(A.billed/A.exp*100).toFixed(0):'—'}% of debit`;
   let run=0;const cum=ms.map(m=>run+=M[m].billed-M[m].exp);
@@ -811,13 +758,42 @@ function cfBody(m){
   const b=BILLS.filter(x=>x.date.startsWith(m)).sort((a,c)=>c.amount-a.amount);
   const e=EXP.filter(x=>x.date.startsWith(m));const cats=catTotals(e);
   const tIn=b.reduce((s,x)=>s+x.amount,0),tOut=e.reduce((s,x)=>s+x.amount,0);
-  const inRows=b.map(x=>`<tr><td class="num" style="white-space:nowrap">${dLabel(x.date)}</td><td>${esc(x.client)} ${x.src==='bank'?'<span class="pill bank">bank</span>':''}${x.paid?'':' <span class="pill unpaid">Outstanding</span>'}</td><td class="n">${inr(x.amount)}</td></tr>`).join('')||'<tr><td colspan="3" class="muted">No credits</td></tr>';
+  const inRows=b.map(x=>`<tr><td class="num" style="white-space:nowrap">${dLabel(x.date)}</td><td>${esc(x.client)}</td><td class="n">${inr(x.amount)}</td></tr>`).join('')||'<tr><td colspan="3" class="muted">No credits</td></tr>';
   const outRows=cats.map(([c,v])=>{const n=e.filter(x=>x.cat===c).length;return `<tr><td style="font-weight:600">${esc(c)}</td><td class="muted">${n} txn</td><td class="n">${inr(v)}</td></tr>`;}).join('')||'<tr><td colspan="3" class="muted">No debits</td></tr>';
   return `<div class="grid g2" style="padding:10px 8px">
-    <div><div class="ct pos" style="margin-bottom:6px">Credit · ${inr(tIn)}</div><div class="split" style="border:0;margin:0 0 6px;padding:0;max-width:420px">${splitHTML(b)}</div><div class="tw" style="max-height:360px;overflow:auto"><table><tbody>${inRows}</tbody></table></div></div>
+    <div><div class="ct pos" style="margin-bottom:6px">Credit · ${inr(tIn)}</div><div class="tw" style="max-height:360px;overflow:auto"><table><tbody>${inRows}</tbody></table></div></div>
     <div><div class="ct" style="margin-bottom:6px;color:var(--out-ink)">Debit · ${inr(tOut)}</div><div class="tw"><table><tbody>${outRows}</tbody></table></div>
       <p class="help" style="margin-top:8px">Full debit detail: Expenses tab, filtered to this month.</p></div></div>`;
 }
+
+/* ───────── render: internal recon ───────── */
+function renderRecon(){
+  const ms=months(),inR=d=>inP(d);
+  const bills=BILLDOCS.filter(b=>inR(b.date)),cred=BILLS.filter(b=>inR(b.date));
+  const tb=bills.reduce((s,b)=>s+b.amount,0),tc=cred.reduce((s,b)=>s+b.amount,0),un=bills.filter(b=>!b.paid),tu=un.reduce((s,b)=>s+b.amount,0);
+  $('qBills').textContent=short(tb);$('qBillsS').textContent=bills.length+' bills';
+  $('qCred').textContent=short(tc);$('qCredS').textContent=cred.length+' bank credits';
+  $('qGap').textContent=short(tc-tb);$('qGapS').textContent=tb?`credits are ${pct(tc,tb).toFixed(0)}% of bills`:'';
+  $('qUnpaid').textContent=short(tu);$('qUnpaidS').textContent=un.length+' marked unpaid in billing';
+  const R={};ms.forEach(m=>R[m]={b:0,p:0,u:0,c:0,n:0});
+  bills.forEach(b=>{const r=R[b.date.slice(0,7)];if(!r)return;r.b+=b.amount;r.n++;b.paid?r.p+=b.amount:r.u+=b.amount;});
+  cred.forEach(c=>{const r=R[c.date.slice(0,7)];if(r)r.c+=c.amount;});
+  const T={b:0,p:0,u:0,c:0};
+  $('qTable').innerHTML=`<table><thead><tr><th>Month</th><th class="n">Bills raised</th><th class="n">Paid</th><th class="n">Unpaid</th><th class="n">Credits received</th><th class="n">Difference</th></tr></thead><tbody>`+
+    ms.slice().reverse().map(m=>{const r=R[m],d=r.c-r.b;T.b+=r.b;T.p+=r.p;T.u+=r.u;T.c+=r.c;
+      return `<tr><td>${ymLong(m)}</td><td class="n">${inr(r.b)}</td><td class="n pos">${inr(r.p)}</td><td class="n negv">${inr(r.u)}</td><td class="n">${inr(r.c)}</td><td class="n ${d<0?'negv':'pos'}">${signed(d)}</td></tr>`;}).join('')+
+    `<tr class="tot"><td>Total</td><td class="n">${inr(T.b)}</td><td class="n">${inr(T.p)}</td><td class="n">${inr(T.u)}</td><td class="n">${inr(T.c)}</td><td class="n ${T.c-T.b<0?'negv':'pos'}">${signed(T.c-T.b)}</td></tr></tbody></table>`;
+  const byM={};bills.forEach(b=>(byM[b.date.slice(0,7)]=byM[b.date.slice(0,7)]||[]).push(b));
+  $('qAcc').innerHTML=Object.keys(byM).sort().reverse().map(m=>{const a=byM[m],u=a.filter(b=>!b.paid).length;
+    return accHTML('q:'+m,'Bills · '+ymLong(m),`${a.length} bills${u?' · '+u+' unpaid':''}`,inr(a.reduce((s,b)=>s+b.amount,0)),'',null);}).join('');
+  wireAcc($('qAcc'),k=>{const a=(byM[k.slice(2)]||[]).slice().sort((x,y)=>y.date.localeCompare(x.date));
+    return `<div class="tw"><table><thead><tr><th>Date</th><th>Client</th><th>Plan</th><th>Bill #</th><th>Status</th><th class="n">Amount</th></tr></thead><tbody>`+
+      a.map(b=>`<tr><td class="num" style="white-space:nowrap">${dLabel(b.date)}</td><td style="font-weight:600">${esc(b.client)}</td><td class="muted">${esc(b.plan)}${b.duration?' · '+esc(b.duration):''}</td><td class="muted">#${esc(b.id)}</td>
+        <td><span class="pill ${b.paid?'paid':'unpaid'}">${b.paid?'Paid':'Unpaid'}</span></td><td class="n" style="font-weight:700">${inr(b.amount,2)}${b.adj?`<div class="muted" style="font-size:11px;font-weight:500">adj ${signed(b.adj)} excl.</div>`:''}</td></tr>`).join('')+'</tbody></table></div>';});
+}
+$('qCsv').onclick=()=>dlCSV(`friska-bills-vs-credits-${P.from}_${P.to}.csv`,[['Date','Bill','Client','Plan','Status','Amount (excl adj)','Adjustment'],...BILLDOCS.filter(b=>inP(b.date)).sort((a,b)=>a.date.localeCompare(b.date)).map(b=>[b.date,b.id,b.client,b.plan,b.paid?'Paid':'Unpaid',b.amount,b.adj])]);
+$('reconClose').onclick=()=>setTab('overview');
+document.addEventListener('keydown',e=>{if(e.shiftKey&&(e.key==='B'||e.key==='b')&&!/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName))setTab(TAB==='recon'?'overview':'recon');});
 
 /* ───────── render all ───────── */
 function renderAll(){
@@ -825,6 +801,7 @@ function renderAll(){
   if(TAB==='credits')renderCredits();
   if(TAB==='expenses')renderExpenses();
   if(TAB==='cashflow')renderCashflow();
+  if(TAB==='recon')renderRecon();
 }
 
 /* ───────── CSV export ───────── */
@@ -834,7 +811,7 @@ function dlCSV(name,rows){
 }
 $('csvPL').onclick=()=>{const M=byMonth();dlCSV(`friska-pnl-${P.from}_${P.to}.csv`,[['Month','Credits','Paid','Outstanding','Debits','Net'],...months().map(m=>[m,M[m].billed,M[m].coll,M[m].billed-M[m].coll,M[m].exp,M[m].billed-M[m].exp])]);};
 $('eCsv').onclick=()=>dlCSV(`friska-expenses-${P.from}_${P.to}.csv`,[['Date','ExpenseId','Category','Description','Amount','Method','PaidBy'],...EXP.filter(e=>inP(e.date)).sort((a,b)=>a.date.localeCompare(b.date)).map(e=>[e.date,e.id,e.cat,e.desc,e.amount,e.method,e.by])]);
-$('rCsv').onclick=()=>dlCSV(`friska-credits-${P.from}_${P.to}.csv`,[['Date','Ref','Client','Plan','Source','Status','Amount'],...BILLS.filter(b=>inP(b.date)).sort((a,b)=>a.date.localeCompare(b.date)).map(b=>[b.date,b.id,b.client,b.plan,b.src,b.paid?'Paid':'Unpaid',b.amount])]);
+$('rCsv').onclick=()=>dlCSV(`friska-credits-${P.from}_${P.to}.csv`,[['Date','Ref','Received from','Batch','Amount'],...BILLS.filter(b=>inP(b.date)).sort((a,b)=>a.date.localeCompare(b.date)).map(b=>[b.date,b.id,b.client,b.batch,b.amount])]);
 
 /* ───────── add single entries ───────── */
 function fillExpenseForm(){
@@ -856,7 +833,7 @@ $('lgSave').onclick=async()=>{
   const d=$('lgDate').value,a=Number($('lgAmt').value);
   if(!d||!(a>0)){toast('Date and amount required',true);return;}
   const b=$('lgSave');b.disabled=true;
-  try{await post({action:'appendLegacyCredit',payload:JSON.stringify({Date:d,Client:$('lgClient').value.trim(),Amount:a,PaidStatus:$('lgStatus').value})});
+  try{await post({action:'appendLegacyCredit',payload:JSON.stringify({Date:d,Client:$('lgClient').value.trim(),Amount:a,PaidStatus:'Paid'})});
     toast('Credit saved');$('lgAmt').value='';$('lgClient').value='';await loadAll();}
   catch(e){toast(e.message,true);}finally{b.disabled=false;}
 };
@@ -881,7 +858,7 @@ $('btnRefresh').onclick=loadAll;
 $('btnPrint').onclick=()=>{if(TAB!=='overview')setTab('overview');setTimeout(()=>window.print(),150);};
 function setHH(){document.documentElement.style.setProperty('--hh',$('hdr').offsetHeight+'px');}
 let rz;addEventListener('resize',()=>{setHH();clearTimeout(rz);rz=setTimeout(renderAll,200);});setHH();
-const h0=location.hash.slice(1);if(['overview','credits','expenses','cashflow'].includes(h0))setTab(h0);
+const h0=location.hash.slice(1);if(['overview','credits','expenses','cashflow','recon'].includes(h0))setTab(h0);
 loadAll();
 </script>
 </body>
