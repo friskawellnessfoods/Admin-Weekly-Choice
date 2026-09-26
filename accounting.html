@@ -7,7 +7,6 @@
 <title>Financials — Friska Wellness</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
 <style>
 :root{
   --navy:#0a1a6e;--navy2:#13268f;--navy-soft:#eef1fb;
@@ -49,7 +48,8 @@ header{background:linear-gradient(135deg,var(--navy),var(--navy2));color:#fff;pa
 .chips{display:flex;gap:6px;flex-wrap:wrap}
 .chip{padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:#fff;font-size:12.5px;font-weight:600;color:var(--ink2);white-space:nowrap}
 .chip[aria-pressed="true"]{background:var(--navy);border-color:var(--navy);color:#fff}
-.mrange{display:flex;align-items:center;gap:6px;margin-left:auto}
+.mrange{display:flex;align-items:center;gap:6px}
+.pwrap .chips{margin-left:auto}
 .mrange select{padding:6px 8px;border:1px solid var(--line);border-radius:8px;font:inherit;font-size:12.5px;background:#fff;color:var(--ink)}
 .mrange span{color:var(--faint);font-size:12px}
 .plabel{font-size:12px;color:var(--muted);font-weight:500}
@@ -181,10 +181,22 @@ label.f{display:block;font-size:12px;font-weight:600;color:var(--muted);margin:0
 .spin{width:28px;height:28px;border:3px solid var(--line);border-top-color:var(--navy);border-radius:50%;animation:sp 0.8s linear infinite;margin:0 auto 10px}
 @keyframes sp{to{transform:rotate(360deg)}}
 .printhead{display:none}
+.more{border:0;background:none;color:var(--navy);font-size:12px;font-weight:700;padding:6px 0 0;display:inline-flex;align-items:center;gap:5px}
+.more .cv{display:inline-block;width:16px;height:16px;border-radius:5px;background:var(--line2);font-size:9px;line-height:16px;text-align:center;transition:transform .15s}
+.more[aria-expanded="true"] .cv{transform:rotate(90deg);background:var(--navy);color:#fff}
+.hero .more{color:#fff}
+.split{margin-top:10px;padding-top:10px;border-top:1px dashed var(--line)}
+.split .sb{display:flex;height:8px;border-radius:999px;overflow:hidden;background:var(--line2);gap:2px;margin-bottom:8px}
+.split .sb i{display:block;height:100%}
+.split .sr{display:flex;justify-content:space-between;font-size:12.5px;padding:3px 0}
+.split .sr span{display:flex;align-items:center;gap:6px;color:var(--ink2)}
+.split .sr span i{width:8px;height:8px;border-radius:2px;display:inline-block}
+.split .sr b{font-variant-numeric:tabular-nums}
+.grid.g3,.grid.g4{align-items:start}
 @media(max-width:640px){
   .brand h1{font-size:14px;white-space:normal}.brand .sub{display:none}
   .hbtn .t{display:none}.hbtn{padding:7px 10px}
-  .mrange{margin-left:0;width:100%}.mrange select{flex:1}
+  .mrange{width:100%}.mrange select{flex:1}.pwrap .chips{margin-left:0}
   .kpi .v{font-size:21px}.card{padding:14px}main{padding:12px}
   .hb{grid-template-columns:96px 1fr auto}
   .acc-h .amt{font-size:13.5px}
@@ -223,16 +235,18 @@ label.f{display:block;font-size:12px;font-weight:600;color:var(--muted);margin:0
     </div>
     <nav class="tabs" role="tablist">
       <button role="tab" aria-selected="true"  data-tab="overview">Overview</button>
+      <button role="tab" aria-selected="false" data-tab="credits">Credits</button>
       <button role="tab" aria-selected="false" data-tab="expenses">Expenses</button>
-      <button role="tab" aria-selected="false" data-tab="revenue">Revenue &amp; Credits</button>
       <button role="tab" aria-selected="false" data-tab="cashflow">Credit vs Debit</button>
-      <button role="tab" aria-selected="false" data-tab="import">Import</button>
     </nav>
   </div>
 </header>
 
 <div class="pbar" id="pbar">
   <div class="pwrap">
+    <div class="mrange">
+      <select id="mFrom" aria-label="From month"></select><span>→</span><select id="mTo" aria-label="To month"></select>
+    </div>
     <div class="chips" id="quick">
       <button class="chip" data-q="this">This month</button>
       <button class="chip" data-q="last">Last month</button>
@@ -240,9 +254,6 @@ label.f{display:block;font-size:12px;font-weight:600;color:var(--muted);margin:0
       <button class="chip" data-q="6">Last 6M</button>
       <button class="chip" data-q="fy">FY</button>
       <button class="chip" data-q="all" aria-pressed="true">All time</button>
-    </div>
-    <div class="mrange">
-      <select id="mFrom" aria-label="From month"></select><span>→</span><select id="mTo" aria-label="To month"></select>
     </div>
   </div>
 </div>
@@ -252,16 +263,16 @@ label.f{display:block;font-size:12px;font-weight:600;color:var(--muted);margin:0
 <section class="panel active" id="panel-overview">
   <div class="printhead"><div><h2>Friska Wellness LLP — Financial Summary</h2><div class="muted" id="phPeriod"></div></div><div class="muted" id="phDate"></div></div>
 
-  <div class="grid g4">
-    <div class="card kpi" style="--acc:var(--navy)"><div class="k">Revenue billed</div><div class="v num" id="kBilled">—</div><div class="s" id="kBilledS"></div></div>
-    <div class="card kpi" style="--acc:var(--in)"><div class="k">Collected (credit)</div><div class="v num" id="kColl">—</div><div class="s" id="kCollS"></div></div>
-    <div class="card kpi" style="--acc:var(--out)"><div class="k">Expenses (debit)</div><div class="v num" id="kExp">—</div><div class="s" id="kExpS"></div></div>
-    <div class="card kpi hero"><div class="k">Net cash profit</div><div class="v num" id="kNet">—</div><div class="s" id="kNetS"></div></div>
+  <div class="grid g3">
+    <div class="card kpi" style="--acc:var(--in)"><div class="k">Credits (sales)</div><div class="v num" id="kCred">—</div><div class="s" id="kCredS"></div>
+      <button class="more" data-split="ov" aria-expanded="false"><span class="cv">▶</span>Paid &amp; outstanding</button><div class="split" id="split-ov" hidden></div></div>
+    <div class="card kpi" style="--acc:var(--out)"><div class="k">Debits (expenses)</div><div class="v num" id="kExp">—</div><div class="s" id="kExpS"></div></div>
+    <div class="card kpi hero"><div class="k">Net profit</div><div class="v num" id="kNet">—</div><div class="s" id="kNetS"></div></div>
   </div>
 
   <div class="grid g3 mt">
     <div class="card span2">
-      <div class="ch"><div><div class="ct">Credit vs debit by month</div><div class="cs">Money collected vs money spent</div></div>
+      <div class="ch"><div><div class="ct">Credit vs debit by month</div><div class="cs">Sales billed vs money spent</div></div>
         <div class="legend"><span><i style="background:var(--in)"></i>Credit</span><span><i style="background:var(--out)"></i>Debit</span></div></div>
       <div class="chart" id="chInOut"></div>
     </div>
@@ -273,7 +284,7 @@ label.f{display:block;font-size:12px;font-weight:600;color:var(--muted);margin:0
 
   <div class="grid g2 mt">
     <div class="card">
-      <div class="ch"><div><div class="ct">Net profit by month</div><div class="cs">Collected − expenses</div></div></div>
+      <div class="ch"><div><div class="ct">Net profit by month</div><div class="cs">Credits − debits</div></div></div>
       <div class="chart" id="chNet"></div>
     </div>
     <div class="card">
@@ -283,7 +294,7 @@ label.f{display:block;font-size:12px;font-weight:600;color:var(--muted);margin:0
   </div>
 
   <div class="card mt">
-    <div class="ch"><div><div class="ct">Monthly P&amp;L</div><div class="cs">Cash basis · bills dated by bill date</div></div>
+    <div class="ch"><div><div class="ct">Monthly P&amp;L</div><div class="cs">Credits = all bills (paid + outstanding) by bill date</div></div>
       <button class="btn noprint" id="csvPL">Export CSV</button></div>
     <div class="tw" id="plTable"></div>
   </div>
@@ -312,20 +323,34 @@ label.f{display:block;font-size:12px;font-weight:600;color:var(--muted);margin:0
     <div class="ch"><div><div class="ct">Category × month</div><div class="cs">Darker = higher spend</div></div></div>
     <div class="tw" id="eMatrix"></div>
   </div>
+
+  <div class="card mt">
+    <div class="ch"><div><div class="ct">Add single expense</div><div class="cs">One-off entry — monthly bank statements are imported from the sheet</div></div></div>
+    <div class="grid g3">
+      <div><label class="f" for="exDate">Date</label><input class="inp" id="exDate" type="date" style="width:100%"></div>
+      <div><label class="f" for="exAmt">Amount (₹)</label><input class="inp" id="exAmt" type="number" inputmode="decimal" min="0" step="0.01" style="width:100%"></div>
+      <div><label class="f" for="exCat">Category</label><select class="inp" id="exCat" style="width:100%"></select></div>
+      <div><label class="f" for="exDesc">Description</label><input class="inp" id="exDesc" style="width:100%" placeholder="What was this for?"></div>
+      <div><label class="f" for="exBy">Paid by</label><select class="inp" id="exBy" style="width:100%"></select></div>
+      <div><label class="f" for="exMethod">Method</label><select class="inp" id="exMethod" style="width:100%"><option>UPI</option><option>Cash</option><option>Bank</option></select></div>
+    </div>
+    <div class="tb mt"><button class="btn go" id="exSave">Save expense</button></div>
+  </div>
 </section>
 
-<!-- ═════════ REVENUE ═════════ -->
-<section class="panel" id="panel-revenue">
+<!-- ═════════ CREDITS ═════════ -->
+<section class="panel" id="panel-credits">
   <div class="grid g4">
-    <div class="card kpi" style="--acc:var(--navy)"><div class="k">Total billed</div><div class="v num" id="rBilled">—</div><div class="s" id="rBilledS"></div></div>
-    <div class="card kpi" style="--acc:var(--in)"><div class="k">Collected</div><div class="v num" id="rColl">—</div><div class="s" id="rCollS"></div></div>
-    <div class="card kpi" style="--acc:var(--neg)"><div class="k">Outstanding</div><div class="v num" id="rOut">—</div><div class="s" id="rOutS"></div></div>
+    <div class="card kpi" style="--acc:var(--in)"><div class="k">Total credits</div><div class="v num" id="rBilled">—</div><div class="s" id="rBilledS"></div>
+      <button class="more" data-split="cr" aria-expanded="false"><span class="cv">▶</span>Paid &amp; outstanding</button><div class="split" id="split-cr" hidden></div></div>
+    <div class="card kpi"><div class="k">Bills raised</div><div class="v num" id="rCnt">—</div><div class="s" id="rCntS"></div></div>
     <div class="card kpi"><div class="k">Avg bill value</div><div class="v num" id="rAvg">—</div><div class="s" id="rAvgS"></div></div>
+    <div class="card kpi"><div class="k">Clients billed</div><div class="v num" id="rCli">—</div><div class="s" id="rCliS"></div></div>
   </div>
 
   <div class="grid g2 mt">
     <div class="card">
-      <div class="ch"><div><div class="ct">Revenue by plan</div><div class="cs">Billed amount</div></div></div>
+      <div class="ch"><div><div class="ct">Credits by plan</div><div class="cs">Billed amount</div></div></div>
       <div id="rPlan"></div>
     </div>
     <div class="card">
@@ -335,68 +360,14 @@ label.f{display:block;font-size:12px;font-weight:600;color:var(--muted);margin:0
   </div>
 
   <div class="card mt">
-    <div class="ch"><div><div class="ct">Revenue components</div><div class="cs">What's inside the billed total</div></div></div>
+    <div class="ch"><div><div class="ct">What makes up credits</div><div class="cs">Components of the billed total</div></div></div>
     <div id="rComp"></div>
   </div>
 
   <div class="card mt">
-    <div class="ch"><div><div class="ct">Credits</div><div class="cs">Bills and bank-statement credits</div></div></div>
+    <div class="ch"><div><div class="ct">All credits</div><div class="cs">Open a group to see each entry</div></div></div>
     <div class="tb"><input class="inp" id="rSearch" placeholder="Search client, bill no, amount…" style="flex:1;min-width:200px"><button class="btn" id="rCsv">Export CSV</button></div>
     <div id="rAcc"></div>
-  </div>
-</section>
-
-<!-- ═════════ CASH FLOW ═════════ -->
-<section class="panel" id="panel-cashflow">
-  <div class="grid g3">
-    <div class="card kpi" style="--acc:var(--in)"><div class="k">Total credit</div><div class="v num" id="cIn">—</div><div class="s" id="cInS"></div></div>
-    <div class="card kpi" style="--acc:var(--out)"><div class="k">Total debit</div><div class="v num" id="cOut">—</div><div class="s" id="cOutS"></div></div>
-    <div class="card kpi hero"><div class="k">Net position</div><div class="v num" id="cNet">—</div><div class="s" id="cNetS"></div></div>
-  </div>
-  <div class="card mt">
-    <div class="ch"><div><div class="ct">Cumulative net position</div><div class="cs">Running total of credit − debit</div></div></div>
-    <div class="chart" id="chCum"></div>
-  </div>
-  <div class="card mt">
-    <div class="ch"><div><div class="ct">Month by month</div><div class="cs">Open a month to see credits and debits side by side</div></div></div>
-    <div id="cAcc"></div>
-  </div>
-</section>
-
-<!-- ═════════ IMPORT ═════════ -->
-<section class="panel" id="panel-import">
-  <div class="card">
-    <div class="ch"><div><div class="ct">Import bank statement</div><div class="cs">Debits → Expenses · Credits → Bank credits. Review everything before it's saved.</div></div>
-      <button class="btn" id="tplBtn">Download template</button></div>
-    <div class="drop" id="drop">
-      <b>Drop a CSV / Excel file here</b>
-      <p>or <label for="file" style="color:var(--navy);font-weight:700;cursor:pointer;text-decoration:underline">choose a file</label> · or paste rows from Google Sheets below</p>
-      <input type="file" id="file" accept=".csv,.tsv,.txt,.xlsx,.xls" hidden>
-    </div>
-    <div class="mt"><textarea class="inp" id="paste" placeholder="Paste here (with header row). e.g.&#10;Date	Description	Debit	Credit	Category&#10;02/09/26	Hyperpure order	12450		Hyperpure&#10;03/09/26	UPI Sainath Reddy		16643"></textarea></div>
-    <div class="tb mt">
-      <button class="btn pri" id="parseBtn">Preview</button>
-      <span class="help">When the file has a single <code>Amount</code> column, treat rows as:</span>
-      <div class="seg" id="defType"><button aria-pressed="true" data-t="D">Debit</button><button aria-pressed="false" data-t="C">Credit</button></div>
-    </div>
-    <p class="help">Recognised headers: <code>Date</code>, <code>Description</code>/<code>Narration</code>/<code>Particulars</code>, <code>Debit</code>/<code>Withdrawal</code>, <code>Credit</code>/<code>Deposit</code>, <code>Amount</code>, <code>Type</code> (Dr/Cr), <code>Category</code>. Categories are auto-filled from past entries and keywords — fix any before importing. Rows already in the books are flagged and unticked.</p>
-
-    <div id="prevWrap" style="display:none">
-      <div class="sumbar" id="sumbar"></div>
-      <div class="tb">
-        <span class="help">Set category for all ticked debits:</span>
-        <select class="sel-sm" id="bulkCat"></select><button class="btn" id="bulkApply">Apply</button>
-        <span style="flex:1"></span>
-        <button class="btn" id="cancelImp">Cancel</button>
-        <button class="btn go" id="doImport">Import</button>
-      </div>
-      <div class="prev" id="prev"></div>
-    </div>
-  </div>
-
-  <div class="card mt">
-    <div class="ch"><div><div class="ct">Import history</div><div class="cs">Undo removes every row from that import</div></div></div>
-    <div class="tw" id="hist"></div>
   </div>
 
   <div class="card mt">
@@ -410,6 +381,25 @@ label.f{display:block;font-size:12px;font-weight:600;color:var(--muted);margin:0
     <div class="tb mt"><button class="btn go" id="lgSave">Save credit</button></div>
   </div>
 </section>
+
+<!-- ═════════ CASH FLOW ═════════ -->
+<section class="panel" id="panel-cashflow">
+  <div class="grid g3">
+    <div class="card kpi" style="--acc:var(--in)"><div class="k">Total credit</div><div class="v num" id="cIn">—</div><div class="s" id="cInS"></div>
+      <button class="more" data-split="cf" aria-expanded="false"><span class="cv">▶</span>Paid &amp; outstanding</button><div class="split" id="split-cf" hidden></div></div>
+    <div class="card kpi" style="--acc:var(--out)"><div class="k">Total debit</div><div class="v num" id="cOut">—</div><div class="s" id="cOutS"></div></div>
+    <div class="card kpi hero"><div class="k">Net position</div><div class="v num" id="cNet">—</div><div class="s" id="cNetS"></div></div>
+  </div>
+  <div class="card mt">
+    <div class="ch"><div><div class="ct">Cumulative net position</div><div class="cs">Running total of credit − debit</div></div></div>
+    <div class="chart" id="chCum"></div>
+  </div>
+  <div class="card mt">
+    <div class="ch"><div><div class="ct">Month by month</div><div class="cs">Open a month to see credits and debits side by side</div></div></div>
+    <div id="cAcc"></div>
+  </div>
+</section>
+
 </main>
 
 <div id="tip"></div>
@@ -419,20 +409,9 @@ label.f{display:block;font-size:12px;font-weight:600;color:var(--muted);margin:0
 <script>
 const API='https://script.google.com/macros/s/AKfycbwI8_v36JJrkAXVhfGIAirSC3IUHbe6l-3WLeeTETg1SGRUcn4M_dPjN9azSCbgTBD1/exec';
 
-/* ━━━ AUTO-CATEGORY KEYWORDS (edit freely; first match wins) ━━━ */
-const CAT_RULES=[
-  ['Hyperpure',          /hyperpure|zomato hyper/i],
-  ['Delivery',           /porter|rapido|uber|ola |dunzo|shadowfax|borzo|delivery|petrol|fuel|bike/i],
-  ['Salary',             /salary|wages|payroll|advance to|staff/i],
-  ['Rent & Utilities',   /rent|electric|tsspdcl|power|water|internet|broadband|airtel|jio|act fibernet|wifi|maintenance charge/i],
-  ['Cylinder',           /cylinder|lpg|hp gas|bharat gas|indane|gas agency/i],
-  ['Packaging',          /packag|container|box|pouch|foil|cling|tiffin/i],
-  ['Marketing',          /facebook|meta |instagram|google ads|adwords|marketing|print|flyer|canva/i],
-  ['Equipment & Repairs',/repair|service|equipment|fridge|mixer|stove|plumb|electrician|amazon|flipkart/i],
-  ['Local Purchase',     /vegetable|veggies|market|kirana|mart|dmart|ratnadeep|more retail|reliance fresh|chicken|mutton|fish|egg|milk|dairy|grocery/i],
-  ['Essentials',         /essential|cleaning|detergent|gloves|tissue|soap|sanitizer/i],
-];
-/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+/* ━━━ EDIT NAMES HERE ━━━ */
+const PAID_BY_NAMES=['Parth','Umesh','Bank'];
+/* ━━━━━━━━━━━━━━━━━━━━━━━ */
 
 const $=id=>document.getElementById(id);
 const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -538,7 +517,7 @@ function agg(from,to){
   const b=BILLS.filter(x=>inR(x.date)),e=EXP.filter(x=>inR(x.date));
   const billed=b.reduce((s,x)=>s+x.amount,0),coll=b.filter(x=>x.paid).reduce((s,x)=>s+x.amount,0);
   const exp=e.reduce((s,x)=>s+x.amount,0);
-  return{b,e,billed,coll,out:billed-coll,exp,net:coll-exp};
+  return{b,e,billed,coll,out:billed-coll,exp,net:billed-exp};
 }
 function byMonth(){
   const M={};months().forEach(m=>M[m]={billed:0,coll:0,exp:0,cats:{}});
@@ -621,52 +600,66 @@ function hbars(el,rows,total,opts={}){
   el.innerHTML=rows.map(([l,v,extra])=>`<div class="hb"><div class="l" title="${esc(l)}">${esc(l)}</div><div class="t"><div class="f" style="width:${(v/max*100).toFixed(1)}%;${opts.color?'background:'+opts.color:''}"></div></div><div class="r num">${short(v)}<small>${extra!=null?extra:pct(v,total).toFixed(1)+'%'}</small></div></div>`).join('');
 }
 
+/* ───────── paid / outstanding split ───────── */
+function splitHTML(bills){
+  const p=bills.filter(b=>b.paid),u=bills.filter(b=>!b.paid);
+  const pv=p.reduce((s,b)=>s+b.amount,0),uv=u.reduce((s,b)=>s+b.amount,0),t=pv+uv||1;
+  return `<div class="sb"><i style="width:${(pv/t*100).toFixed(1)}%;background:var(--in)"></i><i style="width:${(uv/t*100).toFixed(1)}%;background:var(--neg)"></i></div>
+    <div class="sr"><span><i style="background:var(--in)"></i>Paid · ${p.length}</span><b>${inr(pv)} <small class="muted">${pct(pv,t).toFixed(0)}%</small></b></div>
+    <div class="sr"><span><i style="background:var(--neg)"></i>Outstanding · ${u.length}</span><b>${inr(uv)} <small class="muted">${pct(uv,t).toFixed(0)}%</small></b></div>`;
+}
+const SPLIT_OPEN=new Set();
+function setSplit(key,bills){
+  const el=$('split-'+key),btn=document.querySelector(`[data-split="${key}"]`);if(!el)return;
+  el.innerHTML=splitHTML(bills);el.hidden=!SPLIT_OPEN.has(key);btn.setAttribute('aria-expanded',SPLIT_OPEN.has(key));
+}
+document.querySelectorAll('[data-split]').forEach(b=>b.onclick=()=>{const k=b.dataset.split;SPLIT_OPEN.has(k)?SPLIT_OPEN.delete(k):SPLIT_OPEN.add(k);
+  const el=$('split-'+k);el.hidden=!SPLIT_OPEN.has(k);b.setAttribute('aria-expanded',SPLIT_OPEN.has(k));});
+
 /* ───────── render: overview ───────── */
 function renderOverview(){
   const A=agg(P.from,P.to),pr=prevRange(),B=agg(pr.from,pr.to),hasPrev=B.b.length||B.e.length;
-  const vs=hasPrev?(months().length===1?'vs prev month':'vs prev period'):'';
-  $('kBilled').textContent=short(A.billed);
-  $('kBilledS').innerHTML=(hasPrev?deltaChip(A.billed,B.billed)+' '+vs+' · ':'')+`${A.b.length} bills`;
-  $('kColl').textContent=short(A.coll);
-  $('kCollS').innerHTML=(hasPrev?deltaChip(A.coll,B.coll)+' ':'')+`${pct(A.coll,A.billed).toFixed(0)}% of billed`;
+  const vs=hasPrev?(months().length===1?' vs prev month':' vs prev period'):'';
+  $('kCred').textContent=short(A.billed);
+  $('kCredS').innerHTML=(hasPrev?deltaChip(A.billed,B.billed)+vs+' · ':'')+`${A.b.length} entries`;
+  setSplit('ov',A.b);
   $('kExp').textContent=short(A.exp);
-  $('kExpS').innerHTML=(hasPrev?deltaChip(A.exp,B.exp,false)+' ':'')+`${A.e.length} transactions`;
+  $('kExpS').innerHTML=(hasPrev?deltaChip(A.exp,B.exp,false)+vs+' · ':'')+`${A.e.length} transactions`;
   $('kNet').textContent=short(A.net);
-  $('kNetS').innerHTML=`Margin ${pct(A.net,A.coll).toFixed(1)}% on collections`;
+  $('kNetS').innerHTML=`Net margin ${pct(A.net,A.billed).toFixed(1)}% of credits`;
 
   const M=byMonth(),ms=months();
   barGroups($('chInOut'),ms.map(ymLabel),[
-    {name:'Credit',color:'var(--in)',values:ms.map(m=>M[m].coll)},
+    {name:'Credit',color:'var(--in)',values:ms.map(m=>M[m].billed)},
     {name:'Debit',color:'var(--out)',values:ms.map(m=>M[m].exp)}],
-    {tipTitle:ms.map(ymLong),tipExtra:i=>{const m=ms[i],n=M[m].coll-M[m].exp;return `<div class="tr" style="border-top:1px solid rgba(255,255,255,.2);margin-top:5px;padding-top:5px"><span>Net</span><b style="display:inline;margin:0">${signed(n)}</b></div>`;}});
-  barGroups($('chNet'),ms.map(ymLabel),[{name:'Net',color:v=>v<0?'var(--neg)':'var(--pos)',values:ms.map(m=>M[m].coll-M[m].exp)}],{h:220,tipTitle:ms.map(ymLong)});
+    {tipTitle:ms.map(ymLong),tipExtra:i=>{const m=ms[i],n=M[m].billed-M[m].exp;return `<div class="tr" style="border-top:1px solid rgba(255,255,255,.2);margin-top:5px;padding-top:5px"><span>Net</span><b style="display:inline;margin:0">${signed(n)}</b></div>`;}});
+  barGroups($('chNet'),ms.map(ymLabel),[{name:'Net',color:v=>v<0?'var(--neg)':'var(--pos)',values:ms.map(m=>M[m].billed-M[m].exp)}],{h:220,tipTitle:ms.map(ymLong)});
 
   const cats=catTotals(A.e);
   hbars($('ovMix'),cats,A.exp);
 
-  const nMo=ms.length||1,avgBurn=A.exp/nMo;
-  const bestM=ms.slice().sort((a,b)=>(M[b].coll-M[b].exp)-(M[a].coll-M[a].exp))[0];
-  const clients=new Set(A.b.filter(b=>b.src==='bill').map(b=>normName(b.client))).size;
+  const nMo=ms.length||1;
+  const bestM=ms.slice().sort((a,b)=>(M[b].billed-M[b].exp)-(M[a].billed-M[a].exp))[0];
+  const real=A.b.filter(b=>b.src==='bill');
+  const clients=new Set(real.map(b=>normName(b.client))).size;
   const foodCost=cats.filter(c=>['Hyperpure','Local Purchase'].includes(c[0])).reduce((s,c)=>s+c[1],0);
   const r=[
-    ['Collection rate',pct(A.coll,A.billed).toFixed(1)+'%'],
-    ['Net margin (on collections)',pct(A.net,A.coll).toFixed(1)+'%'],
-    ['Food cost (Hyperpure + local)',pct(foodCost,A.coll).toFixed(1)+'% of collections'],
-    ['Avg monthly revenue (billed)',inr(A.billed/nMo)],
-    ['Avg monthly expenses',inr(avgBurn)],
-    ['Outstanding receivables',inr(A.out)],
+    ['Net margin',pct(A.net,A.billed).toFixed(1)+'%'],
+    ['Food cost (Hyperpure + local)',pct(foodCost,A.billed).toFixed(1)+'% of credits'],
+    ['Avg monthly credits',inr(A.billed/nMo)],
+    ['Avg monthly debits',inr(A.exp/nMo)],
+    ['Avg bill value',real.length?inr(real.reduce((s,b)=>s+b.amount,0)/real.length):'—'],
     ['Unique billed clients',clients],
-    ['Best month (net)',bestM?ymLong(bestM)+' · '+signed(M[bestM].coll-M[bestM].exp):'—'],
+    ['Best month (net)',bestM?ymLong(bestM)+' · '+signed(M[bestM].billed-M[bestM].exp):'—'],
   ];
   $('ratios').innerHTML='<table>'+r.map(([k,v])=>`<tr><td class="muted">${k}</td><td class="n" style="font-weight:700">${v}</td></tr>`).join('')+'</table>';
 
-  // P&L table
-  let tb=0,tc=0,te=0;
-  const rows=ms.slice().reverse().map(m=>{const x=M[m],n=x.coll-x.exp;tb+=x.billed;tc+=x.coll;te+=x.exp;
-    return `<tr><td>${ymLong(m)}</td><td class="n">${inr(x.billed)}</td><td class="n">${inr(x.coll)}</td><td class="n">${inr(x.billed-x.coll)}</td><td class="n">${inr(x.exp)}</td><td class="n ${n<0?'negv':'pos'}">${signed(n)}</td><td class="n">${x.coll?pct(n,x.coll).toFixed(1)+'%':'—'}</td></tr>`;}).join('');
-  const tn=tc-te;
-  $('plTable').innerHTML=`<table><thead><tr><th>Month</th><th class="n">Billed</th><th class="n">Collected</th><th class="n">Outstanding</th><th class="n">Expenses</th><th class="n">Net</th><th class="n">Margin</th></tr></thead><tbody>${rows}
-    <tr class="tot"><td>Total</td><td class="n">${inr(tb)}</td><td class="n">${inr(tc)}</td><td class="n">${inr(tb-tc)}</td><td class="n">${inr(te)}</td><td class="n ${tn<0?'negv':'pos'}">${signed(tn)}</td><td class="n">${tc?pct(tn,tc).toFixed(1)+'%':'—'}</td></tr></tbody></table>`;
+  let tb=0,te=0;
+  const rows=ms.slice().reverse().map(m=>{const x=M[m],n=x.billed-x.exp;tb+=x.billed;te+=x.exp;
+    return `<tr><td>${ymLong(m)}</td><td class="n">${inr(x.billed)}</td><td class="n">${inr(x.exp)}</td><td class="n ${n<0?'negv':'pos'}">${signed(n)}</td><td class="n">${x.billed?pct(n,x.billed).toFixed(1)+'%':'—'}</td></tr>`;}).join('');
+  const tn=tb-te;
+  $('plTable').innerHTML=`<table><thead><tr><th>Month</th><th class="n">Credits</th><th class="n">Debits</th><th class="n">Net</th><th class="n">Margin</th></tr></thead><tbody>${rows}
+    <tr class="tot"><td>Total</td><td class="n">${inr(tb)}</td><td class="n">${inr(te)}</td><td class="n ${tn<0?'negv':'pos'}">${signed(tn)}</td><td class="n">${tb?pct(tn,tb).toFixed(1)+'%':'—'}</td></tr></tbody></table>`;
   $('phPeriod').textContent='Period: '+periodText();$('phDate').textContent='Generated '+dLabel(todayStr());
 }
 
@@ -697,6 +690,7 @@ function afterBody(b){
 /* ───────── render: expenses ───────── */
 function expMatch(e,q){if(!q)return true;q=q.toLowerCase();return (e.desc+' '+e.id+' '+e.cat+' '+e.amount+' '+e.method+' '+e.by+' '+e.date).toLowerCase().includes(q);}
 function renderExpenses(){
+  fillExpenseForm();
   const q=$('eSearch').value.trim();
   const all=EXP.filter(e=>inP(e.date)),list=all.filter(e=>expMatch(e,q));
   const tot=all.reduce((s,e)=>s+e.amount,0),nMo=months().length||1;
@@ -753,78 +747,74 @@ async function delLeg(id){
   catch(err){toast(err.message,true);}
 }
 
-/* ───────── render: revenue ───────── */
+/* ───────── render: credits ───────── */
 function billMatch(b,q){if(!q)return true;q=q.toLowerCase();return (b.client+' '+b.id+' '+b.plan+' '+b.amount+' '+b.date).toLowerCase().includes(q);}
-function renderRevenue(){
-  const A=agg(P.from,P.to),q=$('rSearch').value.trim();
-  const realBills=A.b.filter(b=>b.src==='bill');
-  $('rBilled').textContent=short(A.billed);$('rBilledS').textContent=`${realBills.length} bills · ${A.b.length-realBills.length} bank credits`;
-  const paidN=A.b.filter(b=>b.paid).length;
-  $('rColl').textContent=short(A.coll);$('rCollS').textContent=`${paidN} paid · ${pct(A.coll,A.billed).toFixed(0)}% collected`;
-  $('rOut').textContent=short(A.out);$('rOutS').textContent=`${A.b.length-paidN} unpaid`;
-  const avg=realBills.length?realBills.reduce((s,b)=>s+b.amount,0)/realBills.length:0;
-  $('rAvg').textContent=short(avg);$('rAvgS').textContent='per bill (excl. bank credits)';
+function renderCredits(){
+  const A=agg(P.from,P.to),q=$('rSearch').value.trim(),pr=prevRange(),B=agg(pr.from,pr.to);
+  const real=A.b.filter(b=>b.src==='bill'),bank=A.b.filter(b=>b.src==='bank');
+  $('rBilled').textContent=short(A.billed);$('rBilledS').innerHTML=(B.billed?deltaChip(A.billed,B.billed)+' vs prev · ':'')+periodText();
+  setSplit('cr',A.b);
+  $('rCnt').textContent=real.length;$('rCntS').textContent=bank.length?`+ ${bank.length} bank credits`:'from billing';
+  const avg=real.length?real.reduce((s,b)=>s+b.amount,0)/real.length:0;
+  $('rAvg').textContent=short(avg);$('rAvgS').textContent='per bill';
+  $('rCli').textContent=new Set(real.map(b=>normName(b.client))).size;$('rCliS').textContent='unique clients';
 
   const plan={};A.b.forEach(b=>plan[b.plan]=(plan[b.plan]||0)+b.amount);
   hbars($('rPlan'),Object.entries(plan).sort((a,b)=>b[1]-a[1]).slice(0,10),A.billed,{color:'var(--in)'});
   const cl={};A.b.forEach(b=>{const k=b.client||'—';cl[k]=cl[k]||{v:0,n:0};cl[k].v+=b.amount;cl[k].n++;});
   hbars($('rTop'),Object.entries(cl).sort((a,b)=>b[1].v-a[1].v).slice(0,10).map(([k,o])=>[k,o.v,o.n+' bill'+(o.n>1?'s':'')]),A.billed,{color:'var(--navy)'});
 
-  const food=realBills.reduce((s,b)=>s+b.food,0),del=realBills.reduce((s,b)=>s+b.delivery,0),gst=realBills.reduce((s,b)=>s+b.gst,0),
-    disc=realBills.reduce((s,b)=>s+b.discount,0),adj=realBills.reduce((s,b)=>s+b.adj,0),bank=A.b.filter(b=>b.src==='bank').reduce((s,b)=>s+b.amount,0);
+  const food=real.reduce((s,b)=>s+b.food,0),del=real.reduce((s,b)=>s+b.delivery,0),gst=real.reduce((s,b)=>s+b.gst,0),
+    disc=real.reduce((s,b)=>s+b.discount,0),adj=real.reduce((s,b)=>s+b.adj,0),bk=bank.reduce((s,b)=>s+b.amount,0);
   $('rComp').innerHTML=`<div class="tw"><table><tbody>
     <tr><td>Food / meal plans</td><td class="n">${inr(food)}</td></tr>
     <tr><td>Delivery charges</td><td class="n">${inr(del)}</td></tr>
     <tr><td>GST</td><td class="n">${inr(gst)}</td></tr>
     <tr><td>Discounts given</td><td class="n negv">${disc?'−'+inr(Math.abs(disc)):inr(0)}</td></tr>
     ${adj?`<tr><td>Adjustments</td><td class="n">${signed(adj)}</td></tr>`:''}
-    <tr><td>Bank-statement credits (no bill)</td><td class="n">${inr(bank)}</td></tr>
-    <tr class="tot"><td>Total billed</td><td class="n">${inr(A.billed)}</td></tr></tbody></table></div>`;
+    <tr><td>Bank-statement credits (no bill)</td><td class="n">${inr(bk)}</td></tr>
+    <tr class="tot"><td>Total credits</td><td class="n">${inr(A.billed)}</td></tr></tbody></table></div>`;
 
   const list=A.b.filter(b=>billMatch(b,q));
-  const groups=[
-    ['rev:unpaid','Unpaid bills — outstanding',list.filter(b=>b.src==='bill'&&!b.paid)],
-    ['rev:paid','Paid bills',list.filter(b=>b.src==='bill'&&b.paid)],
-    ['rev:bank','Bank-statement credits',list.filter(b=>b.src==='bank')],
-  ];
-  const G={};groups.forEach(g=>G[g[0]]=g[2]);
-  const dupN=LEGACY_RAW.filter(l=>DUP_LEG.has(l.id)&&inP(l.date)).length;
-  $('rAcc').innerHTML=groups.map(([k,n,arr])=>{const t=arr.reduce((s,b)=>s+b.amount,0);
-    return accHTML(k,n,`${arr.length} entr${arr.length===1?'y':'ies'}`+(k==='rev:bank'&&dupN?` · ${dupN} matched to real bills & excluded`:''),inr(t),'',A.billed?t/A.billed*100:0);}).join('');
-  wireAcc($('rAcc'),k=>billBody(G[k]||[],k==='rev:bank'));
+  const byM={};list.forEach(b=>(byM[b.date.slice(0,7)]=byM[b.date.slice(0,7)]||[]).push(b));
+  const keys=Object.keys(byM).sort().reverse();
+  $('rAcc').innerHTML=keys.length?keys.map(m=>{const arr=byM[m],t=arr.reduce((s,b)=>s+b.amount,0),u=arr.filter(b=>!b.paid);
+    return accHTML('cr:'+m,ymLong(m),`${arr.length} entr${arr.length===1?'y':'ies'}`+(u.length?` · ${u.length} outstanding`:''),inr(t),'',A.billed?t/A.billed*100:0);}).join('')
+    :'<div class="empty">No credits'+(q?' match "'+esc(q)+'"':' in this period')+'.</div>';
+  wireAcc($('rAcc'),k=>billBody(byM[k.slice(3)]||[]));
 }
-function billBody(arr,bank){
+function billBody(arr){
   if(!arr.length)return '<div class="empty">Nothing here.</div>';
-  arr=arr.slice().sort((a,b)=>b.date.localeCompare(a.date));
-  return `<div class="tw"><table><thead><tr><th>Date</th><th>Client</th>${bank?'':'<th>Plan</th><th>Bill #</th>'}<th>Status</th><th class="n">Amount</th>${bank?'<th></th>':''}</tr></thead><tbody>`+
-    arr.map(b=>`<tr><td class="num" style="white-space:nowrap">${dLabel(b.date)}</td><td style="font-weight:600">${esc(b.client)}${bank?`<div class="muted" style="font-size:11px">${esc(b.id)}${b.batch?' · '+esc(b.batch):''}</div>`:''}</td>
-      ${bank?'':`<td class="muted">${esc(b.plan)}${b.duration?' · '+esc(b.duration):''}</td><td class="muted">#${esc(b.id)}</td>`}
-      <td><span class="pill ${b.paid?'paid':'unpaid'}">${b.paid?'Paid':'Unpaid'}</span></td><td class="n" style="font-weight:700">${inr(b.amount,2)}</td>
-      ${bank?`<td><button class="x" data-dleg="${esc(b.id)}" title="Delete">×</button></td>`:''}</tr>`).join('')+'</tbody></table></div>';
+  arr=arr.slice().sort((a,b)=>b.date.localeCompare(a.date)||b.amount-a.amount);
+  const pv=arr.filter(b=>b.paid).reduce((s,b)=>s+b.amount,0),uv=arr.filter(b=>!b.paid).reduce((s,b)=>s+b.amount,0);
+  return `<div class="split" style="border:0;margin:0;padding:12px 10px 4px;max-width:420px">${splitHTML(arr)}</div><div class="tw"><table><thead><tr><th>Date</th><th>Client</th><th>Plan</th><th>Ref</th><th>Status</th><th class="n">Amount</th><th></th></tr></thead><tbody>`+
+    arr.map(b=>`<tr><td class="num" style="white-space:nowrap">${dLabel(b.date)}</td><td style="font-weight:600">${esc(b.client)}</td>
+      <td class="muted">${b.src==='bank'?'<span class="pill bank">bank credit</span>':esc(b.plan)+(b.duration?' · '+esc(b.duration):'')}</td><td class="muted">${b.src==='bank'?esc(b.id):'#'+esc(b.id)}</td>
+      <td><span class="pill ${b.paid?'paid':'unpaid'}">${b.paid?'Paid':'Outstanding'}</span></td><td class="n" style="font-weight:700">${inr(b.amount,2)}</td>
+      <td>${b.src==='bank'?`<button class="x" data-dleg="${esc(b.id)}" title="Delete">×</button>`:''}</td></tr>`).join('')+'</tbody></table></div>';
 }
 
 /* ───────── render: cash flow ───────── */
 function renderCashflow(){
   const A=agg(P.from,P.to),M=byMonth(),ms=months();
-  $('cIn').textContent=short(A.coll);$('cInS').textContent=`${A.b.filter(b=>b.paid).length} credits`;
+  $('cIn').textContent=short(A.billed);$('cInS').textContent=`${A.b.length} credits`;setSplit('cf',A.b);
   $('cOut').textContent=short(A.exp);$('cOutS').textContent=`${A.e.length} debits`;
-  $('cNet').textContent=short(A.net);$('cNetS').textContent=`Credit covers ${A.exp?(A.coll/A.exp*100).toFixed(0):'—'}% of debit`;
-  let run=0;const cum=ms.map(m=>run+=M[m].coll-M[m].exp);
+  $('cNet').textContent=short(A.net);$('cNetS').textContent=`Credit covers ${A.exp?(A.billed/A.exp*100).toFixed(0):'—'}% of debit`;
+  let run=0;const cum=ms.map(m=>run+=M[m].billed-M[m].exp);
   lineChart($('chCum'),ms.map(ymLabel),cum,{name:'Cumulative net'});
-  const maxV=Math.max(1,...ms.map(m=>Math.max(M[m].coll,M[m].exp)));
-  run=0;const runMap={};ms.forEach(m=>{run+=M[m].coll-M[m].exp;runMap[m]=run;});
-  $('cAcc').innerHTML=ms.slice().reverse().map(m=>{const x=M[m],n=x.coll-x.exp;
-    return accHTML('cf:'+m,ymLong(m),`<span class="pos">In ${inr(x.coll)}</span> · <span style="color:var(--out-ink)">Out ${inr(x.exp)}</span> · running ${signed(runMap[m])}`,`<span class="${n<0?'negv':'pos'}">${signed(n)}</span>`,'net',null);}).join('');
+  const runMap={};ms.forEach((m,i)=>runMap[m]=cum[i]);
+  $('cAcc').innerHTML=ms.slice().reverse().map(m=>{const x=M[m],n=x.billed-x.exp;
+    return accHTML('cf:'+m,ymLong(m),`<span class="pos">Credit ${inr(x.billed)}</span> · <span style="color:var(--out-ink)">Debit ${inr(x.exp)}</span> · running ${signed(runMap[m])}`,`<span class="${n<0?'negv':'pos'}">${signed(n)}</span>`,'net',null);}).join('');
   wireAcc($('cAcc'),k=>cfBody(k.slice(3)));
 }
 function cfBody(m){
-  const b=BILLS.filter(x=>x.paid&&x.date.startsWith(m)).sort((a,c)=>c.amount-a.amount);
+  const b=BILLS.filter(x=>x.date.startsWith(m)).sort((a,c)=>c.amount-a.amount);
   const e=EXP.filter(x=>x.date.startsWith(m));const cats=catTotals(e);
   const tIn=b.reduce((s,x)=>s+x.amount,0),tOut=e.reduce((s,x)=>s+x.amount,0);
-  const inRows=b.map(x=>`<tr><td class="num" style="white-space:nowrap">${dLabel(x.date)}</td><td>${esc(x.client)} ${x.src==='bank'?'<span class="pill bank">bank</span>':''}</td><td class="n">${inr(x.amount)}</td></tr>`).join('')||'<tr><td colspan="3" class="muted">No credits</td></tr>';
+  const inRows=b.map(x=>`<tr><td class="num" style="white-space:nowrap">${dLabel(x.date)}</td><td>${esc(x.client)} ${x.src==='bank'?'<span class="pill bank">bank</span>':''}${x.paid?'':' <span class="pill unpaid">Outstanding</span>'}</td><td class="n">${inr(x.amount)}</td></tr>`).join('')||'<tr><td colspan="3" class="muted">No credits</td></tr>';
   const outRows=cats.map(([c,v])=>{const n=e.filter(x=>x.cat===c).length;return `<tr><td style="font-weight:600">${esc(c)}</td><td class="muted">${n} txn</td><td class="n">${inr(v)}</td></tr>`;}).join('')||'<tr><td colspan="3" class="muted">No debits</td></tr>';
   return `<div class="grid g2" style="padding:10px 8px">
-    <div><div class="ct pos" style="margin-bottom:6px">Credit · ${inr(tIn)}</div><div class="tw" style="max-height:360px;overflow:auto"><table><tbody>${inRows}</tbody></table></div></div>
+    <div><div class="ct pos" style="margin-bottom:6px">Credit · ${inr(tIn)}</div><div class="split" style="border:0;margin:0 0 6px;padding:0;max-width:420px">${splitHTML(b)}</div><div class="tw" style="max-height:360px;overflow:auto"><table><tbody>${inRows}</tbody></table></div></div>
     <div><div class="ct" style="margin-bottom:6px;color:var(--out-ink)">Debit · ${inr(tOut)}</div><div class="tw"><table><tbody>${outRows}</tbody></table></div>
       <p class="help" style="margin-top:8px">Full debit detail: Expenses tab, filtered to this month.</p></div></div>`;
 }
@@ -832,10 +822,9 @@ function cfBody(m){
 /* ───────── render all ───────── */
 function renderAll(){
   if(TAB==='overview')renderOverview();
+  if(TAB==='credits')renderCredits();
   if(TAB==='expenses')renderExpenses();
-  if(TAB==='revenue')renderRevenue();
   if(TAB==='cashflow')renderCashflow();
-  if(TAB==='import')renderHistory();
 }
 
 /* ───────── CSV export ───────── */
@@ -843,170 +832,25 @@ function dlCSV(name,rows){
   const csv=rows.map(r=>r.map(v=>{const s=String(v==null?'':v);return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;}).join(',')).join('\n');
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['﻿'+csv],{type:'text/csv'}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000);
 }
-$('csvPL').onclick=()=>{const M=byMonth();dlCSV(`friska-pnl-${P.from}_${P.to}.csv`,[['Month','Billed','Collected','Outstanding','Expenses','Net'],...months().map(m=>[m,M[m].billed,M[m].coll,M[m].billed-M[m].coll,M[m].exp,M[m].coll-M[m].exp])]);};
+$('csvPL').onclick=()=>{const M=byMonth();dlCSV(`friska-pnl-${P.from}_${P.to}.csv`,[['Month','Credits','Paid','Outstanding','Debits','Net'],...months().map(m=>[m,M[m].billed,M[m].coll,M[m].billed-M[m].coll,M[m].exp,M[m].billed-M[m].exp])]);};
 $('eCsv').onclick=()=>dlCSV(`friska-expenses-${P.from}_${P.to}.csv`,[['Date','ExpenseId','Category','Description','Amount','Method','PaidBy'],...EXP.filter(e=>inP(e.date)).sort((a,b)=>a.date.localeCompare(b.date)).map(e=>[e.date,e.id,e.cat,e.desc,e.amount,e.method,e.by])]);
 $('rCsv').onclick=()=>dlCSV(`friska-credits-${P.from}_${P.to}.csv`,[['Date','Ref','Client','Plan','Source','Status','Amount'],...BILLS.filter(b=>inP(b.date)).sort((a,b)=>a.date.localeCompare(b.date)).map(b=>[b.date,b.id,b.client,b.plan,b.src,b.paid?'Paid':'Unpaid',b.amount])]);
 
-/* ═══════════ IMPORT ═══════════ */
-let IMP=[]; // preview rows
-let DEF_T='D';
-document.querySelectorAll('#defType button').forEach(b=>b.onclick=()=>{DEF_T=b.dataset.t;document.querySelectorAll('#defType button').forEach(x=>x.setAttribute('aria-pressed',x===b?'true':'false'));});
-
-function parseDelim(text){
-  const first=text.split(/\r?\n/)[0]||'';const d=first.includes('\t')?'\t':(first.split(';').length>first.split(',').length?';':',');
-  const rows=[];let row=[],f='',q=false;
-  for(let i=0;i<text.length;i++){const c=text[i];
-    if(q){if(c==='"'){if(text[i+1]==='"'){f+='"';i++;}else q=false;}else f+=c;}
-    else if(c==='"')q=true;else if(c===d){row.push(f);f='';}
-    else if(c==='\n'||c==='\r'){if(c==='\r'&&text[i+1]==='\n')i++;row.push(f);rows.push(row);row=[];f='';}
-    else f+=c;}
-  if(f!==''||row.length){row.push(f);rows.push(row);}
-  return rows.filter(r=>r.some(c=>String(c).trim()!==''));
+/* ───────── add single entries ───────── */
+function fillExpenseForm(){
+  const cur=$('exCat').value;
+  $('exCat').innerHTML=CATS.map(c=>`<option${c===cur?' selected':''}>${esc(c)}</option>`).join('');
+  if(!$('exBy').options.length)$('exBy').innerHTML=PAID_BY_NAMES.map(n=>`<option>${esc(n)}</option>`).join('');
 }
-function parseDate(v){
-  if(v instanceof Date&&!isNaN(v)){return v.getFullYear()+'-'+String(v.getMonth()+1).padStart(2,'0')+'-'+String(v.getDate()).padStart(2,'0');}
-  if(typeof v==='number'&&v>20000&&v<80000){const d=new Date(Math.round((v-25569)*864e5));return d.getUTCFullYear()+'-'+String(d.getUTCMonth()+1).padStart(2,'0')+'-'+String(d.getUTCDate()).padStart(2,'0');}
-  const s=String(v||'').trim();if(!s)return '';
-  let m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);if(m)return m[1]+'-'+m[2].padStart(2,'0')+'-'+m[3].padStart(2,'0');
-  m=s.match(/^(\d{1,2})[\/\-. ](\d{1,2})[\/\-. ](\d{2,4})/);
-  if(m){let d=+m[1],mo=+m[2],y=+m[3];if(y<100)y+=2000;if(d>31||mo>12||!d||!mo)return '';return y+'-'+String(mo).padStart(2,'0')+'-'+String(d).padStart(2,'0');}
-  m=s.match(/^(\d{1,2})[\s\-\/]([A-Za-z]{3,9})[\s\-\/,]+(\d{2,4})/);
-  if(m){const mo=MN.findIndex(x=>x.toLowerCase()===m[2].slice(0,3).toLowerCase());if(mo<0)return '';let y=+m[3];if(y<100)y+=2000;return y+'-'+String(mo+1).padStart(2,'0')+'-'+String(+m[1]).padStart(2,'0');}
-  return '';
-}
-function findCols(h){
-  const H=h.map(x=>String(x||'').trim().toLowerCase());
-  const f=(re,not)=>H.findIndex(x=>re.test(x)&&!(not&&not.test(x)));
-  let date=f(/(txn|tran|transaction).*date/);if(date<0)date=f(/date/,/value/);if(date<0)date=f(/date/);
-  return{date,
-    desc:f(/desc|narration|particular|remark|details|client|name|beneficiary/),
-    debit:f(/debit|withdraw|paid out|^dr\b|dr amount/),
-    credit:f(/credit|deposit|paid in|^cr\b|cr amount/,/card/),
-    amount:f(/amount|amt|value/,/debit|credit|withdraw|deposit|balance/),
-    type:f(/^type$|dr\s*\/\s*cr|cr\s*\/\s*dr|txn type|transaction type/),
-    cat:f(/categ/),
-    method:f(/mode|method|channel/)};
-}
-function guessCat(desc,raw){
-  const r=String(raw||'').trim().toLowerCase();
-  if(r){const hit=CATS.find(c=>c.toLowerCase()===r);if(hit)return hit;
-    const al={rent:'Rent & Utilities',utilities:'Rent & Utilities',gas:'Cylinder',salaries:'Salary',ads:'Marketing',packing:'Packaging',local:'Local Purchase'};if(al[r]&&CATS.includes(al[r]))return al[r];}
-  const d=normName(desc);
-  if(d){ // learn from history: most recent category used for this exact description
-    const past=EXP.filter(e=>normName(e.desc)===d).sort((a,b)=>b.date.localeCompare(a.date))[0];if(past)return past.cat;}
-  const t=(desc||'')+' '+(raw||'');
-  for(const [c,re] of CAT_RULES)if(re.test(t)&&CATS.includes(c))return c;
-  return CATS.includes('Misc')?'Misc':CATS[CATS.length-1];
-}
-function buildPreview(grid){
-  let hi=grid.findIndex((r,i)=>i<25&&r.some(c=>/date/i.test(String(c))));
-  if(hi<0){toast('No header row with a "Date" column found',true);return;}
-  const C=findCols(grid[hi]);
-  if(C.debit<0&&C.credit<0&&C.amount<0){toast('Need a Debit/Credit or Amount column',true);return;}
-  const rows=[];
-  grid.slice(hi+1).forEach((r,i)=>{
-    const date=parseDate(r[C.date]);if(!date)return;
-    const desc=C.desc>=0?String(r[C.desc]||'').trim():'';
-    const push=(amt,t)=>{if(amt>0)rows.push({i:rows.length,date,desc,amount:Math.round(amt*100)/100,type:t,cat:t==='D'?guessCat(desc,C.cat>=0?r[C.cat]:''):'',method:C.method>=0?String(r[C.method]||'').trim():'',on:true,flag:''});};
-    if(C.debit>=0||C.credit>=0){push(C.debit>=0?Math.abs(N(r[C.debit])):0,'D');push(C.credit>=0?Math.abs(N(r[C.credit])):0,'C');}
-    else{const raw=String(r[C.amount]??'');let a=N(raw);let t=DEF_T;
-      if(C.type>=0){const tv=String(r[C.type]||'').toLowerCase();t=/cr|credit|in|deposit|receiv/.test(tv)?'C':'D';}
-      else if(/cr\b/i.test(raw))t='C';else if(/dr\b/i.test(raw)||a<0)t='D';
-      push(Math.abs(a),t);}
-  });
-  if(!rows.length){toast('No valid rows found',true);return;}
-  flagDups(rows);IMP=rows;renderPreview();
-  $('prevWrap').style.display='block';$('prevWrap').scrollIntoView({behavior:'smooth',block:'start'});
-}
-function flagDups(rows){
-  const em=new Map();EXP.forEach(e=>{const k=e.date+'|'+mkey(e.amount);em.set(k,(em.get(k)||0)+1);});
-  const lm=new Map();LEGACY_RAW.forEach(l=>{const k=l.date+'|'+mkey(l.amount);lm.set(k,(lm.get(k)||0)+1);});
-  const bills=BILLS.filter(b=>b.src==='bill');
-  const dd=(a,b)=>Math.abs(new Date(a)-new Date(b))/864e5;
-  const used=new Set();
-  rows.forEach(r=>{const k=r.date+'|'+mkey(r.amount);
-    if(r.type==='D'){const c=em.get(k)||0;if(c>0){em.set(k,c-1);r.flag='Already in expenses';r.on=false;}}
-    else{const c=lm.get(k)||0;if(c>0){lm.set(k,c-1);r.flag='Already in bank credits';r.on=false;return;}
-      const b=bills.find(b=>!used.has(b.id)&&mkey(b.amount)===mkey(r.amount)&&dd(b.date,r.date)<=10);
-      if(b){used.add(b.id);r.flag='Matches bill #'+b.id+' ('+b.client+')';r.on=false;}}
-  });
-}
-function renderPreview(){
-  const on=IMP.filter(r=>r.on),d=on.filter(r=>r.type==='D'),c=on.filter(r=>r.type==='C');
-  const flagged=IMP.filter(r=>r.flag).length;
-  const ms=[...new Set(IMP.map(r=>r.date.slice(0,7)))].sort();
-  $('sumbar').innerHTML=`<span class="it"><b>${IMP.length}</b> rows · ${ms.map(ymLabel).join(', ')}</span>
-    <span class="it" style="color:var(--out-ink)">Debits <b>${d.length}</b> · ${inr(d.reduce((s,r)=>s+r.amount,0),2)}</span>
-    <span class="it" style="color:var(--in-ink)">Credits <b>${c.length}</b> · ${inr(c.reduce((s,r)=>s+r.amount,0),2)}</span>
-    ${flagged?`<span class="pill dup">${flagged} flagged as duplicate — unticked</span>`:''}`;
-  $('prev').innerHTML=`<table><thead><tr><th><input type="checkbox" id="allOn" ${on.length===IMP.length?'checked':''}></th><th>Date</th><th>Description</th><th>Type</th><th>Category</th><th class="n">Amount</th><th>Note</th></tr></thead><tbody>`+
-    IMP.map(r=>`<tr class="${r.on?'':'off'}"><td><input type="checkbox" data-on="${r.i}" ${r.on?'checked':''}></td>
-      <td class="num" style="white-space:nowrap">${dLabel(r.date)}</td>
-      <td><input class="sel-sm" style="max-width:none;width:100%;min-width:160px" data-desc="${r.i}" value="${esc(r.desc)}"></td>
-      <td><select class="sel-sm" data-type="${r.i}"><option value="D"${r.type==='D'?' selected':''}>Debit</option><option value="C"${r.type==='C'?' selected':''}>Credit</option></select></td>
-      <td>${r.type==='D'?`<select class="sel-sm" data-cat="${r.i}">${CATS.map(c=>`<option${c===r.cat?' selected':''}>${esc(c)}</option>`).join('')}</select>`:'<span class="muted">Revenue</span>'}</td>
-      <td class="n" style="font-weight:700;color:${r.type==='D'?'var(--out-ink)':'var(--in-ink)'}">${r.type==='D'?'−':'+'}${inr(r.amount,2)}</td>
-      <td>${r.flag?`<span class="pill dup">${esc(r.flag)}</span>`:''}</td></tr>`).join('')+'</tbody></table>';
-  const P2=$('prev');
-  P2.querySelectorAll('[data-on]').forEach(x=>x.onchange=()=>{IMP[x.dataset.on].on=x.checked;renderPreview();});
-  P2.querySelectorAll('[data-type]').forEach(x=>x.onchange=()=>{const r=IMP[x.dataset.type];r.type=x.value;if(r.type==='D'&&!r.cat)r.cat=guessCat(r.desc,'');renderPreview();});
-  P2.querySelectorAll('[data-cat]').forEach(x=>x.onchange=()=>{IMP[x.dataset.cat].cat=x.value;});
-  P2.querySelectorAll('[data-desc]').forEach(x=>x.oninput=()=>{IMP[x.dataset.desc].desc=x.value;});
-  $('allOn').onchange=e=>{IMP.forEach(r=>r.on=e.target.checked);renderPreview();};
-}
-$('bulkApply').onclick=()=>{const c=$('bulkCat').value;IMP.forEach(r=>{if(r.on&&r.type==='D')r.cat=c;});renderPreview();};
-$('cancelImp').onclick=()=>{IMP=[];$('prevWrap').style.display='none';$('paste').value='';$('file').value='';};
-$('parseBtn').onclick=()=>{const t=$('paste').value.trim();if(!t){toast('Paste rows or choose a file',true);return;}buildPreview(parseDelim(t));};
-async function handleFile(f){
-  if(!f)return;
-  try{
-    if(/\.(xlsx|xls)$/i.test(f.name)){
-      if(!window.XLSX){toast('Excel reader still loading, try again',true);return;}
-      const wb=XLSX.read(await f.arrayBuffer(),{type:'array',cellDates:true});
-      const ws=wb.Sheets[wb.SheetNames[0]];
-      buildPreview(XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:''}));
-    }else buildPreview(parseDelim(await f.text()));
-  }catch(e){toast('Could not read file: '+e.message,true);}
-}
-$('file').onchange=e=>handleFile(e.target.files[0]);
-const drop=$('drop');
-['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('over');}));
-['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('over');}));
-drop.addEventListener('drop',e=>handleFile(e.dataTransfer.files[0]));
-$('tplBtn').onclick=()=>dlCSV('friska-bank-statement-template.csv',[['Date','Description','Debit','Credit','Category'],['02/09/2026','Hyperpure order','12450','','Hyperpure'],['03/09/2026','UPI from Sainath Reddy','','16643',''],['05/09/2026','Porter delivery','320','','Delivery']]);
-
-$('doImport').onclick=async()=>{
-  const on=IMP.filter(r=>r.on);if(!on.length){toast('Nothing ticked',true);return;}
-  const d=on.filter(r=>r.type==='D'),c=on.filter(r=>r.type==='C');
-  if(!confirm(`Import ${d.length} debits (${inr(d.reduce((s,r)=>s+r.amount,0))}) and ${c.length} credits (${inr(c.reduce((s,r)=>s+r.amount,0))})?`))return;
-  const now=new Date(),batch='IMP-'+todayStr().replace(/-/g,'')+'-'+String(now.getHours()).padStart(2,'0')+String(now.getMinutes()).padStart(2,'0')+String(now.getSeconds()).padStart(2,'0');
-  const btn=$('doImport');btn.disabled=true;btn.textContent='Importing…';
-  try{
-    let ne=0,nc=0;
-    if(d.length){const j=await post({action:'importExpenses',payload:JSON.stringify({batch,paidBy:'Bank',rows:d.map(r=>({Date:r.date,Amount:r.amount,Category:r.cat,Description:r.desc,Method:r.method||'Bank'}))})});ne=j.imported;}
-    if(c.length){const j=await post({action:'importCredits',payload:JSON.stringify({batch,rows:c.map(r=>({Date:r.date,Amount:r.amount,Client:r.desc}))})});nc=j.imported;}
-    toast(`Imported ${ne} debits, ${nc} credits · ${batch}`);
-    $('cancelImp').click();await loadAll();
-  }catch(e){toast('Import failed: '+e.message,true);}
-  finally{btn.disabled=false;btn.textContent='Import';}
+$('exDate').value=todayStr();
+$('exSave').onclick=async()=>{
+  const d=$('exDate').value,a=Number($('exAmt').value);
+  if(!d||!(a>0)){toast('Date and amount required',true);return;}
+  const b=$('exSave');b.disabled=true;b.textContent='Saving…';
+  try{const j=await post({action:'appendExpense',payload:JSON.stringify({Date:d,Amount:a,Category:$('exCat').value,Description:$('exDesc').value.trim(),PaidBy:$('exBy').value,PaymentMethod:$('exMethod').value})});
+    toast('Saved '+(j.expenseId||''));$('exAmt').value='';$('exDesc').value='';await loadAll();}
+  catch(e){toast(e.message,true);}finally{b.disabled=false;b.textContent='Save expense';}
 };
-function renderHistory(){
-  $('bulkCat').innerHTML=CATS.map(c=>`<option>${esc(c)}</option>`).join('');
-  const H={};
-  EXP.forEach(e=>{if(!e.batch)return;const h=H[e.batch]=H[e.batch]||{dn:0,dv:0,cn:0,cv:0,ms:new Set()};h.dn++;h.dv+=e.amount;h.ms.add(e.date.slice(0,7));});
-  LEGACY_RAW.forEach(l=>{if(!l.batch)return;const h=H[l.batch]=H[l.batch]||{dn:0,dv:0,cn:0,cv:0,ms:new Set()};h.cn++;h.cv+=l.amount;h.ms.add(l.date.slice(0,7));});
-  const keys=Object.keys(H).sort().reverse();
-  $('hist').innerHTML=keys.length?`<table><thead><tr><th>Batch</th><th>Months</th><th class="n">Debits</th><th class="n">Credits</th><th></th></tr></thead><tbody>`+
-    keys.map(k=>{const h=H[k];return `<tr><td style="font-weight:600">${esc(k)}</td><td class="muted">${[...h.ms].sort().map(ymLabel).join(', ')}</td>
-      <td class="n">${h.dn} · ${inr(h.dv)}</td><td class="n">${h.cn} · ${inr(h.cv)}</td><td class="n"><button class="btn" data-undo="${esc(k)}" data-d="${h.dn}" data-c="${h.cn}">Undo</button></td></tr>`;}).join('')+'</tbody></table>'
-    :'<div class="empty">No tagged imports yet. Imports made from this page (and new sheet-menu imports) appear here.</div>';
-  $('hist').querySelectorAll('[data-undo]').forEach(b=>b.onclick=async()=>{
-    const k=b.dataset.undo;if(!confirm(`Undo import ${k}? This deletes ${b.dataset.d} expenses and ${b.dataset.c} credits.`))return;
-    b.disabled=true;b.textContent='Undoing…';
-    try{if(+b.dataset.d)await post({action:'deleteBatch',kind:'expense',batch:k});if(+b.dataset.c)await post({action:'deleteBatch',kind:'credit',batch:k});toast('Import '+k+' removed');await loadAll();}
-    catch(e){toast(e.message,true);b.disabled=false;b.textContent='Undo';}
-  });
-}
 $('lgDate').value=todayStr();
 $('lgSave').onclick=async()=>{
   const d=$('lgDate').value,a=Number($('lgAmt').value);
@@ -1021,24 +865,23 @@ $('lgSave').onclick=async()=>{
 function setTab(t){
   TAB=t;document.querySelectorAll('.tabs button').forEach(b=>b.setAttribute('aria-selected',b.dataset.tab===t?'true':'false'));
   document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('active',p.id==='panel-'+t));
-  $('pbar').style.display=t==='import'?'none':'block';
   try{history.replaceState(null,'','#'+t);}catch(e){}
   renderAll();window.scrollTo({top:0});
 }
 document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>setTab(b.dataset.tab));
 document.querySelectorAll('#quick .chip').forEach(c=>c.onclick=()=>{applyQuick(c.dataset.q);renderAll();});
-['mFrom','mTo'].forEach(id=>$(id).onchange=()=>{
-  P.from=$('mFrom').value;P.to=$('mTo').value;if(P.from>P.to){const t=P.from;P.from=P.to;P.to=t;$('mFrom').value=P.from;$('mTo').value=P.to;}
-  document.querySelectorAll('#quick .chip').forEach(c=>c.setAttribute('aria-pressed','false'));renderAll();});
+const clearQuick=()=>document.querySelectorAll('#quick .chip').forEach(c=>c.setAttribute('aria-pressed','false'));
+$('mFrom').onchange=()=>{P.from=P.to=$('mFrom').value;$('mTo').value=P.to;clearQuick();renderAll();};
+$('mTo').onchange=()=>{P.to=$('mTo').value;if(P.to<P.from){P.from=P.to;$('mFrom').value=P.from;}clearQuick();renderAll();};
 let st;$('eSearch').oninput=()=>{clearTimeout(st);st=setTimeout(renderExpenses,200);};
-let rt;$('rSearch').oninput=()=>{clearTimeout(rt);rt=setTimeout(renderRevenue,200);};
+let rt;$('rSearch').oninput=()=>{clearTimeout(rt);rt=setTimeout(renderCredits,200);};
 $('eExpandAll').onclick=()=>{const accs=[...$('eAcc').querySelectorAll('.acc')];const allOpen=accs.every(a=>a.classList.contains('open'));
   accs.forEach(a=>{const k=a.dataset.key;allOpen?OPEN.delete(k):OPEN.add(k);});$('eExpandAll').textContent=allOpen?'Expand all':'Collapse all';renderExpenses();};
 $('btnRefresh').onclick=loadAll;
 $('btnPrint').onclick=()=>{if(TAB!=='overview')setTab('overview');setTimeout(()=>window.print(),150);};
 function setHH(){document.documentElement.style.setProperty('--hh',$('hdr').offsetHeight+'px');}
-let rz;addEventListener('resize',()=>{setHH();clearTimeout(rz);rz=setTimeout(()=>{if(TAB!=='import')renderAll();},200);});setHH();
-const h0=location.hash.slice(1);if(['overview','expenses','revenue','cashflow','import'].includes(h0))setTab(h0);
+let rz;addEventListener('resize',()=>{setHH();clearTimeout(rz);rz=setTimeout(renderAll,200);});setHH();
+const h0=location.hash.slice(1);if(['overview','credits','expenses','cashflow'].includes(h0))setTab(h0);
 loadAll();
 </script>
 </body>
