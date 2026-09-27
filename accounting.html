@@ -5,6 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0a1a6e">
 <title>Financials — Friska Wellness</title>
+<link rel="apple-touch-icon" href="logo.png">
+<link rel="icon" href="logo.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<script>if(/[?&]entry\b/.test(location.search)){document.title='Friska Entry';document.write('<meta name="apple-mobile-web-app-title" content="Friska Entry">');}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
@@ -181,6 +186,60 @@ label.f{display:block;font-size:12px;font-weight:600;color:var(--muted);margin:0
 .spin{width:28px;height:28px;border:3px solid var(--line);border-top-color:var(--navy);border-radius:50%;animation:sp 0.8s linear infinite;margin:0 auto 10px}
 @keyframes sp{to{transform:rotate(360deg)}}
 .printhead{display:none}
+#panel-entry .sec{background:#fff;border-radius:var(--r);border:1px solid var(--line2);box-shadow:0 1px 2px rgba(15,23,42,.04),0 4px 16px rgba(15,23,42,.05);margin-bottom:14px;overflow:hidden}
+#panel-entry .sec-h{width:100%;display:flex;align-items:center;gap:12px;padding:15px 16px;border:0;background:#fff;text-align:left}
+#panel-entry .sec-h .ic{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;font-weight:800;font-size:17px;flex-shrink:0}
+#panel-entry .sec.cr .ic{background:var(--in-soft);color:var(--in-ink)}
+#panel-entry .sec.ex .ic{background:var(--out-soft);color:var(--out-ink)}
+#panel-entry .sec-h .t{flex:1}
+#panel-entry .sec-h .t b{display:block;font-size:15px}
+#panel-entry .sec-h .t span{font-size:12px;color:var(--muted)}
+#panel-entry .sec-h .chev{width:24px;height:24px;border-radius:7px;background:var(--line2);display:grid;place-items:center;font-size:10px;transition:transform .15s}
+#panel-entry .sec.open .sec-h .chev{transform:rotate(90deg);background:var(--navy);color:#fff}
+#panel-entry .sec-b{display:none;border-top:1px solid var(--line);padding:12px 14px 14px}
+#panel-entry .sec.open .sec-b{display:block}
+#panel-entry .row{border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:10px;background:#fcfcfd;position:relative}
+#panel-entry .row .n{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
+#panel-entry .row .rm{position:absolute;top:8px;right:8px;border:0;background:none;color:var(--muted);font-size:20px;line-height:1;padding:2px 8px;border-radius:8px}
+#panel-entry .row .rm:hover{background:#fdecec;color:var(--neg)}
+#panel-entry .g{display:grid;gap:10px;grid-template-columns:repeat(3,1fr)}
+#panel-entry .g .w2{grid-column:span 2}
+#panel-entry .g .w3{grid-column:1/-1}
+#panel-entry label{display:block;font-size:11.5px;font-weight:600;color:var(--muted);margin-bottom:4px}
+#panel-entry input,#panel-entry select{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:10px;font:inherit;font-size:16px;background:#fff;color:var(--ink);-webkit-appearance:none;appearance:none}
+#panel-entry select{background-image:linear-gradient(45deg,transparent 50%,#94a3b8 50%),linear-gradient(135deg,#94a3b8 50%,transparent 50%);background-position:calc(100% - 16px) 50%,calc(100% - 11px) 50%;background-size:5px 5px;background-repeat:no-repeat;padding-right:28px}
+#panel-entry input:focus,#panel-entry select:focus{outline:2px solid var(--in);outline-offset:1px;border-color:transparent}
+#panel-entry input.err,#panel-entry select.err{border-color:var(--neg);background:#fff7f7}
+#panel-entry .amt{font-weight:700}
+#panel-entry .bar{display:flex;align-items:center;gap:10px;margin-top:4px}
+#panel-entry .plus{width:42px;height:42px;border-radius:12px;border:1.5px dashed #b8c0d0;background:#fff;color:var(--navy);font-size:22px;font-weight:600;display:grid;place-items:center;flex-shrink:0}
+#panel-entry .plus:hover{border-color:var(--navy);background:#eef1fb}
+#panel-entry .tot{flex:1;font-size:12.5px;color:var(--muted)}
+#panel-entry .tot b{color:var(--ink);font-size:14px}
+#panel-entry .save{padding:12px 18px;border-radius:12px;border:0;color:#fff;font-size:14.5px;font-weight:700}
+#panel-entry .sec.cr .save{background:var(--in)}
+#panel-entry .sec.ex .save{background:var(--navy)}
+#panel-entry .save:disabled{opacity:.5}
+#panel-entry .recent{background:#fff;border-radius:var(--r);border:1px solid var(--line2);padding:14px 16px}
+#panel-entry .recent h3{font-size:13px;margin-bottom:8px}
+#panel-entry .ri{display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid var(--line2);font-size:13px}
+#panel-entry .ri:last-child{border:0}
+#panel-entry .ri span{color:var(--muted);font-size:12px}
+#panel-entry .ri b.c{color:var(--in-ink)}
+#panel-entry .ri b.d{color:var(--out-ink)}
+@media(max-width:560px){#panel-entry .g{grid-template-columns:1fr 1fr}#panel-entry .g .w2{grid-column:1/-1}}
+#panel-entry{max-width:760px;margin:0 auto}
+body.entry-only .tabs,body.entry-only .hact,body.entry-only #pbar,body.entry-only .entry-note,body.entry-only #loading{display:none!important}
+body.entry-only .htop{margin-bottom:0;padding-bottom:12px}
+.pend-h{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.pend .kpi::before{display:none}
+.pend-h .btn .cv2{display:inline-block;transition:transform .15s;font-size:10px}
+.pend-h .btn[aria-expanded="true"] .cv2{transform:rotate(90deg)}
+.pst{padding:6px 12px;border-radius:999px;font-size:12px;font-weight:700;border:1px solid;white-space:nowrap}
+.pst.unpaid{background:var(--neg-soft);color:var(--neg-ink);border-color:#f5c2c2}
+.pst.paid{background:var(--in-soft);color:var(--in-ink);border-color:#b5e3cf}
+.pst:disabled{opacity:.5}
+.entry-note{font-size:12.5px;color:var(--muted);margin-bottom:10px}.entry-note a{color:var(--navy);font-weight:700}
 .more{border:0;background:none;color:var(--navy);font-size:12px;font-weight:700;padding:6px 0 0;display:inline-flex;align-items:center;gap:5px}
 .more .cv{display:inline-block;width:16px;height:16px;border-radius:5px;background:var(--line2);font-size:9px;line-height:16px;text-align:center;transition:transform .15s}
 .more[aria-expanded="true"] .cv{transform:rotate(90deg);background:var(--navy);color:#fff}
@@ -238,6 +297,7 @@ label.f{display:block;font-size:12px;font-weight:600;color:var(--muted);margin:0
       <button role="tab" aria-selected="false" data-tab="credits">Credits</button>
       <button role="tab" aria-selected="false" data-tab="expenses">Expenses</button>
       <button role="tab" aria-selected="false" data-tab="cashflow">Credit vs Debit</button>
+      <button role="tab" aria-selected="false" data-tab="entry">Entry</button>
     </nav>
   </div>
 </header>
@@ -318,18 +378,6 @@ label.f{display:block;font-size:12px;font-weight:600;color:var(--muted);margin:0
     <div class="tw" id="eMatrix"></div>
   </div>
 
-  <div class="card mt">
-    <div class="ch"><div><div class="ct">Add single expense</div><div class="cs">One-off entry — monthly bank statements are imported from the sheet</div></div></div>
-    <div class="grid g3">
-      <div><label class="f" for="exDate">Date</label><input class="inp" id="exDate" type="date" style="width:100%"></div>
-      <div><label class="f" for="exAmt">Amount (₹)</label><input class="inp" id="exAmt" type="number" inputmode="decimal" min="0" step="0.01" style="width:100%"></div>
-      <div><label class="f" for="exCat">Category</label><select class="inp" id="exCat" style="width:100%"></select></div>
-      <div><label class="f" for="exDesc">Description</label><input class="inp" id="exDesc" style="width:100%" placeholder="What was this for?"></div>
-      <div><label class="f" for="exBy">Paid by</label><select class="inp" id="exBy" style="width:100%"></select></div>
-      <div><label class="f" for="exMethod">Method</label><select class="inp" id="exMethod" style="width:100%"><option>UPI</option><option>Cash</option><option>Bank</option></select></div>
-    </div>
-    <div class="tb mt"><button class="btn go" id="exSave">Save expense</button></div>
-  </div>
 </section>
 
 <!-- ═════════ CREDITS ═════════ -->
@@ -341,21 +389,23 @@ label.f{display:block;font-size:12px;font-weight:600;color:var(--muted);margin:0
     <div class="card kpi"><div class="k">Avg per month</div><div class="v num" id="rCli">—</div><div class="s" id="rCliS"></div></div>
   </div>
 
+  <div class="card mt pend" id="pendCard">
+    <div class="pend-h">
+      <div class="kpi" style="padding:0"><div class="k">Pending payments</div><div class="v num" id="pTot" style="color:var(--neg-ink)">—</div><div class="s" id="pSub"></div></div>
+      <button class="btn" id="pToggle" aria-expanded="false"><span class="cv2">▶</span> View clients</button>
+    </div>
+    <div id="pBody" hidden>
+      <div class="tb mt"><input class="inp" id="pSearch" placeholder="Search client, bill no, amount…" style="flex:1;min-width:200px"></div>
+      <div class="tw" id="pList"></div>
+    </div>
+  </div>
+
   <div class="card mt">
     <div class="ch"><div><div class="ct">All credits</div><div class="cs">Money received in the bank · open a month to see each entry</div></div></div>
     <div class="tb"><input class="inp" id="rSearch" placeholder="Search name, amount, ref…" style="flex:1;min-width:200px"><button class="btn" id="rCsv">Export CSV</button></div>
     <div id="rAcc"></div>
   </div>
 
-  <div class="card mt">
-    <div class="ch"><div><div class="ct">Add single credit</div><div class="cs">One-off entry — monthly bank credits are imported from the sheet</div></div></div>
-    <div class="grid g3">
-      <div><label class="f" for="lgDate">Date</label><input class="inp" id="lgDate" type="date" style="width:100%"></div>
-      <div><label class="f" for="lgClient">Client / description</label><input class="inp" id="lgClient" style="width:100%"></div>
-      <div><label class="f" for="lgAmt">Amount (₹)</label><input class="inp" id="lgAmt" type="number" inputmode="decimal" min="0" step="0.01" style="width:100%"></div>
-    </div>
-    <div class="tb mt"><button class="btn go" id="lgSave">Save credit</button></div>
-  </div>
 </section>
 
 <!-- ═════════ CASH FLOW ═════════ -->
@@ -394,6 +444,35 @@ label.f{display:block;font-size:12px;font-weight:600;color:var(--muted);margin:0
     <div class="mt" id="qAcc"></div>
   </div>
 </section>
+<!-- ═════════ ENTRY ═════════ -->
+<section class="panel" id="panel-entry">
+  <div class="entry-note noprint">Staff link (opens only this Entry screen, can be saved to home screen): <a id="entryLink" href="?entry" target="_blank">?entry</a></div>
+<section class="sec ex open" id="secEx">
+    <button class="sec-h" type="button"><span class="ic">−</span><span class="t"><b>Expense entry</b><span>Money paid out</span></span><span class="chev">▶</span></button>
+    <div class="sec-b">
+      <div id="exRows"></div>
+      <div class="bar">
+        <button class="plus" type="button" id="exAdd" title="Add another expense">+</button>
+        <div class="tot" id="exTot"></div>
+        <button class="save" type="button" id="exSave">Save</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec cr" id="secCr">
+    <button class="sec-h" type="button"><span class="ic">+</span><span class="t"><b>Credit entry</b><span>Money received</span></span><span class="chev">▶</span></button>
+    <div class="sec-b">
+      <div id="crRows"></div>
+      <div class="bar">
+        <button class="plus" type="button" id="crAdd" title="Add another credit">+</button>
+        <div class="tot" id="crTot"></div>
+        <button class="save" type="button" id="crSave">Save</button>
+      </div>
+    </div>
+  </section>
+
+  <div class="recent" id="recent" hidden><h3>Saved just now</h3><div id="recentList"></div></div>
+</section>
 </main>
 
 <div id="tip"></div>
@@ -401,11 +480,8 @@ label.f{display:block;font-size:12px;font-weight:600;color:var(--muted);margin:0
 <div class="loading" id="loading"><div><div class="spin"></div>Loading books…</div></div>
 
 <script>
+const ENTRY_ONLY=new URLSearchParams(location.search).has('entry');
 const API='https://script.google.com/macros/s/AKfycbwI8_v36JJrkAXVhfGIAirSC3IUHbe6l-3WLeeTETg1SGRUcn4M_dPjN9azSCbgTBD1/exec';
-
-/* ━━━ EDIT NAMES HERE ━━━ */
-const PAID_BY_NAMES=['Parth','Umesh','Bank'];
-/* ━━━━━━━━━━━━━━━━━━━━━━━ */
 
 const $=id=>document.getElementById(id);
 const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -460,7 +536,7 @@ async function loadAll(){
       id:e.ExpenseId,date:dstr(e.Timestamp),amount:N(e.Amount),cat:String(e.Category||'Misc').trim()||'Misc',
       desc:String(e.Description||'').trim(),by:e.PaidBy||'',method:e.PaymentMethod||'',batch:String(e.Batch||'')}));
     EXP.forEach(e=>{if(!CATS.includes(e.cat))CATS.push(e.cat);});
-    buildMonthSelects();
+    buildMonthSelects();eRefreshCats();
     renderAll();
   }catch(e){toast('Load failed: '+e.message,true);}
   finally{loading(false);}
@@ -468,7 +544,7 @@ async function loadAll(){
 
 /* ───────── period ───────── */
 function dataMonths(){
-  const s=new Set();BILLS.forEach(b=>s.add(b.date.slice(0,7)));BILLDOCS.forEach(b=>s.add(b.date.slice(0,7)));EXP.forEach(e=>s.add(e.date.slice(0,7)));
+  const s=new Set();BILLS.forEach(b=>s.add(b.date.slice(0,7)));EXP.forEach(e=>s.add(e.date.slice(0,7)));
   const a=[...s].sort();if(!a.length)return[nowYm()];
   const out=[];let m=a[0];const end=a[a.length-1]>nowYm()?a[a.length-1]:nowYm();
   while(m<=end){out.push(m);m=ymAdd(m,1);}return out;
@@ -658,7 +734,6 @@ function afterBody(b){
 /* ───────── render: expenses ───────── */
 function expMatch(e,q){if(!q)return true;q=q.toLowerCase();return (e.desc+' '+e.id+' '+e.cat+' '+e.amount+' '+e.method+' '+e.by+' '+e.date).toLowerCase().includes(q);}
 function renderExpenses(){
-  fillExpenseForm();
   const q=$('eSearch').value.trim();
   const all=EXP.filter(e=>inP(e.date)),list=all.filter(e=>expMatch(e,q));
   const tot=all.reduce((s,e)=>s+e.amount,0),nMo=months().length||1;
@@ -718,6 +793,7 @@ async function delLeg(id){
 /* ───────── render: credits ───────── */
 function billMatch(b,q){if(!q)return true;q=q.toLowerCase();return (b.client+' '+b.id+' '+b.plan+' '+b.amount+' '+b.date).toLowerCase().includes(q);}
 function renderCredits(){
+  renderPending();
   const A=agg(P.from,P.to),q=$('rSearch').value.trim(),pr=prevRange(),B=agg(pr.from,pr.to),nMo=months().length||1;
   $('rBilled').textContent=short(A.billed);$('rBilledS').innerHTML=(B.billed?deltaChip(A.billed,B.billed)+' vs prev · ':'')+periodText();
   $('rCnt').textContent=A.b.length;$('rCntS').textContent='bank credits';
@@ -740,6 +816,130 @@ function billBody(arr){
       <td class="muted" style="font-size:11.5px">${esc(b.id)}${b.batch?' · '+esc(b.batch):''}</td><td class="n" style="font-weight:700">${inr(b.amount,2)}</td>
       <td><button class="x" data-dleg="${esc(b.id)}" title="Delete">×</button></td></tr>`).join('')+'</tbody></table></div>';
 }
+
+/* ───────── pending payments (unpaid bills, all time) ───────── */
+const P_TOUCHED=new Set(); // bills toggled this session stay visible for undo
+function renderPending(){
+  const un=BILLDOCS.filter(b=>!b.paid),tot=un.reduce((s,b)=>s+b.amount,0);
+  const cl=new Set(un.map(b=>normName(b.client))).size;
+  $('pTot').textContent=inr(tot);
+  $('pSub').textContent=`${un.length} unpaid bill${un.length===1?'':'s'} · ${cl} client${cl===1?'':'s'} · all time`;
+  if($('pBody').hidden)return;
+  const q=$('pSearch').value.trim().toLowerCase();
+  const list=BILLDOCS.filter(b=>(!b.paid||P_TOUCHED.has(b.id))&&(!q||(b.client+' '+b.id+' '+b.amount+' '+b.plan).toLowerCase().includes(q)))
+    .sort((a,b)=>b.date.localeCompare(a.date));
+  $('pList').innerHTML=list.length?`<table><thead><tr><th>Date</th><th>Client</th><th>Plan</th><th>Bill #</th><th class="n">Amount</th><th class="n">Status</th></tr></thead><tbody>`+
+    list.map(b=>`<tr><td class="num" style="white-space:nowrap">${dLabel(b.date)}</td><td style="font-weight:600">${esc(b.client)}</td>
+      <td class="muted">${esc(b.plan)}${b.duration?' · '+esc(b.duration):''}</td><td class="muted">#${esc(b.id)}</td>
+      <td class="n" style="font-weight:700">${inr(b.amount,2)}${b.adj?`<div class="muted" style="font-size:11px;font-weight:500">bill total ${inr(b.amount+b.adj,2)} (adj ${signed(b.adj)})</div>`:''}</td>
+      <td class="n"><button class="pst ${b.paid?'paid':'unpaid'}" data-bill="${esc(b.id)}" title="Tap to change">${b.paid?'Paid ✓':'Unpaid'}</button></td></tr>`).join('')+'</tbody></table>'
+    :'<div class="empty">No pending payments 🎉</div>';
+  $('pList').querySelectorAll('[data-bill]').forEach(btn=>btn.onclick=()=>toggleBill(btn));
+}
+async function toggleBill(btn){
+  const b=BILLDOCS.find(x=>x.id===btn.dataset.bill);if(!b)return;
+  const to=b.paid?'Unpaid':'Paid';btn.disabled=true;btn.textContent='Saving…';
+  try{await post({action:'updateBillStatus',billNo:b.id,status:to});b.paid=to==='Paid';P_TOUCHED.add(b.id);toast(`${b.client} → ${to}`);}
+  catch(e){toast(e.message,true);}
+  renderPending();
+}
+$('pToggle').onclick=()=>{const open=$('pBody').hidden;$('pBody').hidden=!open;$('pToggle').setAttribute('aria-expanded',open);$('pToggle').lastChild.textContent=open?' Hide clients':' View clients';renderPending();};
+let pt;$('pSearch').oninput=()=>{clearTimeout(pt);pt=setTimeout(renderPending,200);};
+
+/* ───────── entry tab (multi-row credit / expense entry) ───────── */
+/* ━━━ EDIT NAMES HERE ━━━ */
+const PAID_BY_NAMES=['Parth','Umesh','Ronit','Bank'];
+const METHODS=['UPI','Cash','Bank'];
+/* ━━━━━━━━━━━━━━━━━━━━━━━ */
+const DEFAULT_CATS=['Hyperpure','Local Purchase','Delivery','Salary','Rent & Utilities','Cylinder','Packaging','Marketing','Equipment & Repairs','Essentials','Misc'];
+const eCats=()=>CATS.length?CATS:DEFAULT_CATS;
+const eOpt=(arr,sel)=>arr.map(v=>`<option${v===sel?' selected':''}>${esc(v)}</option>`).join('');
+function exRowHTML(v={}){
+  return `<div class="row" data-k="ex">
+    <div class="n"></div><button class="rm" type="button" title="Remove">×</button>
+    <div class="g">
+      <div><label>Date</label><input type="date" name="date" value="${v.date||todayStr()}"></div>
+      <div><label>Amount (₹)</label><input class="amt" type="number" inputmode="decimal" min="0" step="0.01" name="amount" placeholder="0"></div>
+      <div><label>Category</label><select name="cat">${eOpt(eCats(),v.cat||'')}</select></div>
+      <div class="w2"><label>Description</label><input name="desc" placeholder="What was this for?"></div>
+      <div><label>Paid by</label><select name="by">${eOpt(PAID_BY_NAMES,v.by||PAID_BY_NAMES[0])}</select></div>
+      <div><label>Method</label><select name="method">${eOpt(METHODS,v.method||'UPI')}</select></div>
+    </div></div>`;
+}
+function crRowHTML(v={}){
+  return `<div class="row" data-k="cr">
+    <div class="n"></div><button class="rm" type="button" title="Remove">×</button>
+    <div class="g">
+      <div><label>Date</label><input type="date" name="date" value="${v.date||todayStr()}"></div>
+      <div class="w2"><label>Client name</label><input name="client" placeholder="Who paid?"></div>
+      <div class="w3"><label>Amount (₹)</label><input class="amt" type="number" inputmode="decimal" min="0" step="0.01" name="amount" placeholder="0"></div>
+    </div></div>`;
+}
+function eAddRow(k,focus){
+  const box=$(k+'Rows'),rows=box.querySelectorAll('.row'),last=rows[rows.length-1];
+  const v=last?{date:last.querySelector('[name=date]').value,by:(last.querySelector('[name=by]')||{}).value,method:(last.querySelector('[name=method]')||{}).value}:{};
+  box.insertAdjacentHTML('beforeend',k==='ex'?exRowHTML(v):crRowHTML(v));
+  eRenumber(k);
+  if(focus)box.lastElementChild.querySelector('[name=amount]').focus();
+}
+function eRenumber(k){
+  const rows=$(k+'Rows').querySelectorAll('.row');
+  rows.forEach((r,i)=>{r.querySelector('.n').textContent=(k==='ex'?'Expense ':'Credit ')+(i+1);r.querySelector('.rm').style.display=rows.length>1?'':'none';});
+  eTotal(k);
+}
+function eTotal(k){
+  const rows=[...$(k+'Rows').querySelectorAll('.row')];
+  const t=rows.reduce((s,r)=>s+(Number(r.querySelector('[name=amount]').value)||0),0);
+  $(k+'Tot').innerHTML=`${rows.length} entr${rows.length>1?'ies':'y'} · <b>${inr(t,2)}</b>`;
+  $(k+'Save').textContent=rows.length>1?`Save ${rows.length}`:'Save';
+}
+function eCollect(k){
+  const out=[];let ok=true;
+  $(k+'Rows').querySelectorAll('.row').forEach(r=>{
+    const g=n=>r.querySelector(`[name=${n}]`);
+    const amt=Number(g('amount').value),date=g('date').value;
+    if(!date){g('date').classList.add('err');ok=false;}
+    if(!(amt>0)){g('amount').classList.add('err');ok=false;}
+    if(k==='cr'&&!g('client').value.trim()){g('client').classList.add('err');ok=false;}
+    out.push(k==='ex'
+      ?{Date:date,Amount:amt,Category:g('cat').value,Description:g('desc').value.trim(),PaidBy:g('by').value,Method:g('method').value}
+      :{Date:date,Amount:amt,Client:g('client').value.trim()});
+  });
+  return ok?out:null;
+}
+async function eSave(k){
+  const rows=eCollect(k);if(!rows){toast('Fill the highlighted fields',true);return;}
+  const btn=$(k+'Save');btn.disabled=true;btn.textContent='Saving…';
+  try{
+    const j=await post({action:k==='ex'?'importExpenses':'importCredits',payload:JSON.stringify({batch:'',rows})});
+    toast(`Saved ${j.imported} ${k==='ex'?'expense':'credit'}${j.imported>1?'s':''}`);
+    eRecent(k,rows);
+    const d=rows[rows.length-1].Date;
+    $(k+'Rows').innerHTML='';eAddRow(k);$(k+'Rows').querySelector('[name=date]').value=d;
+    if(!ENTRY_ONLY){clearTimeout(window._ld);window._ld=setTimeout(loadAll,600);}
+  }catch(err){toast('Save failed: '+err.message,true);}
+  finally{btn.disabled=false;eTotal(k);}
+}
+function eRecent(k,rows){
+  const list=$('recentList');
+  rows.slice().reverse().forEach(r=>{
+    const dd=r.Date.split('-').reverse().join('/');
+    list.insertAdjacentHTML('afterbegin',`<div class="ri"><div>${esc(k==='ex'?(r.Category+(r.Description?' · '+r.Description:'')):r.Client)}<br><span>${dd}${k==='ex'?' · '+esc(r.PaidBy)+' · '+esc(r.Method):''}</span></div><b class="${k==='ex'?'d':'c'}">${k==='ex'?'−':'+'}${inr(r.Amount,2)}</b></div>`);
+  });
+  while(list.children.length>12)list.lastElementChild.remove();
+  $('recent').hidden=false;
+}
+function eRefreshCats(){$('exRows').querySelectorAll('[name=cat]').forEach(sel=>{const v=sel.value;sel.innerHTML=eOpt(eCats(),v);});}
+document.querySelectorAll('#panel-entry .sec-h').forEach(h=>h.onclick=()=>h.parentElement.classList.toggle('open'));
+['ex','cr'].forEach(k=>{
+  const box=$(k+'Rows');
+  box.addEventListener('click',ev=>{const b=ev.target.closest('.rm');if(b){b.closest('.row').remove();eRenumber(k);}});
+  box.addEventListener('input',ev=>{ev.target.classList.remove('err');if(ev.target.name==='amount')eTotal(k);});
+  $(k+'Add').onclick=()=>eAddRow(k,true);
+  $(k+'Save').onclick=()=>eSave(k);
+  eAddRow(k);
+});
+function showEntry(){const u=new URL(location.href);u.search='?entry';u.hash='';$('entryLink').href=u.href;$('entryLink').textContent=u.href;eRefreshCats();}
 
 /* ───────── render: cash flow ───────── */
 function renderCashflow(){
@@ -813,36 +1013,13 @@ $('csvPL').onclick=()=>{const M=byMonth();dlCSV(`friska-pnl-${P.from}_${P.to}.cs
 $('eCsv').onclick=()=>dlCSV(`friska-expenses-${P.from}_${P.to}.csv`,[['Date','ExpenseId','Category','Description','Amount','Method','PaidBy'],...EXP.filter(e=>inP(e.date)).sort((a,b)=>a.date.localeCompare(b.date)).map(e=>[e.date,e.id,e.cat,e.desc,e.amount,e.method,e.by])]);
 $('rCsv').onclick=()=>dlCSV(`friska-credits-${P.from}_${P.to}.csv`,[['Date','Ref','Received from','Batch','Amount'],...BILLS.filter(b=>inP(b.date)).sort((a,b)=>a.date.localeCompare(b.date)).map(b=>[b.date,b.id,b.client,b.batch,b.amount])]);
 
-/* ───────── add single entries ───────── */
-function fillExpenseForm(){
-  const cur=$('exCat').value;
-  $('exCat').innerHTML=CATS.map(c=>`<option${c===cur?' selected':''}>${esc(c)}</option>`).join('');
-  if(!$('exBy').options.length)$('exBy').innerHTML=PAID_BY_NAMES.map(n=>`<option>${esc(n)}</option>`).join('');
-}
-$('exDate').value=todayStr();
-$('exSave').onclick=async()=>{
-  const d=$('exDate').value,a=Number($('exAmt').value);
-  if(!d||!(a>0)){toast('Date and amount required',true);return;}
-  const b=$('exSave');b.disabled=true;b.textContent='Saving…';
-  try{const j=await post({action:'appendExpense',payload:JSON.stringify({Date:d,Amount:a,Category:$('exCat').value,Description:$('exDesc').value.trim(),PaidBy:$('exBy').value,PaymentMethod:$('exMethod').value})});
-    toast('Saved '+(j.expenseId||''));$('exAmt').value='';$('exDesc').value='';await loadAll();}
-  catch(e){toast(e.message,true);}finally{b.disabled=false;b.textContent='Save expense';}
-};
-$('lgDate').value=todayStr();
-$('lgSave').onclick=async()=>{
-  const d=$('lgDate').value,a=Number($('lgAmt').value);
-  if(!d||!(a>0)){toast('Date and amount required',true);return;}
-  const b=$('lgSave');b.disabled=true;
-  try{await post({action:'appendLegacyCredit',payload:JSON.stringify({Date:d,Client:$('lgClient').value.trim(),Amount:a,PaidStatus:'Paid'})});
-    toast('Credit saved');$('lgAmt').value='';$('lgClient').value='';await loadAll();}
-  catch(e){toast(e.message,true);}finally{b.disabled=false;}
-};
-
 /* ───────── wiring ───────── */
 function setTab(t){
   TAB=t;document.querySelectorAll('.tabs button').forEach(b=>b.setAttribute('aria-selected',b.dataset.tab===t?'true':'false'));
   document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('active',p.id==='panel-'+t));
-  try{history.replaceState(null,'','#'+t);}catch(e){}
+  $('pbar').style.display=t==='entry'?'none':'';
+  if(t==='entry')showEntry();
+  if(!ENTRY_ONLY){try{history.replaceState(null,'','#'+t);}catch(e){}}
   renderAll();window.scrollTo({top:0});
 }
 document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>setTab(b.dataset.tab));
@@ -858,8 +1035,18 @@ $('btnRefresh').onclick=loadAll;
 $('btnPrint').onclick=()=>{if(TAB!=='overview')setTab('overview');setTimeout(()=>window.print(),150);};
 function setHH(){document.documentElement.style.setProperty('--hh',$('hdr').offsetHeight+'px');}
 let rz;addEventListener('resize',()=>{setHH();clearTimeout(rz);rz=setTimeout(renderAll,200);});setHH();
-const h0=location.hash.slice(1);if(['overview','credits','expenses','cashflow','recon'].includes(h0))setTab(h0);
-loadAll();
+const ENTRY_ONLY_BOOT=ENTRY_ONLY;
+if(ENTRY_ONLY){
+  document.body.classList.add('entry-only');
+  document.title='Friska Entry';
+  $('hdr').querySelector('h1').textContent='Friska Entry';
+  $('hdr').querySelector('.sub').textContent='Add credits & expenses';
+  setTab('entry');
+  post({action:'getExpenseMeta'}).then(j=>{if(j.categories&&j.categories.length){CATS=j.categories;eRefreshCats();}}).catch(()=>{});
+}else{
+  const h0=location.hash.slice(1);if(['overview','credits','expenses','cashflow','entry','recon'].includes(h0))setTab(h0);
+  loadAll();
+}
 </script>
 </body>
 </html>
