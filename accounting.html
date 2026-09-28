@@ -951,7 +951,7 @@ function renderCashflow(){
   lineChart($('chCum'),ms.map(ymLabel),cum,{name:'Cumulative net'});
   const runMap={};ms.forEach((m,i)=>runMap[m]=cum[i]);
   $('cAcc').innerHTML=ms.slice().reverse().map(m=>{const x=M[m],n=x.billed-x.exp;
-    return accHTML('cf:'+m,ymLong(m),`<span class="pos">Credit ${inr(x.billed)}</span> · <span style="color:var(--out-ink)">Debit ${inr(x.exp)}</span> · running ${signed(runMap[m])}`,`<span class="${n<0?'negv':'pos'}">${signed(n)}</span>`,'net',null);}).join('');
+    return accHTML('cf:'+m,ymLong(m),`<span class="pos">Credit ${inr(x.billed)}</span> · <span style="color:var(--out-ink)">Debit ${inr(x.exp)}</span>`,`<span class="${n<0?'negv':'pos'}">${signed(n)}</span>`,'net',null);}).join('');
   wireAcc($('cAcc'),k=>cfBody(k.slice(3)));
 }
 function cfBody(m){
