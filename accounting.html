@@ -817,16 +817,18 @@ function billBody(arr){
       <td><button class="x" data-dleg="${esc(b.id)}" title="Delete">×</button></td></tr>`).join('')+'</tbody></table></div>';
 }
 
-/* ───────── pending payments (unpaid bills, all time) ───────── */
+/* ───────── pending payments (unpaid bills in selected months) ───────── */
 const P_TOUCHED=new Set(); // bills toggled this session stay visible for undo
 function renderPending(){
-  const un=BILLDOCS.filter(b=>!b.paid),tot=un.reduce((s,b)=>s+b.amount,0);
+  // bills dated inside the selected months; when the range starts at the first data month, older bills are included too
+  const first=dataMonths()[0],inPend=d=>{const m=d.slice(0,7);return (m>=P.from||P.from===first)&&m<=P.to;};
+  const un=BILLDOCS.filter(b=>!b.paid&&inPend(b.date)),tot=un.reduce((s,b)=>s+b.amount,0);
   const cl=new Set(un.map(b=>normName(b.client))).size;
   $('pTot').textContent=inr(tot);
-  $('pSub').textContent=`${un.length} unpaid bill${un.length===1?'':'s'} · ${cl} client${cl===1?'':'s'} · all time`;
+  $('pSub').textContent=`${un.length} unpaid bill${un.length===1?'':'s'} · ${cl} client${cl===1?'':'s'} · ${periodText()}`;
   if($('pBody').hidden)return;
   const q=$('pSearch').value.trim().toLowerCase();
-  const list=BILLDOCS.filter(b=>(!b.paid||P_TOUCHED.has(b.id))&&(!q||(b.client+' '+b.id+' '+b.amount+' '+b.plan).toLowerCase().includes(q)))
+  const list=BILLDOCS.filter(b=>(!b.paid||P_TOUCHED.has(b.id))&&inPend(b.date)&&(!q||(b.client+' '+b.id+' '+b.amount+' '+b.plan).toLowerCase().includes(q)))
     .sort((a,b)=>b.date.localeCompare(a.date));
   $('pList').innerHTML=list.length?`<table><thead><tr><th>Date</th><th>Client</th><th>Plan</th><th>Bill #</th><th class="n">Amount</th><th class="n">Status</th></tr></thead><tbody>`+
     list.map(b=>`<tr><td class="num" style="white-space:nowrap">${dLabel(b.date)}</td><td style="font-weight:600">${esc(b.client)}</td>
