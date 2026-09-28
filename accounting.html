@@ -837,19 +837,29 @@ function renderPending(){
   const q=$('pSearch').value.trim().toLowerCase();
   const list=BILLDOCS.filter(b=>(!b.paid||P_TOUCHED.has(b.id))&&inPend(b.date)&&(!q||(b.client+' '+b.id+' '+b.amount+' '+b.plan).toLowerCase().includes(q)))
     .sort((a,b)=>b.date.localeCompare(a.date));
-  $('pList').innerHTML=list.length?`<table><thead><tr><th>Date</th><th>Client</th><th>Plan</th><th>Bill #</th><th class="n">Amount</th><th class="n">Status</th></tr></thead><tbody>`+
+  $('pList').innerHTML=list.length?`<table><thead><tr><th>Date</th><th>Client</th><th>Plan</th><th>Bill #</th><th class="n">Amount</th><th class="n">Status</th><th></th></tr></thead><tbody>`+
     list.map(b=>`<tr><td class="num" style="white-space:nowrap">${dLabel(b.date)}</td><td style="font-weight:600">${esc(b.client)}</td>
       <td class="muted">${esc(b.plan)}${b.duration?' · '+esc(b.duration):''}</td><td class="muted">#${esc(b.id)}</td>
       <td class="n" style="font-weight:700">${inr(b.amount,2)}${b.adj?`<div class="muted" style="font-size:11px;font-weight:500">bill total ${inr(b.amount+b.adj,2)} (adj ${signed(b.adj)})</div>`:''}</td>
-      <td class="n"><button class="pst ${b.paid?'paid':'unpaid'}" data-bill="${esc(b.id)}" title="Tap to change">${b.paid?'Paid ✓':'Unpaid'}</button></td></tr>`).join('')+'</tbody></table>'
+      <td class="n"><button class="pst ${b.paid?'paid':'unpaid'}" data-bill="${esc(b.id)}" title="Tap to change">${b.paid?'Paid ✓':'Unpaid'}</button></td>
+      <td><button class="x" data-delbill="${esc(b.id)}" title="Delete this bill from the sheet">×</button></td></tr>`).join('')+'</tbody></table>'
     :'<div class="empty">No pending payments 🎉</div>';
   $('pList').querySelectorAll('[data-bill]').forEach(btn=>btn.onclick=()=>toggleBill(btn));
+  $('pList').querySelectorAll('[data-delbill]').forEach(btn=>btn.onclick=()=>deleteBill(btn));
 }
 async function toggleBill(btn){
   const b=BILLDOCS.find(x=>x.id===btn.dataset.bill);if(!b)return;
   const to=b.paid?'Unpaid':'Paid';btn.disabled=true;btn.textContent='Saving…';
   try{await post({action:'updateBillStatus',billNo:b.id,status:to});b.paid=to==='Paid';P_TOUCHED.add(b.id);toast(`${b.client} → ${to}`);}
   catch(e){toast(e.message,true);}
+  renderPending();
+}
+async function deleteBill(btn){
+  const b=BILLDOCS.find(x=>x.id===btn.dataset.delbill);if(!b)return;
+  if(!confirm(`Delete bill #${b.id} — ${b.client} — ${inr(b.amount,2)}?\n\nThis removes the row from the Bills sheet and cannot be undone.`))return;
+  btn.disabled=true;
+  try{await post({action:'deleteBill',billNo:b.id});BILLDOCS=BILLDOCS.filter(x=>x.id!==b.id);P_TOUCHED.delete(b.id);toast(`Bill #${b.id} deleted`);}
+  catch(e){toast(e.message,true);btn.disabled=false;}
   renderPending();
 }
 $('pToggle').onclick=()=>{const open=$('pBody').hidden;$('pBody').hidden=!open;$('pToggle').setAttribute('aria-expanded',open);$('pToggle').lastChild.textContent=open?' Hide clients':' View clients';renderPending();};
