@@ -131,7 +131,8 @@
   </div>
   <div class="advrow">
     <label title="points closer than this ride together in one zone">zone radius km <input type="number" id="zr" value="2.5" min="0.2" step="0.1"></label>
-    <label title="only buy distances between points this close. Keeps the Google bill small.">measure within km <input type="number" id="nearKm" value="6" min="1" step="0.5"></label>
+    <label title="only buy distances between points this close. A spending limit, not a routing rule.">measure within km <input type="number" id="nearKm" value="6" min="1" step="0.5"></label>
+    <label title="refuse a route containing a single hop longer than this. 0 = no limit.">max leg km <input type="number" id="maxLegKm" value="0" min="0" step="0.5"></label>
     <button id="measure">Measure distances</button>
     <button class="warn" id="rebuild" disabled>Rebuild zones</button>
   </div>
@@ -311,12 +312,17 @@ function measure(rows){
   const pts = uniqPts(rows);
   const t = tour(pts);
   const stop = rows.length * num('stopMin');
+
+  // longest single hop on the route, kitchen leg included
+  let maxLeg = 0, prev = KITCHEN;
+  t.order.forEach(p=>{ const d = roadPair(prev,p).km; if (isFinite(d) && d > maxLeg) maxLeg = d; prev = p; });
+
   return {
     parcels: rows.length, points: pts.length,
     km: t.km, drive: t.min, stop, total: t.min + stop,
     lastKm: roadPair(KITCHEN, t.last).km,
     kmpp: rows.length ? t.km/rows.length : 0,
-    order: t.order
+    maxLeg, order: t.order
   };
 }
 function uniqPts(rows){
@@ -325,11 +331,12 @@ function uniqPts(rows){
   return out;
 }
 function fits(m){
-  const cap = num('maxTotKm'), reach = num('maxKm');
+  const cap = num('maxTotKm'), reach = num('maxKm'), leg = num('maxLegKm');
   return m.parcels <= num('maxP')
       && m.total <= num('maxMin')
-      && (cap   <= 0 || m.km     <= cap)
-      && (reach <= 0 || m.lastKm <= reach);
+      && (cap   <= 0 || m.km      <= cap)
+      && (reach <= 0 || m.lastKm  <= reach)
+      && (leg   <= 0 || m.maxLeg  <= leg);
 }
 
 /* ---------- zones: stable clusters of points ---------- */
@@ -1042,6 +1049,7 @@ function render(){
         chip(m.km.toFixed(1)+' km driven', num('maxTotKm')>0 && m.km>num('maxTotKm'))+
         chip(Math.round(m.total)+' min', m.total>num('maxMin'))+
         chip('reaches '+m.lastKm.toFixed(1)+' km', num('maxKm')>0 && m.lastKm>num('maxKm'))+
+        chip('longest hop '+m.maxLeg.toFixed(1)+' km', num('maxLegKm')>0 && m.maxLeg>num('maxLegKm'))+
         chip(m.kmpp.toFixed(2)+' km/p')+
         '<span class="spacer"></span>'+
         '<select onchange="pickAgent('+i+',this)">'+agentOptsFor(r.agent)+'</select>'+
