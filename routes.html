@@ -3,154 +3,229 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Route builder</title>
+<title>Friska — Delivery Routes</title>
+<script src="config.js"></script>
 <style>
   :root{
-    --bg:#0f1115; --panel:#171a21; --panel2:#1d222b; --line:#272c36;
-    --ink:#e6e9ef; --dim:#8b93a3; --acc:#4ade80; --warn:#fbbf24;
-    --bad:#f87171; --info:#60a5fa;
+    --c-bg:#eef2f6; --c-surface:#ffffff; --c-ink:#1f2a37; --c-muted:#5b6b7b; --c-line:#d7e0ea;
+    --grad-a:#0ea5a3; --grad-b:#2563eb; --c-primary:#0ea5a3; --c-primary-d:#0b8482;
+    --wa:#25D366; --warn:#b45309; --bad:#dc2626; --ok:#0b8482;
+    --radius:12px; --shadow:0 6px 24px rgba(20,40,70,.10);
   }
-  *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--ink);padding:18px;
-    font:14px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
-  h1{font-size:17px;margin:0 0 2px;font-weight:600}
-  .sub{color:var(--dim);font-size:12px;margin-bottom:16px}
-  .bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
-  input,select,button{font:inherit;background:var(--panel);color:var(--ink);
-    border:1px solid var(--line);border-radius:6px;padding:7px 10px}
-  input[type=number]{width:74px}
-  button{cursor:pointer;border-color:#3a4150}
-  button:hover:not(:disabled){border-color:#4d5666}
-  button.go{background:var(--acc);color:#08130c;border-color:var(--acc);font-weight:600}
-  button.warn{background:var(--warn);color:#241a02;border-color:var(--warn);font-weight:600}
-  button:disabled{opacity:.45;cursor:default}
-  .bar .spacer{flex:1}
-  button.ghost{background:none;color:var(--dim)}
-  button.ghost:hover{color:var(--ink)}
-  .adv{background:var(--panel);border:1px solid var(--line);border-radius:8px;
-    padding:11px 13px;margin-bottom:12px}
-  .advrow{display:flex;gap:9px;flex-wrap:wrap;align-items:center;margin-bottom:9px}
-  .advrow:last-of-type{margin-bottom:0}
-  .adv label{display:flex;gap:5px;align-items:center;font-size:12px;color:var(--dim)}
-  .adv input[type=number]{width:74px}
-  .rname{font-weight:600;font-size:14px;min-width:88px;cursor:text;
-    border-bottom:1px dashed transparent;padding:1px 3px;border-radius:3px}
-  .rname:hover{border-bottom-color:var(--dim);background:var(--bg)}
-  .statusrow{display:flex;gap:9px;align-items:center;flex-wrap:wrap;
-    min-height:20px;margin-bottom:12px}
-  .status{color:var(--dim);font-size:12px}
-  .cards{display:flex;gap:9px;flex-wrap:wrap;margin-bottom:16px}
-  .card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:9px 13px;min-width:96px}
-  .card .n{font-size:19px;font-weight:600}
-  .card .l{font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:.05em}
-  .card.bad .n{color:var(--bad)} .card.ok .n{color:var(--acc)} .card.info .n{color:var(--info)}
+  *{ box-sizing:border-box; }
+  body{ font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif; margin:0;
+    background:var(--c-bg); color:var(--c-ink); -webkit-text-size-adjust:100%; }
 
-  .route{background:var(--panel);border:1px solid var(--line);border-radius:9px;margin-bottom:11px;overflow:hidden}
-  .route.over{border-color:var(--bad)}
-  .rhead{display:flex;gap:10px;align-items:center;flex-wrap:wrap;
-    padding:10px 13px;background:var(--panel2);border-bottom:1px solid var(--line)}
-  .chip{font-size:11px;color:var(--dim);background:var(--bg);
-    border:1px solid var(--line);border-radius:20px;padding:2px 9px}
-  .chip.bad{color:var(--bad);border-color:var(--bad)}
-  .rhead .spacer{flex:1}
-  .rhead select,.rhead input{padding:5px 8px;font-size:12px}
-  .rbody{padding:9px 13px}
-  table{border-collapse:collapse;width:100%;font-size:12px}
-  th,td{border-bottom:1px solid var(--line);padding:4px 7px;text-align:left}
-  th{color:var(--dim);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:.04em}
-  tr:last-child td{border-bottom:none}
-  td.num{text-align:right;font-variant-numeric:tabular-nums}
-  .pill{display:inline-block;font-size:10px;padding:1px 6px;border-radius:10px;
-    background:var(--bg);border:1px solid var(--line);color:var(--dim)}
-  .notrouted{background:var(--panel);border:1px solid var(--warn);
-    border-radius:9px;padding:11px 14px;margin-bottom:14px}
-  .notrouted h3{margin:0 0 7px;font-size:12px;color:var(--warn);
-    text-transform:uppercase;letter-spacing:.05em}
-  h2.slothead{font-size:13px;color:var(--acc);text-transform:uppercase;
-    letter-spacing:.06em;font-weight:600;margin:22px 0 9px;
-    border-bottom:1px solid var(--line);padding-bottom:5px}
-  h2{font-size:12px;color:var(--dim);text-transform:uppercase;
-    letter-spacing:.05em;font-weight:600;margin:20px 0 9px}
-  .hint{color:var(--dim);font-size:11px;margin-top:4px}
-  .split{display:flex;gap:5px;align-items:center}
-  .note{border-radius:8px;padding:8px 12px;margin-bottom:11px;font-size:12px}
-  .note.draft{background:rgba(96,165,250,.09);border:1px solid var(--info);color:var(--info)}
-  .note.live{background:rgba(248,113,113,.09);border:1px solid var(--bad);color:var(--bad)}
-  .sel td{background:rgba(96,165,250,.09)}
-  tr.same td{color:var(--dim)}
-  input[type=checkbox]{width:14px;height:14px;accent-color:var(--info)}
-  button.x{background:none;border:none;color:var(--dim);font-size:16px;
-    line-height:1;padding:0 5px;cursor:pointer}
-  button.x:hover{color:var(--bad)}
-  .addpanel{background:var(--panel2);border:1px solid var(--line);
-    border-radius:7px;padding:9px;margin-bottom:9px}
-  .addpanel input{width:100%;margin-bottom:7px}
-  .addlist{max-height:190px;overflow:auto}
-  .addrow{display:flex;gap:9px;align-items:center;padding:5px 7px;
-    border-radius:5px;cursor:pointer;font-size:12px}
-  .addrow:hover{background:var(--bg)}
-  .addrow span:first-child{flex:1}
-  .dim{color:var(--dim);font-size:11px}
-  .pool{background:var(--panel);border:1px solid var(--info);
-    border-radius:9px;padding:11px 14px;margin-bottom:14px}
-  .pool h3{margin:0 0 7px;font-size:12px;color:var(--info);
-    text-transform:uppercase;letter-spacing:.05em}
-  .pool select{padding:3px 6px;font-size:11px}
-  .pool button{padding:3px 8px;font-size:11px}
+  .bar{ background:var(--c-surface); }
+  body.landing .bar{
+    position:static; min-height:100vh; display:flex; flex-direction:column; align-items:center;
+    justify-content:center; gap:18px; padding:32px 20px;
+    background:
+      radial-gradient(1200px 500px at 50% -10%, rgba(37,99,235,.10), transparent 60%),
+      radial-gradient(900px 500px at 50% 110%, rgba(14,165,163,.12), transparent 60%),
+      var(--c-bg);
+  }
+  body.landing .content{ display:none; }
+  body.working .bar{
+    position:sticky; top:0; z-index:10; flex-direction:row; min-height:auto; padding:10px 16px;
+    display:flex; gap:10px; align-items:center; flex-wrap:wrap;
+    background:var(--c-surface); border-bottom:1px solid var(--c-line); box-shadow:0 1px 0 rgba(0,0,0,.02);
+  }
+
+  .brand{ display:flex; align-items:center; gap:12px; }
+  .brand img{ height:36px; width:auto; }
+  .brand span{ font-size:16px; font-weight:800; letter-spacing:.2px;
+    background:linear-gradient(90deg,var(--grad-a),var(--grad-b));
+    -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
+  body.landing .brand{ flex-direction:column; gap:10px; margin-bottom:4px; }
+  body.landing .brand img{ height:64px; }
+  body.landing .brand span{ font-size:26px; }
+
+  .hero-sub{ display:none; }
+  body.landing .hero-sub{ display:block; color:var(--c-muted); font-size:14px; margin-top:-6px; text-align:center; }
+
+  .controls{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  body.landing .controls{ flex-direction:column; width:100%; max-width:340px; }
+  body.landing .controls > *{ width:100%; }
+  .field{ position:relative; display:flex; align-items:center; }
+  body.landing .field{ width:100%; }
+  input[type=date], select, input[type=text], input[type=number]{
+    padding:11px 13px; border:1.5px solid var(--c-line); border-radius:var(--radius); font-size:15px;
+    background:var(--c-surface); color:var(--c-ink); font-family:inherit; transition:border-color .15s, box-shadow .15s; }
+  input[type=date]{ cursor:pointer; width:100%; }
+  input:focus, select:focus{ outline:none; border-color:var(--c-primary); box-shadow:0 0 0 3px rgba(14,165,163,.16); }
+
+  .btn{ padding:11px 17px; border:0; border-radius:var(--radius); font-size:15px; font-weight:700;
+    cursor:pointer; color:#fff; font-family:inherit; transition:transform .08s, filter .15s;
+    background:linear-gradient(90deg,var(--grad-a),var(--grad-b)); box-shadow:0 4px 14px rgba(37,99,235,.25); }
+  .btn:hover:not(:disabled){ filter:brightness(1.05); }
+  .btn:active:not(:disabled){ transform:translateY(1px); }
+  .btn.alt{ background:var(--c-surface); color:var(--c-primary-d); border:1.5px solid var(--c-line); box-shadow:none; }
+  .btn.alt:hover:not(:disabled){ border-color:var(--c-primary); }
+  .btn.sm{ padding:7px 12px; font-size:13px; border-radius:9px; box-shadow:none; }
+  .btn.wa{ background:var(--wa); box-shadow:0 4px 14px rgba(37,211,102,.25); }
+  .btn.danger{ background:var(--bad); box-shadow:none; }
+  .btn:disabled{ opacity:.45; cursor:default; box-shadow:none; }
+  body.landing .btn{ padding:14px 18px; font-size:16px; }
+
+  .status{ display:flex; align-items:center; gap:8px; font-size:13px; color:var(--c-muted); }
+  .spinner{ width:14px; height:14px; border:2px solid var(--c-line); border-top-color:var(--c-primary);
+    border-radius:50%; animation:spin .7s linear infinite; display:none; flex:none; }
+  .status.busy .spinner{ display:block; }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+
+  .content{ max-width:980px; margin:0 auto; padding:18px 16px 60px; }
+
+  .cards{ display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px; }
+  .card{ background:var(--c-surface); border:1px solid var(--c-line); border-radius:var(--radius);
+    padding:11px 15px; min-width:96px; box-shadow:var(--shadow); }
+  .card .n{ font-size:20px; font-weight:800; }
+  .card .l{ font-size:10.5px; color:var(--c-muted); text-transform:uppercase; letter-spacing:.06em; margin-top:2px; }
+  .card.bad .n{ color:var(--bad); } .card.ok .n{ color:var(--ok); } .card.info .n{ color:var(--grad-b); }
+
+  .slotcard, .routecard{ background:var(--c-surface); border:1px solid var(--c-line); border-radius:var(--radius);
+    box-shadow:var(--shadow); padding:16px; margin-bottom:12px; cursor:pointer; transition:border-color .15s, transform .08s; }
+  .slotcard:hover, .routecard:hover{ border-color:var(--c-primary); }
+  .slotcard:active, .routecard:active{ transform:translateY(1px); }
+  .sc-top{ display:flex; align-items:baseline; justify-content:space-between; gap:10px; }
+  .sc-name{ font-size:18px; font-weight:800; color:var(--c-primary-d); }
+  .rc-name{ font-size:16px; font-weight:800; }
+  .sc-sub{ font-size:12.5px; color:var(--c-muted); margin-top:4px; }
+  .routecard.over{ border-color:var(--bad); }
+
+  .chips{ display:flex; gap:7px; flex-wrap:wrap; margin-top:10px; }
+  .chip{ font-size:11px; font-weight:700; padding:4px 10px; border-radius:999px;
+    background:#eef2f6; color:var(--c-muted); white-space:nowrap; }
+  .chip.bad{ background:#fee2e2; color:var(--bad); }
+  .chip.ok{ background:#d1fae5; color:var(--ok); }
+  .pill{ display:inline-block; font-size:10px; font-weight:700; padding:2px 7px; border-radius:999px;
+    background:#eef2f6; color:var(--c-muted); }
+
+  .back{ display:inline-flex; align-items:center; gap:6px; font-size:13.5px; font-weight:700;
+    color:var(--c-primary-d); cursor:pointer; margin-bottom:12px; }
+  .back:hover{ text-decoration:underline; }
+
+  .panel{ background:var(--c-surface); border:1px solid var(--c-line); border-radius:var(--radius);
+    box-shadow:var(--shadow); padding:16px; margin-bottom:14px; }
+  .panel h3{ margin:0 0 10px; font-size:14px; font-weight:800; }
+  .panel.warn{ border-color:#fcd34d; } .panel.warn h3{ color:var(--warn); }
+  .panel.info{ border-color:var(--grad-b); } .panel.info h3{ color:var(--grad-b); }
+  .panel.bad{ border-color:var(--bad); } .panel.bad h3{ color:var(--bad); }
+
+  table{ border-collapse:collapse; width:100%; font-size:13px; }
+  th,td{ border-bottom:1px solid var(--c-line); padding:7px 8px; text-align:left; vertical-align:middle; }
+  th{ font-size:10.5px; color:var(--c-muted); text-transform:uppercase; letter-spacing:.05em; font-weight:700; }
+  tr:last-child td{ border-bottom:none; }
+  td.num, th.num{ text-align:right; font-variant-numeric:tabular-nums; }
+  tr.same td{ color:var(--c-muted); }
+  .rowx{ background:none; border:0; color:var(--c-muted); font-size:17px; cursor:pointer; padding:0 4px; }
+  .rowx:hover{ color:var(--bad); }
+  input[type=checkbox]{ width:15px; height:15px; accent-color:var(--grad-b); }
+
+  .hint{ font-size:11.5px; color:var(--c-muted); margin-top:8px; line-height:1.5; }
+  .actrow{ display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; }
+
+  .msgbox{ background:#f8fafc; border:1px solid var(--c-line); border-radius:10px; padding:12px;
+    font-size:12.5px; white-space:pre-wrap; word-break:break-word; max-height:280px; overflow:auto;
+    font-family:ui-monospace,Menlo,Consolas,monospace; }
+
+  .addpanel{ background:#f8fafc; border:1px solid var(--c-line); border-radius:10px; padding:10px; margin-bottom:12px; }
+  .addpanel input{ width:100%; margin-bottom:8px; }
+  .addlist{ max-height:210px; overflow:auto; }
+  .addrow{ display:flex; gap:9px; align-items:center; padding:7px 8px; border-radius:7px;
+    cursor:pointer; font-size:12.5px; }
+  .addrow:hover{ background:#eef2f6; }
+  .addrow span:first-child{ flex:1; }
+  .dim{ color:var(--c-muted); font-size:11px; }
+
+  .adv{ background:var(--c-surface); border:1px solid var(--c-line); border-radius:var(--radius);
+    box-shadow:var(--shadow); padding:14px; margin-bottom:16px; }
+  .advrow{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:10px; }
+  .advrow:last-of-type{ margin-bottom:0; }
+  .adv label{ display:flex; gap:6px; align-items:center; font-size:12px; color:var(--c-muted); }
+  .adv input[type=number]{ width:78px; padding:8px 10px; font-size:14px; }
+
+  .note{ border-radius:10px; padding:10px 13px; margin-bottom:12px; font-size:12.5px; }
+  .note.draft{ background:#eff6ff; border:1px solid var(--grad-b); color:#1d4ed8; }
+  .note.live{ background:#fef2f2; border:1px solid var(--bad); color:var(--bad); }
+
+  .toast{ position:fixed; bottom:22px; left:50%; transform:translateX(-50%); background:var(--c-ink);
+    color:#fff; padding:11px 20px; border-radius:11px; font-size:13.5px; font-weight:600;
+    opacity:0; transition:opacity .3s; pointer-events:none; z-index:100; max-width:90%; text-align:center; }
+  .toast.show{ opacity:1; }
+
+  .empty{ text-align:center; color:var(--c-muted); padding:44px 16px; font-size:14px;
+    background:var(--c-surface); border-radius:var(--radius); box-shadow:var(--shadow); }
+
+  @media (max-width:560px){
+    .content{ padding:14px 12px 60px; }
+    th,td{ padding:6px 5px; font-size:12px; }
+  }
 </style>
 </head>
-<body>
+<body class="landing">
 
-<h1>Route builder</h1>
-<div class="sub">Standalone. Builds routes from coordinates. Writes only to RouteAssign, RouteZones and RoadCache when you press Save.</div>
-
-<div class="bar">
-  <input type="date" id="date">
-  <select id="slot">
-    <option value="">All slots</option>
-    <option>Morning</option><option>Afternoon</option><option>Evening</option>
-  </select>
-  <button class="go" id="load">Build routes</button>
-  <select id="mode" title="Draft writes to a sheet nothing reads. Live is what delivery.html and kitchen.html read.">
-    <option value="draft">Draft (safe)</option>
-    <option value="live">Live — used by delivery</option>
-  </select>
-  <button id="save" disabled>Save routes</button>
-  <button id="undo" disabled>Undo</button>
-  <span class="spacer"></span>
-  <button id="advToggle" class="ghost">Settings</button>
-</div>
-
-<div class="adv" id="adv" hidden>
-  <div class="advrow">
-    <label title="most parcels one rider carries">max parcels <input type="number" id="maxP" value="20" min="1"></label>
-    <label title="total driving across the whole route. 0 = no limit">max km driven <input type="number" id="maxTotKm" value="40" min="0"></label>
-    <label title="kitchen to the final parcel. 0 = no limit">max km reach <input type="number" id="maxKm" value="0" min="0"></label>
-    <label title="the 2pm cutoff. Lower this on a late dispatch.">max minutes <input type="number" id="maxMin" value="180" min="10"></label>
-    <label title="time spent at each door">min/stop <input type="number" id="stopMin" value="2" min="0" step="0.5"></label>
+  <div class="bar">
+    <div class="brand">
+      <img src="logo.png" alt="Friska Wellness Foods">
+      <span>Delivery Routes</span>
+    </div>
+    <div class="hero-sub">Pick a date to build the day's delivery routes.</div>
+    <div class="controls">
+      <div class="field"><input type="date" id="date"></div>
+      <select id="slot">
+        <option value="">All slots</option>
+        <option>Morning</option><option>Afternoon</option><option>Evening</option>
+      </select>
+      <button id="load" class="btn">Generate</button>
+      <select id="mode" title="Draft writes to a sheet nothing reads. Live is what delivery and kitchen read.">
+        <option value="draft">Draft (safe)</option>
+        <option value="live">Live — used by kitchen</option>
+      </select>
+      <button id="save" class="btn alt" disabled>Save routes</button>
+      <button id="undo" class="btn alt" disabled>Undo</button>
+      <button id="advToggle" class="btn alt">Settings</button>
+      <span class="status" id="statusWrap"><span class="spinner"></span><span id="status">Pick a date to begin.</span></span>
+      <span id="cover"></span>
+    </div>
   </div>
-  <div class="advrow">
-    <label title="points closer than this ride together in one zone">zone radius km <input type="number" id="zr" value="2.5" min="0.2" step="0.1"></label>
-    <label title="only buy distances between points this close. A spending limit, not a routing rule.">measure within km <input type="number" id="nearKm" value="6" min="1" step="0.5"></label>
-    <label title="refuse a route containing a single hop longer than this. 0 = no limit.">max leg km <input type="number" id="maxLegKm" value="0" min="0" step="0.5"></label>
-    <button class="go" id="saveSettings">Save settings for everyone</button>
-    <button id="measure">Measure distances</button>
-    <button class="warn" id="rebuild" disabled>Rebuild zones</button>
-  </div>
-  <div class="advrow">
-    <label style="flex:1">web app URL <input type="text" id="api" placeholder="/exec URL — normally taken from config.js" style="width:100%"></label>
-  </div>
-  <div class="hint">Saved settings live in the spreadsheet, so every device and the automatic 6am run use the same rules. Limits apply the next time you press Build routes; zone radius and measure-within take effect when you measure or rebuild.</div>
-</div>
 
-<div id="modeNote"></div>
-<div class="statusrow"><span class="status" id="status"></span><span id="cover"></span></div>
-<div class="cards" id="cards"></div>
-<div id="notRouted"></div>
-<div id="pool"></div>
-<div id="routes"></div>
+  <div id="content" class="content">
 
-<script src="config.js" onerror="void 0"></script>
+    <div class="adv" id="adv" hidden>
+      <div class="advrow">
+        <label title="most parcels one rider carries">max parcels <input type="number" id="maxP" value="20" min="1"></label>
+        <label title="total driving across the whole route. 0 = no limit">max km driven <input type="number" id="maxTotKm" value="40" min="0"></label>
+        <label title="kitchen to the final parcel. 0 = no limit">max km reach <input type="number" id="maxKm" value="0" min="0"></label>
+        <label title="refuse a route with a single hop longer than this. 0 = no limit">max leg km <input type="number" id="maxLegKm" value="0" min="0" step="0.5"></label>
+      </div>
+      <div class="advrow">
+        <label title="the 2pm cutoff. Lower this on a late dispatch.">max minutes <input type="number" id="maxMin" value="180" min="10"></label>
+        <label title="time spent at each door">min/stop <input type="number" id="stopMin" value="2" min="0" step="0.5"></label>
+        <label title="points closer than this ride together in one zone">zone radius km <input type="number" id="zr" value="2.5" min="0.2" step="0.1"></label>
+        <label title="only buy distances between points this close. A spending limit, not a routing rule.">measure within km <input type="number" id="nearKm" value="6" min="1" step="0.5"></label>
+      </div>
+      <div class="advrow">
+        <button class="btn sm" id="saveSettings">Save settings for everyone</button>
+        <button class="btn alt sm" id="measure">Measure distances</button>
+        <button class="btn alt sm" id="rebuild" disabled>Rebuild zones</button>
+        <label style="flex:1; min-width:220px;">web app URL
+          <input type="text" id="api" placeholder="from config.js" style="flex:1; min-width:140px;"></label>
+      </div>
+      <div class="hint">Saved settings live in the spreadsheet, so every device and the automatic run use the same rules.
+        Limits apply on the next Generate; zone radius and measure-within take effect when you measure or rebuild.</div>
+    </div>
+
+    <div id="modeNote"></div>
+    <div id="cards" class="cards"></div>
+    <div id="notRouted"></div>
+    <div id="pool"></div>
+    <div id="routes"></div>
+
+  </div>
+
+  <div class="toast" id="toast"></div>
+
 <script>
 const KITCHEN = { lat: 17.452623115758335, lng: 78.41967516576499 };
 const BOUNDS  = { latMin:17.0, latMax:17.8, lngMin:78.0, lngMax:78.8 };
@@ -200,7 +275,8 @@ $('advToggle').addEventListener('click', ()=>{
   $('advToggle').textContent = a.hidden ? 'Settings' : 'Hide settings';
 });
 
-const setStatus = m => $('status').textContent = m;
+const setStatus = m => { $('status').textContent = m; };
+function busy(on){ $('statusWrap').classList.toggle('busy', !!on); }
 const num = id => parseFloat($(id).value) || 0;
 
 async function api(action, params={}) {
@@ -533,6 +609,7 @@ async function load(){
   const url = $('api').value.trim();
   if (!url){ setStatus('Paste the web app URL first.'); return; }
   $('load').disabled = true;
+  busy(true);
   setStatus('Loading…');
 
   try {
@@ -605,6 +682,7 @@ async function load(){
     buildAndRender();
 
   } catch(e){ setStatus('Error: '+e.message); }
+  busy(false);
   $('load').disabled = false;
 }
 
@@ -737,7 +815,9 @@ $('measure').addEventListener('click', async () => {
   if (!need.length){ setStatus('Every leg already measured.'); buildAndRender(); return; }
 
   $('measure').disabled = true;
+  busy(true);
   await measureLegs(need);
+  busy(false);
   $('measure').disabled = false;
   buildAndRender();
 });
@@ -991,13 +1071,25 @@ function renumber(){
   });
 }
 
-/* ---------- render ---------- */
-function render(){
+
+/* =================== VIEW LAYER ===================
+ * Three screens, the way delivery.html works:
+ *   summary -> one card per slot
+ *   slot    -> one card per route in that slot
+ *   route   -> the client list, with the rider's WhatsApp message
+ * ================================================== */
+let view = { mode:'summary', slot:null, idx:null };
+
+function go(mode, slot, idx){
+  view = { mode, slot: slot==null?null:slot, idx: idx==null?null:idx };
+  render();
+  window.scrollTo({ top:0, behavior:'smooth' });
+}
+
+/* chrome shared by every screen */
+function renderChrome(){
   routes.forEach(r=>{ r.m = measure(r.rows); });
 
-  // Only the legs a rider actually drives. The packer asks about far more
-  // pairs than that while deciding, and we deliberately never buy the distant
-  // ones, so counting every query would sit below 100% forever.
   let driven = 0, drivenReal = 0;
   routes.forEach(r=>{
     let prev = KITCHEN;
@@ -1009,37 +1101,43 @@ function render(){
   });
   const pct = driven ? Math.round(drivenReal/driven*100) : 0;
   $('cover').innerHTML = driven
-    ? '<span class="chip'+(pct<100?' bad':'')+'" title="'+drivenReal+' of '+driven+
-      ' legs on the built routes come from Google">'+pct+'% of driven legs measured</span>' : '';
+    ? '<span class="chip'+(pct<100?' bad':' ok')+'" title="'+drivenReal+' of '+driven+
+      ' legs on the built routes come from Google">'+pct+'% measured</span>' : '';
+
   const totKm = routes.reduce((s,r)=>s+r.m.km,0);
   const totP  = routes.reduce((s,r)=>s+r.m.parcels,0);
   const over  = routes.filter(r=>!fits(r.m)).length;
 
-  $('cards').innerHTML = [
+  $('cards').innerHTML = routes.length ? [
     cardEl(routes.length,'routes', over?'bad':'ok'),
-    cardEl([...new Set(routes.map(r=>r.slot))].length,'slots'),
     cardEl(totP,'parcels'),
-    cardEl(totKm.toFixed(1)+' km','km driven'),
+    cardEl(totKm.toFixed(1)+' km','driven'),
     cardEl(totP?(totKm/totP).toFixed(2):'0','km / parcel','info'),
     cardEl(notRouted.length,'not routed', notRouted.length?'bad':''),
     cardEl(over,'over limit', over?'bad':'ok')
-  ].join('');
+  ].join('') : '';
+}
 
+function render(){
+  renderChrome();
+  if (view.mode === 'route' && routes[view.idx]) return renderRoute();
+  if (view.mode === 'slot'  && view.slot)        return renderSlot();
+  view = { mode:'summary', slot:null, idx:null };
+  renderSummary();
+}
+
+/* ---------- screen 1: slots ---------- */
+function renderSummary(){
   $('notRouted').innerHTML = notRouted.length ? (
-    '<div class="notrouted"><h3>Not routed &mdash; '+notRouted.length+'</h3><table>'+
-    '<tr><th>name</th><th>phone</th><th>location</th><th>reason</th></tr>'+
-    notRouted.map(c=>'<tr><td>'+esc(c.name)+'</td><td>'+c.phone+'</td><td>'+
+    '<div class="panel warn"><h3>Not routed &mdash; '+notRouted.length+'</h3><table>'+
+    '<tr><th>name</th><th>phone</th><th>slot</th><th>location</th><th>reason</th></tr>'+
+    notRouted.map(c=>'<tr><td>'+esc(c.name)+'</td><td>'+c.phone+'</td><td>'+esc(c.slot||'')+'</td><td>'+
       esc(c.location||'—')+'</td><td><span class="pill">'+c.why+'</span></td></tr>').join('')+
     '</table><div class="hint">Self-pickup clients belong here. Anything else needs its Master location fixed.</div></div>'
   ) : '';
 
-  const agentOptsFor = sel => ['<option value="">— agent —</option>']
-    .concat(agents.map(a=>'<option value="'+esc(a.name)+'"'+
-       (a.name===sel?' selected':'')+'>'+esc(a.name)+'</option>'))
-    .concat('<option value="__new">+ new agent</option>').join('');
-
   $('pool').innerHTML = unassigned.length ? (
-    '<div class="pool"><h3>Unassigned &mdash; '+unassigned.length+
+    '<div class="panel info"><h3>Unassigned &mdash; '+unassigned.length+
     ' <span class="dim">(these will NOT be saved)</span></h3><table>'+
     '<tr><th>name</th><th>phone</th><th class="num">km</th><th>location</th><th>send to</th></tr>'+
     unassigned.slice().sort((a,b)=>roadPair(KITCHEN,a.coord).km-roadPair(KITCHEN,b.coord).km)
@@ -1049,62 +1147,180 @@ function render(){
         '<td><select onchange="assignFromPool(\''+c.phone+'\',this)">'+
           '<option value="">route…</option>'+
           routes.map((o,oi)=>'<option value="'+oi+'">'+esc(o.name)+'</option>').join('')+
-        '</select> <button onclick="poolToNewRoute(\''+c.phone+'\')">new route</button></td></tr>').join('')+
+        '</select> <button class="btn alt sm" onclick="poolToNewRoute(\''+c.phone+'\')">new route</button></td></tr>').join('')+
     '</table></div>'
   ) : '';
 
-  let lastSlot = null;
-  $('routes').innerHTML = routes.map((r,i)=>{
-    const m=r.m, bad=!fits(m);
-    let head = '';
-    if (r.slot !== lastSlot){
-      const n = routes.filter(x=>x.slot===r.slot).reduce((s,x)=>s+x.m.parcels,0);
-      head = '<h2 class="slothead">'+esc(r.slot||'Unassigned slot')+
-             ' &mdash; '+routes.filter(x=>x.slot===r.slot).length+' routes, '+n+' parcels</h2>';
-      lastSlot = r.slot;
-    }
-    return head + '<div class="route'+(bad?' over':'')+'">'+
-      '<div class="rhead">'+
-        '<span class="rname" title="click to rename" onclick="renameRoute('+i+')">'+esc(r.name)+'</span>'+
+  if (!routes.length){ $('routes').innerHTML = ''; return; }
+
+  const slots = SLOT_ORDER.filter(s => routes.some(r=>r.slot===s));
+  $('routes').innerHTML = slots.map(s=>{
+    const rs = routes.filter(r=>r.slot===s);
+    const p  = rs.reduce((a,r)=>a+r.m.parcels,0);
+    const km = rs.reduce((a,r)=>a+r.m.km,0);
+    const bad = rs.filter(r=>!fits(r.m)).length;
+    const noAgent = rs.filter(r=>!r.agent).length;
+    return '<div class="slotcard" onclick="go(\'slot\',\''+s+'\')">'+
+      '<div class="sc-top"><span class="sc-name">'+esc(s)+'</span>'+
+        '<span class="dim">'+rs.length+' route'+(rs.length>1?'s':'')+' &rsaquo;</span></div>'+
+      '<div class="sc-sub">'+p+' parcels &middot; '+km.toFixed(1)+' km driven</div>'+
+      '<div class="chips">'+
+        (bad ? '<span class="chip bad">'+bad+' over limit</span>' : '<span class="chip ok">all within limits</span>')+
+        (noAgent ? '<span class="chip">'+noAgent+' without an agent</span>' : '<span class="chip ok">agents assigned</span>')+
+      '</div></div>';
+  }).join('');
+}
+
+/* ---------- screen 2: routes in a slot ---------- */
+function renderSlot(){
+  $('notRouted').innerHTML = ''; $('pool').innerHTML = '';
+  const s = view.slot;
+  const idxs = routes.map((r,i)=>i).filter(i=>routes[i].slot===s);
+
+  $('routes').innerHTML =
+    '<span class="back" onclick="go(\'summary\')">&lsaquo; All slots</span>'+
+    '<div class="panel"><h3>'+esc(s)+' &mdash; '+idxs.length+' routes, '+
+      idxs.reduce((a,i)=>a+routes[i].m.parcels,0)+' parcels</h3>'+
+      '<div class="hint">Tap a route to see its stops, set the agent and send it to the rider.</div></div>'+
+    idxs.map(i=>{
+      const r = routes[i], m = r.m, bad = !fits(m);
+      return '<div class="routecard'+(bad?' over':'')+'" onclick="go(\'route\',\''+s+'\','+i+')">'+
+        '<div class="sc-top"><span class="rc-name">'+esc(r.name)+'</span>'+
+          '<span class="dim">'+(r.agent ? esc(r.agent) : 'no agent')+' &rsaquo;</span></div>'+
+        '<div class="chips">'+
+          chip(m.parcels+' parcels', m.parcels>num('maxP'))+
+          chip(m.km.toFixed(1)+' km driven', num('maxTotKm')>0 && m.km>num('maxTotKm'))+
+          chip(Math.round(m.total)+' min', m.total>num('maxMin'))+
+          chip('reaches '+m.lastKm.toFixed(1)+' km', num('maxKm')>0 && m.lastKm>num('maxKm'))+
+          chip('longest hop '+m.maxLeg.toFixed(1)+' km', num('maxLegKm')>0 && m.maxLeg>num('maxLegKm'))+
+          chip(m.kmpp.toFixed(2)+' km/p')+
+        '</div></div>';
+    }).join('');
+}
+
+/* ---------- screen 3: one route ---------- */
+function renderRoute(){
+  $('notRouted').innerHTML = ''; $('pool').innerHTML = '';
+  const i = view.idx, r = routes[i], m = r.m, bad = !fits(m);
+
+  const agentOpts = ['<option value="">— agent —</option>']
+    .concat(agents.map(a=>'<option value="'+esc(a.name)+'"'+
+       (a.name===r.agent?' selected':'')+'>'+esc(a.name)+'</option>'))
+    .concat('<option value="__new">+ new agent</option>').join('');
+
+  $('routes').innerHTML =
+    '<span class="back" onclick="go(\'slot\',\''+esc(r.slot)+'\')">&lsaquo; '+esc(r.slot)+' routes</span>'+
+
+    '<div class="panel'+(bad?' bad':'')+'">'+
+      '<div class="sc-top">'+
+        '<span class="rc-name" style="cursor:text" title="click to rename" onclick="renameRoute('+i+')">'+esc(r.name)+'</span>'+
+        '<select onchange="pickAgent('+i+',this)">'+agentOpts+'</select>'+
+      '</div>'+
+      '<div class="chips">'+
         chip(m.parcels+' parcels', m.parcels>num('maxP'))+
         chip(m.km.toFixed(1)+' km driven', num('maxTotKm')>0 && m.km>num('maxTotKm'))+
         chip(Math.round(m.total)+' min', m.total>num('maxMin'))+
         chip('reaches '+m.lastKm.toFixed(1)+' km', num('maxKm')>0 && m.lastKm>num('maxKm'))+
         chip('longest hop '+m.maxLeg.toFixed(1)+' km', num('maxLegKm')>0 && m.maxLeg>num('maxLegKm'))+
-        chip(m.kmpp.toFixed(2)+' km/p')+
-        '<span class="spacer"></span>'+
-        '<select onchange="pickAgent('+i+',this)">'+agentOptsFor(r.agent)+'</select>'+
-        '<div class="split">'+
-          '<button onclick="toggleAdd('+i+')">'+(addOpen===i?'Close':'+ Add')+'</button>'+
-          '<button onclick="autoSplit('+i+',4)">Split /4</button>'+
-          '<button onclick="manualSplit('+i+')">Split picked</button>'+
-          (routes.length>1 ? '<select onchange="mergeInto('+i+',this)">'+
-             '<option value="">merge into…</option>'+
-             routes.map((o,oi)=>oi===i?'':'<option value="'+oi+'">'+esc(o.name)+'</option>').join('')+
-           '</select>' : '')+
-        '</div>'+
       '</div>'+
-      '<div class="rbody">'+
-        (addOpen===i ? '<div class="addpanel">'+
-           '<input id="addSearch" placeholder="search name or phone…" oninput="onAddFilter(this.value)">'+
-           '<div id="addList" class="addlist">'+addListHtml(i)+'</div></div>' : '')+
-        '<table>'+
-        '<tr><th class="num">#</th><th></th><th>name</th><th>phone</th><th>zone</th>'+
-        '<th class="num">leg km</th><th class="num">from kitchen</th><th>location</th><th></th></tr>'+
-        inDriveOrder(r).map(x=>{
-          const c=x.c, z=(zoneMap[ptKey(c.coord)]||{}).zone||'—';
-          return '<tr'+(x.same?' class="same"':'')+'>'+
-            '<td class="num">'+(x.same?'&#8226;':x.stop)+'</td>'+
-            '<td><input type="checkbox" class="pick" data-r="'+i+'" data-p="'+c.phone+'"></td>'+
-            '<td>'+esc(c.name)+'</td><td>'+c.phone+'</td>'+
-            '<td><span class="pill">'+z+'</span></td>'+
-            '<td class="num">'+(x.same?'—':x.legKm.toFixed(1))+'</td>'+
-            '<td class="num">'+roadPair(KITCHEN,c.coord).km.toFixed(1)+'</td>'+
-            '<td>'+esc(c.location||'')+'</td>'+
-            '<td><button class="x" title="remove from route" onclick="removeClient('+i+',\''+c.phone+'\')">&times;</button></td></tr>';
-        }).join('')+
-      '</table></div></div>';
-  }).join('');
+      '<div class="actrow">'+
+        '<button class="btn alt sm" onclick="toggleAdd('+i+')">'+(addOpen===i?'Close':'+ Add client')+'</button>'+
+        '<button class="btn alt sm" onclick="autoSplit('+i+',4)">Split into 4s</button>'+
+        '<button class="btn alt sm" onclick="manualSplit('+i+')">Move ticked out</button>'+
+        (routes.filter(x=>x.slot===r.slot).length>1
+          ? '<select onchange="mergeInto('+i+',this)"><option value="">merge into…</option>'+
+            routes.map((o,oi)=>(oi===i||o.slot!==r.slot)?'':'<option value="'+oi+'">'+esc(o.name)+'</option>').join('')+
+            '</select>' : '')+
+      '</div>'+
+    '</div>'+
+
+    (addOpen===i ? '<div class="panel"><div class="addpanel">'+
+       '<input id="addSearch" placeholder="search name or phone…" oninput="onAddFilter(this.value)">'+
+       '<div id="addList" class="addlist">'+addListHtml(i)+'</div></div></div>' : '')+
+
+    '<div class="panel"><h3>Stops in delivery order</h3><table>'+
+      '<tr><th class="num">#</th><th></th><th>name</th><th>phone</th><th>zone</th>'+
+      '<th class="num">leg km</th><th>location</th><th></th></tr>'+
+      inDriveOrder(r).map(x=>{
+        const c=x.c, z=(zoneMap[ptKey(c.coord)]||{}).zone||'—';
+        return '<tr'+(x.same?' class="same"':'')+'>'+
+          '<td class="num">'+(x.same?'&#8226;':x.stop)+'</td>'+
+          '<td><input type="checkbox" class="pick" data-r="'+i+'" data-p="'+c.phone+'"></td>'+
+          '<td>'+esc(c.name)+'</td><td>'+c.phone+'</td>'+
+          '<td><span class="pill">'+z+'</span></td>'+
+          '<td class="num">'+(x.same?'—':x.legKm.toFixed(1))+'</td>'+
+          '<td>'+esc(c.location||'')+'</td>'+
+          '<td><button class="rowx" title="remove from route" onclick="removeClient('+i+',\''+c.phone+'\')">&times;</button></td></tr>';
+      }).join('')+
+    '</table></div>'+
+
+    '<div class="panel"><h3>Message for the rider</h3>'+
+      '<div class="msgbox" id="msgBox">'+esc(routeMessage(r))+'</div>'+
+      '<div class="actrow">'+
+        '<button class="btn alt" onclick="copyRouteMsg()">Copy</button>'+
+        '<button class="btn wa" onclick="shareRouteMsg()">Share on WhatsApp</button>'+
+      '</div>'+
+      '<div class="hint">Each stop is numbered in delivery order with a map link. Distances are real Google road distances.</div>'+
+    '</div>';
+}
+
+/* ---------- the rider's message ---------- */
+function mapLink(c){
+  return 'https://www.google.com/maps/search/?api=1&query='
+       + c.lat.toFixed(6) + '%2C' + c.lng.toFixed(6);
+}
+
+function routeMessage(r){
+  const lines = [];
+  lines.push(r.name + ' — ' + r.slot + ' — ' + $('date').value);
+  if (r.agent) lines.push('Agent: ' + r.agent + (r.agentPhone ? ' (' + r.agentPhone + ')' : ''));
+  lines.push('');
+
+  inDriveOrder(r).forEach(x=>{
+    const c = x.c;
+    if (x.same){
+      lines.push('    • ' + c.name + ' — ' + c.phone);
+    } else {
+      lines.push(x.stop + '. ' + c.name + ' — ' + c.phone);
+      if (c.location) lines.push('   ' + c.location);
+      lines.push('   ' + mapLink(c.coord));
+    }
+  });
+
+  lines.push('');
+  lines.push('Total: ' + r.m.parcels + ' parcels, '
+    + r.m.km.toFixed(1) + ' km, about ' + Math.round(r.m.total) + ' min');
+  return lines.join('\n');
+}
+
+function copyRouteMsg(){
+  const t = routeMessage(routes[view.idx]);
+  const done = ok => toast(ok ? 'Copied to clipboard' : 'Copy failed — long-press the text to copy');
+  if (navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(t).then(()=>done(true)).catch(()=>done(fallbackCopy(t)));
+  } else done(fallbackCopy(t));
+}
+function fallbackCopy(text){
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.position='fixed'; ta.style.opacity='0';
+    document.body.appendChild(ta); ta.focus(); ta.select();
+    const ok = document.execCommand('copy'); document.body.removeChild(ta);
+    return ok;
+  } catch(e){ return false; }
+}
+function shareRouteMsg(){
+  const r = routes[view.idx];
+  const text = routeMessage(r);
+  const phone = String(r.agentPhone||'').replace(/\D/g,'');
+  const to = phone ? (phone.length === 10 ? '91'+phone : phone) : '';
+  window.open('https://wa.me/' + to + '?text=' + encodeURIComponent(text), '_blank');
+}
+
+function toast(msg){
+  const t = $('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 1900);
 }
 
 /* Rows in the order the rider actually drives them. Several parcels at one
@@ -1128,7 +1344,6 @@ function inDriveOrder(r){
     prev = p;
   });
 
-  // anything the tour did not place, so it can never be silently dropped
   Object.keys(byPt).forEach(k=>{
     byPt[k].forEach((c,gi)=> out.push({ c, stop:'?', legKm:0, same: gi>0 }));
   });
@@ -1146,6 +1361,7 @@ function pickAgent(i, sel){
   routes[i].agent = sel.value;
   const a = agents.find(x=>(x.name||x)===sel.value);
   routes[i].agentPhone = (a && a.phone) || '';
+  render();
 }
 
 /* readAgents_ returns an object keyed by route, and one person can cover
@@ -1166,6 +1382,7 @@ function normAgents(raw){
 const chip = (t,bad) => '<span class="chip'+(bad?' bad':'')+'">'+t+'</span>';
 const cardEl = (n,l,cls) => '<div class="card '+(cls||'')+'"><div class="n">'+n+'</div><div class="l">'+l+'</div></div>';
 const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
 </script>
 <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCqVJgCfV0C1KBF0u1Jc02p_RHE7K7g1V8" async defer></script>
 </body>
