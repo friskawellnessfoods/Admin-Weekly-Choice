@@ -84,9 +84,19 @@
   .card.bad .n{ color:var(--bad); } .card.ok .n{ color:var(--ok); } .card.info .n{ color:var(--grad-b); }
 
   .slotcard, .routecard{ background:var(--c-surface); border:1px solid var(--c-line); border-radius:var(--radius);
-    box-shadow:var(--shadow); padding:16px; margin-bottom:12px; cursor:pointer; transition:border-color .15s, transform .08s; }
-  .slotcard:hover, .routecard:hover{ border-color:var(--c-primary); }
-  .slotcard:active, .routecard:active{ transform:translateY(1px); }
+    box-shadow:var(--shadow); margin-bottom:12px; transition:border-color .15s; }
+  .slotcard{ padding:16px; cursor:pointer; }
+  .slotcard:hover{ border-color:var(--c-primary); }
+  .slotcard:active{ transform:translateY(1px); }
+
+  .rc-head{ padding:14px 16px; cursor:pointer; user-select:none; }
+  .rc-head:hover{ background:#f8fafc; }
+  .routecard.open{ border-color:var(--c-primary); }
+  .routecard.open .rc-head{ border-bottom:1px solid var(--c-line); background:#f8fafc; }
+  .rc-body{ padding:14px 16px 16px; }
+  .chev{ font-size:11px; margin-left:4px; }
+  .msghead{ font-size:10.5px; color:var(--c-muted); text-transform:uppercase; letter-spacing:.06em;
+    font-weight:700; margin:16px 0 8px; }
   .sc-top{ display:flex; align-items:baseline; justify-content:space-between; gap:10px; }
   .sc-name{ font-size:18px; font-weight:800; color:var(--c-primary-d); }
   .rc-name{ font-size:16px; font-weight:800; }
@@ -1080,13 +1090,14 @@ function renumber(){
  *   slot    -> one card per route in that slot
  *   route   -> the client list, with the rider's WhatsApp message
  * ================================================== */
-let view = { mode:'summary', slot:null, idx:null };
+let view = { mode:'summary', slot:null, open:null };
 
-function go(mode, slot, idx){
-  view = { mode, slot: slot==null?null:slot, idx: idx==null?null:idx };
+function go(mode, slot){
+  view = { mode, slot: slot==null?null:slot, open: null };
   render();
   window.scrollTo({ top:0, behavior:'smooth' });
 }
+
 
 /* chrome shared by every screen */
 function renderChrome(){
@@ -1122,9 +1133,8 @@ function renderChrome(){
 
 function render(){
   renderChrome();
-  if (view.mode === 'route' && routes[view.idx]) return renderRoute();
-  if (view.mode === 'slot'  && view.slot)        return renderSlot();
-  view = { mode:'summary', slot:null, idx:null };
+  if (view.mode === 'slot' && view.slot) return renderSlot();
+  view = { mode:'summary', slot:null, open:null };
   renderSummary();
 }
 
@@ -1173,7 +1183,14 @@ function renderSummary(){
   }).join('');
 }
 
-/* ---------- screen 2: routes in a slot ---------- */
+/* ---------- screen 2: routes in a slot, one expanding inline ---------- */
+function toggleRoute(i){
+  const name = routes[i] && routes[i].name;
+  view.open = (view.open === name) ? null : name;
+  render();
+}
+function isOpen(i){ return !!routes[i] && routes[i].name === view.open; }
+
 function renderSlot(){
   $('notRouted').innerHTML = ''; $('pool').innerHTML = '';
   const s = view.slot;
@@ -1183,64 +1200,54 @@ function renderSlot(){
     '<span class="back" onclick="go(\'summary\')">&lsaquo; All slots</span>'+
     '<div class="panel"><h3>'+esc(s)+' &mdash; '+idxs.length+' routes, '+
       idxs.reduce((a,i)=>a+routes[i].m.parcels,0)+' parcels</h3>'+
-      '<div class="hint">Tap a route to see its stops, set the agent and send it to the rider.</div></div>'+
+      '<div class="hint">Tap a route to open its stops, set the agent and send it to the rider.</div></div>'+
     idxs.map(i=>{
-      const r = routes[i], m = r.m, bad = !fits(m);
-      return '<div class="routecard'+(bad?' over':'')+'" onclick="go(\'route\',\''+s+'\','+i+')">'+
-        '<div class="sc-top"><span class="rc-name">'+esc(r.name)+'</span>'+
-          '<span class="dim">'+(r.agent ? esc(r.agent) : 'no agent')+' &rsaquo;</span></div>'+
-        '<div class="chips">'+
-          chip(m.parcels+' parcels', m.parcels>num('maxP'))+
-          chip(m.km.toFixed(1)+' km driven', num('maxTotKm')>0 && m.km>num('maxTotKm'))+
-          chip(Math.round(m.total)+' min', m.total>num('maxMin'))+
-          chip('reaches '+m.lastKm.toFixed(1)+' km', num('maxKm')>0 && m.lastKm>num('maxKm'))+
-          chip('longest hop '+m.maxLeg.toFixed(1)+' km', num('maxLegKm')>0 && m.maxLeg>num('maxLegKm'))+
-          chip(m.kmpp.toFixed(2)+' km/p')+
-        '</div></div>';
+      const r = routes[i], m = r.m, bad = !fits(m), open = isOpen(i);
+      return '<div class="routecard'+(bad?' over':'')+(open?' open':'')+'">'+
+        '<div class="rc-head" onclick="toggleRoute('+i+')">'+
+          '<div class="sc-top"><span class="rc-name">'+esc(r.name)+'</span>'+
+            '<span class="dim">'+(r.agent ? esc(r.agent) : 'no agent')+
+            ' <span class="chev">'+(open?'&#9652;':'&#9662;')+'</span></span></div>'+
+          '<div class="chips">'+
+            chip(m.parcels+' parcels', m.parcels>num('maxP'))+
+            chip(m.km.toFixed(1)+' km driven', num('maxTotKm')>0 && m.km>num('maxTotKm'))+
+            chip(Math.round(m.total)+' min', m.total>num('maxMin'))+
+            chip('reaches '+m.lastKm.toFixed(1)+' km', num('maxKm')>0 && m.lastKm>num('maxKm'))+
+            chip('longest hop '+m.maxLeg.toFixed(1)+' km', num('maxLegKm')>0 && m.maxLeg>num('maxLegKm'))+
+            chip(m.kmpp.toFixed(2)+' km/p')+
+          '</div>'+
+        '</div>'+
+        (open ? '<div class="rc-body">'+routeDetail(i)+'</div>' : '')+
+      '</div>';
     }).join('');
 }
 
-/* ---------- screen 3: one route ---------- */
-function renderRoute(){
-  $('notRouted').innerHTML = ''; $('pool').innerHTML = '';
-  const i = view.idx, r = routes[i], m = r.m, bad = !fits(m);
+/* the expanded contents of one route card */
+function routeDetail(i){
+  const r = routes[i];
 
   const agentOpts = ['<option value="">— agent —</option>']
     .concat(agents.map(a=>'<option value="'+esc(a.name)+'"'+
        (a.name===r.agent?' selected':'')+'>'+esc(a.name)+'</option>'))
     .concat('<option value="__new">+ new agent</option>').join('');
 
-  $('routes').innerHTML =
-    '<span class="back" onclick="go(\'slot\',\''+esc(r.slot)+'\')">&lsaquo; '+esc(r.slot)+' routes</span>'+
-
-    '<div class="panel'+(bad?' bad':'')+'">'+
-      '<div class="sc-top">'+
-        '<span class="rc-name" style="cursor:text" title="click to rename" onclick="renameRoute('+i+')">'+esc(r.name)+'</span>'+
-        '<select onchange="pickAgent('+i+',this)">'+agentOpts+'</select>'+
-      '</div>'+
-      '<div class="chips">'+
-        chip(m.parcels+' parcels', m.parcels>num('maxP'))+
-        chip(m.km.toFixed(1)+' km driven', num('maxTotKm')>0 && m.km>num('maxTotKm'))+
-        chip(Math.round(m.total)+' min', m.total>num('maxMin'))+
-        chip('reaches '+m.lastKm.toFixed(1)+' km', num('maxKm')>0 && m.lastKm>num('maxKm'))+
-        chip('longest hop '+m.maxLeg.toFixed(1)+' km', num('maxLegKm')>0 && m.maxLeg>num('maxLegKm'))+
-      '</div>'+
-      '<div class="actrow">'+
-        '<button class="btn alt sm" onclick="toggleAdd('+i+')">'+(addOpen===i?'Close':'+ Add client')+'</button>'+
-        '<button class="btn alt sm" onclick="autoSplit('+i+',4)">Split into 4s</button>'+
-        '<button class="btn alt sm" onclick="manualSplit('+i+')">Move ticked out</button>'+
-        (routes.filter(x=>x.slot===r.slot).length>1
-          ? '<select onchange="mergeInto('+i+',this)"><option value="">merge into…</option>'+
-            routes.map((o,oi)=>(oi===i||o.slot!==r.slot)?'':'<option value="'+oi+'">'+esc(o.name)+'</option>').join('')+
-            '</select>' : '')+
-      '</div>'+
+  return '<div class="actrow">'+
+      '<select onchange="pickAgent('+i+',this)">'+agentOpts+'</select>'+
+      '<button class="btn alt sm" onclick="renameRoute('+i+')">Rename</button>'+
+      '<button class="btn alt sm" onclick="toggleAdd('+i+')">'+(addOpen===i?'Close':'+ Add client')+'</button>'+
+      '<button class="btn alt sm" onclick="autoSplit('+i+',4)">Split into 4s</button>'+
+      '<button class="btn alt sm" onclick="manualSplit('+i+')">Move ticked out</button>'+
+      (routes.filter(x=>x.slot===r.slot).length>1
+        ? '<select onchange="mergeInto('+i+',this)"><option value="">merge into…</option>'+
+          routes.map((o,oi)=>(oi===i||o.slot!==r.slot)?'':'<option value="'+oi+'">'+esc(o.name)+'</option>').join('')+
+          '</select>' : '')+
     '</div>'+
 
-    (addOpen===i ? '<div class="panel"><div class="addpanel">'+
+    (addOpen===i ? '<div class="addpanel">'+
        '<input id="addSearch" placeholder="search name or phone…" oninput="onAddFilter(this.value)">'+
-       '<div id="addList" class="addlist">'+addListHtml(i)+'</div></div></div>' : '')+
+       '<div id="addList" class="addlist">'+addListHtml(i)+'</div></div>' : '')+
 
-    '<div class="panel"><h3>Stops in delivery order</h3><table>'+
+    '<table>'+
       '<tr><th class="num">#</th><th></th><th>name</th><th>phone</th><th>zone</th>'+
       '<th class="num">leg km</th><th>location</th><th></th></tr>'+
       inDriveOrder(r).map(x=>{
@@ -1254,15 +1261,13 @@ function renderRoute(){
           '<td>'+esc(c.location||'')+'</td>'+
           '<td><button class="rowx" title="remove from route" onclick="removeClient('+i+',\''+c.phone+'\')">&times;</button></td></tr>';
       }).join('')+
-    '</table></div>'+
+    '</table>'+
 
-    '<div class="panel"><h3>Message for the rider</h3>'+
-      '<div class="msgbox" id="msgBox">'+esc(routeMessage(r))+'</div>'+
-      '<div class="actrow">'+
-        '<button class="btn alt" onclick="copyRouteMsg()">Copy</button>'+
-        '<button class="btn wa" onclick="shareRouteMsg()">Share on WhatsApp</button>'+
-      '</div>'+
-      '<div class="hint">Each stop is numbered in delivery order with a map link. Distances are real Google road distances.</div>'+
+    '<div class="msghead">Message for the rider</div>'+
+    '<div class="msgbox">'+esc(routeMessage(r))+'</div>'+
+    '<div class="actrow">'+
+      '<button class="btn alt sm" onclick="copyRouteMsg('+i+')">Copy</button>'+
+      '<button class="btn wa sm" onclick="shareRouteMsg('+i+')">Share on WhatsApp</button>'+
     '</div>';
 }
 
@@ -1295,8 +1300,8 @@ function routeMessage(r){
   return lines.join('\n');
 }
 
-function copyRouteMsg(){
-  const t = routeMessage(routes[view.idx]);
+function copyRouteMsg(i){
+  const t = routeMessage(routes[i]);
   const done = ok => toast(ok ? 'Copied to clipboard' : 'Copy failed — long-press the text to copy');
   if (navigator.clipboard && navigator.clipboard.writeText){
     navigator.clipboard.writeText(t).then(()=>done(true)).catch(()=>done(fallbackCopy(t)));
@@ -1311,8 +1316,8 @@ function fallbackCopy(text){
     return ok;
   } catch(e){ return false; }
 }
-function shareRouteMsg(){
-  const r = routes[view.idx];
+function shareRouteMsg(i){
+  const r = routes[i];
   const text = routeMessage(r);
   const phone = String(r.agentPhone||'').replace(/\D/g,'');
   const to = phone ? (phone.length === 10 ? '91'+phone : phone) : '';
