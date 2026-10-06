@@ -439,14 +439,34 @@ function packOneSlot(rows){
 
   while (left.size && guard++ < 500){
 
-    // nearest remaining zone, measured to its closest point
-    let bestZone = null, bestD = Infinity;
+    // Shortlist the zones that are genuinely near where we are, then pick the
+    // one that adds the LEAST total distance to the route. Judging only by the
+    // nearest point is myopic: two zones can start the same distance away and
+    // cost very different amounts once their whole contents are absorbed.
+    let bestD = Infinity;
+    const reach = [];
     left.forEach(z=>{
+      let near = Infinity;
       byZone[z].forEach(r=>{
         const d = roadPair(from, r.coord).km;
-        if (isFinite(d) && d < bestD){ bestD = d; bestZone = z; }
+        if (isFinite(d) && d < near) near = d;
       });
+      if (isFinite(near)){ reach.push({ zone:z, near }); if (near < bestD) bestD = near; }
     });
+
+    // anything within twice the closest, or 3 km of it, is a fair candidate
+    const cutoff = Math.max(bestD * 2, bestD + 3);
+    const shortlist = reach.filter(x => x.near <= cutoff);
+
+    let bestZone = null, bestCost = Infinity;
+    const baseKm = cur.length ? measure(cur).km : 0;
+    shortlist.forEach(x=>{
+      const cost = measure(cur.concat(byZone[x.zone])).km - baseKm;
+      if (cost < bestCost - 1e-9 || (Math.abs(cost - bestCost) < 1e-9 && x.near < bestD)){
+        bestCost = cost; bestZone = x.zone;
+      }
+    });
+    if (!bestZone && reach.length) bestZone = reach[0].zone;
 
     // nothing measured within reach of where we are: that is a genuinely
     // isolated stop, so close this route and start again from the kitchen
@@ -575,19 +595,22 @@ function buildAndRender(){
     render();
     $('rebuild').disabled = true;
     $('save').disabled = true;
-    $('routes').innerHTML =
-      '<div class="note live"><b>' + need.length + ' legs not measured.</b> '
-      + 'Routes are not built from estimates, so nothing is shown yet. '
-      + 'Press <b>Measure distances</b> to fetch them from Google — they are cached '
-      + 'permanently, so this is a one-time cost for these locations.<br><br>'
-      + 'Only legs within <b>' + num('nearKm') + ' km</b> or inside the same zone are bought. '
-      + 'Raising that number measures more and costs more.<br><br>'
-      + '<button class="go" onclick="document.getElementById(\'measure\').click()">Measure now</button>'
-      + '</div>';
-    setStatus(clients.length + ' parcels loaded. ' + need.length + ' legs need measuring.  ' + cacheNote);
-    // one click instead of two: ask about measuring right away, but only once
-    // per load so a declined prompt does not keep reappearing
-    if (!autoMeasured){ autoMeasured = true; setTimeout(()=>$('measure').click(), 200); }
+
+    // Measuring runs by itself, so this is a progress state, not a prompt.
+    // A panel only appears if measuring has already been tried and the legs
+    // are still missing — that is a real failure worth stopping on.
+    if (!autoMeasured){
+      autoMeasured = true;
+      $('routes').innerHTML = '';
+      setStatus(clients.length + ' parcels loaded. Measuring ' + need.length + ' legs…  ' + cacheNote);
+      setTimeout(()=>$('measure').click(), 50);
+    } else {
+      $('routes').innerHTML =
+        '<div class="note live"><b>' + need.length + ' legs could not be measured.</b> '
+        + 'Routes are not built from estimates, so nothing is shown. '
+        + 'Check that Google Maps loaded and that saveRoadCache is wired up in doPost.</div>';
+      setStatus(need.length + ' legs still unmeasured after trying.  ' + cacheNote);
+    }
     return;
   }
 
