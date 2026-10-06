@@ -707,6 +707,7 @@ function buildAndRender(){
     // are still missing — that is a real failure worth stopping on.
     if (!autoMeasured){
       autoMeasured = true;
+      document.body.className = 'working';
       $('routes').innerHTML = '';
       setStatus(clients.length + ' parcels loaded. Measuring ' + need.length + ' legs…  ' + cacheNote);
       setTimeout(()=>$('measure').click(), 50);
@@ -721,6 +722,7 @@ function buildAndRender(){
   }
 
   routes = packRoutes(clients);
+  document.body.className = 'working';   // reveal the content area
 
   // Second pass: the packer decided WHO travels together using nearby legs
   // only. Now buy every leg inside each route so the order within it can be
