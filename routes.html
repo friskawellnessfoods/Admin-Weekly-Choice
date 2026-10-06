@@ -133,13 +133,14 @@
     <label title="points closer than this ride together in one zone">zone radius km <input type="number" id="zr" value="2.5" min="0.2" step="0.1"></label>
     <label title="only buy distances between points this close. A spending limit, not a routing rule.">measure within km <input type="number" id="nearKm" value="6" min="1" step="0.5"></label>
     <label title="refuse a route containing a single hop longer than this. 0 = no limit.">max leg km <input type="number" id="maxLegKm" value="0" min="0" step="0.5"></label>
+    <button class="go" id="saveSettings">Save settings for everyone</button>
     <button id="measure">Measure distances</button>
     <button class="warn" id="rebuild" disabled>Rebuild zones</button>
   </div>
   <div class="advrow">
     <label style="flex:1">web app URL <input type="text" id="api" placeholder="/exec URL — normally taken from config.js" style="width:100%"></label>
   </div>
-  <div class="hint">Limits apply the next time you press Build routes. Zone radius and measure-within only take effect when you measure or rebuild.</div>
+  <div class="hint">Saved settings live in the spreadsheet, so every device and the automatic 6am run use the same rules. Limits apply the next time you press Build routes; zone radius and measure-within take effect when you measure or rebuild.</div>
 </div>
 
 <div id="modeNote"></div>
@@ -157,6 +158,7 @@ const SECTORS = ['N','NE','E','SE','S','SW','W','NW'];
 const SLOT_ORDER  = ['Morning','Afternoon','Evening'];
 const SLOT_PREFIX = { Morning:'M', Afternoon:'A', Evening:'E' };
 const slotsWanted = () => $('slot').value ? [$('slot').value] : SLOT_ORDER;
+const LIMIT_FIELDS = ['maxP','maxTotKm','maxKm','maxLegKm','maxMin','stopMin','zr','nearKm'];
 
 /* A missing element used to throw and blank the page. Return a harmless stub
    instead, so a UI change can never take the whole tool down. */
@@ -178,6 +180,19 @@ $('date').value = n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'
 /* Measure needs the day's client list, so it loads first if you have not. */
 $('date').addEventListener('change', ()=>{ $('measure').disabled = false; });
 $('measure').disabled = false;
+
+$('saveSettings').addEventListener('click', async () => {
+  const payload = {};
+  LIMIT_FIELDS.forEach(k=>{ payload[k] = num(k); });
+  $('saveSettings').disabled = true;
+  try {
+    const res = await api('setRouteLimits', { limits: JSON.stringify(payload) });
+    setStatus(res && res.ok
+      ? 'Settings saved. Every device and the automatic run now use these limits.'
+      : 'Could not save settings: ' + JSON.stringify(res));
+  } catch(e){ setStatus('Could not save settings: ' + e.message); }
+  $('saveSettings').disabled = false;
+});
 
 $('advToggle').addEventListener('click', ()=>{
   const a = $('adv');
@@ -526,6 +541,12 @@ async function load(){
 
     const geo   = (boot.geo && boot.geo.geo) || {};
     zoneMap     = (boot.zones && boot.zones.zones) || {};
+
+    // settings are stored in the spreadsheet, not the browser, so the rules are
+    // identical on every device and in the automatic run
+    if (boot.limits){
+      LIMIT_FIELDS.forEach(k=>{ if (boot.limits[k] != null) $(k).value = boot.limits[k]; });
+    }
     agents      = normAgents((boot.agents && boot.agents.agents) || []);
 
     const want = slotsWanted();
