@@ -176,7 +176,7 @@
     <div class="card">
       <h2 class="sec">Bill items</h2>
       <table class="lines"><thead><tr><th>Item</th><th>Qty</th><th>Rate</th><th>Price</th><th></th></tr></thead><tbody id="n_lines"></tbody></table>
-      <button class="add-line" id="n_addline">+ Add custom line</button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="add-line" id="n_addmeal">+ Add meal line (GST applies)</button><button class="add-line" id="n_addline">+ Add custom line (no GST)</button></div>
       <div class="grid g2" style="margin-top:16px">
         <div class="field"><label>Discount %</label><input id="n_disc" type="number" value="0" min="0" /></div>
         <div class="field"><label>GST % (food only)</label><input id="n_gst" type="number" value="5" min="0" /></div>
@@ -235,7 +235,7 @@
         <div class="field"><label>Days</label><input id="r_days" type="number" value="26" min="1" /></div>
       </div>
       <table class="lines" style="margin-top:14px"><thead><tr><th>Item</th><th>Qty</th><th>Rate</th><th>Price</th><th></th></tr></thead><tbody id="r_nextlines"></tbody></table>
-      <button class="add-line" id="r_addline">+ Add custom line</button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="add-line" id="r_addmeal">+ Add meal line (GST applies)</button><button class="add-line" id="r_addline">+ Add custom line (no GST)</button></div>
       <div class="grid g3" style="margin-top:16px">
         <div class="field"><label>Discount %</label><input id="r_disc" type="number" value="0" min="0" /></div>
         <div class="field"><label>GST % (food only)</label><input id="r_gst" type="number" value="5" min="0" /></div>
@@ -448,12 +448,12 @@ function computeRenew(data,name,prev){
 
 /* line table */
 function lineRowHtml(line,editable){
-  const editLbl=line.custom||editable;
+  const editLbl=line.custom||line.extra||editable;
   const lbl=editLbl
     ?`<input class="lbl-in" value="${(line.label||"").replace(/<[^>]*>/g,"").replace(/"/g,"&quot;")}" data-f="label">`
     :`<span style="font-weight:600" data-meal="${line._meal||""}" data-plans="${line._plans||""}" data-dur="${line._dur||""}" data-days="${line._days||""}">${line.label}</span>`;
-  const rm=(line.custom||editable)?`<button class="rm" data-rm>×</button>`:"";
-  return `<tr data-id="${line.id}" data-food="${line.food===false?0:1}" data-custom="${line.custom?1:0}"><td>${lbl}</td><td class="qtycol"><input type="number" min="0" value="${line.qty}" data-f="qty"></td><td class="ratecol"><input type="number" min="0" step="0.5" value="${line.rate}" data-f="rate"></td><td class="pricecol num" data-price>${money(line.qty*line.rate)}</td><td class="rmcol">${rm}</td></tr>`;
+  const rm=(line.custom||line.extra||editable)?`<button class="rm" data-rm>×</button>`:"";
+  return `<tr data-id="${line.id}" data-food="${line.food===false?0:1}" data-custom="${line.custom?1:0}" data-extra="${line.extra?1:0}"><td>${lbl}</td><td class="qtycol"><input type="number" min="0" value="${line.qty}" data-f="qty"></td><td class="ratecol"><input type="number" min="0" step="0.5" value="${line.rate}" data-f="rate"></td><td class="pricecol num" data-price>${money(line.qty*line.rate)}</td><td class="rmcol">${rm}</td></tr>`;
 }
 function renderLines(tbodyId,lines,editable){el(tbodyId).innerHTML=lines.map(l=>lineRowHtml(l,editable)).join("");}
 function readLines(tbodyId){
@@ -461,7 +461,7 @@ function readLines(tbodyId){
   el(tbodyId).querySelectorAll("tr").forEach(tr=>{
     const id=tr.getAttribute("data-id");const get=f=>tr.querySelector(`[data-f="${f}"]`);
     const labelEl=get("label");const label=labelEl?labelEl.value:(tr.querySelector("span")?tr.querySelector("span").textContent:"");
-    out.push({id,label,qty:parseFloat(get("qty").value)||0,rate:parseFloat(get("rate").value)||0,custom:tr.dataset.custom==="1",food:tr.dataset.food!=="0"});
+    out.push({id,label,qty:parseFloat(get("qty").value)||0,rate:parseFloat(get("rate").value)||0,custom:tr.dataset.custom==="1",extra:tr.dataset.extra==="1",food:tr.dataset.food!=="0"});
   });
   return out;
 }
@@ -511,6 +511,7 @@ function buildNewLines(resetQty,freshMains,freshJuice){
   const jx=chosen.includes("juice2x")?2:(chosen.includes("juice1x")?1:0);
   if(jx>0)out.push({id:"juices",label:"Juices",qty:freshJuice?days*jx:keepQ("juices",days*jx),rate:keepR("juices",plans.length?rate(plans[0],dur,"juice1"):gRate("juice1")),food:true});
   if(chosen.includes("seafood"))out.push({id:"seafood",label:"Seafood add-on",qty:keepQ("seafood",days),rate:keepR("seafood",gRate("seafood")),food:true});
+  Object.values(prev).filter(l=>l.extra).forEach(l=>out.push(l));   // extra meal lines (2nd plan for a couple etc) — food-rated, GST applies
   Object.values(prev).filter(l=>l.custom).forEach(l=>out.push(l));
   const delprice=parseFloat(el("n_delprice").value)||0;
   const slotNames=Array.from(el("n_slots").querySelectorAll("input:checked")).map(c=>c.value);const delLabel=slotNames.length?"Delivery · "+slotNames.join(" + "):"Delivery";
@@ -641,6 +642,8 @@ function reconstructNextLines(prev,days,slots,op){
   if(op.snack)out.push({id:"snack",label:"Snack",qty:days,rate:lockedRate(prev,"snack",rate(p0,dur,"snack")),food:true});
   if(op.juices)out.push({id:"juices",label:"Juices",qty:days*op.juices,rate:lockedRate(prev,"juices",rate(p0,dur,"juice1")),food:true});
   if(op.seafood)out.push({id:"seafood",label:"Seafood add-on",qty:days,rate:lockedRate(prev,"seafood",gRate("seafood")),food:true});
+  // carry forward any extra meal lines from the previous bill (e.g. a second plan for a couple), at their locked rate
+  if(prev&&prev.lineItems&&prev.lineItems.length)prev.lineItems.filter(l=>String(l.id||"").indexOf("meal_")===0).forEach(l=>out.push({id:l.id,label:l.label,qty:l.qty,rate:l.rate,food:true,extra:true}));
   out.push({id:"delivery",label:"Delivery",qty:days*slots,rate:prevDeliveryUnit(prev),food:false});
   return out;
 }
@@ -805,6 +808,7 @@ function resetNewBill(){
   el("n_km").value=0;el("n_delprice").value=0;
   el("n_disc").value=0;el("n_gst").value=5;
   el("n_billdate").value=keyOf(dateOnly(new Date()));
+  el("n_lines").innerHTML="";   // drop any added meal / custom lines too
   nRender(true,true,true);
   suggestBillNo("n_billno","n_start");
 }
@@ -1079,6 +1083,7 @@ el("n_km").addEventListener("input",()=>{el("n_delprice").value=money((parseFloa
 el("n_delprice").addEventListener("input",()=>nRender(false));
 el("n_disc").addEventListener("input",recalcNew);el("n_gst").addEventListener("input",recalcNew);
 bindLivePrice("n_lines",recalcNew);
+el("n_addmeal").addEventListener("click",()=>{el("n_lines").insertAdjacentHTML("beforeend",lineRowHtml({id:"meal_"+Date.now(),label:"High Protein · Lunch",qty:nDays(),rate:0,food:true,extra:true}));recalcNew();});
 el("n_addline").addEventListener("click",()=>{el("n_lines").insertAdjacentHTML("beforeend",lineRowHtml({id:"custom_"+Date.now(),label:"Custom item",qty:0,rate:0,food:true,custom:true}));recalcNew();});
 el("n_suggestno").addEventListener("click",async()=>{try{await fetchBills(true);suggestBillNo("n_billno","n_start");}catch(e){setStatus("n_status","Couldn't load Bills: "+e.message,"err");}});
 el("n_billdate").addEventListener("change",()=>refreshNum("n_billno","n_start"));
@@ -1097,6 +1102,7 @@ el("r_adjinput").addEventListener("input",recalcRenewNext);
 el("r_adjreset").addEventListener("click",()=>{if(!renewCtx)return;el("r_adjinput").value=money(renewCtx.computedAdj||0);recalcRenewNext();});
 el("r_start").addEventListener("change",()=>{renewDatesFromStart();refreshNum("r_billno","r_start");});
 el("r_days").addEventListener("input",renewDatesFromStart);
+el("r_addmeal").addEventListener("click",()=>{el("r_nextlines").insertAdjacentHTML("beforeend",lineRowHtml({id:"meal_"+Date.now(),label:"High Protein · Lunch",qty:parseInt(el("r_days").value)||26,rate:0,food:true,extra:true}));recalcRenewNext();});
 el("r_addline").addEventListener("click",()=>{el("r_nextlines").insertAdjacentHTML("beforeend",lineRowHtml({id:"custom_"+Date.now(),label:"Custom item",qty:0,rate:0,food:true,custom:true}));recalcRenewNext();});
 el("r_billdate").addEventListener("change",()=>refreshNum("r_billno","r_start"));
 function gatherRenewMeta(){const p=renewCtx.prev;return {billNo:el("r_billno").value.trim(),billDate:readDate("r_billdate")||dateOnly(new Date()),client:p.client||"",phone:p.phone||"",plan:p.plan,duration:p.duration,slots:p.slots,days:parseInt(el("r_days").value)||26,start:readDate("r_start"),end:readDate("r_end"),discPct:parseFloat(el("r_disc").value)||0,gstPct:parseFloat(el("r_gst").value)||5,paidStatus:"Unpaid"};}
