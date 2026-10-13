@@ -189,6 +189,7 @@
       </div>
       <div class="actions">
         <button class="btn btn-ghost" id="n_save">Save to sheet</button>
+        <button class="btn btn-ghost" id="n_quote">Send as quote (no save)</button>
         <button class="btn btn-wa" id="n_wa">Bill image → WhatsApp</button>
       </div>
       <div class="status info" id="n_status">Choose what the client takes, set quantities, then save or send.</div>
@@ -248,6 +249,7 @@
       </div>
       <div class="actions">
         <button class="btn btn-ghost" id="r_save">Save to sheet</button>
+        <button class="btn btn-ghost" id="r_quote">Send as quote (no save)</button>
         <button class="btn btn-wa" id="r_wa">Bill image → WhatsApp</button>
       </div>
       <div class="status info" id="r_status2"></div>
@@ -682,7 +684,7 @@ function buildInvoice(meta,lines,t){
   if(t.delivery>0){const dl=lines.find(l=>l.id==="delivery");rows+=`<tr><td>Delivery</td><td>${dl?dl.qty:""}</td><td>${dl&&dl.rate?money(dl.rate):""}</td><td>${money(t.delivery)}</td></tr>`;}
   if(t.adjustment)rows+=`<tr class="sub"><td>Prev-cycle adjustment</td><td></td><td></td><td>${t.adjustment<0?'−':'+'}${money(Math.abs(t.adjustment))}</td></tr>`;
   el("invoice").innerHTML=`
-    <div class="ihead"><img src="${BIZ.logo}" onerror="this.style.display='none'"><div><h2>${BIZ.name}</h2><div class="tg">${BIZ.tagline}</div><div class="reg">${BIZ.address}<br>GST ${BIZ.gst} · FSSAI ${BIZ.fssai}</div></div><div class="invno"><div class="lab">Invoice</div><div class="no">${meta.billNo||""}</div></div></div>
+    <div class="ihead"><img src="${BIZ.logo}" onerror="this.style.display='none'"><div><h2>${BIZ.name}</h2><div class="tg">${BIZ.tagline}</div><div class="reg">${BIZ.address}<br>GST ${BIZ.gst} · FSSAI ${BIZ.fssai}</div></div><div class="invno"><div class="lab">${meta.quote?"Quotation":"Invoice"}</div><div class="no">${meta.quote?"":(meta.billNo||"")}</div></div></div>
     <div class="meta">
       <div class="cell"><div class="lab">Client</div><div class="val big">${meta.client||""}</div></div>
       <div class="cell"><div class="lab">Plan</div><div class="val">${meta.plan||""}</div></div>
@@ -691,23 +693,29 @@ function buildInvoice(meta,lines,t){
       <div class="cell"><div class="lab">Cycle end</div><div class="val">${dtstr(meta.end)}</div></div>
       <div class="cell"><div class="lab">Days</div><div class="val">${meta.days}</div></div></div>
     <table class="itab"><thead><tr><th>Description</th><th>Qty</th><th>Rate</th><th>Price</th></tr></thead><tbody>${rows}</tbody></table>
-    <div class="grand"><span class="gl">${meta.paidStatus==="Paid"?"Paid":"Total payable"}</span><span class="gv">₹${money(t.grand)}</span></div>
+    <div class="grand"><span class="gl">${meta.quote?"Estimated total":(meta.paidStatus==="Paid"?"Paid":"Total payable")}</span><span class="gv">₹${money(t.grand)}</span></div>
     <div class="bank"><div style="flex:1"><div class="upi">UPI : ${BIZ.upi}</div>${BIZ.acHolder}<br>A/C ${BIZ.acNumber} · ${BIZ.acType}</div><div style="flex:1">IFSC ${BIZ.ifsc}<br>${BIZ.branch}</div></div>
     <div class="footnote">*Please read all Terms &amp; Conditions on delivery timings, meal storage &amp; shelf life — refunds, substitutions &amp; cancellation policy on our website.</div>`;
 }
 function invoiceBlob(){return new Promise((resolve,reject)=>{html2canvas(el("invoice"),{scale:2,backgroundColor:"#ffffff"}).then(c=>c.toBlob(b=>b?resolve(b):reject(new Error("image failed")),"image/png")).catch(reject);});}
 function waPhone(p){const d=String(p||"").replace(/\D/g,"");if(!d)return "";return d.length>10?d.slice(-12):("91"+d.slice(-10));}
-function waMessage(client){return `Hi ${client||""}, your bill has been generated. Please process the payment at your earliest convenience. Thank you!`;}
+function waMessage(client,isQuote){
+  return isQuote
+    ? `Hi ${client||""}, here is your quote. Let us know if you'd like to go ahead and we'll confirm your plan. Thank you!`
+    : `Hi ${client||""}, your bill has been generated. Please process the payment at your earliest convenience. Thank you!`;
+}
 function showWaChatLink(statusId,meta){
   const ph=waPhone(meta.phone);
   const s=el(statusId);if(!s)return;
   if(!ph){s.innerHTML=`Image ready. <span class="subtle">No phone on file — can't open the chat automatically.</span>`;s.className="status info";return;}
-  const url=`https://wa.me/${ph}?text=${encodeURIComponent(waMessage(meta.client))}`;
-  s.innerHTML=`Image shared. <a href="${url}" target="_blank" rel="noopener" style="color:var(--accent);font-weight:700">Open ${meta.client||"client"}'s WhatsApp chat →</a>`;
+  const url=`https://wa.me/${ph}?text=${encodeURIComponent(waMessage(meta.client,meta.quote))}`;
+  s.innerHTML=`${meta.quote?"Quote":"Image"} shared${meta.quote?" (not saved to the sheet)":""}. <a href="${url}" target="_blank" rel="noopener" style="color:var(--accent);font-weight:700">Open ${meta.client||"client"}'s WhatsApp chat →</a>`;
   s.className="status ok";
 }
 async function sendWhatsApp(meta,t,statusId){
-  const blob=await invoiceBlob();const file=new File([blob],`Bill_${meta.billNo}.png`,{type:"image/png"});
+  const safe=String(meta.client||"client").replace(/[^A-Za-z0-9]+/g,"_");
+  const fname=meta.quote?`Quote_${safe}.png`:`Bill_${meta.billNo}.png`;
+  const blob=await invoiceBlob();const file=new File([blob],fname,{type:"image/png"});
   if(navigator.canShare&&navigator.canShare({files:[file]})){try{await navigator.share({files:[file]});if(statusId)showWaChatLink(statusId,meta);return;}catch(e){if(e&&e.name==="AbortError")return;}} // share image only, no text
   const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=file.name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1500);
   if(statusId)showWaChatLink(statusId,meta);
@@ -1089,6 +1097,13 @@ el("n_suggestno").addEventListener("click",async()=>{try{await fetchBills(true);
 el("n_billdate").addEventListener("change",()=>refreshNum("n_billno","n_start"));
 el("n_clear").addEventListener("click",()=>{resetNewBill();setStatus("n_status","Form cleared.","info");});
 el("n_save").addEventListener("click",async()=>{try{const meta=gatherNewMeta();const lines=readLines("n_lines");const t=computeTotals(lines,meta.discPct,meta.gstPct,0);await validateAndSave(meta,lines,t,"n_status");}catch(e){setStatus("n_status","Error: "+e.message,"err");}});
+el("n_quote").addEventListener("click",async()=>{try{
+  const meta=gatherNewMeta();meta.quote=true;
+  if(!meta.client){setStatus("n_status","Enter client name.","err");return;}
+  const lines=readLines("n_lines");const t=computeTotals(lines,meta.discPct,meta.gstPct,0);
+  setStatus("n_status","Building quote…","info");
+  buildInvoice(meta,lines,t);await sendWhatsApp(meta,t,"n_status");   // quote only — nothing written to the Bills sheet
+}catch(e){setStatus("n_status","Error: "+e.message,"err");}});
 el("n_wa").addEventListener("click",async()=>{try{const meta=gatherNewMeta();const lines=readLines("n_lines");const t=computeTotals(lines,meta.discPct,meta.gstPct,0);if(!await validateAndSave(meta,lines,t,"n_status"))return;buildInvoice(meta,lines,t);await sendWhatsApp(meta,t,"n_status");}catch(e){setStatus("n_status","Error: "+e.message,"err");}});
 
 el("r_fetch").addEventListener("click",()=>runRenew(false));
@@ -1107,6 +1122,13 @@ el("r_addline").addEventListener("click",()=>{el("r_nextlines").insertAdjacentHT
 el("r_billdate").addEventListener("change",()=>refreshNum("r_billno","r_start"));
 function gatherRenewMeta(){const p=renewCtx.prev;return {billNo:el("r_billno").value.trim(),billDate:readDate("r_billdate")||dateOnly(new Date()),client:p.client||"",phone:p.phone||"",plan:p.plan,duration:p.duration,slots:p.slots,days:parseInt(el("r_days").value)||26,start:readDate("r_start"),end:readDate("r_end"),discPct:parseFloat(el("r_disc").value)||0,gstPct:parseFloat(el("r_gst").value)||5,paidStatus:"Unpaid"};}
 el("r_save").addEventListener("click",async()=>{try{if(!renewCtx)return;const meta=gatherRenewMeta();const lines=readLines("r_nextlines");const t=computeTotals(lines,meta.discPct,meta.gstPct,renewAdj());await validateAndSave(meta,lines,t,"r_status2");}catch(e){setStatus("r_status2","Error: "+e.message,"err");}});
+el("r_quote").addEventListener("click",async()=>{try{
+  if(!renewCtx)return;
+  const meta=gatherRenewMeta();meta.quote=true;
+  const lines=readLines("r_nextlines");const t=computeTotals(lines,meta.discPct,meta.gstPct,renewAdj());
+  setStatus("r_status2","Building quote…","info");
+  buildInvoice(meta,lines,t);await sendWhatsApp(meta,t,"r_status2");   // quote only — nothing written to the Bills sheet
+}catch(e){setStatus("r_status2","Error: "+e.message,"err");}});
 el("r_wa").addEventListener("click",async()=>{try{if(!renewCtx)return;const meta=gatherRenewMeta();const lines=readLines("r_nextlines");const t=computeTotals(lines,meta.discPct,meta.gstPct,renewAdj());if(!await validateAndSave(meta,lines,t,"r_status2"))return;buildInvoice(meta,lines,t);await sendWhatsApp(meta,t,"r_status2");}catch(e){setStatus("r_status2","Error: "+e.message,"err");}});
 
 el("u_fetch").addEventListener("click",()=>runUsageCheck(false));
