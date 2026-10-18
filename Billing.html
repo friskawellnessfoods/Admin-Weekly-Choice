@@ -62,6 +62,19 @@
   .stat{background:var(--accent-soft);border-radius:13px;padding:11px 12px}
   .stat .n{font-size:1.35rem;font-weight:800;color:var(--navy);line-height:1.1}
   .stat .l{font-size:.66rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-top:3px;font-weight:600}
+  .stat.tap{cursor:pointer;transition:box-shadow .12s ease,background .12s ease}
+  .stat.tap:hover{box-shadow:0 0 0 2px rgba(16,185,129,.28) inset}
+  .stat.tap.on{background:var(--navy)}
+  .stat.tap.on .n{color:#fff}.stat.tap.on .l{color:#bfe8d6}
+  .stat .c{font-size:.6rem;opacity:.55;margin-top:2px;font-weight:700}
+  .drill{margin-top:12px;border:1.5px solid var(--line);border-radius:14px;overflow:hidden}
+  .drill-h{background:var(--accent-soft);padding:9px 13px;font-size:.82rem;font-weight:700;color:var(--navy);display:flex;justify-content:space-between;align-items:center}
+  .drill-x{cursor:pointer;color:var(--muted);font-weight:700}
+  .drill-b{max-height:280px;overflow:auto}
+  .drill-b table{width:100%;border-collapse:collapse;font-size:.85rem}
+  .drill-b td{padding:7px 13px;border-bottom:1px solid #f0f2f7}
+  .drill-b tr:last-child td{border-bottom:none}
+  .drill-b td.r{text-align:right;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
   .kv{display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid #f0f2f7;font-size:.9rem}
   .kv:last-child{border-bottom:none}.kv .k{color:var(--muted)}.kv .v{font-weight:600}
   .note{border-radius:12px;padding:11px 13px;font-size:.85rem;margin-top:12px}
@@ -216,9 +229,9 @@
       <h2 class="sec">Previous cycle usage</h2>
       <div id="r_prevline" class="note info" style="margin-top:0"></div>
       <div class="stat-grid" id="r_stats" style="margin-top:12px"></div>
+      <div id="r_drill"></div>
       <div id="r_usageKV" style="margin-top:12px"></div>
       <div id="r_pauseWarn"></div>
-      <div style="margin-top:10px"><div class="subtle" style="font-weight:600">Paused dates</div><div id="r_paused" class="subtle"></div></div>
     </div>
     <div class="card hidden" id="r_reconCard">
       <h2 class="sec">Actual usage (priced)</h2>
@@ -293,10 +306,10 @@
       <h2 class="sec">Usage report</h2>
       <div id="u_range" class="note info" style="margin-top:0"></div>
       <div class="stat-grid" id="u_stats" style="margin-top:12px"></div>
+      <div id="u_drill"></div>
       <div id="u_kv" style="margin-top:12px"></div>
       <div id="u_slots" style="margin-top:12px"></div>
       <div id="u_pauseWarn"></div>
-      <div style="margin-top:12px"><div class="subtle" style="font-weight:600">Paused dates</div><div id="u_paused" class="subtle"></div></div>
     </div>
   </section>
 </div>
@@ -307,7 +320,7 @@
 const BIZ={name:"Friska Wellness",tagline:"Healthy Meals",address:"Moti Nagar, Hyderabad, Telangana 500018",gst:"38AAKFF6850B1ZI",fssai:"23624030000435",upi:"friskawellnessllp@idfcbank",acHolder:"FRISKA WELLNESS LLP",acNumber:"50200087206209",ifsc:"HDFC0005486",branch:"LIBERTY CROSS ROADS",acType:"CURRENT",logo:"logo.png"};
 const ADMIN_PRICES_URL="https://script.google.com/macros/s/AKfycbz82SA1y26hBJ_cd5kFBE3vD73djtTMVh4G_dCs43JKdSlVXzLWDR4DPMbUtHyTIa0/exec";
 const BILLS_API_URL="https://script.google.com/macros/s/AKfycbwI8_v36JJrkAXVhfGIAirSC3IUHbe6l-3WLeeTETg1SGRUcn4M_dPjN9azSCbgTBD1/exec";
-const COL={date:0,name:1,phone:2,slot:5,opt1:7,opt2:8,brk:9,snk:10,j1:11,j2:12};
+const COL={date:0,name:1,phone:2,slot:5,loc:6,opt1:7,opt2:8,brk:9,snk:10,j1:11,j2:12};
 const MONTH_ABBR=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 const MONTHS={jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
 const PLAN_LABEL={nb:"Nutri Balance",hp:"High Protein",lc:"Low Carb",hc:"High Carb",nc:"No Carb"};
@@ -401,6 +414,8 @@ function lockedRate(prev,id,fallback){if(prev&&prev.lineItems&&prev.lineItems.le
 function countUsage(data,start,end,clientName){
   const key=normName(clientName);const totals={meal1:0,meal2:0,snack:0,j1:0,j2:0,brk:0,seafood:0};
   const activeSet=new Set();const slotDates={};let lastActive=null;const paused=[];
+  const byDate={};        // dateKey -> per-day item tallies, for the drill-down lists
+  const delSeen={};       // 'dateKey|slot' -> location, so each delivery is counted once
   const service=[];let cur=dateOnly(start);
   while(cur<=end){if(!isSunday(cur))service.push(dateOnly(cur));cur=addDays(cur,1);}
   for(const row of data){
@@ -410,21 +425,34 @@ function countUsage(data,start,end,clientName){
     if(normName(row[COL.name])!==key)continue;
     const c=i=>(i<row.length?String(row[i]).trim():"");
     const o1=c(COL.opt1),o2=c(COL.opt2),brk=c(COL.brk),snk=c(COL.snk),j1=c(COL.j1),j2=c(COL.j2);
+    const dk=keyOf(rd);const d=byDate[dk]=byDate[dk]||{meals:0,brk:0,snack:0,juices:0};
     let mc=0;
-    if(o1&&o1!=="N/A"){totals.meal1++;mc++;if(normName(o1)==="seafood 1")totals.seafood++;}
-    if(o2&&o2!=="N/A"){totals.meal2++;mc++;if(normName(o2)==="seafood 2")totals.seafood++;}
-    if(brk&&brk!=="N/A"){totals.brk++;mc++;}
-    if(snk&&snk!=="N/A"){totals.snack++;mc++;}
-    if(j1&&j1!=="N/A"){totals.j1++;mc++;}
-    if(j2&&j2!=="N/A"){totals.j2++;mc++;}
-    if(mc>0){activeSet.add(keyOf(rd));let slot=(row.length>COL.slot?String(row[COL.slot]).trim():"")||"No slot";(slotDates[slot]=slotDates[slot]||new Set()).add(keyOf(rd));if(!lastActive||rd>lastActive)lastActive=rd;}
+    if(o1&&o1!=="N/A"){totals.meal1++;mc++;d.meals++;if(normName(o1)==="seafood 1")totals.seafood++;}
+    if(o2&&o2!=="N/A"){totals.meal2++;mc++;d.meals++;if(normName(o2)==="seafood 2")totals.seafood++;}
+    if(brk&&brk!=="N/A"){totals.brk++;mc++;d.brk++;}
+    if(snk&&snk!=="N/A"){totals.snack++;mc++;d.snack++;}
+    if(j1&&j1!=="N/A"){totals.j1++;mc++;d.juices++;}
+    if(j2&&j2!=="N/A"){totals.j2++;mc++;d.juices++;}
+    if(mc>0){
+      activeSet.add(dk);
+      let slot=(row.length>COL.slot?String(row[COL.slot]).trim():"")||"No slot";
+      (slotDates[slot]=slotDates[slot]||new Set()).add(dk);
+      const dsk=dk+"|"+slot;const lv=(row.length>COL.loc?String(row[COL.loc]).trim():"");
+      if(!delSeen[dsk])delSeen[dsk]=lv;                 // first row wins; a later row only fills a blank
+      else if(!delSeen[dsk]&&lv)delSeen[dsk]=lv;
+      if(!lastActive||rd>lastActive)lastActive=rd;
+    }
   }
   for(const d of service){if(!activeSet.has(keyOf(d)))paused.push(dateOnly(d));}
   totals.meals_total=totals.meal1+totals.meal2;totals.juices_total=totals.j1+totals.j2;
   const slotCounts={};let deliveries=0;for(const s in slotDates){slotCounts[s]=slotDates[s].size;deliveries+=slotCounts[s];}
-  const activeDatesSorted=Array.from(activeSet).sort().map(k=>{const [y,m,da]=k.split("-").map(Number);return dateOnly(new Date(y,m-1,da,12));});
-  return {totals,activeDays:activeSet.size,activeDatesSorted,pausedDays:paused.length,totalDays:service.length,pausedDates:paused,lastActiveDate:lastActive,slotCounts,deliveries};
+  const activeDatesSorted=Array.from(activeSet).sort().map(k=>dtFromKey(k));
+  const mealsDetail=Object.keys(byDate).filter(k=>byDate[k].meals>0).sort().map(k=>({date:dtFromKey(k),n:byDate[k].meals}));
+  const activeDetail=Array.from(activeSet).sort().map(k=>({date:dtFromKey(k),d:byDate[k]||{meals:0,brk:0,snack:0,juices:0}}));
+  const deliveryDetail=Object.keys(delSeen).sort().map(k=>{const p=k.split("|");return {date:dtFromKey(p[0]),slot:p[1],loc:delSeen[k]};});
+  return {totals,activeDays:activeSet.size,activeDatesSorted,pausedDays:paused.length,totalDays:service.length,pausedDates:paused,lastActiveDate:lastActive,slotCounts,deliveries,byDate,mealsDetail,activeDetail,deliveryDetail,serviceDates:service};
 }
+function dtFromKey(k){const [y,m,d]=k.split("-").map(Number);return dateOnly(new Date(y,m-1,d,12));}
 function hasActivityAfter(data,name,date){
   const key=normName(name);
   for(const row of data){if(!row||row.length<2)continue;const dt=toDt(row[COL.date]);if(!dt)continue;if(dateOnly(dt)<=date)continue;if(normName(row[COL.name])!==key)continue;
@@ -487,7 +515,45 @@ function bindLivePrice(tbodyId,onChange){
   el(tbodyId).addEventListener("input",e=>{const tr=e.target.closest("tr");if(tr){const q=tr.querySelector('[data-f="qty"]'),r=tr.querySelector('[data-f="rate"]'),p=tr.querySelector('[data-price]');if(q&&r&&p)p.textContent=money((parseFloat(q.value)||0)*(parseFloat(r.value)||0));}onChange&&onChange();});
   el(tbodyId).addEventListener("click",e=>{if(e.target.dataset.rm!==undefined){e.target.closest("tr").remove();onChange&&onChange();}});
 }
-function statBox(n,l){return `<div class="stat"><div class="n">${n}</div><div class="l">${l}</div></div>`;}
+function statBox(n,l,key){
+  if(!key)return `<div class="stat"><div class="n">${n}</div><div class="l">${l}</div></div>`;
+  return `<div class="stat tap" data-stat="${key}"><div class="n">${n}</div><div class="l">${l}</div><div class="c">tap for list</div></div>`;
+}
+/* ---- stat drill-downs: tap a tile, the list opens right under the tiles ---- */
+const DRILL_TITLE={meals:"Meals by date",active:"Active days",deliveries:"Deliveries",paused:"Paused days",total:"Service days"};
+function drillRows(u,key){
+  if(key==="meals")return (u.mealsDetail||[]).map(r=>[dtstr(r.date),r.n+(r.n===1?" meal":" meals")]);
+  if(key==="active")return (u.activeDetail||[]).map(r=>{
+    const p=[];if(r.d.meals)p.push(r.d.meals+"× meal");if(r.d.brk)p.push(r.d.brk+"× breakfast");if(r.d.snack)p.push(r.d.snack+"× snack");if(r.d.juices)p.push(r.d.juices+"× juice");
+    return [dtstr(r.date),p.join(" · ")||"—"];
+  });
+  if(key==="deliveries")return (u.deliveryDetail||[]).map(r=>[dtstr(r.date)+(r.slot&&r.slot!=="No slot"?` · ${r.slot}`:""),r.loc||"—"]);
+  if(key==="paused")return (u.pausedDates||[]).map(d=>[dtstr(d),""]);
+  if(key==="total")return (u.serviceDates||[]).map(d=>[dtstr(d),""]);
+  return [];
+}
+function renderDrill(hostId,u,key){
+  const host=el(hostId);if(!host)return;
+  if(!key){host.innerHTML="";return;}
+  const rows=drillRows(u,key);
+  host.innerHTML=`<div class="drill"><div class="drill-h"><span>${DRILL_TITLE[key]||""} (${rows.length})</span><span class="drill-x" data-drillx>✕</span></div>`+
+    (rows.length?`<div class="drill-b"><table><tbody>`+rows.map(r=>`<tr><td>${r[0]}</td><td class="r">${r[1]}</td></tr>`).join("")+`</tbody></table></div>`
+                :`<div class="drill-b"><table><tbody><tr><td style="color:var(--muted)">None.</td></tr></tbody></table></div>`)+
+    `</div>`;
+}
+function bindStatDrill(gridId,hostId,getUsage){
+  const grid=el(gridId);if(!grid)return;
+  grid.querySelectorAll(".stat.tap").forEach(function(box){
+    box.onclick=function(){
+      const key=box.dataset.stat;const was=box.classList.contains("on");
+      grid.querySelectorAll(".stat.tap").forEach(b=>b.classList.remove("on"));
+      if(was){renderDrill(hostId,getUsage(),null);return;}
+      box.classList.add("on");renderDrill(hostId,getUsage(),key);
+      const x=el(hostId).querySelector("[data-drillx]");
+      if(x)x.onclick=function(){grid.querySelectorAll(".stat.tap").forEach(b=>b.classList.remove("on"));renderDrill(hostId,getUsage(),null);};
+    };
+  });
+}
 function kvRow(k,v){return `<div class="kv"><span class="k">${k}</span><span class="v">${v}</span></div>`;}
 function stripPlan(label){return label.indexOf("· ")>=0?label.split("· ").slice(1).join("· "):label;}
 function itemsReadable(lines){return lines.filter(l=>l.qty>0&&l.id!=="delivery").map(l=>`${stripPlan(l.label)} ×${l.qty}`).join(" · ");}
@@ -612,12 +678,13 @@ function renderRenew(){
   }
   el("r_usageCard").classList.remove("hidden");
   el("r_prevline").innerHTML=`Started <b>${dtstr(prev.start)}</b> · ${prev.plan||"—"} · ${rc.optedDays} opted days`;
-  el("r_stats").innerHTML=statBox(b.totals.meals_total,"Meals")+statBox(rc.activeDates.length,"Active days")+statBox(rc.pending,"Pending days")+statBox(b.deliveries,"Deliveries");
+  el("r_stats").innerHTML=statBox(b.totals.meals_total,"Meals","meals")+statBox(rc.activeDates.length,"Active days","active")+statBox(rc.pending,"Pending days","paused")+statBox(b.deliveries,"Deliveries","deliveries");
+  el("r_drill").innerHTML="";
+  bindStatDrill("r_stats","r_drill",()=>renewCtx.rc.billing);
   let kv="";if(b.totals.brk>0)kv+=kvRow("Breakfast",b.totals.brk);if(b.totals.snack>0)kv+=kvRow("Snack",b.totals.snack);if(b.totals.juices_total>0)kv+=kvRow("Juices",b.totals.juices_total);if(b.totals.seafood>0)kv+=kvRow("Seafood",b.totals.seafood);
   el("r_usageKV").innerHTML=kv;
   if(!rc.complete)el("r_pauseWarn").innerHTML=`<div class="note pause"><b>Previous plan still pending.</b> ${rc.activeDates.length} of ${rc.optedDays} opted days completed as of today — ${rc.pending} pending. A new bill is usually generated once the cycle completes.</div>`;
   else el("r_pauseWarn").innerHTML=`<div class="note info">Cycle completed on <b>${dtstr(rc.completionDate)}</b> after ${rc.optedDays} active days.</div>`;
-  el("r_paused").textContent=b.pausedDates.length?b.pausedDates.map(dtstr).join(", "):"None";
 
   // actual usage — every item the client actually took (qty>0), priced from the locked bill rate when it was on the previous bill, else the current sheet rate
   const both=op.main==="both", plabel=(plans.length?plans:[p0]).map(p=>PLAN_LABEL[p]).join(" + "), actual=[];
@@ -828,11 +895,11 @@ function openNewBillFor(name,phone,dateKey){
   if(phone)el("n_phone").value=phone;
   if(dateKey){el("n_start").value=dateKey;newDatesFromStart();refreshNum("n_billno","n_start");}
 }
-function openUsageCheckFor(name,dateKey){
+function openUsageCheckFor(name,startKey,endKey){
   switchTab("usage");
   el("u_client").value=name;
-  if(dateKey)el("u_start").value=dateKey;
-  el("u_end").value=keyOf(dateOnly(new Date()));
+  if(startKey)el("u_start").value=startKey;
+  el("u_end").value=endKey||keyOf(dateOnly(new Date()));
   runUsageCheck(false);
 }
 async function loadDashboard(force){setStatus("d_status","Loading bills…","info");try{const bills=await fetchBills(force);let orders=[];try{orders=await fetchOrders(force);}catch(e){}let inactiveSet=new Set();try{const st=await fetchStatus(force);inactiveSet=new Set(st.filter(c=>c.status==="inactive").map(c=>normName(c.name)));}catch(e){}renderDashboard(orders,inactiveSet);try{renderUnbilled(orders,bills);}catch(e){el("d_unbilled").innerHTML='<div class="subtle">Orders load failed.</div>';}setStatus("d_status",`${Math.max(0,bills.length-1)} bills.`,"ok");}catch(err){setStatus("d_status","Error: "+err.message,"err");el("d_followups").innerHTML="";}}
@@ -972,7 +1039,7 @@ function applyDashFilter(){
     var open=searching?true:!!dashMonthOpen[k];
     html+=`<div style="margin-top:8px"><div class="oldhead" data-mk="${k}">${open?"▾":"▸"} ${monthLabel_(k)} (${groups[k].length})</div>`+
       `<div class="monthwrap ${open?"":"hidden"}" data-mw="${k}"><div style="overflow-x:auto"><table class="dtable">${head}<tbody>`+
-      groups[k].map(r=>`<tr><td>${r.billNo}</td><td><b class="clientlink" data-name="${String(r.client).replace(/"/g,"&quot;")}" style="cursor:pointer;color:var(--navy);text-decoration:underline">${r.client}</b></td><td>${r.plan||""}</td><td>${dtstr(r.start)}</td><td>${dtstr(r.end)}</td><td>₹${money(r.grand)}</td><td>${pillHtml(r)}</td><td><div class="rowmenu"><button class="rowmenu-btn" data-menubtn="${r.billNo}">⋮</button><div class="rowmenu-pop" data-menupop="${r.billNo}"><button class="rowmenu-item" data-dl="${r.billNo}">Download image</button><button class="rowmenu-item danger" data-delbill="${r.billNo}">Delete bill</button></div></div></td></tr>`).join("")+
+      groups[k].map(r=>`<tr><td>${r.billNo}</td><td><b class="clientlink" data-name="${String(r.client).replace(/"/g,"&quot;")}" style="cursor:pointer;color:var(--navy);text-decoration:underline">${r.client}</b></td><td>${r.plan||""}</td><td>${dtstr(r.start)}</td><td>${dtstr(r.end)}</td><td>₹${money(r.grand)}</td><td>${pillHtml(r)}</td><td><div class="rowmenu" data-name="${String(r.client).replace(/"/g,"&quot;")}" data-start="${r.start?keyOf(r.start):""}" data-end="${r.end?keyOf(r.end):""}"><button class="rowmenu-btn" data-menubtn="${r.billNo}">⋮</button><div class="rowmenu-pop" data-menupop="${r.billNo}"><button class="rowmenu-item" data-busage>Check usage</button><button class="rowmenu-item" data-dl="${r.billNo}">Download image</button><button class="rowmenu-item danger" data-delbill="${r.billNo}">Delete bill</button></div></div></td></tr>`).join("")+
       `</tbody></table></div></div></div>`;
   });
   el("d_table").innerHTML=html;
@@ -987,6 +1054,9 @@ function applyDashFilter(){
       openRowMenu(b,pop);
     };
   });
+  el("d_table").querySelectorAll("button[data-busage]").forEach(function(b){
+    b.onclick=function(e){e.stopPropagation();closeAllRowMenus();var w=b.closest(".rowmenu");openUsageCheckFor(w.dataset.name,w.dataset.start,w.dataset.end);};
+  });
   el("d_table").querySelectorAll("button[data-dl]").forEach(function(b){b.onclick=function(e){e.stopPropagation();closeAllRowMenus();downloadBillImage(b.dataset.dl);};});
   el("d_table").querySelectorAll("button[data-delbill]").forEach(function(b){b.onclick=function(e){e.stopPropagation();closeAllRowMenus();deleteBillPrompt(b.dataset.delbill);};});
 }
@@ -998,10 +1068,12 @@ function openRowMenu(btn,pop){
     var rect=btn.getBoundingClientRect();
     var popW=170;
     var left=Math.min(Math.max(8,rect.right-popW),window.innerWidth-popW-8);
-    var top=rect.bottom+4;
-    if(top+90>window.innerHeight)top=rect.top-94; // flip above the button if it would overflow the bottom
-    pop.style.left=left+"px";pop.style.top=top+"px";
+    pop.style.left=left+"px";pop.style.top="0px";
     pop.classList.add("open");
+    var h=pop.offsetHeight||90;                                  // measure actual height — menus vary in item count
+    var top=rect.bottom+4;
+    if(top+h>window.innerHeight)top=Math.max(8,rect.top-h-4);    // flip above the button if it would overflow the bottom
+    pop.style.top=top+"px";
   }
 }
 window.addEventListener("scroll",function(){closeAllRowMenus();},true);
@@ -1020,7 +1092,9 @@ async function runUsageCheck(force){
 function renderUsageReport(u,start,end,continued){
   const t=u.totals;el("u_card").classList.remove("hidden");
   el("u_range").innerHTML=`Usage for <b>${dtstr(start)} → ${dtstr(end)}</b> (Sundays excluded)`;
-  el("u_stats").innerHTML=statBox(t.meals_total,"Meals")+statBox(u.activeDays,"Active days")+statBox(u.pausedDays,"Paused days")+statBox(u.totalDays,"Total days")+statBox(u.deliveries,"Deliveries");
+  el("u_stats").innerHTML=statBox(t.meals_total,"Meals","meals")+statBox(u.activeDays,"Active days","active")+statBox(u.pausedDays,"Paused days","paused")+statBox(u.totalDays,"Total days","total")+statBox(u.deliveries,"Deliveries","deliveries");
+  el("u_drill").innerHTML="";
+  bindStatDrill("u_stats","u_drill",()=>u);
   let kv=kvRow("Lunch (option 1)",t.meal1)+kvRow("Dinner (option 2)",t.meal2);
   if(t.seafood>0)kv+=kvRow("Seafood",t.seafood);if(t.brk>0)kv+=kvRow("Breakfast",t.brk);if(t.snack>0)kv+=kvRow("Snack",t.snack);if(t.juices_total>0)kv+=kvRow("Juices",t.juices_total);
   el("u_kv").innerHTML=kv;
@@ -1029,7 +1103,6 @@ function renderUsageReport(u,start,end,continued){
   if(continued)el("u_pauseWarn").innerHTML=`<div class="note info">Client has orders after this range — they're continuing, so paused days here are likely made up later.</div>`;
   else if(u.lastActiveDate&&u.lastActiveDate<end)el("u_pauseWarn").innerHTML=`<div class="note pause">Last meal on <b>${dtstr(u.lastActiveDate)}</b>; no meals after that in this range.</div>`;
   else el("u_pauseWarn").innerHTML="";
-  el("u_paused").textContent=u.pausedDates.length?u.pausedDates.map(dtstr).join(", "):"None";
 }
 
 /* ===================== NAME AUTOCOMPLETE ===================== */
