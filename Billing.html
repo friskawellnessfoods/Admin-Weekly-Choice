@@ -243,6 +243,8 @@
     </div>
     <div class="card hidden" id="r_nextCard">
       <h2 class="sec">Next bill</h2>
+      <label class="chk" id="r_settleWrap" style="margin-bottom:14px"><input type="checkbox" id="r_settle"/>Settlement only — bill just the pending amount (client not continuing)</label>
+      <div id="r_nextBody">
       <div class="grid g3">
         <div class="field"><label>Start date</label><input id="r_start" type="date" onclick="this.showPicker&&this.showPicker()" /></div>
         <div class="field"><label>End date</label><input id="r_end" type="date" onclick="this.showPicker&&this.showPicker()" /></div>
@@ -250,11 +252,12 @@
       </div>
       <table class="lines" style="margin-top:14px"><thead><tr><th>Item</th><th>Qty</th><th>Rate</th><th>Price</th><th></th></tr></thead><tbody id="r_nextlines"></tbody></table>
       <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="add-line" id="r_addmeal">+ Add meal line (GST applies)</button><button class="add-line" id="r_addline">+ Add custom line (no GST)</button></div>
-      <div class="grid g3" style="margin-top:16px">
+      <div class="grid g2" style="margin-top:16px">
         <div class="field"><label>Discount %</label><input id="r_disc" type="number" value="0" min="0" /></div>
         <div class="field"><label>GST % (food only)</label><input id="r_gst" type="number" value="5" min="0" /></div>
-        <div class="field"><label>Prev-cycle adjustment (₹) — 0 to omit</label><input id="r_adjinput" type="number" step="0.5" value="0" /><div class="subtle" style="margin-top:4px">Computed: <b id="r_adjcomputed">₹0</b> · <span id="r_adjreset" style="color:var(--accent);font-weight:700;cursor:pointer">reset</span></div></div>
       </div>
+      </div>
+      <div class="field" style="margin-top:16px"><label id="r_adjlabel">Prev-cycle adjustment (₹) — 0 to omit</label><input id="r_adjinput" type="number" step="0.5" value="0" /><div class="subtle" style="margin-top:4px">Computed: <b id="r_adjcomputed">₹0</b> · <span id="r_adjreset" style="color:var(--accent);font-weight:700;cursor:pointer">reset</span></div></div>
       <div class="totals" id="r_nextTotals"></div>
       <div class="grid g2" style="margin-top:16px">
         <div class="field"><label>Bill no.</label><input id="r_billno" /></div>
@@ -520,7 +523,7 @@ function statBox(n,l,key){
   return `<div class="stat tap" data-stat="${key}"><div class="n">${n}</div><div class="l">${l}</div><div class="c">tap for list</div></div>`;
 }
 /* ---- stat drill-downs: tap a tile, the list opens right under the tiles ---- */
-const DRILL_TITLE={meals:"Meals by date",active:"Active days",deliveries:"Deliveries",paused:"Paused days",total:"Service days"};
+const DRILL_TITLE={meals:"Meals by date",active:"Active days",deliveries:"Deliveries",paused:"Paused days"};
 function drillRows(u,key){
   if(key==="meals")return (u.mealsDetail||[]).map(r=>[dtstr(r.date),r.n+(r.n===1?" meal":" meals")]);
   if(key==="active")return (u.activeDetail||[]).map(r=>{
@@ -529,7 +532,6 @@ function drillRows(u,key){
   });
   if(key==="deliveries")return (u.deliveryDetail||[]).map(r=>[dtstr(r.date)+(r.slot&&r.slot!=="No slot"?` · ${r.slot}`:""),r.loc||"—"]);
   if(key==="paused")return (u.pausedDates||[]).map(d=>[dtstr(d),""]);
-  if(key==="total")return (u.serviceDates||[]).map(d=>[dtstr(d),""]);
   return [];
 }
 function renderDrill(hostId,u,key){
@@ -698,6 +700,8 @@ function renderRenew(){
 
   // next bill — rebuilt from opted items + plans + carried-forward locked rates
   el("r_nextCard").classList.remove("hidden");
+  el("r_settle").checked=false;el("r_nextBody").style.display="";el("r_settleWrap").classList.remove("on");
+  el("r_adjlabel").textContent="Prev-cycle adjustment (₹) — 0 to omit";
   const newDays=prevDaysOf(prev),slots=Math.max(1,prevSlotCount(prev));
   el("r_days").value=newDays;el("r_disc").value=prev.discPct||0;el("r_gst").value=5;el("r_billdate").value=keyOf(dateOnly(new Date()));
   setDate("r_start",rc.nextStart);setDate("r_end",rc.nextEnd);
@@ -729,7 +733,31 @@ function recalcRenewActual(){
   recalcRenewNext();
 }
 function renewAdj(){const v=parseFloat(el("r_adjinput").value);return isNaN(v)?0:v;}
-function recalcRenewNext(){if(!renewCtx)return;renderTotals("r_nextTotals",computeTotals(readLines("r_nextlines"),parseFloat(el("r_disc").value)||0,parseFloat(el("r_gst").value)||0,renewAdj()));}
+function isSettle(){return el("r_settle").checked;}
+/* Settlement-only bill: no new cycle, the whole bill IS the outstanding balance.
+   Lines are empty and the amount sits in Adjustment so the sheet columns still reconcile. */
+function settleTotals(){return computeTotals([],0,0,renewAdj());}
+function applySettleMode(){
+  const on=isSettle();
+  el("r_nextBody").style.display=on?"none":"";
+  el("r_settleWrap").classList.toggle("on",on);
+  el("r_adjlabel").textContent=on?"Settlement amount (₹) — what the client still owes":"Prev-cycle adjustment (₹) — 0 to omit";
+  if(renewCtx){
+    if(on){const d=renewCtx.rc.billingEnd||dateOnly(new Date());setDate("r_start",d);setDate("r_end",d);el("r_days").value=0;}
+    else{setDate("r_start",renewCtx.rc.nextStart);setDate("r_end",renewCtx.rc.nextEnd);el("r_days").value=prevDaysOf(renewCtx.prev);}
+  }
+  recalcRenewNext();
+}
+function recalcRenewNext(){
+  if(!renewCtx)return;
+  if(isSettle()){
+    const t=settleTotals();
+    el("r_nextTotals").innerHTML=`<div class="tline"><span class="k">Settlement — previous cycle balance</span><span class="v">₹${money(t.adjustment)}</span></div>`+
+      `<div class="tline grand"><span class="k">Total payable</span><span class="v">₹${money(t.grand)}</span></div>`;
+    return;
+  }
+  renderTotals("r_nextTotals",computeTotals(readLines("r_nextlines"),parseFloat(el("r_disc").value)||0,parseFloat(el("r_gst").value)||0,renewAdj()));
+}
 function renewDatesFromStart(){const s=readDate("r_start");const days=parseInt(el("r_days").value)||26;if(s){const f=nextServiceDates(addDays(s,-1),days);setDate("r_end",f[f.length-1]);}}
 
 /* bill number */
@@ -747,9 +775,11 @@ function buildInvoice(meta,lines,t){
   let rows="";
   food.forEach(l=>{rows+=`<tr><td>${l.label}</td><td>${l.qty}</td><td>${l.rate?money(l.rate):""}</td><td>${money(l.qty*l.rate)}</td></tr>`;});
   if(t.discAmt>0)rows+=`<tr class="sub"><td>Discount (${meta.discPct}%)</td><td></td><td></td><td>−${money(t.discAmt)}</td></tr>`;
-  rows+=`<tr class="sub"><td>GST (${meta.gstPct}%, food only)</td><td></td><td></td><td>${money(t.gst)}</td></tr>`;
+  if(!meta.settle)rows+=`<tr class="sub"><td>GST (${meta.gstPct}%, food only)</td><td></td><td></td><td>${money(t.gst)}</td></tr>`;
   if(t.delivery>0){const dl=lines.find(l=>l.id==="delivery");rows+=`<tr><td>Delivery</td><td>${dl?dl.qty:""}</td><td>${dl&&dl.rate?money(dl.rate):""}</td><td>${money(t.delivery)}</td></tr>`;}
-  if(t.adjustment)rows+=`<tr class="sub"><td>Prev-cycle adjustment</td><td></td><td></td><td>${t.adjustment<0?'−':'+'}${money(Math.abs(t.adjustment))}</td></tr>`;
+  if(t.adjustment)rows+=meta.settle
+    ?`<tr><td>Settlement — previous cycle balance</td><td></td><td></td><td>${money(t.adjustment)}</td></tr>`
+    :`<tr class="sub"><td>Prev-cycle adjustment</td><td></td><td></td><td>${t.adjustment<0?'−':'+'}${money(Math.abs(t.adjustment))}</td></tr>`;
   el("invoice").innerHTML=`
     <div class="ihead"><img src="${BIZ.logo}" onerror="this.style.display='none'"><div><h2>${BIZ.name}</h2><div class="tg">${BIZ.tagline}</div><div class="reg">${BIZ.address}<br>GST ${BIZ.gst} · FSSAI ${BIZ.fssai}</div></div><div class="invno"><div class="lab">${meta.quote?"Quotation":"Invoice"}</div><div class="no">${meta.quote?"":(meta.billNo||"")}</div></div></div>
     <div class="meta">
@@ -842,7 +872,7 @@ function gatherNewMeta(){
 const MONTH_FULL=["January","February","March","April","May","June","July","August","September","October","November","December"];
 function monthNameOf(d){return d?MONTH_FULL[d.getMonth()]:"";}
 function billObject(meta,lines,t){
-  return {BillNo:meta.billNo,Date:keyOf(meta.billDate),Client:meta.client,Phone:meta.phone,Plan:meta.plan,Duration:meta.duration,Slots:meta.slots,Start:meta.start?keyOf(meta.start):"",End:meta.end?keyOf(meta.end):"",Items:itemsReadable(lines),LineItemsJSON:JSON.stringify(lines.filter(l=>l.qty>0).map(l=>({id:l.id,label:l.label,qty:l.qty,rate:l.rate}))),Food:money(t.food),Discount:meta.discPct,Gst:money(t.gst),Delivery:money(t.delivery),Adjustment:money(t.adjustment),GrandTotal:money(t.grand),PaidStatus:meta.paidStatus,Month:monthNameOf(meta.start)};
+  return {BillNo:meta.billNo,Date:keyOf(meta.billDate),Client:meta.client,Phone:meta.phone,Plan:meta.plan,Duration:meta.duration,Slots:meta.slots,Start:meta.start?keyOf(meta.start):"",End:meta.end?keyOf(meta.end):"",Items:meta.settle?"Settlement — previous cycle balance":itemsReadable(lines),LineItemsJSON:JSON.stringify(lines.filter(l=>l.qty>0).map(l=>({id:l.id,label:l.label,qty:l.qty,rate:l.rate}))),Food:money(t.food),Discount:meta.discPct,Gst:money(t.gst),Delivery:money(t.delivery),Adjustment:money(t.adjustment),GrandTotal:money(t.grand),PaidStatus:meta.paidStatus,Month:monthNameOf(meta.start)};
 }
 async function validateAndSave(meta,lines,t,statusId){
   if(!meta.client){setStatus(statusId,"Enter client name.","err");return false;}
@@ -1092,7 +1122,7 @@ async function runUsageCheck(force){
 function renderUsageReport(u,start,end,continued){
   const t=u.totals;el("u_card").classList.remove("hidden");
   el("u_range").innerHTML=`Usage for <b>${dtstr(start)} → ${dtstr(end)}</b> (Sundays excluded)`;
-  el("u_stats").innerHTML=statBox(t.meals_total,"Meals","meals")+statBox(u.activeDays,"Active days","active")+statBox(u.pausedDays,"Paused days","paused")+statBox(u.totalDays,"Total days","total")+statBox(u.deliveries,"Deliveries","deliveries");
+  el("u_stats").innerHTML=statBox(t.meals_total,"Meals","meals")+statBox(u.activeDays,"Active days","active")+statBox(u.pausedDays,"Paused days","paused")+statBox(u.totalDays,"Total days")+statBox(u.deliveries,"Deliveries","deliveries");
   el("u_drill").innerHTML="";
   bindStatDrill("u_stats","u_drill",()=>u);
   let kv=kvRow("Lunch (option 1)",t.meal1)+kvRow("Dinner (option 2)",t.meal2);
@@ -1186,6 +1216,7 @@ el("r_client").addEventListener("keydown",e=>{if(e.key==="Enter")runRenew(false)
 bindLivePrice("r_lines",recalcRenewActual);
 bindLivePrice("r_nextlines",recalcRenewNext);
 el("r_disc").addEventListener("input",recalcRenewNext);el("r_gst").addEventListener("input",recalcRenewNext);
+el("r_settle").addEventListener("change",applySettleMode);
 el("r_adjinput").addEventListener("input",recalcRenewNext);
 el("r_adjreset").addEventListener("click",()=>{if(!renewCtx)return;el("r_adjinput").value=money(renewCtx.computedAdj||0);recalcRenewNext();});
 el("r_start").addEventListener("change",()=>{renewDatesFromStart();refreshNum("r_billno","r_start");});
@@ -1193,16 +1224,21 @@ el("r_days").addEventListener("input",renewDatesFromStart);
 el("r_addmeal").addEventListener("click",()=>{el("r_nextlines").insertAdjacentHTML("beforeend",lineRowHtml({id:"meal_"+Date.now(),label:"High Protein · Lunch",qty:parseInt(el("r_days").value)||26,rate:0,food:true,extra:true}));recalcRenewNext();});
 el("r_addline").addEventListener("click",()=>{el("r_nextlines").insertAdjacentHTML("beforeend",lineRowHtml({id:"custom_"+Date.now(),label:"Custom item",qty:0,rate:0,food:true,custom:true}));recalcRenewNext();});
 el("r_billdate").addEventListener("change",()=>refreshNum("r_billno","r_start"));
-function gatherRenewMeta(){const p=renewCtx.prev;return {billNo:el("r_billno").value.trim(),billDate:readDate("r_billdate")||dateOnly(new Date()),client:p.client||"",phone:p.phone||"",plan:p.plan,duration:p.duration,slots:p.slots,days:parseInt(el("r_days").value)||26,start:readDate("r_start"),end:readDate("r_end"),discPct:parseFloat(el("r_disc").value)||0,gstPct:parseFloat(el("r_gst").value)||5,paidStatus:"Unpaid"};}
-el("r_save").addEventListener("click",async()=>{try{if(!renewCtx)return;const meta=gatherRenewMeta();const lines=readLines("r_nextlines");const t=computeTotals(lines,meta.discPct,meta.gstPct,renewAdj());await validateAndSave(meta,lines,t,"r_status2");}catch(e){setStatus("r_status2","Error: "+e.message,"err");}});
+function gatherRenewMeta(){const p=renewCtx.prev;return {billNo:el("r_billno").value.trim(),billDate:readDate("r_billdate")||dateOnly(new Date()),client:p.client||"",phone:p.phone||"",plan:p.plan,duration:p.duration,slots:p.slots,days:isSettle()?0:(parseInt(el("r_days").value)||26),start:readDate("r_start"),end:readDate("r_end"),discPct:isSettle()?0:(parseFloat(el("r_disc").value)||0),gstPct:isSettle()?0:(parseFloat(el("r_gst").value)||5),paidStatus:"Unpaid",settle:isSettle()};}
+function renewPayload(){
+  const meta=gatherRenewMeta();
+  if(meta.settle)return {meta,lines:[],t:settleTotals()};          // settlement: no cycle lines, balance sits in Adjustment
+  const lines=readLines("r_nextlines");
+  return {meta,lines,t:computeTotals(lines,meta.discPct,meta.gstPct,renewAdj())};
+}
+el("r_save").addEventListener("click",async()=>{try{if(!renewCtx)return;const{meta,lines,t}=renewPayload();await validateAndSave(meta,lines,t,"r_status2");}catch(e){setStatus("r_status2","Error: "+e.message,"err");}});
 el("r_quote").addEventListener("click",async()=>{try{
   if(!renewCtx)return;
-  const meta=gatherRenewMeta();meta.quote=true;
-  const lines=readLines("r_nextlines");const t=computeTotals(lines,meta.discPct,meta.gstPct,renewAdj());
+  const{meta,lines,t}=renewPayload();meta.quote=true;
   setStatus("r_status2","Building quote…","info");
   buildInvoice(meta,lines,t);await sendWhatsApp(meta,t,"r_status2");   // quote only — nothing written to the Bills sheet
 }catch(e){setStatus("r_status2","Error: "+e.message,"err");}});
-el("r_wa").addEventListener("click",async()=>{try{if(!renewCtx)return;const meta=gatherRenewMeta();const lines=readLines("r_nextlines");const t=computeTotals(lines,meta.discPct,meta.gstPct,renewAdj());if(!await validateAndSave(meta,lines,t,"r_status2"))return;buildInvoice(meta,lines,t);await sendWhatsApp(meta,t,"r_status2");}catch(e){setStatus("r_status2","Error: "+e.message,"err");}});
+el("r_wa").addEventListener("click",async()=>{try{if(!renewCtx)return;const{meta,lines,t}=renewPayload();if(!await validateAndSave(meta,lines,t,"r_status2"))return;buildInvoice(meta,lines,t);await sendWhatsApp(meta,t,"r_status2");}catch(e){setStatus("r_status2","Error: "+e.message,"err");}});
 
 el("u_fetch").addEventListener("click",()=>runUsageCheck(false));
 el("u_reload").addEventListener("click",()=>runUsageCheck(true));
