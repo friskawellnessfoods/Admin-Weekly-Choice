@@ -1763,6 +1763,7 @@
         const val = String(cell.val || '').trim();
         const td = document.createElement('td');
         td.textContent = val;
+        if(cell.bold) td.style.fontWeight = '700';   // bold carried over from the sheet
         tr.appendChild(td);
       }
       table.appendChild(tr);
@@ -1844,6 +1845,7 @@
         const val = String(cell.val || '').trim();
         const td = document.createElement('td');
         td.textContent = val;
+        if(cell.bold) td.style.fontWeight = '700';   // bold carried over from the sheet
         tr.appendChild(td);
       }
       table.appendChild(tr);
