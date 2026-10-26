@@ -228,6 +228,12 @@
     <div class="card hidden" id="r_usageCard">
       <h2 class="sec">Previous cycle usage</h2>
       <div id="r_prevline" class="note info" style="margin-top:0"></div>
+      <div class="grid g3" style="margin-top:12px">
+        <div class="field"><label>Count usage from</label><input id="r_winstart" type="date" onclick="this.showPicker&&this.showPicker()" /></div>
+        <div class="field"><label>Count usage to</label><input id="r_winend" type="date" onclick="this.showPicker&&this.showPicker()" /></div>
+        <div class="field"><label>&nbsp;</label><button class="btn btn-ghost" id="r_winreset" style="width:100%">Reset dates</button></div>
+      </div>
+      <div class="subtle" id="r_winnote" style="margin-top:6px"></div>
       <div class="stat-grid" id="r_stats" style="margin-top:12px"></div>
       <div id="r_drill"></div>
       <div id="r_usageKV" style="margin-top:12px"></div>
@@ -464,9 +470,20 @@ function hasActivityAfter(data,name,date){
 }
 // Roll forward from the bill start, counting actual active service days up to today (never beyond).
 // The cycle completes when optedDays active days are reached; new bill is due only then.
-function computeRenew(data,name,prev){
+function computeRenew(data,name,prev,winStart,winEnd){
   const today=dateOnly(new Date());
   const optedDays=prevDaysOf(prev);
+  if(winStart||winEnd){
+    // manual window — count exactly what falls inside it (used for long-pause clients)
+    const ws=winStart||prev.start, we=winEnd||today;
+    const billing=countUsage(data,ws,we,name);
+    const activeDates=billing.activeDatesSorted;
+    const complete=activeDates.length>=optedDays;
+    const completionDate=complete?activeDates[optedDays-1]:null;
+    const pending=complete?0:(optedDays-activeDates.length);
+    const f=nextServiceDates(we,optedDays);
+    return {today,optedDays,activeDates,complete,completionDate,billingEnd:we,billing,pending,nextStart:f[0],nextEnd:f[f.length-1],scan:billing,winStart:ws,manual:true};
+  }
   const scan=countUsage(data,prev.start,today,name);
   const activeDates=scan.activeDatesSorted;
   const complete=activeDates.length>=optedDays;
@@ -476,7 +493,7 @@ function computeRenew(data,name,prev){
   const pending=complete?0:(optedDays-activeDates.length);
   const base=complete?completionDate:today;
   const f=nextServiceDates(base,optedDays);
-  return {today,optedDays,activeDates,complete,completionDate,billingEnd,billing,pending,nextStart:f[0],nextEnd:f[f.length-1],scan};
+  return {today,optedDays,activeDates,complete,completionDate,billingEnd,billing,pending,nextStart:f[0],nextEnd:f[f.length-1],scan,winStart:prev.start,manual:false};
 }
 
 /* line table */
@@ -671,6 +688,22 @@ function selectRenewBill(i){
   renewCtx={prev,rc:computeRenew(renewOrders,renewName,prev)};
   renderRenew();
 }
+/* Re-run the reconciliation over a hand-picked window (long-pause clients). */
+function applyRenewWindow(){
+  if(!renewCtx)return;
+  const ws=readDate("r_winstart"),we=readDate("r_winend");
+  if(!ws||!we){setStatus("r_status","Enter both usage dates.","err");return;}
+  if(we<ws){setStatus("r_status","Usage 'to' date is before 'from' date.","err");return;}
+  renewCtx.rc=computeRenew(renewOrders,renewName,renewCtx.prev,ws,we);
+  renderRenew();
+  setStatus("r_status",`Recounted ${dtstr(ws)} → ${dtstr(we)}.`,"ok");
+}
+function resetRenewWindow(){
+  if(!renewCtx)return;
+  renewCtx.rc=computeRenew(renewOrders,renewName,renewCtx.prev);
+  renderRenew();
+  setStatus("r_status","Window reset to the bill's own dates.","ok");
+}
 function renderRenew(){
   const prev=renewCtx.prev,rc=renewCtx.rc,b=rc.billing,plans=planCodesOf(prev),dur=durCodeOf(prev),p0=plans[0]||"nb";
   let op=parseItems(prev.items,prevDaysOf(prev));
@@ -680,12 +713,16 @@ function renderRenew(){
   }
   el("r_usageCard").classList.remove("hidden");
   el("r_prevline").innerHTML=`Started <b>${dtstr(prev.start)}</b> · ${prev.plan||"—"} · ${rc.optedDays} opted days`;
+  setDate("r_winstart",rc.winStart||prev.start);setDate("r_winend",rc.billingEnd);
+  el("r_winnote").innerHTML=rc.manual
+    ?`<span style="color:var(--warn-ink);font-weight:600">Manual window</span> — usage below is counted over these dates, and the next bill starts the day after.`
+    :`Auto window — from the bill's start to ${rc.complete?"the day the cycle completed":"today"}. Edit either date to override.`;
   el("r_stats").innerHTML=statBox(b.totals.meals_total,"Meals","meals")+statBox(rc.activeDates.length,"Active days","active")+statBox(rc.pending,"Pending days","paused")+statBox(b.deliveries,"Deliveries","deliveries");
   el("r_drill").innerHTML="";
   bindStatDrill("r_stats","r_drill",()=>renewCtx.rc.billing);
   let kv="";if(b.totals.brk>0)kv+=kvRow("Breakfast",b.totals.brk);if(b.totals.snack>0)kv+=kvRow("Snack",b.totals.snack);if(b.totals.juices_total>0)kv+=kvRow("Juices",b.totals.juices_total);if(b.totals.seafood>0)kv+=kvRow("Seafood",b.totals.seafood);
   el("r_usageKV").innerHTML=kv;
-  if(!rc.complete)el("r_pauseWarn").innerHTML=`<div class="note pause"><b>Previous plan still pending.</b> ${rc.activeDates.length} of ${rc.optedDays} opted days completed as of today — ${rc.pending} pending. A new bill is usually generated once the cycle completes.</div>`;
+  if(!rc.complete)el("r_pauseWarn").innerHTML=`<div class="note pause"><b>Previous plan still pending.</b> ${rc.activeDates.length} of ${rc.optedDays} opted days completed as of ${rc.manual?dtstr(rc.billingEnd):"today"} — ${rc.pending} pending. A new bill is usually generated once the cycle completes.</div>`;
   else el("r_pauseWarn").innerHTML=`<div class="note info">Cycle completed on <b>${dtstr(rc.completionDate)}</b> after ${rc.optedDays} active days.</div>`;
 
   // actual usage — every item the client actually took (qty>0), priced from the locked bill rate when it was on the previous bill, else the current sheet rate
@@ -1216,6 +1253,9 @@ el("r_client").addEventListener("keydown",e=>{if(e.key==="Enter")runRenew(false)
 bindLivePrice("r_lines",recalcRenewActual);
 bindLivePrice("r_nextlines",recalcRenewNext);
 el("r_disc").addEventListener("input",recalcRenewNext);el("r_gst").addEventListener("input",recalcRenewNext);
+el("r_winstart").addEventListener("change",applyRenewWindow);
+el("r_winend").addEventListener("change",applyRenewWindow);
+el("r_winreset").addEventListener("click",resetRenewWindow);
 el("r_settle").addEventListener("change",applySettleMode);
 el("r_adjinput").addEventListener("input",recalcRenewNext);
 el("r_adjreset").addEventListener("click",()=>{if(!renewCtx)return;el("r_adjinput").value=money(renewCtx.computedAdj||0);recalcRenewNext();});
