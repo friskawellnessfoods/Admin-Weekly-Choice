@@ -516,17 +516,21 @@ function readLines(tbodyId){
   return out;
 }
 function computeTotals(lines,discPct,gstPct,adjustment){
-  let food=0,delivery=0,other=0;
-  lines.forEach(l=>{const amt=l.qty*l.rate;if(l.id==="delivery")delivery+=amt;else if(l.custom||l.food===false)other+=amt;else food+=amt;});
+  let food=0,delivery=0,other=0;const otherLines=[];
+  lines.forEach(l=>{const amt=l.qty*l.rate;
+    if(l.id==="delivery")delivery+=amt;
+    else if(l.custom||l.food===false){other+=amt;if(amt)otherLines.push({label:l.label||"Custom item",amt});}  // non-GST lines, listed by their own name
+    else food+=amt;});
   const discAmt=food*(discPct||0)/100;const foodAfter=food-discAmt;const gst=foodAfter*(gstPct||0)/100;
-  return {food,discAmt,foodAfter,gst,delivery,other,adjustment:adjustment||0,grand:foodAfter+gst+delivery+other+(adjustment||0)};
+  return {food,discAmt,foodAfter,gst,delivery,other,otherLines,adjustment:adjustment||0,grand:foodAfter+gst+delivery+other+(adjustment||0)};
 }
 function renderTotals(containerId,t){
   let h=`<div class="tline"><span class="k">Food subtotal</span><span class="v">₹${money(t.food)}</span></div>`;
   if(t.discAmt>0)h+=`<div class="tline"><span class="k">Discount</span><span class="v credit">−₹${money(t.discAmt)}</span></div>`;
   h+=`<div class="tline"><span class="k">GST (food only)</span><span class="v">₹${money(t.gst)}</span></div>`;
   if(t.delivery>0)h+=`<div class="tline"><span class="k">Delivery</span><span class="v">₹${money(t.delivery)}</span></div>`;
-  if(t.other)h+=`<div class="tline"><span class="k">Other / adjustments</span><span class="v ${t.other<0?"credit":""}">${t.other<0?"−":""}₹${money(Math.abs(t.other))}</span></div>`;
+  if(t.otherLines&&t.otherLines.length)t.otherLines.forEach(o=>{h+=`<div class="tline"><span class="k">${o.label}</span><span class="v ${o.amt<0?"credit":""}">${o.amt<0?"−":""}₹${money(Math.abs(o.amt))}</span></div>`;});
+  else if(t.other)h+=`<div class="tline"><span class="k">Other / adjustments</span><span class="v ${t.other<0?"credit":""}">${t.other<0?"−":""}₹${money(Math.abs(t.other))}</span></div>`;
   if(t.adjustment)h+=`<div class="tline"><span class="k">Prev-cycle adjustment</span><span class="v ${t.adjustment<0?'credit':'debit'}">${t.adjustment<0?'−':'+'}₹${money(Math.abs(t.adjustment))}</span></div>`;
   h+=`<div class="tline grand"><span class="k">Grand total</span><span class="v">₹${money(t.grand)}</span></div>`;
   el(containerId).innerHTML=h;
@@ -826,11 +830,14 @@ function buildInvoice(meta,lines,t){
     if(i.prevAdj)rows+=`<tr class="sub"><td>Add back: carry-forward included in that bill</td><td></td><td></td><td>${i.prevAdj<0?'−':'+'}${money(Math.abs(i.prevAdj))}</td></tr>`;
     if(i.diff)rows+=`<tr class="sub"><td>Adjustment</td><td></td><td></td><td>${i.diff<0?'−':'+'}${money(Math.abs(i.diff))}</td></tr>`;
   }else{
-    const food=lines.filter(l=>(l.id!=="delivery"&&l.food!==false)&&l.qty>0);
+    // GST-bearing lines (incl. added meal lines) sit above the GST row; non-GST custom lines go below Delivery.
+    const food=lines.filter(l=>l.id!=="delivery"&&l.food!==false&&!l.custom&&l.qty>0);
     food.forEach(l=>{rows+=`<tr><td>${l.label}</td><td>${l.qty}</td><td>${l.rate?money(l.rate):""}</td><td>${money(l.qty*l.rate)}</td></tr>`;});
     if(t.discAmt>0)rows+=`<tr class="sub"><td>Discount (${meta.discPct}%)</td><td></td><td></td><td>−${money(t.discAmt)}</td></tr>`;
     rows+=`<tr class="sub"><td>GST (${meta.gstPct}%, food only)</td><td></td><td></td><td>${money(t.gst)}</td></tr>`;
     if(t.delivery>0){const dl=lines.find(l=>l.id==="delivery");rows+=`<tr><td>Delivery</td><td>${dl?dl.qty:""}</td><td>${dl&&dl.rate?money(dl.rate):""}</td><td>${money(t.delivery)}</td></tr>`;}
+    lines.filter(l=>(l.custom||l.food===false)&&l.id!=="delivery"&&l.qty>0).forEach(l=>{
+      rows+=`<tr><td>${l.label}</td><td>${l.qty}</td><td>${l.rate?money(l.rate):""}</td><td>${money(l.qty*l.rate)}</td></tr>`;});
     if(t.adjustment)rows+=`<tr class="sub"><td>Prev-cycle adjustment</td><td></td><td></td><td>${t.adjustment<0?'−':'+'}${money(Math.abs(t.adjustment))}</td></tr>`;
   }
   el("invoice").innerHTML=`
