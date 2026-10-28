@@ -1,13 +1,18 @@
 <!DOCTYPE html>
+<html lang="en">
 <head>
   <base target="_top">
-  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-  <meta http-equiv="Pragma" content="no-cache">
-  <meta http-equiv="Expires" content="0">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, user-scalable=yes">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0a1a6e">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Friska">
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
   <script src="config.js"></script>
   <style>
   :root{
@@ -660,6 +665,70 @@
     padding: 9px 15px; font-size: 12.5px; font-weight: 700;
     text-decoration: none; box-shadow: 0 4px 12px rgba(37,211,102,0.28);
   }
+
+  /* modal close cross */
+  .modal-x {
+    position: absolute; top: 10px; right: 12px;
+    width: 30px; height: 30px; border-radius: 50%;
+    border: none; background: rgba(20,33,62,0.06); color: var(--muted);
+    font-size: 15px; line-height: 1; cursor: pointer; font-family: inherit;
+    display: flex; align-items: center; justify-content: center; z-index: 5;
+  }
+  .modal-x:active { background: rgba(20,33,62,0.12); }
+  .modal-head { position: relative; }
+  .modal-foot { flex-wrap: wrap; }
+  .modal-foot .btn { flex: 1 1 auto; min-width: 120px; }
+  .modal-foot .btn.full { flex: 1 1 100%; }
+
+  /* ===== CLIENT CENTRE STATUS ===== */
+  .home-status {
+    display: flex; align-items: center; gap: 11px;
+    background: #fff; border: 1px solid rgba(226,231,241,0.9);
+    border-radius: 15px; padding: 13px 15px; margin-bottom: 14px;
+    box-shadow: var(--shadow);
+  }
+  .home-status .hs-ic {
+    width: 38px; height: 38px; border-radius: 11px; flex: none;
+    display: flex; align-items: center; justify-content: center; font-size: 18px;
+    background: var(--accent-soft);
+  }
+  .home-status.none .hs-ic { background: #fff6e6; }
+  .home-status .hs-t { font-size: 13.5px; font-weight: 700; color: var(--navy); line-height: 1.3; }
+  .home-status .hs-s { font-size: 11.5px; color: var(--muted); font-weight: 500; margin-top: 2px; line-height: 1.4; }
+
+  /* ===== TRANSITIONS ===== */
+  .tabpanel.anim { animation: tabIn .19s cubic-bezier(.22,.61,.36,1) both; }
+  @keyframes tabIn {
+    from { opacity: 0; transform: translateY(9px); }
+    to   { opacity: 1; transform: none; }
+  }
+  .modal-content { animation: modalIn .2s cubic-bezier(.22,.61,.36,1) both; }
+  @keyframes modalIn {
+    from { opacity: 0; transform: translateY(14px) scale(.97); }
+    to   { opacity: 1; transform: none; }
+  }
+  .home-card { transition: transform .1s ease, border-color .15s, box-shadow .15s; }
+  @media (prefers-reduced-motion: reduce) {
+    .tabpanel.anim, .modal-content { animation: none; }
+  }
+
+  /* ===== BILLING HOLD ===== */
+  .hold-wrap { padding: 0 14px 18px; }
+  .hold-card {
+    background: #fff; border: 1px solid #f3d9a6; border-left: 4px solid #e0a52e;
+    border-radius: 16px; padding: 22px 20px; box-shadow: var(--shadow); text-align: center;
+  }
+  .hold-card .h-ic { font-size: 34px; margin-bottom: 10px; }
+  .hold-card h4 { margin: 0 0 8px; font-size: 16.5px; color: var(--navy); }
+  .hold-card p { margin: 0 0 6px; font-size: 13.5px; color: var(--muted); line-height: 1.6; }
+  .hold-card .h-days { font-size: 12px; color: #8a6112; font-weight: 600; margin-top: 10px; }
+  .hold-card .h-act { margin-top: 18px; }
+  .home-card.held { opacity: .55; }
+  .home-card.held .hc-title { color: var(--muted); }
+  .hc-held {
+    font-size: 9.5px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase;
+    background: #fdf1dc; color: #8a6112; border-radius: 5px; padding: 2px 6px; margin-top: 2px;
+  }
   </style>
 </head>
 
@@ -761,6 +830,7 @@
         <h3>What would you like to do?</h3>
         <p>Pick an option below.</p>
       </div>
+      <div id="homeStatus"></div>
       <div class="home-grid" id="homeGrid"></div>
     </div>
   </div>
@@ -823,7 +893,10 @@
 
   <!-- ---- TAB: ORDER ---- -->
   <div id="tab-order" class="tabpanel">
-  <div class="content wrapper">
+
+  <div id="orderHold" class="hold-wrap" style="display:none;"></div>
+
+  <div class="content wrapper" id="orderBody">
 
 <div class="box">
   <label>Client Name</label>
@@ -921,7 +994,7 @@ let MASTER_REMARK = '';
 let SLOT_DEFAULTS = null;   // {"Morning":"loc","Afternoon":"loc",...} or null
 /* ========= CONFIG ========= */
 const ADMIN_MODE = true;              // admin repo = true, client repo = false
-const CUTOFF_HOUR = 4;                // orders for a day close at 04:00 that morning
+const CUTOFF_HOUR = 4;                // orders for a day close at 04:00 IST that morning
 const CUTOFF_ENABLED = !ADMIN_MODE;   // admin = no cutoff, client = cutoff on
 
 let MASTER_CLIENTS = [];              // admin name search cache
@@ -931,6 +1004,42 @@ let DATES = [];
 let VISIBLE_DATES = [];
 let STATE = {};
 let currentIndex = 0;
+
+/* ========= TRUSTED CLOCK =========
+   The phone's clock can be wrong (manually changed, or a foreign timezone).
+   Real time is read from the HTTP "Date" header of a request to this same
+   site (same-origin, so the header is readable) and kept as an offset from
+   the device clock. Every cutoff check uses nowMs(), never Date.now(). */
+let CLOCK_OFFSET = 0;       // ms to add to the device clock to get real time
+let CLOCK_SYNCED = false;
+
+async function syncClock(){
+  const ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+  const timer = ctrl ? setTimeout(() => ctrl.abort(), 4000) : null;
+  try {
+    const t0 = Date.now();
+    const res = await fetch(location.pathname + '?clk=' + t0, {
+      method: 'HEAD', cache: 'no-store', signal: ctrl ? ctrl.signal : undefined
+    });
+    const t1 = Date.now();
+    const h = res.headers.get('Date');
+    if (!h) return false;
+    const server = new Date(h).getTime();
+    if (isNaN(server)) return false;
+    CLOCK_OFFSET = server - Math.round((t0 + t1) / 2);
+    CLOCK_SYNCED = true;
+    return true;
+  } catch (e) {
+    return false;           // keep the last known offset
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+function nowMs(){ return Date.now() + CLOCK_OFFSET; }
+
+// start syncing immediately; bootClient waits for it before deciding open days
+const CLOCK_READY = syncClock();
 
 /* ========= AUTH ========= */
 const AUTH_KEY = 'friska_auth_v1';
@@ -956,6 +1065,25 @@ function clearAuth(){
 }
 function readAuth(){
   try { return JSON.parse(localStorage.getItem(AUTH_KEY) || 'null'); } catch(e){ return null; }
+}
+
+const SNAP_KEY = 'friska_snap_v1';
+
+function saveSnapshot(phone, client, menu, billing){
+  try {
+    localStorage.setItem(SNAP_KEY, JSON.stringify({
+      phone: phone, client: client, menu: menu,
+      billing: billing || null, at: Date.now()
+    }));
+  } catch(e){}
+}
+function readSnapshot(phone){
+  try {
+    const s = JSON.parse(localStorage.getItem(SNAP_KEY) || 'null');
+    if (!s || s.phone !== phone) return null;
+    if (Date.now() - s.at > 12*60*60*1000) return null;
+    return s;
+  } catch(e){ return null; }
 }
 
 function togglePw(id, btn){
@@ -1002,7 +1130,7 @@ async function authContinue(ev){
         $id('inactiveModal').style.display = 'flex';
         return;
       }
-      await bootClient(d.client, d.menu, phone);
+      await bootClient(d.client, d.menu, phone, d.billing);
       return;
     }
 
@@ -1100,7 +1228,7 @@ async function authSubmit(ev){
     saveAuth(phone, r.token);
     $id('password').value = '';
     $id('password2').value = '';
-    await bootClient(r.client, r.menu, phone);
+    await bootClient(r.client, r.menu, phone, r.billing);
 
   } catch (e) {
     btn.classList.remove("loading");
@@ -1151,7 +1279,7 @@ async function tryAutoLogin(){
   try {
     $id('phone').value = a.phone;
     saveAuth(a.phone, r.token);        // roll the token forward
-    await bootClient(r.client, r.menu, a.phone);
+    await bootClient(r.client, r.menu, a.phone, r.billing);
     return true;
   } catch (e) {
     AUTO_LOGIN_ERROR = 'Signed in, but the page failed to load: ' + (e.message || e);
@@ -1162,6 +1290,7 @@ async function tryAutoLogin(){
 
 function doLogout(){
   clearAuth();
+  try { localStorage.removeItem(SNAP_KEY); } catch(e){}
   location.href = location.pathname;   // drop any query string, fresh start
 }
 
@@ -1220,7 +1349,10 @@ function closeForgotModal(){
 }
 
 /* ========= BOOT CLIENT INTO THE APP ========= */
-async function bootClient(client, menu, phone){
+async function bootClient(client, menu, phone, billing){
+
+  // whether this client may choose meals (billing hold); see applyBillingHold
+  BILLING_HOLD = billing || { blocked: false };
 
   $id('phone').value = phone;
 
@@ -1255,6 +1387,9 @@ async function bootClient(client, menu, phone){
   }
 
   DATES = Object.keys(MENU).sort();
+
+  // real IST time must be known before deciding which days are still open
+  await CLOCK_READY;
   applyCutoff();
 
   showApp(client.clientName || '', cleanedType);
@@ -1267,6 +1402,8 @@ async function bootClient(client, menu, phone){
     return;   // popup will call finishLogin() after save
   }
 
+  saveSnapshot(phone, client, MENU, BILLING_HOLD);
+
   initState();
   await restorePastSelections(phone);
   renderCurrentDay();
@@ -1276,6 +1413,52 @@ async function bootClient(client, menu, phone){
 /* ========= NAVIGATION =========
    Add a new section by adding one entry here and one <div id="tab-<id>">
    panel in the markup. Set soon:true to show it greyed out as "coming soon". */
+/* ========= BILLING HOLD =========
+   Set from the login payload (code.gs decides it from two columns in Master
+   Client List). A client with unbilled orders past the grace window can sign
+   in and see everything else, but cannot choose meals. ADVISORY only - the
+   admin copy can still submit on their behalf. */
+let BILLING_HOLD = { blocked: false };
+
+function holdActive(){
+  return !ADMIN_MODE && !!(BILLING_HOLD && BILLING_HOLD.blocked);
+}
+
+/* swaps the Order tab between the picker and the hold notice */
+function applyBillingHold(){
+  const body = $id('orderBody');
+  const hold = $id('orderHold');
+  if (!body || !hold) return;
+
+  if (!holdActive()) {
+    body.style.display = '';
+    hold.style.display = 'none';
+    hold.innerHTML = '';
+    return;
+  }
+
+  const days = BILLING_HOLD.days;
+  const since = BILLING_HOLD.since ? prettyDate(BILLING_HOLD.since) : '';
+
+  body.style.display = 'none';
+  hold.style.display = 'block';
+  hold.innerHTML =
+    '<div class="hold-card">' +
+      '<div class="h-ic">\u{1F9FE}</div>' +
+      '<h4>Your account needs to be settled</h4>' +
+      '<p>We have not raised a bill for your meals yet, so meal selection is paused ' +
+        'until that is sorted out.</p>' +
+      '<p>Please contact Friska Wellness — it only takes a moment, and your ' +
+        'selection opens again straight away.</p>' +
+      (days != null && since
+        ? '<div class="h-days">Unbilled since ' + esc(since) + ' · ' + days + ' days</div>'
+        : '') +
+      '<div class="h-act">' +
+        '<button class="btn" onclick="navTo(\'feedback\')">Contact us</button>' +
+      '</div>' +
+    '</div>';
+}
+
 const NAV_ITEMS = [
   { id: 'order', label: 'Order',            icon: '🍱', desc: 'Choose your meals for the week' },
   { id: 'menu',  label: 'Menu at Glance',   icon: '📋', desc: "See what's cooking each day" },
@@ -1298,6 +1481,10 @@ function showApp(name, type){
   $id('heroName').textContent = name || 'Welcome';
   $id('heroMeta').textContent = type || 'Weekly Meal Selection';
   renderNav();
+
+  // base entry: pressing back from here leaves the app, like any native app
+  try { history.replaceState({ tab: 'home' }, '', location.href); } catch (e) {}
+
   showTab('home');
   window.scrollTo(0, 0);
 }
@@ -1308,13 +1495,15 @@ function renderNav(){
   const grid = $id('homeGrid');
   if (grid) {
     grid.innerHTML = NAV_ITEMS.map(it => {
-      const cls = 'home-card' + (it.soon ? ' soon' : '');
-      const click = it.soon ? '' : ' onclick="showTab(\'' + it.id + '\')"';
+      const held = (it.id === 'order') && holdActive();
+      const cls = 'home-card' + (it.soon ? ' soon' : '') + (held ? ' held' : '');
+      const click = it.soon ? '' : ' onclick="navTo(\'' + it.id + '\')"';
       return '' +
         '<button class="' + cls + '" type="button"' + click + '>' +
           '<span class="hc-icon">' + it.icon + '</span>' +
           '<span class="hc-title">' + esc(it.label) + '</span>' +
-          '<span class="hc-desc">' + esc(it.desc || '') + '</span>' +
+          '<span class="hc-desc">' + esc(held ? 'Paused \u2014 account not settled' : (it.desc || '')) + '</span>' +
+          (held ? '<span class="hc-held">On hold</span>' : '') +
           (it.soon ? '<span class="hc-soon">Coming soon</span>' : '') +
         '</button>';
     }).join('');
@@ -1323,29 +1512,196 @@ function renderNav(){
   const bar = $id('tabbar');
   if (bar) {
     bar.innerHTML =
-      '<button class="home-chip" type="button" title="Home" onclick="showTab(\'home\')">⌂</button>' +
+      '<button class="home-chip" type="button" title="Client Centre" onclick="navTo(\'home\')">⌂</button>' +
       NAV_ITEMS.filter(it => !it.soon).map(it =>
-        '<button type="button" id="tabbtn-' + it.id + '" onclick="showTab(\'' + it.id + '\')">' +
+        '<button type="button" id="tabbtn-' + it.id + '" onclick="navTo(\'' + it.id + '\')">' +
           esc(it.label) +
         '</button>'
       ).join('');
   }
 }
 
+/* ========= BACK-BUTTON ROUTER =========
+   One extra history entry is kept while a section is open, so:
+     Client Centre -> section      pushes an entry
+     back / swipe                  returns to the Client Centre
+     back again                    leaves the app
+   Switching straight between sections replaces that entry instead of
+   stacking, so back is never a long trail of tabs. */
+
+let CURRENT_TAB = 'home';
+
+const DISMISSIBLE_MODALS =
+  ['summaryModal', 'upgradeModal', 'forgotModal', 'inactiveModal', 'permModal'];
+
+function anyModalOpen(){
+  return DISMISSIBLE_MODALS.some(id => {
+    const m = $id(id);
+    return m && m.style.display === 'flex';
+  });
+}
+
+function closeDismissibleModals(){
+  DISMISSIBLE_MODALS.forEach(id => {
+    const m = $id(id);
+    if (m) m.style.display = 'none';
+  });
+}
+
+/* every user-initiated navigation goes through here */
+function navTo(name){
+
+  if (name === CURRENT_TAB && !anyModalOpen()) return;
+
+  if (name === 'home') {
+    // if we are sitting on a pushed entry, let the browser unwind it so the
+    // forward/back stack stays honest
+    const st = history.state || {};
+    if (st.tab && st.tab !== 'home') { history.back(); return; }
+    showTab('home');
+    return;
+  }
+
+  try {
+    if (CURRENT_TAB === 'home') history.pushState({ tab: name }, '', location.href);
+    else                        history.replaceState({ tab: name }, '', location.href);
+  } catch (e) {}
+
+  showTab(name);
+}
+
+/* opening a modal adds its own entry, so back closes the modal
+   rather than leaving the section */
+function pushModalState(id){
+  try { history.pushState({ tab: CURRENT_TAB, modal: id }, '', location.href); } catch (e) {}
+}
+
+window.addEventListener('popstate', function (ev) {
+
+  const st = ev.state || {};
+
+  // came back off a modal entry -> just shut the modal
+  if (!st.modal && anyModalOpen()) closeDismissibleModals();
+
+  const target = (st.tab && st.tab !== 'home') ? st.tab : 'home';
+
+  // only the app shell participates; the login screen is left alone
+  const shell = $id('appShell');
+  if (!shell || shell.style.display === 'none') return;
+
+  showTab(target);
+});
+
+/* A one-line read on where the client's week stands, so the launcher is not
+   identical whether or not they have ordered. Built from STATE, which already
+   holds their restored selections - no extra request. */
+function renderHomeStatus(){
+
+  const host = $id('homeStatus');
+  if (!host) return;
+
+  if (holdActive()) {
+    host.innerHTML =
+      '<div class="home-status none">' +
+        '<div class="hs-ic">\u{1F9FE}</div>' +
+        '<div><div class="hs-t">Meal selection is paused</div>' +
+        '<div class="hs-s">Your account has not been billed yet \u2014 ' +
+          'please contact Friska Wellness.</div></div>' +
+      '</div>';
+    return;
+  }
+
+  if (!VISIBLE_DATES.length) {
+    host.innerHTML =
+      '<div class="home-status none">' +
+        '<div class="hs-ic">\u{1F553}</div>' +
+        '<div><div class="hs-t">Ordering is closed for now</div>' +
+        '<div class="hs-s">The next week\u2019s menu will appear here.</div></div>' +
+      '</div>';
+    return;
+  }
+
+  let picked = 0, cancelled = 0, next = null;
+
+  VISIBLE_DATES.forEach(d => {
+    const s = STATE[d];
+    if (!s) return;
+    if (s.cancel) { cancelled++; return; }
+    if (hasSelectionForDate(d)) {
+      picked++;
+      if (!next) next = d;
+    }
+  });
+
+  const total = VISIBLE_DATES.length;
+
+  if (!picked) {
+    // paused every open day is a decision, not an empty week - say so
+    const allPaused = cancelled > 0 && cancelled >= total;
+
+    host.innerHTML =
+      '<div class="home-status none">' +
+        '<div class="hs-ic">' + (allPaused ? '\u23F8\uFE0F' : '\u{1F374}') + '</div>' +
+        '<div><div class="hs-t">' +
+          (allPaused ? 'All days paused' : 'No meals chosen yet') +
+        '</div>' +
+        '<div class="hs-s">' +
+          (allPaused
+            ? 'You have paused all ' + total + ' open ' + (total === 1 ? 'day' : 'days') + '.'
+            : total + ' ' + (total === 1 ? 'day is' : 'days are') + ' open for selection.') +
+        '</div></div>' +
+      '</div>';
+    return;
+  }
+
+  const nextName = next
+    ? ymdLocal(next).toLocaleDateString('en-US', { weekday: 'long' })
+    : '';
+
+  const title = (picked >= total)
+    ? 'Your week is set'
+    : (picked + ' of ' + total + ' days chosen');
+
+  let sub = nextName ? ('Next delivery on ' + nextName) : '';
+  if (cancelled) sub += (sub ? ' \u00b7 ' : '') + cancelled + ' day' + (cancelled === 1 ? '' : 's') + ' paused';
+
+  host.innerHTML =
+    '<div class="home-status">' +
+      '<div class="hs-ic">\u2705</div>' +
+      '<div><div class="hs-t">' + esc(title) + '</div>' +
+      (sub ? '<div class="hs-s">' + esc(sub) + '</div>' : '') + '</div>' +
+    '</div>';
+}
+
 function showTab(name){
+
+  CURRENT_TAB = name;
 
   const ids = ['home'].concat(NAV_ITEMS.map(it => it.id));
 
   ids.forEach(t => {
     const panel = $id('tab-' + t);
     const btn   = $id('tabbtn-' + t);
-    if (panel) panel.style.display = (t === name) ? 'block' : 'none';
+    if (panel) {
+      const on = (t === name);
+      panel.style.display = on ? 'block' : 'none';
+      if (on) {
+        // restart the entrance animation each time the panel is shown
+        panel.classList.remove('anim');
+        void panel.offsetWidth;
+        panel.classList.add('anim');
+      }
+    }
     if (btn) btn.classList.toggle('active', t === name);
   });
 
   // the launcher shows the options as cards, so the tab bar is hidden there
   const bar = $id('tabbar');
   if (bar) bar.style.display = (name === 'home') ? 'none' : 'flex';
+
+  if (name === 'order') applyBillingHold();
+
+  if (name === 'home') renderHomeStatus();
 
   if (name === 'menu') renderMenuTab();
 
@@ -1786,11 +2142,32 @@ function dishHTML(label){
          '</div>';
 }
 
+/* ========= DATES =========
+   1. new Date("2026-09-07") parses as UTC midnight; ymdLocal() builds the
+      date from its parts at midday so no timezone/DST shift moves the day.
+   2. "Today" and the cutoff run on IST from the TRUSTED clock (nowMs), so a
+      wrong phone clock or a foreign timezone cannot move the 04:00 cutoff. */
+
+function ymdLocal(ymd){
+  const p = String(ymd || '').split('-');
+  if (p.length !== 3) return new Date(ymd);
+  return new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]), 12, 0, 0);
+}
+
+function ymdStr(d){
+  return d.getFullYear() + '-' +
+    String(d.getMonth() + 1).padStart(2, '0') + '-' +
+    String(d.getDate()).padStart(2, '0');
+}
+
+/* a Date whose local getters read as real IST, whatever the phone says */
+function istNow(){
+  const ms = nowMs();
+  return new Date(ms + (new Date(ms).getTimezoneOffset() + 330) * 60000);
+}
+
 function todayStr(){
-  const n = new Date();
-  return n.getFullYear() + '-' +
-    String(n.getMonth() + 1).padStart(2, '0') + '-' +
-    String(n.getDate()).padStart(2, '0');
+  return ymdStr(istNow());
 }
 
 function renderMenuTab(){
@@ -1810,7 +2187,7 @@ function renderMenuTab(){
   host.innerHTML = dates.map(date => {
 
     const day = MENU[date] || {};
-    const dt  = new Date(date);
+    const dt  = ymdLocal(date);
 
     const dayName = dt.toLocaleDateString('en-US', { weekday: 'long' });
     const nice =
@@ -1864,7 +2241,17 @@ function openMenu(){
 window.open("menu.html","_blank");
 
 }
-/* ========= CUTOFF ========= */
+/* ========= CUTOFF =========
+   Earliest day still open for ordering, in real IST.
+   Before CUTOFF_HOUR today is open; from CUTOFF_HOUR it closes.
+   e.g. Tuesday 03:59 IST -> Tuesday open. Tuesday 04:00 IST -> Wednesday. */
+function earliestOpenDate(){
+  const now = istNow();
+  const d = new Date(now.getFullYear(), now.getMonth(),
+                     now.getDate() + (now.getHours() >= CUTOFF_HOUR ? 1 : 0), 12, 0, 0);
+  return ymdStr(d);
+}
+
 function applyCutoff() {
 
   if (!CUTOFF_ENABLED) {
@@ -1873,46 +2260,57 @@ function applyCutoff() {
     return;
   }
 
-  const now = new Date();
-  const today = new Date(
-    now.getFullYear(),
-    now.getMonth(),
-    now.getDate()
-  );
-
-  const todayStr =
-    today.getFullYear() + '-' +
-    String(today.getMonth() + 1).padStart(2, '0') + '-' +
-    String(today.getDate()).padStart(2, '0');
-
-  const todayExists = DATES.includes(todayStr);
-
-  if (!todayExists) {
-    // Show only valid dates that exist in MENU
-    VISIBLE_DATES = DATES.filter(d => MENU[d]);
-    currentIndex = 0;
-    return;
-  }
-
-  // Earliest day still open for ordering.
-  // Before CUTOFF_HOUR the current day is still selectable; from CUTOFF_HOUR
-  // onwards it closes and the next day becomes the earliest.
-  // e.g. Tuesday 03:59 -> Tuesday is still open. Tuesday 04:00 -> Wednesday.
-  let targetDate = new Date(today);
-
-  if (now.getHours() >= CUTOFF_HOUR) {
-    targetDate.setDate(today.getDate() + 1);
-  }
-
-  const targetStr =
-    targetDate.getFullYear() + '-' +
-    String(targetDate.getMonth() + 1).padStart(2, '0') + '-' +
-    String(targetDate.getDate()).padStart(2, '0');
-
-  VISIBLE_DATES = DATES.filter(d => d >= targetStr && MENU[d]);
+  const open = earliestOpenDate();
+  VISIBLE_DATES = DATES.filter(d => d >= open && MENU[d]);   // never shows past days
 
   currentIndex = 0;
 }
+
+/* Re-check the cutoff while the page is already open (resume, timer).
+   Can only REMOVE days that have closed; keeps the client on the same day
+   if it is still open. Returns true if something was removed. */
+function refreshCutoff(){
+
+  if (!CUTOFF_ENABLED || !DATES.length) return false;
+
+  const cur = VISIBLE_DATES[currentIndex];
+  const open = earliestOpenDate();
+  const next = VISIBLE_DATES.filter(d => d >= open && STATE[d]);
+
+  if (next.length === VISIBLE_DATES.length) return false;
+
+  VISIBLE_DATES = next;
+  const i = VISIBLE_DATES.indexOf(cur);
+  currentIndex = i >= 0 ? i : 0;
+
+  renderCurrentDay();
+  if (CURRENT_TAB === 'home') renderHomeStatus();
+  return true;
+}
+
+function cutoffShellActive(){
+  const shell = $id('appShell');
+  return CUTOFF_ENABLED && shell && shell.style.display !== 'none' && DATES.length;
+}
+
+// app brought back to the foreground: re-sync real time, drop closed days
+document.addEventListener('visibilitychange', async function(){
+  if (document.visibilityState !== 'visible' || !cutoffShellActive()) return;
+  await syncClock();
+  refreshCutoff();
+});
+
+// page restored from the back/forward cache without reloading
+window.addEventListener('pageshow', async function(ev){
+  if (!ev.persisted || !cutoffShellActive()) return;
+  await syncClock();
+  refreshCutoff();
+});
+
+// left open on screen across 04:00
+setInterval(function(){
+  if (document.visibilityState === 'visible' && cutoffShellActive()) refreshCutoff();
+}, 60000);
 
 /* ========= STATE ========= */
 function initState(){
@@ -2094,10 +2492,12 @@ function renderCurrentDay(){
 
   if (!date) {
     container.innerHTML = '<div class="box">Ordering closed.</div>';
+    backBtn.style.display = 'none';
+    nextBtn.style.display = 'none';
     return;
   }
 
-  const parsedDate = new Date(date);
+  const parsedDate = ymdLocal(date);
   
 
 
@@ -2122,7 +2522,7 @@ function renderCurrentDay(){
 
         <div id="dayDropdown" class="day-dropdown">
           ${VISIBLE_DATES.map((d,i)=>{
-            const dn = new Date(d).toLocaleDateString('en-US',{weekday:'long'});
+            const dn = ymdLocal(d).toLocaleDateString('en-US',{weekday:'long'});
             return `<div onclick="jumpToDay(${i})">${dn}</div>`;
           }).join('')}
         </div>
@@ -2460,6 +2860,17 @@ async function saveCurrentDay(btn) {
 
   const date = VISIBLE_DATES[currentIndex];
 
+  // cutoff guard (real IST)
+  if (CUTOFF_ENABLED && date) {
+    await syncClock();
+    if (date < earliestOpenDate()) {
+      if (btn) btn.classList.remove("loading");
+      alert('Ordering for this day closed at ' + CUTOFF_HOUR + ':00 AM IST.');
+      refreshCutoff();
+      return { success: false };
+    }
+  }
+
   // 🔴 IMPORTANT FIX — Skip backend if nothing selected
   if (!hasSelectionForDate(date)) {
     if (btn) btn.classList.remove("loading");
@@ -2502,6 +2913,13 @@ async function saveCurrentDay(btn) {
 
   async function handleSubmit(event) {
 
+  // last line of defence: the Order tab is already swapped out when on hold,
+  // but never let a submission through from a stale page
+  if (holdActive()) {
+    alert('Meal selection is paused until your account is billed. Please contact Friska Wellness.');
+    return;
+  }
+
   const btn = event.target;
 
   // 🔒 Prevent double click
@@ -2511,17 +2929,47 @@ async function saveCurrentDay(btn) {
   btn.disabled = true;
   btn.classList.add("loading");
 
-  const phone = document.getElementById('phone').value.trim();
-  if (!phone) {
+  const unlock = () => {
     btn.disabled = false;
     btn.dataset.locked = "false";
     btn.classList.remove("loading");
+  };
+
+  const phone = document.getElementById('phone').value.trim();
+  if (!phone) {
+    unlock();
     return alert("Phone missing");
   }
 
+  /* ---- CUTOFF GUARD: real IST time, not the phone clock ----
+     If any selected day has passed its 04:00 IST cutoff, NOTHING is sent. */
+  if (CUTOFF_ENABLED) {
+    await syncClock();
+    const open = earliestOpenDate();
+    const closed = VISIBLE_DATES.filter(d => d < open && hasSelectionForDate(d));
+
+    if (closed.length) {
+      const names = closed.map(d => {
+        const dt = ymdLocal(d);
+        return dt.toLocaleDateString('en-US', { weekday: 'long' }) + ' (' +
+               String(dt.getDate()).padStart(2, '0') + '-' +
+               dt.toLocaleDateString('en-US', { month: 'short' }) + ')';
+      }).join(', ');
+
+      unlock();
+      refreshCutoff();
+      return alert(
+        'It is past ' + CUTOFF_HOUR + ':00 AM IST. Ordering for ' + names + ' is closed.\n\n' +
+        'Nothing was submitted. That day has been removed \u2014 please review and submit again.'
+      );
+    }
+  }
+
+  const open = CUTOFF_ENABLED ? earliestOpenDate() : '';
   const allDays = [];
 
   VISIBLE_DATES.forEach(date => {
+    if (CUTOFF_ENABLED && date < open) return;   // belt and braces
     if (!hasSelectionForDate(date)) return;
 
     allDays.push({
@@ -2533,28 +2981,27 @@ async function saveCurrentDay(btn) {
   });
 
   if (!allDays.length) {
-    btn.disabled = false;
-    btn.dataset.locked = "false";
-    btn.classList.remove("loading");
+    unlock();
     return alert("No selections made.");
   }
 
- const now = new Date();
-    const pad = n => String(n).padStart(2,'0');
-    const submissionTimestamp =
-      now.getFullYear() + '-' +
-      pad(now.getMonth()+1) + '-' +
-      pad(now.getDate()) + ' ' +
-      pad(now.getHours()) + ':' +
-      pad(now.getMinutes()) + ':' +
-      pad(now.getSeconds());
-  
-    const payload = {
-      phone,
-      remarks: clientRemarks.value || '',
-      submissionTimestamp,
-      days: allDays
-    };
+  // timestamp in real IST
+  const now = istNow();
+  const pad = n => String(n).padStart(2,'0');
+  const submissionTimestamp =
+    now.getFullYear() + '-' +
+    pad(now.getMonth()+1) + '-' +
+    pad(now.getDate()) + ' ' +
+    pad(now.getHours()) + ':' +
+    pad(now.getMinutes()) + ':' +
+    pad(now.getSeconds());
+
+  const payload = {
+    phone,
+    remarks: clientRemarks.value || '',
+    submissionTimestamp,
+    days: allDays
+  };
 
   const params = new URLSearchParams();
   params.append("action", "submitOrder");
@@ -2574,7 +3021,7 @@ async function saveCurrentDay(btn) {
 
   btn.classList.remove("loading");
 
-  // ⏳ Keep disabled for 60 seconds
+  // ⏳ Keep disabled for 30 seconds
   let countdown = 30;
     btn.textContent = `Wait ${countdown}s`;
   
@@ -2692,7 +3139,7 @@ function generateSummary() {
 
     if (!hasSelection) return;
 
-    const dayName = new Date(date)
+    const dayName = ymdLocal(date)
       .toLocaleDateString('en-US',{ weekday:'long' });
 
     html += `<div class="summary-day">`;
@@ -2734,11 +3181,23 @@ function generateSummary() {
 
   document.getElementById("summaryContent").innerHTML = html;
   document.getElementById("summaryModal").style.display = "flex";
+  pushModalState('summaryModal');   // so back / swipe closes the popup, not the section
 }
 
 
 function closeSummary() {
   document.getElementById("summaryModal").style.display = "none";
+  // unwind the entry the popup added, so back still means "leave this section"
+  const st = history.state || {};
+  if (st.modal === 'summaryModal') { try { history.back(); } catch (e) {} }
+}
+
+/* close the summary and land on the Client Centre */
+function summaryToHome() {
+  document.getElementById("summaryModal").style.display = "none";
+  const st = history.state || {};
+  if (st.modal === 'summaryModal') { try { history.back(); } catch (e) {} }
+  setTimeout(function () { navTo('home'); }, 30);
 }
 function showLoader() {
   const el = document.getElementById("loader");
@@ -3251,11 +3710,35 @@ function runBoot(){
   const stored = ADMIN_MODE ? null : readAuth();
   const hasToken = !!(stored && stored.phone && stored.token);
 
-  // no saved session -> just show the login card
   if (!hasToken) return;
 
-  // hide the login card immediately so it never flashes, then verify the token
   const ls = $id('loginScreen');
+  const snap = readSnapshot(stored.phone);
+
+  /* cached client on this device — paint straight away, verify quietly after */
+  if (snap) {
+    if (ls) ls.style.display = 'none';
+    bootClient(snap.client, snap.menu, stored.phone, snap.billing).catch(function(){});
+
+    apiPost("authToken", { phone: stored.phone, token: stored.token })
+      .then(function(r){
+        if (r && r.ok === true) {
+          saveAuth(stored.phone, r.token);
+          saveSnapshot(stored.phone, r.client, r.menu || snap.menu, r.billing);
+          // the hold may have appeared (or lifted) since this device last looked
+          BILLING_HOLD = r.billing || { blocked: false };
+          renderNav();
+          if (CURRENT_TAB === 'order') applyBillingHold();
+        } else if (r && typeof r.ok !== 'undefined') {
+          clearAuth();
+          try { localStorage.removeItem(SNAP_KEY); } catch(e){}
+        }
+      })
+      .catch(function(){});
+    return;
+  }
+
+  /* no cache yet — original path with the splash */
   if (ls) ls.style.display = 'none';
   showSplash(true);
 
@@ -3266,9 +3749,8 @@ function runBoot(){
     showSplash(false);
 
     if (!ok) {
-      if (ls) ls.style.display = 'flex';       // token dead/expired -> back to login
+      if (ls) ls.style.display = 'flex';
       if (AUTO_LOGIN_ERROR) {
-        // pre-fill the number we know, and say why the session didn't resume
         if (stored && stored.phone) $id('phone').value = stored.phone;
         authError(AUTO_LOGIN_ERROR);
       }
@@ -3433,6 +3915,7 @@ function restoreSimple(sec, drows, col, matchFn){
   <div id="summaryModal" class="modal">
   <div class="modal-content">
     <div class="modal-head">
+      <button class="modal-x" onclick="closeSummary()" aria-label="Close">✕</button>
       <h3 style="color:#2e7d32;">Submitted Successfully ✅</h3>
       <h4 style="text-align:center;margin-top:-6px;">Order Summary</h4>
     </div>
@@ -3441,7 +3924,8 @@ function restoreSimple(sec, drows, col, matchFn){
     </div>
     <div class="modal-foot">
       <button class="btn secondary" onclick="shareSummary()">Share</button>
-      <button class="btn" onclick="closeSummary()">Make Changes</button>
+      <button class="btn secondary" onclick="closeSummary()">Make Changes</button>
+      <button class="btn full" onclick="summaryToHome()">Back to Client Centre</button>
     </div>
   </div>
 </div>
