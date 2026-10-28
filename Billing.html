@@ -855,7 +855,22 @@ function buildInvoice(meta,lines,t){
     <div class="footnote">*Please read all Terms &amp; Conditions on delivery timings, meal storage &amp; shelf life — refunds, substitutions &amp; cancellation policy on our website.</div>`;
 }
 function invoiceBlob(){return new Promise((resolve,reject)=>{html2canvas(el("invoice"),{scale:2,backgroundColor:"#ffffff"}).then(c=>c.toBlob(b=>b?resolve(b):reject(new Error("image failed")),"image/png")).catch(reject);});}
-function waPhone(p){const d=String(p||"").replace(/\D/g,"");if(!d)return "";return d.length>10?d.slice(-12):("91"+d.slice(-10));}
+function waPhone(p){
+  let d=String(p||"").replace(/\D/g,"").replace(/^0+/,"");   // drop STD-style leading zeros
+  if(!d)return "";
+  if(d.length>10)d=d.slice(-10);                             // keep the last 10 digits, whatever prefix came with it
+  return d.length===10?("91"+d):"";                          // anything shorter isn't a dialable number
+}
+/* wa.me lets the OS choose between WhatsApp and WhatsApp Business. On Android an intent URL
+   targets the Business package directly; anywhere else (and if it isn't installed) wa.me takes over. */
+const WA_PACKAGE="com.whatsapp.w4b";   // "com.whatsapp" for personal WhatsApp instead
+function waLink(phone,text){
+  const ph=waPhone(phone);if(!ph)return "";
+  const msg=encodeURIComponent(text||"");
+  const fallback=`https://wa.me/${ph}${msg?`?text=${msg}`:""}`;
+  if(!/Android/i.test(navigator.userAgent))return fallback;
+  return `intent://send?phone=${ph}${msg?`&text=${msg}`:""}#Intent;scheme=whatsapp;package=${WA_PACKAGE};S.browser_fallback_url=${encodeURIComponent(fallback)};end`;
+}
 function waMessage(client,isQuote){
   return isQuote
     ? `Hi ${client||""}, here is your quote. Let us know if you'd like to go ahead and we'll confirm your plan. Thank you!`
@@ -865,7 +880,7 @@ function showWaChatLink(statusId,meta){
   const ph=waPhone(meta.phone);
   const s=el(statusId);if(!s)return;
   if(!ph){s.innerHTML=`Image ready. <span class="subtle">No phone on file — can't open the chat automatically.</span>`;s.className="status info";return;}
-  const url=`https://wa.me/${ph}?text=${encodeURIComponent(waMessage(meta.client,meta.quote))}`;
+  const url=waLink(meta.phone,waMessage(meta.client,meta.quote));
   s.innerHTML=`${meta.quote?"Quote":"Image"} shared${meta.quote?" (not saved to the sheet)":""}. <a href="${url}" target="_blank" rel="noopener" style="color:var(--accent);font-weight:700">Open ${meta.client||"client"}'s WhatsApp chat →</a>`;
   s.className="status ok";
 }
@@ -1026,7 +1041,7 @@ function renderUnbilled(orders,bills){
     groups[k].sort((a,b)=>a.date-b.date);
     const open=!!unbilledOpen[k];
     html+=`<div style="margin-top:8px"><div style="display:flex;align-items:center;gap:8px"><div class="oldhead" data-mk="${k}" style="flex:1">${open?"▾":"▸"} ${monthLabel_(k)} (${groups[k].length})</div><button class="btn btn-ghost" data-dismm="${k}" style="padding:6px 10px;font-size:.8rem">Dismiss all</button></div><div class="${open?"":"hidden"}" data-wrap="${k}"><div style="overflow-x:auto"><table class="dtable"><thead><tr><th>Client</th><th>Phone</th><th>First order in month</th><th></th></tr></thead><tbody>`+
-      groups[k].map(r=>`<tr><td><b>${r.name}</b></td><td>${r.phone}</td><td>${dtstr(r.date)}</td><td style="white-space:nowrap"><div class="rowmenu" data-name="${String(r.name).replace(/"/g,"&quot;")}" data-phone="${r.phone}" data-date="${keyOf(r.date)}"><button class="rowmenu-btn" data-ubmenubtn="${r.key}">⋮</button><div class="rowmenu-pop" data-ubmenupop="${r.key}"><button class="rowmenu-item" data-ubnew>Make new bill</button><button class="rowmenu-item" data-ubusage>Check usage</button><button class="rowmenu-item danger" data-ubdis="${r.key}">Dismiss</button></div></div></td></tr>`).join("")+`</tbody></table></div></div></div>`;});
+      groups[k].map(r=>`<tr><td><b>${r.name}</b></td><td>${r.phone?`<a href="${waLink(r.phone,"")}" target="_blank" rel="noopener" style="color:var(--accent);font-weight:600;text-decoration:none;white-space:nowrap">${r.phone} <span style="opacity:.6">↗</span></a>`:""}</td><td>${dtstr(r.date)}</td><td style="white-space:nowrap"><div class="rowmenu" data-name="${String(r.name).replace(/"/g,"&quot;")}" data-phone="${r.phone}" data-date="${keyOf(r.date)}"><button class="rowmenu-btn" data-ubmenubtn="${r.key}">⋮</button><div class="rowmenu-pop" data-ubmenupop="${r.key}"><button class="rowmenu-item" data-ubnew>Make new bill</button><button class="rowmenu-item" data-ubusage>Check usage</button><button class="rowmenu-item danger" data-ubdis="${r.key}">Dismiss</button></div></div></td></tr>`).join("")+`</tbody></table></div></div></div>`;});
   el("d_unbilled").innerHTML=html;
   el("d_unbilled").querySelectorAll("button[data-ubmenubtn]").forEach(function(b){
     b.onclick=function(e){
