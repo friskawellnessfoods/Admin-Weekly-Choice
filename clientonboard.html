@@ -61,6 +61,11 @@
   .btn:hover:not(:disabled){ filter:brightness(1.05); }
   .btn:active:not(:disabled){ transform:translateY(1px); }
   .btn:disabled{ opacity:.55; cursor:default; box-shadow:none; }
+  .btn-danger{ background:linear-gradient(90deg,#f97316,#dc2626); box-shadow:0 4px 14px rgba(220,38,38,.22); }
+
+  .pwBox{ margin:2px 0 16px; padding:13px 14px; border:1.5px solid #fcd9b6; border-radius:var(--radius); background:#fff7ed; }
+  .pwBox .pwTitle{ font-size:13px; font-weight:800; color:#9a3412; margin-bottom:9px; }
+  .pwBox .hint{ margin:9px 0 0; }
 
   .spinner{ width:16px; height:16px; border:2.5px solid rgba(255,255,255,.5); border-top-color:#fff; border-radius:50%; animation:spin .7s linear infinite; }
   @keyframes spin{ to{ transform:rotate(360deg); } }
@@ -178,6 +183,13 @@
         <label class="slot-chip"><input type="checkbox" id="evening"> Evening</label>
       </div>
 
+      <div id="pwResetWrap" class="pwBox" style="display:none">
+        <div class="pwTitle">App password</div>
+        <button type="button" id="pwResetBtn" class="btn btn-danger">🔑 Reset Password</button>
+        <div class="hint">Clears their saved password. They create a new one the next time they open the app, and any device still signed in is logged out.</div>
+        <div id="pwResetMsg" class="message" style="margin-top:4px"></div>
+      </div>
+
       <button id="saveBtn" class="btn">Save Client</button>
       <div id="message" class="message"></div>
     </div>
@@ -192,6 +204,7 @@
 
   document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('saveBtn').addEventListener('click', saveClient);
+    document.getElementById('pwResetBtn').addEventListener('click', resetClientPassword);
 
     document.getElementById('mealTypeBtn').addEventListener('click', (e) => {
       e.stopPropagation();
@@ -336,6 +349,7 @@
   function startAdd(){
     MODE='add'; editPhone=''; clearForm();
     document.getElementById('statusField').style.display = 'none';
+    document.getElementById('pwResetWrap').style.display = 'none';
     document.getElementById('phone').readOnly = false;
     document.getElementById('formTitle').textContent = 'Add New Client';
     document.getElementById('saveBtn').textContent = 'Save Client';
@@ -408,6 +422,45 @@
     document.getElementById('mapInput2').value = '';
     document.getElementById('statusField').style.display = 'block';
     document.getElementById('status').value = (String(c.status||'').toLowerCase().indexOf('inact') === 0) ? 'Inactive' : 'Active';
+    // password reset is only meaningful for an existing client
+    document.getElementById('pwResetWrap').style.display = 'block';
+    const pm = document.getElementById('pwResetMsg');
+    pm.className = 'message'; pm.innerText = '';
+  }
+
+  /* ---------- Reset app password (clears Master Client List col R) ---------- */
+  async function resetClientPassword(){
+    if(MODE !== 'edit' || !editPhone) return;
+    const who = (document.getElementById('name').value || '').trim() || editPhone;
+    if(!confirm('Reset the app password for ' + who + '?\n\nThey will be asked to create a new one the next time they log in.')) return;
+
+    const btn = document.getElementById('pwResetBtn');
+    const msg = document.getElementById('pwResetMsg');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Resetting…';
+    msg.className = 'message'; msg.innerText = '';
+
+    try{
+      const res = await fetch(API, {
+        method:'POST',
+        headers:{'Content-Type':'application/x-www-form-urlencoded'},
+        body:new URLSearchParams({ action:'authResetPassword', phone:editPhone })
+      });
+      const d = await res.json();
+      if(d && d.ok){
+        msg.className = 'message ok';
+        msg.innerText = 'Password cleared ✅';
+      }else{
+        msg.className = 'message err';
+        msg.innerText = (d && d.message) ? d.message : 'Could not reset password';
+      }
+    }catch(e){
+      msg.className = 'message err';
+      msg.innerText = 'Server error';
+    }
+
+    btn.disabled = false;
+    btn.innerHTML = '🔑 Reset Password';
   }
   function setSlot(id, val){ const cb=document.getElementById(id); cb.checked=!!val; cb.closest('.slot-chip').classList.toggle('on', !!val); }
   function ensureRouteOption(id, val){ const sel=document.getElementById(id); if(val && ![...sel.options].some(o=>o.value===val)){ const o=document.createElement('option'); o.value=val; o.textContent=val; sel.appendChild(o); } sel.value = val || ''; }
