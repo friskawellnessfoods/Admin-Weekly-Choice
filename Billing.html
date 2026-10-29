@@ -118,11 +118,51 @@
   #invoice .grand .gl{font-size:14px;color:var(--navy);text-transform:uppercase;letter-spacing:.06em}#invoice .grand .gv{font-size:24px;color:var(--navy)}
   #invoice .bank{display:flex;gap:18px;padding:14px 20px;border-top:1px solid #eef1f7;font-size:11.5px;line-height:1.7}#invoice .bank .upi{font-weight:800;color:var(--navy);font-size:13px}
   #invoice .footnote{padding:8px 20px 14px;font-size:10px;color:var(--muted);font-style:italic}
+  /* ---- pay mode (billing.html?pay) ---- */
+  .paynav{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+  .paynav .mo{flex:1;text-align:center;font-weight:800;color:var(--navy);font-size:1.05rem}
+  .paynav button{background:#fff;border:1.5px solid var(--line);border-radius:11px;width:42px;height:42px;font-size:1.1rem;font-weight:700;color:var(--navy);cursor:pointer}
+  .paysum{display:flex;gap:10px;margin-bottom:12px}
+  .paysum div{flex:1;border-radius:13px;padding:10px 12px}
+  .paysum .due{background:var(--pause-bg);color:var(--pause-ink)}
+  .paysum .got{background:var(--accent-soft);color:var(--credit)}
+  .paysum .n{font-size:1.2rem;font-weight:800;line-height:1.1}
+  .paysum .l{font-size:.64rem;text-transform:uppercase;letter-spacing:.05em;font-weight:700;opacity:.8;margin-top:2px}
+  .payhead{font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:700;margin:16px 0 6px}
+  .payrow{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:#fff;border:1.5px solid var(--line);border-left:4px solid var(--debit);border-radius:13px;padding:13px 14px;margin-bottom:8px;cursor:pointer;font:inherit}
+  .payrow:active{transform:scale(.995)}
+  .payrow.ispaid{border-left-color:var(--accent);opacity:.62}
+  .payrow .who{flex:1;min-width:0}
+  .payrow .nm{font-weight:700;font-size:.97rem;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .payrow .sub{font-size:.72rem;color:var(--muted);margin-top:2px}
+  .payrow .amt{font-weight:800;font-variant-numeric:tabular-nums;color:var(--navy);white-space:nowrap}
+  .payrow .tick{width:26px;height:26px;border-radius:50%;border:2px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:.85rem;color:transparent;flex:0 0 auto}
+  .payrow.ispaid .tick{background:var(--accent);border-color:var(--accent);color:#fff}
+  .payrow[disabled]{opacity:.45;cursor:wait}
 </style>
 </head>
 <body>
 <div class="wrap">
   <div class="topbar"><img src="logo.png" alt="" onerror="this.style.display='none'" /><h1>Friska Billing</h1></div>
+  <!-- PAY MODE — billing.html?pay : fastest path from "client paid" to "marked paid" -->
+  <section id="payView" class="hidden">
+    <div class="card">
+      <div class="paynav">
+        <button id="p_prev" title="Previous month">‹</button>
+        <div class="mo" id="p_month">—</div>
+        <button id="p_next" title="Next month">›</button>
+      </div>
+      <input id="p_search" placeholder="Search name or bill no." autocomplete="off" />
+      <div class="paysum" style="margin-top:12px">
+        <div class="due"><div class="n" id="p_due">₹0</div><div class="l">Unpaid <span id="p_duen"></span></div></div>
+        <div class="got"><div class="n" id="p_got">₹0</div><div class="l">Collected <span id="p_gotn"></span></div></div>
+      </div>
+      <div class="status info" id="p_status">Tap a client to mark them paid.</div>
+      <div id="p_list"></div>
+      <div class="actions"><button class="btn btn-ghost" id="p_reload" style="flex:1">Reload</button><a class="btn btn-ghost" href="billing.html" style="flex:1;text-align:center;text-decoration:none;line-height:1.4">Full billing →</a></div>
+    </div>
+  </section>
+
   <div class="tabs">
     <button class="tab" data-tab="dash">Dashboard</button>
     <button class="tab" data-tab="renew">Renew / Reconcile</button>
@@ -1627,17 +1667,96 @@ el("u_quote").addEventListener("click",async()=>{try{
 }catch(e){setStatus("u_status2","Error: "+e.message,"err");}});
 el("u_wa").addEventListener("click",async()=>{try{if(!usageCtx)return;const{meta,lines,t}=usagePayload();if(!await validateAndSave(meta,lines,t,"u_status2"))return;buildInvoice(meta,lines,t);await sendWhatsApp(meta,t,"u_status2");}catch(e){setStatus("u_status2","Error: "+e.message,"err");}});
 
+/* ===================== PAY MODE ===================== */
+let payMonth=null;
+function payIsOn(){return /(^|[?&])pay(=|&|$)/.test(location.search);}
+function payMonths(){
+  const s=new Set();dashRows().forEach(r=>{if(r.start)s.add(monthKey_(r.start));});
+  return Array.from(s).sort();
+}
+function payShift(step){
+  const ms=payMonths();if(!ms.length)return;
+  let i=ms.indexOf(payMonth);
+  if(i<0)i=ms.length-1;
+  i=Math.min(ms.length-1,Math.max(0,i+step));
+  payMonth=ms[i];renderPay();
+}
+function renderPay(){
+  const ms=payMonths();
+  if(!payMonth)payMonth=ms.length?ms[ms.length-1]:monthKey_(dateOnly(new Date()));
+  el("p_month").textContent=monthLabel_(payMonth);
+  const i=ms.indexOf(payMonth);
+  el("p_prev").disabled=(i<=0);el("p_next").disabled=(i<0||i>=ms.length-1);
+  const q=normName(el("p_search").value);
+  let rows=dashRows().filter(r=>r.start&&monthKey_(r.start)===payMonth);
+  if(q)rows=rows.filter(r=>normName(r.client).includes(q)||String(r.billNo).includes(q));
+  const amt=r=>parseFloat(r.grand)||0;
+  const unpaid=rows.filter(r=>r.paid.toLowerCase()!=="paid").sort((a,b)=>a.client.localeCompare(b.client));
+  const paid=rows.filter(r=>r.paid.toLowerCase()==="paid").sort((a,b)=>a.client.localeCompare(b.client));
+  el("p_due").textContent="₹"+money(unpaid.reduce((s,r)=>s+amt(r),0));
+  el("p_got").textContent="₹"+money(paid.reduce((s,r)=>s+amt(r),0));
+  el("p_duen").textContent=unpaid.length?`· ${unpaid.length}`:"";
+  el("p_gotn").textContent=paid.length?`· ${paid.length}`:"";
+  const row=r=>`<button class="payrow${r.paid.toLowerCase()==="paid"?" ispaid":""}" data-pay="${String(r.billNo).replace(/"/g,"&quot;")}">`+
+    `<span class="tick">✓</span><span class="who"><span class="nm">${r.client||"—"}</span>`+
+    `<span class="sub">#${r.billNo} · ${dtstr(r.start)}${r.end?" → "+dtstr(r.end):""}</span></span>`+
+    `<span class="amt">₹${money(r.grand)}</span></button>`;
+  let h="";
+  if(!rows.length)h=`<div class="subtle" style="padding:14px 2px">No bills${q?" match that search":""} in ${monthLabel_(payMonth)}.</div>`;
+  else{
+    if(unpaid.length)h+=`<div class="payhead">Unpaid — tap to mark paid</div>`+unpaid.map(row).join("");
+    if(paid.length)h+=`<div class="payhead">Already paid — tap to undo</div>`+paid.map(row).join("");
+  }
+  el("p_list").innerHTML=h;
+  el("p_list").querySelectorAll("button[data-pay]").forEach(b=>{b.onclick=()=>payToggle(b.dataset.pay,b);});
+}
+async function payToggle(billNo,btn){
+  const idx=billHeaderIndex(billsCache),bi=idx["BillNo"],si=idx["PaidStatus"];
+  if(bi===undefined||si===undefined)return;
+  let cur="";
+  for(let i=1;i<billsCache.length;i++){if(String(billsCache[i][bi]).trim()===String(billNo).trim()){cur=String(billsCache[i][si]||"Unpaid");break;}}
+  const next=cur.toLowerCase()==="paid"?"Unpaid":"Paid";
+  const setLocal=v=>{for(let i=1;i<billsCache.length;i++){if(String(billsCache[i][bi]).trim()===String(billNo).trim()){billsCache[i][si]=v;break;}}};
+  setLocal(next);btn.disabled=true;btn.classList.toggle("ispaid",next==="Paid");   // optimistic — instant feedback
+  setStatus("p_status",`${next==="Paid"?"Marking":"Reverting"} #${billNo}…`,"info");
+  try{
+    const res=await billsApiCall("updateBillStatus",{billNo,status:next});
+    if(!res||!res.ok)throw new Error((res&&res.message)||"server said no");
+    setStatus("p_status",`#${billNo} → ${next}.`,"ok");
+    renderPay();
+  }catch(e){
+    setLocal(cur);btn.classList.toggle("ispaid",cur.toLowerCase()==="paid");
+    setStatus("p_status",`Couldn't update #${billNo}: ${e.message}`,"err");
+  }finally{btn.disabled=false;}
+}
+async function payInit(){
+  el("payView").classList.remove("hidden");
+  document.querySelector(".tabs").classList.add("hidden");
+  ["tab-new","tab-renew","tab-dash","tab-usage"].forEach(id=>el(id).classList.add("hidden"));
+  el("p_prev").onclick=()=>payShift(-1);
+  el("p_next").onclick=()=>payShift(1);
+  el("p_search").addEventListener("input",renderPay);
+  el("p_reload").onclick=async()=>{setStatus("p_status","Reloading…","info");try{await fetchBills(true);renderPay();setStatus("p_status","Up to date.","ok");}catch(e){setStatus("p_status","Error: "+e.message,"err");}};
+  setStatus("p_status","Loading bills…","info");
+  try{await fetchBills(false);renderPay();setStatus("p_status","Tap a client to mark them paid.","info");}
+  catch(e){setStatus("p_status","Couldn't load bills: "+e.message,"err");}
+}
+
 // init
 el("n_billdate").value=keyOf(dateOnly(new Date()));
 updatePlanHead();
-showTab(tabFromHash());                                        // honour a #tab in the URL on load / refresh
-try{history.replaceState({tab:currentTab},"","#"+currentTab);}catch(e){}
-(async()=>{
-  try{await fetchPrices(false);}catch(e){setStatus("n_status","Couldn't load Prices: "+e.message,"err");}
-  nRender(true);
-  try{await fetchMaster(false);}catch(e){}
-  try{await fetchBills(false);suggestBillNo("n_billno","n_start");}catch(e){}
-})();
+if(payIsOn()){
+  payInit();                                                   // ?pay — bills only, nothing else loads
+}else{
+  showTab(tabFromHash());                                      // honour a #tab in the URL on load / refresh
+  try{history.replaceState({tab:currentTab},"","#"+currentTab);}catch(e){}
+  (async()=>{
+    try{await fetchPrices(false);}catch(e){setStatus("n_status","Couldn't load Prices: "+e.message,"err");}
+    nRender(true);
+    try{await fetchMaster(false);}catch(e){}
+    try{await fetchBills(false);suggestBillNo("n_billno","n_start");}catch(e){}
+  })();
+}
 </script>
 </body>
 </html>
