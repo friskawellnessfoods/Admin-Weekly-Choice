@@ -159,7 +159,7 @@
       </div>
       <div class="status info" id="p_status">Tap a client to mark them paid.</div>
       <div id="p_list"></div>
-      <div class="actions"><button class="btn btn-ghost" id="p_reload" style="flex:1">Reload</button><a class="btn btn-ghost" href="billing.html" style="flex:1;text-align:center;text-decoration:none;line-height:1.4">Full billing →</a></div>
+      <div class="actions"><button class="btn btn-ghost" id="p_reload" style="flex:1">Reload</button><a class="btn btn-ghost" id="p_full" href="#" style="flex:1;text-align:center;text-decoration:none;line-height:1.4">Full billing →</a></div>
     </div>
   </section>
 
@@ -1669,7 +1669,9 @@ el("u_wa").addEventListener("click",async()=>{try{if(!usageCtx)return;const{meta
 
 /* ===================== PAY MODE ===================== */
 let payMonth=null;
-function payIsOn(){return /(^|[?&])pay(=|&|$)/.test(location.search);}
+/* Accepts ?pay, &pay, #pay and #dash?pay — the hash is checked too, since
+   appending ?pay to a URL that already ends in #dash puts it inside the hash. */
+function payIsOn(){return /(^|[?&#])pay(=|&|#|$)/.test(location.search+location.hash);}
 function payMonths(){
   const s=new Set();dashRows().forEach(r=>{if(r.start)s.add(monthKey_(r.start));});
   return Array.from(s).sort();
@@ -1733,6 +1735,7 @@ async function payInit(){
   el("payView").classList.remove("hidden");
   document.querySelector(".tabs").classList.add("hidden");
   ["tab-new","tab-renew","tab-dash","tab-usage"].forEach(id=>el(id).classList.add("hidden"));
+  el("p_full").href=location.pathname+"#dash";                 // same file, whatever it's called / wherever it lives
   el("p_prev").onclick=()=>payShift(-1);
   el("p_next").onclick=()=>payShift(1);
   el("p_search").addEventListener("input",renderPay);
