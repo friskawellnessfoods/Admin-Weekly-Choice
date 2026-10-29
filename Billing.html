@@ -293,13 +293,12 @@
     </div>
     <div class="card">
       <h2 class="sec" style="cursor:pointer;user-select:none" id="d_ubHead">▾ Unbilled clients</h2>
-      <div id="d_ubBody"><p class="subtle" style="margin-top:0">Clients with orders but no bill at all in the system, listed under each month they ordered. Clients who already have bills appear in Follow-ups instead. Use the ⋮ menu to bill, check usage, or dismiss.</p>
-      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 10px">
-        <button class="btn btn-ghost" id="d_ubSync" style="padding:7px 12px;font-size:.82rem">↻ Sync hold list</button>
-        <span class="subtle" id="d_ubSyncMsg" style="font-size:.78rem"></span>
+      <div id="d_ubBody">
+      <div style="display:flex;align-items:center;gap:8px;margin:0 0 8px">
+        <button class="rowmenu-btn" id="d_ubSync" title="Re-stamp the Unbilled date (col T) in Master Client List and clear it for anyone now billed. Runs once automatically each time the Dashboard opens. Clients left unbilled past the grace window can't choose meals; set Billing Exempt (col S) to Yes to exclude someone.">↻</button>
+        <span class="subtle" id="d_ubSyncMsg" style="font-size:.76rem"></span>
       </div>
-      <p class="subtle" style="margin:-4px 0 10px;font-size:.76rem">Writes the first-order date into <b>Unbilled</b> (col T) of Master Client List and clears it for anyone now billed. Clients left unbilled past the grace window cannot choose meals. Put anything in <b>Billing Exempt</b> (col S) to exclude someone.</p>
-      <div id="d_unbilled"><div class="subtle">Loading…</div></div></div>
+      <div id="d_unbilled" title="Clients with orders but no bill at all. Already-billed clients appear in Follow-ups; exempt clients are hidden. Use the ⋮ menu to bill, check usage, or dismiss."><div class="subtle">Loading…</div></div></div>
     </div>
   </section>
 
@@ -324,6 +323,46 @@
       <div id="u_kv" style="margin-top:12px"></div>
       <div id="u_slots" style="margin-top:12px"></div>
       <div id="u_pauseWarn"></div>
+      <div class="actions"><button class="btn btn-primary" id="u_makebill">Make bill from this usage</button></div>
+    </div>
+    <div class="card hidden" id="u_billCard">
+      <h2 class="sec">Bill from usage</h2>
+      <p class="subtle" style="margin-top:0">Priced from what the client actually took over the dates above. For a client who stopped and needs a final bill.</p>
+      <div class="grid g3">
+        <div class="field"><label>Plan(s)</label>
+          <div class="msel" id="u_planSel">
+            <button type="button" class="msel-head" id="u_planHead">Nutri Balance</button>
+            <div class="msel-panel hidden" id="u_planPanel">
+              <label class="msel-opt"><input type="checkbox" value="nb" checked>Nutri Balance</label>
+              <label class="msel-opt"><input type="checkbox" value="hp">High Protein</label>
+              <label class="msel-opt"><input type="checkbox" value="lc">Low Carb</label>
+              <label class="msel-opt"><input type="checkbox" value="hc">High Carb</label>
+              <label class="msel-opt"><input type="checkbox" value="nc">No Carb</label>
+            </div>
+          </div>
+        </div>
+        <div class="field"><label>Rate tier</label>
+          <select id="u_dur"><option value="d">2 day trial</option><option value="w">Weekly</option><option value="m" selected>1 month</option><option value="q">3 months</option></select>
+        </div>
+        <div class="field"><label>Delivery price (₹/delivery)</label><input id="u_delprice" type="number" value="0" min="0" step="0.5" /></div>
+      </div>
+      <table class="lines" style="margin-top:14px"><thead><tr><th>Item</th><th>Qty</th><th>Rate</th><th>Price</th><th></th></tr></thead><tbody id="u_lines"></tbody></table>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="add-line" id="u_addmeal">+ Add meal line (GST applies)</button><button class="add-line" id="u_addline">+ Add custom line (no GST)</button></div>
+      <div class="grid g2" style="margin-top:16px">
+        <div class="field"><label>Discount %</label><input id="u_disc" type="number" value="0" min="0" /></div>
+        <div class="field"><label>GST % (food only)</label><input id="u_gst" type="number" value="5" min="0" /></div>
+      </div>
+      <div class="totals" id="u_totals"></div>
+      <div class="grid g2" style="margin-top:16px">
+        <div class="field"><label>Bill no.</label><input id="u_billno" /></div>
+        <div class="field"><label>Bill date</label><input id="u_billdate" type="date" onclick="this.showPicker&&this.showPicker()" /></div>
+      </div>
+      <div class="actions">
+        <button class="btn btn-ghost" id="u_save">Save to sheet</button>
+        <button class="btn btn-ghost" id="u_quote">Send as quote (no save)</button>
+        <button class="btn btn-wa" id="u_wa">Bill image → WhatsApp</button>
+      </div>
+      <div class="status info" id="u_status2"></div>
     </div>
   </section>
 </div>
@@ -331,6 +370,9 @@
 <div id="invoiceWrap"><div id="invoice"></div></div>
 
 <script>
+/* Unbilled list only looks at months from here on — auto-billing started Aug 2026,
+   anything earlier was billed by hand and would just be noise. Format: "YYYY-MM". */
+const UNBILLED_FROM="2026-08";
 const BIZ={name:"Friska Wellness",tagline:"Healthy Meals",address:"Moti Nagar, Hyderabad, Telangana 500018",gst:"38AAKFF6850B1ZI",fssai:"23624030000435",upi:"friskawellnessllp@idfcbank",acHolder:"FRISKA WELLNESS LLP",acNumber:"50200087206209",ifsc:"HDFC0005486",branch:"LIBERTY CROSS ROADS",acType:"CURRENT",logo:"logo.png"};
 const ADMIN_PRICES_URL="https://script.google.com/macros/s/AKfycbz82SA1y26hBJ_cd5kFBE3vD73djtTMVh4G_dCs43JKdSlVXzLWDR4DPMbUtHyTIa0/exec";
 const BILLS_API_URL="https://script.google.com/macros/s/AKfycbwI8_v36JJrkAXVhfGIAirSC3IUHbe6l-3WLeeTETg1SGRUcn4M_dPjN9azSCbgTBD1/exec";
@@ -410,6 +452,14 @@ async function fetchOrders(force){if(ordersCache&&!force)return ordersCache;cons
 async function fetchBills(force){if(billsCache&&!force)return billsCache;const j=await billsApiCall("getBillsAll");billsCache=Array.isArray(j)?j:(j.rows||[]);return billsCache;}
 async function fetchMaster(force){if(masterCache&&!force)return masterCache;const j=await apiCall("getMasterClientsAll");masterCache=(j&&j.clients)||[];return masterCache;}
 async function fetchStatus(force){if(statusCache&&!force)return statusCache;const j=await apiCall("getMasterClientStatusAll");statusCache=(j&&j.clients)||[];return statusCache;}
+/* The billing-hold list straight from the backend: clients with an Unbilled date (col T),
+   already filtered for Billing Exempt (col S) using the same rule the client app enforces. */
+async function fetchHoldList(){const j=await apiCall("getUnbilledList");return (j&&j.ok)?j:null;}
+function phoneForClient(name){
+  const k=normName(name);
+  const hit=(masterCache||[]).find(c=>normName(c.name)===k);
+  return hit?hit.phone:"";
+}
 async function fetchPrices(force){
   if(priceMap&&!force)return priceMap;
   const res=await fetch(ADMIN_PRICES_URL+"?t="+Date.now(),{method:"GET",cache:"no-store"});
@@ -811,12 +861,13 @@ function recalcRenewNext(){
 function renewDatesFromStart(){const s=readDate("r_start");const days=parseInt(el("r_days").value)||26;if(s){const f=nextServiceDates(addDays(s,-1),days);setDate("r_end",f[f.length-1]);}}
 
 /* bill number */
-function suggestBillNo(billnoId,startId){
-  const sd=readDate(startId)||dateOnly(new Date());const month=sd.getMonth()+1;const prefix=month*100;let maxSeq=0;
+function suggestBillNoFor(billnoId,startDate){
+  const sd=startDate||dateOnly(new Date());const month=sd.getMonth()+1;const prefix=month*100;let maxSeq=0;
   if(billsCache&&billsCache.length>1){const idx=billHeaderIndex(billsCache);const bi=idx["BillNo"];
     if(bi!==undefined)for(let i=1;i<billsCache.length;i++){const n=parseInt(String(billsCache[i][bi]).replace(/\D/g,""));if(!isNaN(n)&&Math.floor(n/100)===month)maxSeq=Math.max(maxSeq,n-prefix);}}
   el(billnoId).value=prefix+(maxSeq+1);
 }
+function suggestBillNo(billnoId,startId){suggestBillNoFor(billnoId,readDate(startId));}
 async function refreshNum(billnoId,startId){try{await fetchBills(false);}catch(e){}suggestBillNo(billnoId,startId);}
 
 /* invoice */
@@ -1001,25 +1052,20 @@ async function validateAndSave(meta,lines,t,statusId){
 /* ===================== DASHBOARD ===================== */
 /* Reconciles the Unbilled column in Master Client List. One heavy pass here,
    so the client app only ever reads a cached column at login. */
-async function syncUnbilledHold(){
+async function syncUnbilledHold(quiet){
   const btn=el("d_ubSync"), msg=el("d_ubSyncMsg");
   if(btn)btn.disabled=true;
-  if(msg){msg.textContent="Syncing…";msg.style.color="";}
+  if(msg&&!quiet){msg.textContent="Syncing…";msg.style.color="";}
   try{
     const r=await apiCall("reconcileUnbilled");
     if(r&&r.ok){
-      if(msg){
-        msg.textContent=`${r.stamped} dated · ${r.cleared} cleared`+
-          (r.pending?` · ${r.pending} awaiting a first order`:"");
-        msg.style.color="var(--ok,#2e9e6b)";
-      }
-      await loadDashboard(true);
+      if(msg){msg.textContent="Synced";msg.style.color="var(--accent)";setTimeout(()=>{if(msg.textContent==="Synced")msg.textContent="";},3000);}
+      if(!quiet)await loadDashboard(true);               // the auto-run is already inside loadDashboard
     } else if(msg){
-      msg.textContent="Failed: "+((r&&r.message)||"unknown");
-      msg.style.color="var(--err,#c0392b)";
+      msg.textContent="Sync failed";msg.style.color="var(--debit)";
     }
   }catch(e){
-    if(msg){msg.textContent="Failed: "+e.message;msg.style.color="var(--err,#c0392b)";}
+    if(msg){msg.textContent="Sync failed";msg.style.color="var(--debit)";}
   }finally{
     if(btn)btn.disabled=false;
   }
@@ -1063,60 +1109,56 @@ function openUsageCheckFor(name,startKey,endKey){
   el("u_end").value=endKey||keyOf(dateOnly(new Date()));
   runUsageCheck(false);
 }
-async function loadDashboard(force){setStatus("d_status","Loading bills…","info");try{const bills=await fetchBills(force);let orders=[];try{orders=await fetchOrders(force);}catch(e){}let inactiveSet=new Set();try{const st=await fetchStatus(force);inactiveSet=new Set(st.filter(c=>c.status==="inactive").map(c=>normName(c.name)));}catch(e){}renderDashboard(orders,inactiveSet);try{renderUnbilled(orders,bills);}catch(e){el("d_unbilled").innerHTML='<div class="subtle">Orders load failed.</div>';}setStatus("d_status",`${Math.max(0,bills.length-1)} bills.`,"ok");}catch(err){setStatus("d_status","Error: "+err.message,"err");el("d_followups").innerHTML="";}}
+let dashSyncedOnce=false;
+async function loadDashboard(force){
+  setStatus("d_status","Loading bills…","info");
+  try{
+    if(!dashSyncedOnce){dashSyncedOnce=true;try{await syncUnbilledHold(true);}catch(e){}}   // stamp the hold column once per page load
+    const bills=await fetchBills(force);
+    let orders=[];try{orders=await fetchOrders(force);}catch(e){}
+    let inactiveSet=new Set();
+    try{const st=await fetchStatus(force);inactiveSet=new Set(st.filter(c=>c.status==="inactive").map(c=>normName(c.name)));}catch(e){}
+    renderDashboard(orders,inactiveSet);
+    let hold=null;try{hold=await fetchHoldList();}catch(e){}
+    try{renderUnbilled(hold);}catch(e){el("d_unbilled").innerHTML='<div class="subtle">Unbilled list failed to load.</div>';}
+    setStatus("d_status",`${Math.max(0,bills.length-1)} bills.`,"ok");
+  }catch(err){setStatus("d_status","Error: "+err.message,"err");el("d_followups").innerHTML="";}
+}
 function unbilledDismissed(){try{return new Set(JSON.parse(localStorage.getItem("friska_unbilled_dismiss")||"[]"));}catch(e){return new Set();}}
 function dismissUnbilled(k){const s=unbilledDismissed();s.add(k);try{localStorage.setItem("friska_unbilled_dismiss",JSON.stringify([...s]));}catch(e){}}
-function dismissUnbilledMany(ks){const s=unbilledDismissed();ks.forEach(k=>s.add(k));try{localStorage.setItem("friska_unbilled_dismiss",JSON.stringify([...s]));}catch(e){}}
-let unbilledOpen={};
-function renderUnbilled(orders,bills){
-  const act={}; // client -> { name, phone, months: { 'yyyy-MM': earliest order date that month } }
-  for(const row of orders){if(!row||row.length<2)continue;const dt=toDt(row[COL.date]);if(!dt)continue;const nm=String(row[COL.name]||"").trim();if(!nm)continue;
-    let has=false;for(const i of[7,8,9,10,11,12])if(i<row.length){const v=String(row[i]).trim();if(v&&v!=="N/A"){has=true;break;}} if(!has)continue;
-    const k=normName(nm);const ph=String(row[COL.phone]||"").trim();const d=dateOnly(dt);const mk=monthKey_(d);
-    if(!act[k])act[k]={name:nm,phone:ph,months:{}};
-    if(!act[k].phone&&ph)act[k].phone=ph;
-    if(!act[k].months[mk]||d<act[k].months[mk])act[k].months[mk]=d;}
-  const everBilled=new Set();
-  if(billsCache&&billsCache.length>1){const idx=billHeaderIndex(billsCache);const ci=idx["Client"];
-    if(ci!==undefined)for(let i=1;i<billsCache.length;i++){const nm=normName(billsCache[i][ci]);if(nm)everBilled.add(nm);}}
+function renderUnbilled(hold){
+  const host=el("d_unbilled");
+  if(!hold){host.innerHTML='<div class="subtle">Hold list unavailable — tap ↻ to retry.</div>';return;}
   const dismissed=unbilledDismissed();
-  const rows=[];
-  for(const k in act){
-    if(everBilled.has(k))continue;   // has a bill on record — renewal is Follow-ups' job, not Unbilled's
-    const a=act[k];
-    for(const mk in a.months){
-      const dk=k+"|"+mk;
-      if(dismissed.has(dk))continue;
-      rows.push({key:dk,name:a.name,phone:a.phone,date:a.months[mk],mk});
-    }}
-  if(!rows.length){el("d_unbilled").innerHTML='<div class="subtle">All clients billed.</div>';return;}
-  const groups={};rows.forEach(r=>(groups[r.mk]=groups[r.mk]||[]).push(r));
-  const keys=Object.keys(groups).sort().reverse();
-  if(Object.keys(unbilledOpen).length===0&&keys.length)unbilledOpen[keys[0]]=true;
-  let html="";keys.forEach(k=>{
-    groups[k].sort((a,b)=>a.date-b.date);
-    const open=!!unbilledOpen[k];
-    html+=`<div style="margin-top:8px"><div style="display:flex;align-items:center;gap:8px"><div class="oldhead" data-mk="${k}" style="flex:1">${open?"▾":"▸"} ${monthLabel_(k)} (${groups[k].length})</div><button class="btn btn-ghost" data-dismm="${k}" style="padding:6px 10px;font-size:.8rem">Dismiss all</button></div><div class="${open?"":"hidden"}" data-wrap="${k}"><div style="overflow-x:auto"><table class="dtable"><thead><tr><th>Client</th><th>Phone</th><th>First order in month</th><th></th></tr></thead><tbody>`+
-      groups[k].map(r=>`<tr><td><b>${r.name}</b></td><td>${r.phone?waAnchor(r.phone,"",`${r.phone} <span style="opacity:.6">↗</span>`,"color:var(--accent);font-weight:600;text-decoration:none;white-space:nowrap"):""}</td><td>${dtstr(r.date)}</td><td style="white-space:nowrap"><div class="rowmenu" data-name="${String(r.name).replace(/"/g,"&quot;")}" data-phone="${r.phone}" data-date="${keyOf(r.date)}"><button class="rowmenu-btn" data-ubmenubtn="${r.key}">⋮</button><div class="rowmenu-pop" data-ubmenupop="${r.key}"><button class="rowmenu-item" data-ubnew>Make new bill</button><button class="rowmenu-item" data-ubusage>Check usage</button><button class="rowmenu-item danger" data-ubdis="${r.key}">Dismiss</button></div></div></td></tr>`).join("")+`</tbody></table></div></div></div>`;});
-  el("d_unbilled").innerHTML=html;
-  el("d_unbilled").querySelectorAll("button[data-ubmenubtn]").forEach(function(b){
-    b.onclick=function(e){
-      e.stopPropagation();
-      var pop=el("d_unbilled").querySelector('[data-ubmenupop="'+b.dataset.ubmenubtn+'"]');
-      openRowMenu(b,pop);
-    };
+  const rows=(hold.clients||[]).map(function(c){
+    const d=toDt(c.since);
+    return {name:c.name||"",phone:c.phone||"",date:d,days:c.days,blocked:!!c.blocked,key:normName(c.name)};
+  }).filter(function(r){
+    if(!r.date)return false;
+    if(monthKey_(r.date)<UNBILLED_FROM)return false;   // pre-automation, billed by hand
+    return !dismissed.has(r.key);
   });
-  el("d_unbilled").querySelectorAll("button[data-ubnew]").forEach(function(b){
+  if(!rows.length){host.innerHTML='<div class="subtle">Nothing unbilled.</div>';return;}
+  rows.sort(function(a,b){return (b.days==null?-1:b.days)-(a.days==null?-1:a.days);});   // most overdue first
+  host.innerHTML='<div style="overflow-x:auto"><table class="dtable"><thead><tr><th>Client</th><th>Phone</th><th>First order</th><th>Month</th><th></th></tr></thead><tbody>'+
+    rows.map(function(r){
+      const tag=r.blocked?' <span class="rowtag exp">on hold</span>':(r.days!=null?` <span class="rowtag">${r.days}d</span>`:"");
+      const ph=r.phone?waAnchor(r.phone,"",`${r.phone} <span style="opacity:.6">↗</span>`,"color:var(--accent);font-weight:600;text-decoration:none;white-space:nowrap"):"";
+      return `<tr><td><b>${r.name}</b>${tag}</td><td>${ph}</td><td>${dtstr(r.date)}</td><td>${monthLabel_(monthKey_(r.date))}</td><td style="white-space:nowrap"><div class="rowmenu" data-name="${String(r.name).replace(/"/g,"&quot;")}" data-phone="${r.phone}" data-date="${keyOf(r.date)}"><button class="rowmenu-btn" data-ubmenubtn="${r.key}">⋮</button><div class="rowmenu-pop" data-ubmenupop="${r.key}"><button class="rowmenu-item" data-ubnew>Make new bill</button><button class="rowmenu-item" data-ubusage>Check usage</button><button class="rowmenu-item danger" data-ubdis="${r.key}">Dismiss</button></div></div></td></tr>`;
+    }).join("")+
+    '</tbody></table></div>';
+  host.querySelectorAll("button[data-ubmenubtn]").forEach(function(b){
+    b.onclick=function(e){e.stopPropagation();openRowMenu(b,host.querySelector('[data-ubmenupop="'+b.dataset.ubmenubtn+'"]'));};
+  });
+  host.querySelectorAll("button[data-ubnew]").forEach(function(b){
     b.onclick=function(e){e.stopPropagation();closeAllRowMenus();var w=b.closest(".rowmenu");openNewBillFor(w.dataset.name,w.dataset.phone,w.dataset.date);};
   });
-  el("d_unbilled").querySelectorAll("button[data-ubusage]").forEach(function(b){
+  host.querySelectorAll("button[data-ubusage]").forEach(function(b){
     b.onclick=function(e){e.stopPropagation();closeAllRowMenus();var w=b.closest(".rowmenu");openUsageCheckFor(w.dataset.name,w.dataset.date);};
   });
-  el("d_unbilled").querySelectorAll("button[data-ubdis]").forEach(function(b){
-    b.onclick=function(e){e.stopPropagation();closeAllRowMenus();dismissUnbilled(b.dataset.ubdis);renderUnbilled(orders,bills);};
+  host.querySelectorAll("button[data-ubdis]").forEach(function(b){
+    b.onclick=function(e){e.stopPropagation();closeAllRowMenus();dismissUnbilled(b.dataset.ubdis);renderUnbilled(hold);};
   });
-  el("d_unbilled").querySelectorAll("button[data-dismm]").forEach(b=>b.onclick=()=>{const k=b.dataset.dismm;if(!confirm(`Dismiss all ${groups[k].length} clients in ${monthLabel_(k)}?`))return;dismissUnbilledMany(groups[k].map(r=>r.key));renderUnbilled(orders,bills);});
-  el("d_unbilled").querySelectorAll(".oldhead[data-mk]").forEach(h=>h.onclick=()=>{const k=h.dataset.mk;unbilledOpen[k]=!unbilledOpen[k];renderUnbilled(orders,bills);});
 }
 function dashRows(){
   if(!billsCache||billsCache.length<2)return [];
@@ -1252,6 +1294,8 @@ async function runUsageCheck(force){
 }
 function renderUsageReport(u,start,end,continued){
   const t=u.totals;el("u_card").classList.remove("hidden");
+  usageCtx={u,start,end,client:el("u_client").value.trim()};
+  el("u_billCard").classList.add("hidden");   // a fresh report invalidates any half-built bill
   el("u_range").innerHTML=`Usage for <b>${dtstr(start)} → ${dtstr(end)}</b> (Sundays excluded)`;
   el("u_stats").innerHTML=statBox(t.meals_total,"Meals","meals")+statBox(u.activeDays,"Active days","active")+statBox(u.pausedDays,"Paused days","paused")+statBox(u.totalDays,"Total days")+statBox(u.deliveries,"Deliveries","deliveries");
   el("u_drill").innerHTML="";
@@ -1265,6 +1309,50 @@ function renderUsageReport(u,start,end,continued){
   else if(u.lastActiveDate&&u.lastActiveDate<end)el("u_pauseWarn").innerHTML=`<div class="note pause">Last meal on <b>${dtstr(u.lastActiveDate)}</b>; no meals after that in this range.</div>`;
   else el("u_pauseWarn").innerHTML="";
 }
+
+/* ===================== BILL FROM USAGE ===================== */
+let usageCtx=null;
+function uPlans(){return Array.from(el("u_planPanel").querySelectorAll("input:checked")).map(c=>c.value);}
+function updateUPlanHead(){const p=uPlans();el("u_planHead").textContent=p.length?p.map(x=>PLAN_LABEL[x]).join(", "):"Select plan(s)";}
+function buildUsageLines(keep){
+  const prev=keep?domLines("u_lines"):{};
+  const b=usageCtx.u,tt=b.totals,pl=uPlans().length?uPlans():["nb"],p0=pl[0],dur=el("u_dur").value;
+  const both=tt.meal1>0&&tt.meal2>0;
+  const keepR=(id,def)=>prev[id]?prev[id].rate:def;
+  const out=[];
+  if(tt.meals_total>0)out.push({id:"main",label:pl.map(p=>PLAN_LABEL[p]).join(" + ")+" · "+(both?"Lunch + Dinner":(tt.meal1>0?"Lunch":"Dinner")),qty:tt.meals_total,rate:keepR("main",both?rate(p0,dur,"combo"):rate(p0,dur,"lunch")),food:true});
+  if(tt.brk>0)out.push({id:"breakfast",label:"Breakfast",qty:tt.brk,rate:keepR("breakfast",rate(p0,dur,"breakfast")),food:true});
+  if(tt.snack>0)out.push({id:"snack",label:"Snack",qty:tt.snack,rate:keepR("snack",rate(p0,dur,"snack")),food:true});
+  if(tt.juices_total>0)out.push({id:"juices",label:"Juices",qty:tt.juices_total,rate:keepR("juices",rate(p0,dur,"juice1")),food:true});
+  if(tt.seafood>0)out.push({id:"seafood",label:"Seafood add-on",qty:tt.seafood,rate:keepR("seafood",gRate("seafood")),food:true});
+  Object.values(prev).filter(l=>l.extra).forEach(l=>out.push(l));
+  Object.values(prev).filter(l=>l.custom).forEach(l=>out.push(l));
+  if(b.deliveries>0)out.push({id:"delivery",label:"Delivery",qty:b.deliveries,rate:parseFloat(el("u_delprice").value)||0,food:false});
+  return out;
+}
+function uRender(keep){renderLines("u_lines",buildUsageLines(keep),true);recalcUsageBill();}
+function recalcUsageBill(){if(!usageCtx)return;renderTotals("u_totals",computeTotals(readLines("u_lines"),parseFloat(el("u_disc").value)||0,parseFloat(el("u_gst").value)||0,0));}
+function openUsageBill(){
+  if(!usageCtx){setStatus("u_status","Run a usage report first.","err");return;}
+  if(!usageCtx.client){setStatus("u_status","Enter a client name.","err");return;}
+  el("u_billCard").classList.remove("hidden");
+  el("u_delprice").value=0;el("u_disc").value=0;el("u_gst").value=5;
+  el("u_billdate").value=keyOf(dateOnly(new Date()));
+  updateUPlanHead();
+  uRender(false);
+  suggestBillNoFor("u_billno",usageCtx.start);
+  setStatus("u_status2","Set the plan and rates, then save or send.","info");
+  el("u_billCard").scrollIntoView({behavior:"smooth",block:"start"});
+}
+function gatherUsageMeta(){
+  const slots=Object.keys(usageCtx.u.slotCounts||{}).filter(s=>s&&s!=="No slot");
+  return {billNo:el("u_billno").value.trim(),billDate:readDate("u_billdate")||dateOnly(new Date()),
+    client:usageCtx.client,phone:phoneForClient(usageCtx.client),
+    plan:uPlans().map(p=>PLAN_LABEL[p]).join(", "),duration:DUR_LABEL[el("u_dur").value]||"",
+    slots:slots.join(", "),days:usageCtx.u.activeDays,start:usageCtx.start,end:usageCtx.end,
+    discPct:parseFloat(el("u_disc").value)||0,gstPct:parseFloat(el("u_gst").value)||5,paidStatus:"Unpaid"};
+}
+function usagePayload(){const meta=gatherUsageMeta();const lines=readLines("u_lines");return {meta,lines,t:computeTotals(lines,meta.discPct,meta.gstPct,0)};}
 
 /* ===================== NAME AUTOCOMPLETE ===================== */
 function fillDatalist(listId,names,q){
@@ -1413,7 +1501,29 @@ el("d_filter").addEventListener("change",applyDashFilter);
 el("d_reload").addEventListener("click",()=>loadDashboard(true));
 el("d_allHead").addEventListener("click",()=>{const b=el("d_allBody"),h=el("d_allHead");const o=!b.classList.toggle("hidden");h.textContent=(o?"▾":"▸")+" All bills";});
 el("d_ubHead").addEventListener("click",()=>{const b=el("d_ubBody"),h=el("d_ubHead");const o=!b.classList.toggle("hidden");h.textContent=(o?"▾":"▸")+" Unbilled clients";});
-el("d_ubSync").addEventListener("click",syncUnbilledHold);
+el("d_ubSync").addEventListener("click",()=>syncUnbilledHold(false));
+
+/* bill-from-usage */
+el("u_makebill").addEventListener("click",openUsageBill);
+el("u_planHead").addEventListener("click",e=>{e.stopPropagation();el("u_planPanel").classList.toggle("hidden");});
+el("u_planPanel").addEventListener("change",()=>{updateUPlanHead();uRender(false);});
+document.addEventListener("click",e=>{if(!el("u_planSel").contains(e.target))el("u_planPanel").classList.add("hidden");});
+el("u_dur").addEventListener("change",()=>uRender(false));
+el("u_delprice").addEventListener("input",()=>uRender(true));
+el("u_disc").addEventListener("input",recalcUsageBill);
+el("u_gst").addEventListener("input",recalcUsageBill);
+bindLivePrice("u_lines",recalcUsageBill);
+el("u_addmeal").addEventListener("click",()=>{el("u_lines").insertAdjacentHTML("beforeend",lineRowHtml({id:"meal_"+Date.now(),label:"High Protein · Lunch",qty:usageCtx?usageCtx.u.activeDays:0,rate:0,food:true,extra:true}));recalcUsageBill();});
+el("u_addline").addEventListener("click",()=>{el("u_lines").insertAdjacentHTML("beforeend",lineRowHtml({id:"custom_"+Date.now(),label:"Custom item",qty:0,rate:0,food:true,custom:true}));recalcUsageBill();});
+el("u_save").addEventListener("click",async()=>{try{if(!usageCtx)return;const{meta,lines,t}=usagePayload();await validateAndSave(meta,lines,t,"u_status2");}catch(e){setStatus("u_status2","Error: "+e.message,"err");}});
+el("u_quote").addEventListener("click",async()=>{try{
+  if(!usageCtx)return;
+  const{meta,lines,t}=usagePayload();meta.quote=true;
+  if(!meta.client){setStatus("u_status2","Enter client name.","err");return;}
+  setStatus("u_status2","Building quote…","info");
+  buildInvoice(meta,lines,t);await sendWhatsApp(meta,t,"u_status2");   // quote only — nothing written to the Bills sheet
+}catch(e){setStatus("u_status2","Error: "+e.message,"err");}});
+el("u_wa").addEventListener("click",async()=>{try{if(!usageCtx)return;const{meta,lines,t}=usagePayload();if(!await validateAndSave(meta,lines,t,"u_status2"))return;buildInvoice(meta,lines,t);await sendWhatsApp(meta,t,"u_status2");}catch(e){setStatus("u_status2","Error: "+e.message,"err");}});
 
 // init
 el("n_billdate").value=keyOf(dateOnly(new Date()));
