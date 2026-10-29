@@ -978,8 +978,9 @@ function showWaChatLink(statusId,meta,fname){
 function blobToBase64(blob){
   return new Promise((res,rej)=>{const fr=new FileReader();fr.onload=()=>res(String(fr.result).split(",")[1]||"");fr.onerror=rej;fr.readAsDataURL(blob);});
 }
+/* Returns {url, error} — never throws, but never hides the reason either. */
 async function uploadBillImage(billNo,blob){
-  if(!billNo)return "";
+  if(!billNo)return {url:"",error:"no bill number"};
   try{
     const r=await billsApiCall("saveBillImage",{billNo:billNo,image:await blobToBase64(blob)});
     if(r&&r.ok&&r.url){
@@ -988,9 +989,16 @@ async function uploadBillImage(billNo,blob){
         if(bi!==undefined&&ui!==undefined)for(let i=1;i<billsCache.length;i++){
           if(String(billsCache[i][bi]).trim()===String(billNo).trim()){billsCache[i][ui]=r.url;break;}}
       }
-      return r.url;
+      return {url:r.url,error:""};
     }
-  }catch(e){}
+    return {url:"",error:(r&&(r.message||r.error))||"backend returned no URL"};
+  }catch(e){return {url:"",error:(e&&e.message)||String(e)};}
+}
+function waHint(msg){
+  const m=String(msg||"").toLowerCase();
+  if(m.indexOf("permission")>=0||m.indexOf("authoriz")>=0||m.indexOf("authentic")>=0||m.indexOf("drive")>=0)
+    return "\n\nDrive access hasn't been approved yet. Open the Bills Apps Script project, pick grantDriveAccess in the function dropdown, press Run, and approve the prompt. Then try again.";
+  if(m.indexOf("billurl")>=0)return "\n\nAdd a 'BillUrl' header column to the Bills sheet.";
   return "";
 }
 function downloadBlob(blob,fname){
@@ -1006,7 +1014,9 @@ async function sendWhatsApp(meta,t,statusId){
   const fname=meta.quote?`Quote_${safe}.png`:`Bill_${meta.billNo}.png`;
   const blob=await invoiceBlob();
   downloadBlob(blob,fname);
-  if(!meta.quote)uploadBillImage(meta.billNo,blob);   // archive in the background, don't delay the hand-off
+  if(!meta.quote)uploadBillImage(meta.billNo,blob).then(r=>{   // archive in the background, don't delay the hand-off
+    if(!r.url&&statusId){const s=el(statusId);if(s)s.innerHTML+=` <span style="color:var(--debit)">· not archived to Drive (${r.error})</span>`;}
+  });
   if(statusId)showWaChatLink(statusId,meta,fname);
   if(!waPhone(meta.phone))return;
   setTimeout(()=>{openWa(meta.phone,waMessage(meta.client,meta.quote));},700);   // let the download commit before handing off
@@ -1054,7 +1064,7 @@ async function backfillBillImages(){
   if(!todo.length){setStatus("d_status","Every bill already has an image.","ok");return;}
   if(!confirm(`Generate and archive images for ${todo.length} bill(s)?\n\nThis runs one at a time and can take a few minutes — keep this tab open. You can stop it at any point; progress is kept.`))return;
   backfillRunning=true;backfillStop=false;
-  let done=0,failed=0;
+  let done=0,failed=0,lastErr='';
   for(let n=0;n<todo.length;n++){
     if(backfillStop)break;
     const no=todo[n];
@@ -1068,12 +1078,22 @@ async function backfillBillImages(){
       const {meta,lines,t}=reconstructInvoiceData(bill);
       buildInvoice(meta,lines,t);
       const blob=await invoiceBlob();
-      if(await uploadBillImage(no,blob))done++;else failed++;
-    }catch(e){failed++;}
+      const res=await uploadBillImage(no,blob);
+      if(res.url)done++;
+      else{
+        failed++;lastErr=res.error;
+        if(done===0){          // first one failed — something is wrong for all of them, don't grind through 175
+          backfillRunning=false;btn.textContent="Backfill images";
+          setStatus("d_status",`Backfill stopped — bill ${no} failed: ${lastErr}`,"err");
+          alert(`Couldn't archive bill ${no}.\n\n${lastErr}${waHint(lastErr)}`);
+          return;
+        }
+      }
+    }catch(e){failed++;lastErr=(e&&e.message)||String(e);}
   }
   backfillRunning=false;btn.textContent="Backfill images";
   applyDashFilter();
-  setStatus("d_status",`Backfill finished — ${done} archived${failed?`, ${failed} failed`:""}${backfillStop?" (stopped early)":""}.`,done?"ok":"err");
+  setStatus("d_status",`Backfill finished — ${done} archived${failed?`, ${failed} failed (${lastErr})`:""}${backfillStop?" (stopped early)":""}.`,done?"ok":"err");
 }
 async function downloadBillImage(billNo){
   try{
@@ -1086,7 +1106,7 @@ async function downloadBillImage(billNo){
     buildInvoice(meta,lines,t);
     const blob=await invoiceBlob();
     downloadBlob(blob,`Bill_${billNo}.png`);
-    uploadBillImage(billNo,blob).then(u=>{if(u)applyDashFilter();});   // backfills the link for older bills
+    uploadBillImage(billNo,blob).then(r=>{if(r.url)applyDashFilter();else alert("Image downloaded, but archiving to Drive failed.\n\n"+r.error+waHint(r.error));});
   }catch(e){alert("Couldn't generate image: "+e.message);}
 }
 async function deleteBillPrompt(billNo){
