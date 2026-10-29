@@ -287,6 +287,7 @@
         <div class="field" style="flex:1 1 200px"><input id="d_search" placeholder="Search name or bill no." /></div>
         <select id="d_filter" style="flex:0 0 140px"><option value="all">All</option><option value="unpaid">Unpaid</option><option value="paid">Paid</option></select>
         <button class="btn btn-ghost" id="d_reload" style="flex:0 0 auto">Reload</button>
+        <button class="btn btn-ghost" id="d_backfill" style="flex:0 0 auto" title="Generate and archive images for every bill that doesn't have one yet, so their bill numbers become links. Safe to re-run — it skips bills already done.">Backfill images</button>
       </div>
       <div id="d_table"></div>
       <div class="status info" id="d_status"></div></div>
@@ -1034,6 +1035,46 @@ function reconstructInvoiceData(bill){
   const meta={billNo:bill.billNo,billDate:toDt(g("Date"))||bill.start||dateOnly(new Date()),client:bill.client,plan:bill.plan,start:bill.start,end:bill.end,days,discPct,gstPct,paidStatus:bill.paid};
   return {meta,lines,t};
 }
+/* Generates + archives an image for every bill that has no BillUrl yet.
+   Sequential on purpose — each one renders a canvas and posts to Apps Script. */
+let backfillRunning=false,backfillStop=false;
+async function backfillBillImages(){
+  const btn=el("d_backfill");
+  if(backfillRunning){backfillStop=true;btn.textContent="Stopping…";return;}
+  try{await fetchBills(true);}catch(e){}
+  if(!billsCache||billsCache.length<2){alert("No bills loaded.");return;}
+  const idx=billHeaderIndex(billsCache);
+  if(idx["BillUrl"]===undefined){alert('The Bills sheet has no "BillUrl" column — add that header first.');return;}
+  const todo=[];
+  for(let i=1;i<billsCache.length;i++){
+    const no=String(billsCache[i][idx["BillNo"]]||"").trim();
+    const u=String(billsCache[i][idx["BillUrl"]]||"").trim();
+    if(no&&!u)todo.push(no);
+  }
+  if(!todo.length){setStatus("d_status","Every bill already has an image.","ok");return;}
+  if(!confirm(`Generate and archive images for ${todo.length} bill(s)?\n\nThis runs one at a time and can take a few minutes — keep this tab open. You can stop it at any point; progress is kept.`))return;
+  backfillRunning=true;backfillStop=false;
+  let done=0,failed=0;
+  for(let n=0;n<todo.length;n++){
+    if(backfillStop)break;
+    const no=todo[n];
+    btn.textContent=`Stop (${n+1}/${todo.length})`;
+    setStatus("d_status",`Archiving bill ${no}… ${done} done${failed?`, ${failed} failed`:""}`,"info");
+    try{
+      let raw=null;
+      for(let i=1;i<billsCache.length;i++){if(String(billsCache[i][idx["BillNo"]]).trim()===no){raw=billsCache[i];break;}}
+      if(!raw){failed++;continue;}
+      const bill=parseBillRow(raw,idx);
+      const {meta,lines,t}=reconstructInvoiceData(bill);
+      buildInvoice(meta,lines,t);
+      const blob=await invoiceBlob();
+      if(await uploadBillImage(no,blob))done++;else failed++;
+    }catch(e){failed++;}
+  }
+  backfillRunning=false;btn.textContent="Backfill images";
+  applyDashFilter();
+  setStatus("d_status",`Backfill finished — ${done} archived${failed?`, ${failed} failed`:""}${backfillStop?" (stopped early)":""}.`,done?"ok":"err");
+}
 async function downloadBillImage(billNo){
   try{
     if(!billsCache||billsCache.length<2)await fetchBills(false);
@@ -1539,6 +1580,7 @@ el("u_client").addEventListener("keydown",e=>{if(e.key==="Enter")runUsageCheck(f
 el("d_search").addEventListener("input",applyDashFilter);
 el("d_filter").addEventListener("change",applyDashFilter);
 el("d_reload").addEventListener("click",()=>loadDashboard(true));
+el("d_backfill").addEventListener("click",backfillBillImages);
 el("d_allHead").addEventListener("click",()=>{const b=el("d_allBody"),h=el("d_allHead");const o=!b.classList.toggle("hidden");h.textContent=(o?"▾":"▸")+" All bills";});
 el("d_ubHead").addEventListener("click",()=>{const b=el("d_ubBody"),h=el("d_ubHead");const o=!b.classList.toggle("hidden");h.textContent=(o?"▾":"▸")+" Unbilled clients";});
 el("d_ubSync").addEventListener("click",()=>syncUnbilledHold(false));
