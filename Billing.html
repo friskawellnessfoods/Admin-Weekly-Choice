@@ -139,6 +139,14 @@
   .payrow .tick{width:26px;height:26px;border-radius:50%;border:2px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:.85rem;color:transparent;flex:0 0 auto}
   .payrow.ispaid .tick{background:var(--accent);border-color:var(--accent);color:#fff}
   .payrow[disabled]{opacity:.45;cursor:wait}
+  .payrow.sel{border-color:var(--accent);background:var(--accent-soft);border-left-color:var(--accent)}
+  .payrow input[type=checkbox]{width:24px;height:24px;flex:0 0 auto;accent-color:var(--accent);margin:0}
+  .payrow.justdone{border-left-color:var(--accent);opacity:1;background:#f3fbf7}
+  .undo{flex:0 0 auto;background:#fff;border:1.5px solid var(--line);color:var(--muted);border-radius:9px;padding:6px 11px;font-size:.76rem;font-weight:700;cursor:pointer}
+  .undo:hover{border-color:var(--debit);color:var(--debit)}
+  .paybar{position:sticky;bottom:10px;z-index:50;margin-top:12px}
+  .paybar button{width:100%;padding:15px;border:none;border-radius:14px;background:var(--accent);color:#fff;font-size:1rem;font-weight:800;cursor:pointer;box-shadow:0 8px 22px rgba(16,185,129,.35)}
+  .paybar button:disabled{opacity:.6;cursor:wait}
 </style>
 </head>
 <body>
@@ -157,8 +165,9 @@
         <div class="due"><div class="n" id="p_due">₹0</div><div class="l">Unpaid <span id="p_duen"></span></div></div>
         <div class="got"><div class="n" id="p_got">₹0</div><div class="l">Collected <span id="p_gotn"></span></div></div>
       </div>
-      <div class="status info" id="p_status">Tap a client to mark them paid.</div>
+      <div class="status info" id="p_status">Tick the clients who paid, then press the button.</div>
       <div id="p_list"></div>
+      <div class="paybar hidden" id="p_bar"><button id="p_submit">Mark paid</button></div>
       <div class="actions"><button class="btn btn-ghost" id="p_reload" style="flex:1">Reload</button><a class="btn btn-ghost" id="p_full" href="#" style="flex:1;text-align:center;text-decoration:none;line-height:1.4">Full billing →</a></div>
     </div>
   </section>
@@ -1669,6 +1678,8 @@ el("u_wa").addEventListener("click",async()=>{try{if(!usageCtx)return;const{meta
 
 /* ===================== PAY MODE ===================== */
 let payMonth=null;
+let payChecked=new Set();   // ticked but not yet submitted
+let paySession=[];          // marked paid in this session, newest first — stays pinned with an Undo
 /* Accepts ?pay, &pay, #pay and #dash?pay — the hash is checked too, since
    appending ?pay to a URL that already ends in #dash puts it inside the hash. */
 function payIsOn(){return /(^|[?&#])pay(=|&|#|$)/.test(location.search+location.hash);}
@@ -1693,44 +1704,90 @@ function renderPay(){
   let rows=dashRows().filter(r=>r.start&&monthKey_(r.start)===payMonth);
   if(q)rows=rows.filter(r=>normName(r.client).includes(q)||String(r.billNo).includes(q));
   const amt=r=>parseFloat(r.grand)||0;
-  const unpaid=rows.filter(r=>r.paid.toLowerCase()!=="paid").sort((a,b)=>a.client.localeCompare(b.client));
-  const paid=rows.filter(r=>r.paid.toLowerCase()==="paid").sort((a,b)=>a.client.localeCompare(b.client));
+  const isPaid=r=>r.paid.toLowerCase()==="paid";
+  const byName=(a,b)=>String(a.client||"").localeCompare(String(b.client||""));
+  const unpaid=rows.filter(r=>!isPaid(r)).sort(byName);
+  const just=paySession.map(no=>rows.find(r=>String(r.billNo)===String(no))).filter(r=>r&&isPaid(r));   // newest first
+  const justSet=new Set(just.map(r=>String(r.billNo)));
+  const paid=rows.filter(r=>isPaid(r)&&!justSet.has(String(r.billNo))).sort(byName);
   el("p_due").textContent="₹"+money(unpaid.reduce((s,r)=>s+amt(r),0));
-  el("p_got").textContent="₹"+money(paid.reduce((s,r)=>s+amt(r),0));
+  el("p_got").textContent="₹"+money(rows.filter(isPaid).reduce((s,r)=>s+amt(r),0));
   el("p_duen").textContent=unpaid.length?`· ${unpaid.length}`:"";
-  el("p_gotn").textContent=paid.length?`· ${paid.length}`:"";
-  const row=r=>`<button class="payrow${r.paid.toLowerCase()==="paid"?" ispaid":""}" data-pay="${String(r.billNo).replace(/"/g,"&quot;")}">`+
-    `<span class="tick">✓</span><span class="who"><span class="nm">${r.client||"—"}</span>`+
-    `<span class="sub">#${r.billNo} · ${dtstr(r.start)}${r.end?" → "+dtstr(r.end):""}</span></span>`+
-    `<span class="amt">₹${money(r.grand)}</span></button>`;
+  el("p_gotn").textContent=rows.filter(isPaid).length?`· ${rows.filter(isPaid).length}`:"";
+  const meta=r=>`<span class="sub">#${r.billNo} · ${dtstr(r.start)}${r.end?" → "+dtstr(r.end):""}</span>`;
+  const pickRow=r=>{
+    const on=payChecked.has(String(r.billNo));
+    return `<label class="payrow${on?" sel":""}"><input type="checkbox" data-chk="${r.billNo}"${on?" checked":""}>`+
+      `<span class="who"><span class="nm">${r.client||"—"}</span>${meta(r)}</span>`+
+      `<span class="amt">₹${money(r.grand)}</span></label>`;
+  };
+  const doneRow=(r,fresh)=>`<div class="payrow ispaid${fresh?" justdone":""}">`+
+      `<span class="tick">✓</span><span class="who"><span class="nm">${r.client||"—"}</span>${meta(r)}</span>`+
+      `<span class="amt">₹${money(r.grand)}</span><button class="undo" data-undo="${r.billNo}">Undo</button></div>`;
   let h="";
   if(!rows.length)h=`<div class="subtle" style="padding:14px 2px">No bills${q?" match that search":""} in ${monthLabel_(payMonth)}.</div>`;
   else{
-    if(unpaid.length)h+=`<div class="payhead">Unpaid — tap to mark paid</div>`+unpaid.map(row).join("");
-    if(paid.length)h+=`<div class="payhead">Already paid — tap to undo</div>`+paid.map(row).join("");
+    if(just.length)h+=`<div class="payhead">Marked paid just now</div>`+just.map(r=>doneRow(r,true)).join("");
+    if(unpaid.length)h+=`<div class="payhead">Unpaid — tick who paid</div>`+unpaid.map(pickRow).join("");
+    if(paid.length)h+=`<div class="payhead">Already paid</div>`+paid.map(r=>doneRow(r,false)).join("");
   }
   el("p_list").innerHTML=h;
-  el("p_list").querySelectorAll("button[data-pay]").forEach(b=>{b.onclick=()=>payToggle(b.dataset.pay,b);});
+  el("p_list").querySelectorAll("input[data-chk]").forEach(c=>{
+    c.onchange=()=>{
+      const no=String(c.dataset.chk);
+      if(c.checked)payChecked.add(no);else payChecked.delete(no);
+      c.closest(".payrow").classList.toggle("sel",c.checked);
+      payBar();
+    };
+  });
+  el("p_list").querySelectorAll("button[data-undo]").forEach(b=>{b.onclick=()=>payUndo(b.dataset.undo,b);});
+  payBar();
 }
-async function payToggle(billNo,btn){
+function payBar(){
+  const n=payChecked.size, bar=el("p_bar");
+  bar.classList.toggle("hidden",n===0);
+  if(n)el("p_submit").textContent=`Mark ${n} as paid`;
+}
+function paySetLocal(billNo,v){
   const idx=billHeaderIndex(billsCache),bi=idx["BillNo"],si=idx["PaidStatus"];
   if(bi===undefined||si===undefined)return;
-  let cur="";
-  for(let i=1;i<billsCache.length;i++){if(String(billsCache[i][bi]).trim()===String(billNo).trim()){cur=String(billsCache[i][si]||"Unpaid");break;}}
-  const next=cur.toLowerCase()==="paid"?"Unpaid":"Paid";
-  const setLocal=v=>{for(let i=1;i<billsCache.length;i++){if(String(billsCache[i][bi]).trim()===String(billNo).trim()){billsCache[i][si]=v;break;}}};
-  setLocal(next);btn.disabled=true;btn.classList.toggle("ispaid",next==="Paid");   // optimistic — instant feedback
-  setStatus("p_status",`${next==="Paid"?"Marking":"Reverting"} #${billNo}…`,"info");
-  try{
-    const res=await billsApiCall("updateBillStatus",{billNo,status:next});
-    if(!res||!res.ok)throw new Error((res&&res.message)||"server said no");
-    setStatus("p_status",`#${billNo} → ${next}.`,"ok");
-    renderPay();
-  }catch(e){
-    setLocal(cur);btn.classList.toggle("ispaid",cur.toLowerCase()==="paid");
-    setStatus("p_status",`Couldn't update #${billNo}: ${e.message}`,"err");
-  }finally{btn.disabled=false;}
+  for(let i=1;i<billsCache.length;i++){if(String(billsCache[i][bi]).trim()===String(billNo).trim()){billsCache[i][si]=v;break;}}
 }
+async function paySubmit(){
+  const list=[...payChecked];
+  if(!list.length)return;
+  const btn=el("p_submit");btn.disabled=true;
+  let ok=0,fail=0,lastErr="";
+  for(let n=0;n<list.length;n++){
+    const no=list[n];
+    btn.textContent=`Saving ${n+1} of ${list.length}…`;
+    try{
+      const res=await billsApiCall("updateBillStatus",{billNo:no,status:"Paid"});
+      if(!res||!res.ok)throw new Error((res&&res.message)||"server said no");
+      paySetLocal(no,"Paid");payChecked.delete(no);
+      paySession=paySession.filter(x=>String(x)!==String(no));paySession.unshift(no);
+      ok++;
+    }catch(e){fail++;lastErr=(e&&e.message)||String(e);}
+  }
+  btn.disabled=false;
+  renderPay();
+  setStatus("p_status",fail?`${ok} marked paid, ${fail} failed (${lastErr}) — the failed ones are still ticked.`:`${ok} marked paid.`,fail?"err":"ok");
+}
+async function payUndo(billNo,btn){
+  btn.disabled=true;btn.textContent="…";
+  try{
+    const res=await billsApiCall("updateBillStatus",{billNo,status:"Unpaid"});
+    if(!res||!res.ok)throw new Error((res&&res.message)||"server said no");
+    paySetLocal(billNo,"Unpaid");
+    paySession=paySession.filter(x=>String(x)!==String(billNo));
+    renderPay();
+    setStatus("p_status",`#${billNo} set back to Unpaid.`,"ok");
+  }catch(e){
+    btn.disabled=false;btn.textContent="Undo";
+    setStatus("p_status",`Couldn't undo #${billNo}: ${e.message}`,"err");
+  }
+}
+
 async function payInit(){
   el("payView").classList.remove("hidden");
   document.querySelector(".tabs").classList.add("hidden");
@@ -1739,9 +1796,10 @@ async function payInit(){
   el("p_prev").onclick=()=>payShift(-1);
   el("p_next").onclick=()=>payShift(1);
   el("p_search").addEventListener("input",renderPay);
+  el("p_submit").onclick=paySubmit;
   el("p_reload").onclick=async()=>{setStatus("p_status","Reloading…","info");try{await fetchBills(true);renderPay();setStatus("p_status","Up to date.","ok");}catch(e){setStatus("p_status","Error: "+e.message,"err");}};
   setStatus("p_status","Loading bills…","info");
-  try{await fetchBills(false);renderPay();setStatus("p_status","Tap a client to mark them paid.","info");}
+  try{await fetchBills(false);renderPay();setStatus("p_status","Tick the clients who paid, then press the button.","info");}
   catch(e){setStatus("p_status","Couldn't load bills: "+e.message,"err");}
 }
 
