@@ -922,19 +922,42 @@ function waPhone(p){
 const WA_PACKAGE="com.whatsapp.w4b";   // "com.whatsapp" for personal WhatsApp instead
 /* An intent: URL hands off to the app in place, so it must NOT open a tab;
    the https fallback still does, to avoid navigating away from the billing page. */
-function waAnchor(phone,text,inner,style){
-  const u=waLink(phone,text);
-  if(!u)return inner;
-  const tgt=u.indexOf("intent:")===0?"":' target="_blank" rel="noopener"';
-  return `<a href="${u}"${tgt} style="${style||""}">${inner}</a>`;
-}
+function waWebUrl(phone,text){const ph=waPhone(phone);if(!ph)return "";const m=encodeURIComponent(text||"");return `https://wa.me/${ph}${m?`?text=${m}`:""}`;}
 function waLink(phone,text){
   const ph=waPhone(phone);if(!ph)return "";
   const msg=encodeURIComponent(text||"");
-  const fallback=`https://wa.me/${ph}${msg?`?text=${msg}`:""}`;
-  if(!/Android/i.test(navigator.userAgent))return fallback;
-  return `intent://send?phone=${ph}${msg?`&text=${msg}`:""}#Intent;scheme=whatsapp;package=${WA_PACKAGE};S.browser_fallback_url=${encodeURIComponent(fallback)};end`;
+  if(/Android/i.test(navigator.userAgent))
+    return `intent://send?phone=${ph}${msg?`&text=${msg}`:""}#Intent;scheme=whatsapp;package=${WA_PACKAGE};S.browser_fallback_url=${encodeURIComponent(waWebUrl(phone,text))};end`;
+  return `whatsapp://send?phone=${ph}${msg?`&text=${msg}`:""}`;   // desktop/iOS: straight to the app, no wa.me page
 }
+/* Hands off to the app without opening a tab. If the app never takes over
+   (not installed / protocol unregistered) the page stays visible, so after a
+   short wait we fall back to wa.me in a tab. */
+function openWa(phone,text){
+  const app=waLink(phone,text);if(!app)return;
+  let handed=false;
+  const mark=()=>{handed=true;};
+  window.addEventListener("blur",mark,{once:true});
+  document.addEventListener("visibilitychange",mark,{once:true});
+  try{location.href=app;}catch(e){}
+  setTimeout(()=>{
+    window.removeEventListener("blur",mark);
+    document.removeEventListener("visibilitychange",mark);
+    if(!handed&&!document.hidden){const w=waWebUrl(phone,text);if(w)window.open(w,"_blank","noopener");}
+  },2000);
+}
+/* Rendered as a real link (so copy / long-press still work) but click is
+   intercepted and routed through openWa. */
+function waAnchor(phone,text,inner,style){
+  if(!waPhone(phone))return inner;
+  return `<a href="${waWebUrl(phone,text)}" data-wa="${waPhone(phone)}" data-watxt="${encodeURIComponent(text||"")}" style="${style||""}">${inner}</a>`;
+}
+document.addEventListener("click",function(e){
+  const a=e.target&&e.target.closest?e.target.closest("a[data-wa]"):null;
+  if(!a)return;
+  e.preventDefault();
+  openWa(a.dataset.wa,decodeURIComponent(a.dataset.watxt||""));
+});
 function waMessage(client,isQuote){
   return isQuote
     ? `Hi ${client||""}, here is your quote. Let us know if you'd like to go ahead and we'll confirm your plan. Thank you!`
@@ -949,6 +972,26 @@ function showWaChatLink(statusId,meta,fname){
   s.innerHTML=`${saved} Opening WhatsApp — attach it from Downloads. ${link}`;
   s.className="status ok";
 }
+/* Bill images are archived to Drive and the URL written back into the Bills row,
+   so the dashboard can link each bill number to its image. Quotes aren't archived. */
+function blobToBase64(blob){
+  return new Promise((res,rej)=>{const fr=new FileReader();fr.onload=()=>res(String(fr.result).split(",")[1]||"");fr.onerror=rej;fr.readAsDataURL(blob);});
+}
+async function uploadBillImage(billNo,blob){
+  if(!billNo)return "";
+  try{
+    const r=await billsApiCall("saveBillImage",{billNo:billNo,image:await blobToBase64(blob)});
+    if(r&&r.ok&&r.url){
+      if(billsCache&&billsCache.length>1){                 // patch the cache so the link appears without a reload
+        const idx=billHeaderIndex(billsCache),bi=idx["BillNo"],ui=idx["BillUrl"];
+        if(bi!==undefined&&ui!==undefined)for(let i=1;i<billsCache.length;i++){
+          if(String(billsCache[i][bi]).trim()===String(billNo).trim()){billsCache[i][ui]=r.url;break;}}
+      }
+      return r.url;
+    }
+  }catch(e){}
+  return "";
+}
 function downloadBlob(blob,fname){
   const u=URL.createObjectURL(blob);const a=document.createElement("a");
   a.href=u;a.download=fname;document.body.appendChild(a);a.click();a.remove();
@@ -962,15 +1005,10 @@ async function sendWhatsApp(meta,t,statusId){
   const fname=meta.quote?`Quote_${safe}.png`:`Bill_${meta.billNo}.png`;
   const blob=await invoiceBlob();
   downloadBlob(blob,fname);
-  const url=waLink(meta.phone,waMessage(meta.client,meta.quote));
+  if(!meta.quote)uploadBillImage(meta.billNo,blob);   // archive in the background, don't delay the hand-off
   if(statusId)showWaChatLink(statusId,meta,fname);
-  if(!url)return;
-  setTimeout(()=>{                                   // let the download commit before handing off
-    try{
-      if(url.indexOf("intent:")===0)location.href=url;   // Android: app takes over, page stays put
-      else window.open(url,"_blank","noopener");          // desktop/iOS: keep the billing page open
-    }catch(e){}
-  },700);
+  if(!waPhone(meta.phone))return;
+  setTimeout(()=>{openWa(meta.phone,waMessage(meta.client,meta.quote));},700);   // let the download commit before handing off
 }
 
 /* rebuild invoice meta/lines/totals from an already-saved bill row — used for the dashboard download/delete menu */
@@ -1005,7 +1043,9 @@ async function downloadBillImage(billNo){
     const bill=parseBillRow(raw,idx);
     const {meta,lines,t}=reconstructInvoiceData(bill);
     buildInvoice(meta,lines,t);
-    downloadBlob(await invoiceBlob(),`Bill_${billNo}.png`);
+    const blob=await invoiceBlob();
+    downloadBlob(blob,`Bill_${billNo}.png`);
+    uploadBillImage(billNo,blob).then(u=>{if(u)applyDashFilter();});   // backfills the link for older bills
   }catch(e){alert("Couldn't generate image: "+e.message);}
 }
 async function deleteBillPrompt(billNo){
@@ -1164,7 +1204,7 @@ function dashRows(){
   if(!billsCache||billsCache.length<2)return [];
   const idx=billHeaderIndex(billsCache);const out=[];
   for(let i=1;i<billsCache.length;i++){const r=billsCache[i];const g=k=>{const j=idx[k];return (j===undefined||j>=r.length)?"":r[j];};
-    out.push({billNo:g("BillNo"),client:g("Client"),plan:g("Plan"),start:toDt(g("Start")),end:toDt(g("End")),grand:g("GrandTotal"),paid:String(g("PaidStatus")||"Unpaid")});}
+    out.push({billNo:g("BillNo"),client:g("Client"),plan:g("Plan"),start:toDt(g("Start")),end:toDt(g("End")),grand:g("GrandTotal"),paid:String(g("PaidStatus")||"Unpaid"),url:String(g("BillUrl")||"").trim()});}
   return out;
 }
 function pillHtml(r){return `<label class="paidchk"><input type="checkbox" data-bill="${r.billNo}" ${r.paid.toLowerCase()==="paid"?"checked":""}><span>Paid</span></label>`;}
@@ -1205,7 +1245,7 @@ function renderDashboard(orders,inactiveSet){
   if(!follow.length)el("d_followups").innerHTML=`<div class="subtle">Nothing due for renewal.</div>`;
   else{
     el("d_followups").innerHTML=`<div style="overflow-x:auto"><table class="dtable"><thead><tr><th>Client</th><th>Status</th><th>Bill</th><th>Paid</th><th></th></tr></thead><tbody>`+
-      follow.map(r=>`<tr><td><b class="clientlink" data-name="${String(r.client).replace(/"/g,"&quot;")}" style="cursor:pointer;color:var(--navy);text-decoration:underline">${r.client}</b></td><td>${r.complete?'<span class="rowtag exp">due</span>':'<span class="rowtag">'+r.pending+'d left</span>'}</td><td>${r.billNo}</td><td>${pillHtml(r)}</td><td><button class="rm" data-followdis="${r.billNo}" data-ac="${r.activeCount}">×</button></td></tr>`).join("")+
+      follow.map(r=>`<tr><td><b class="clientlink" data-name="${String(r.client).replace(/"/g,"&quot;")}" style="cursor:pointer;color:var(--navy);text-decoration:underline">${r.client}</b></td><td>${r.complete?'<span class="rowtag exp">due</span>':'<span class="rowtag">'+r.pending+'d left</span>'}</td><td>${r.url?`<a href="${r.url}" target="_blank" rel="noopener" title="Open the bill image" style="color:var(--navy);font-weight:700">${r.billNo}</a>`:r.billNo}</td><td>${pillHtml(r)}</td><td><button class="rm" data-followdis="${r.billNo}" data-ac="${r.activeCount}">×</button></td></tr>`).join("")+
       `</tbody></table></div>`;
     bindPills("d_followups");
     el("d_followups").querySelectorAll(".clientlink").forEach(nd=>{nd.onclick=()=>openRenewFor(nd.dataset.name);});
@@ -1242,7 +1282,7 @@ function applyDashFilter(){
     var open=searching?true:!!dashMonthOpen[k];
     html+=`<div style="margin-top:8px"><div class="oldhead" data-mk="${k}">${open?"▾":"▸"} ${monthLabel_(k)} (${groups[k].length})</div>`+
       `<div class="monthwrap ${open?"":"hidden"}" data-mw="${k}"><div style="overflow-x:auto"><table class="dtable">${head}<tbody>`+
-      groups[k].map(r=>`<tr><td>${r.billNo}</td><td><b class="clientlink" data-name="${String(r.client).replace(/"/g,"&quot;")}" style="cursor:pointer;color:var(--navy);text-decoration:underline">${r.client}</b></td><td>${r.plan||""}</td><td>${dtstr(r.start)}</td><td>${dtstr(r.end)}</td><td>₹${money(r.grand)}</td><td>${pillHtml(r)}</td><td><div class="rowmenu" data-name="${String(r.client).replace(/"/g,"&quot;")}" data-start="${r.start?keyOf(r.start):""}" data-end="${r.end?keyOf(r.end):""}"><button class="rowmenu-btn" data-menubtn="${r.billNo}">⋮</button><div class="rowmenu-pop" data-menupop="${r.billNo}"><button class="rowmenu-item" data-busage>Check usage</button><button class="rowmenu-item" data-dl="${r.billNo}">Download image</button><button class="rowmenu-item danger" data-delbill="${r.billNo}">Delete bill</button></div></div></td></tr>`).join("")+
+      groups[k].map(r=>`<tr><td>${r.url?`<a href="${r.url}" target="_blank" rel="noopener" title="Open the bill image" style="color:var(--navy);font-weight:700">${r.billNo}</a>`:r.billNo}</td><td><b class="clientlink" data-name="${String(r.client).replace(/"/g,"&quot;")}" style="cursor:pointer;color:var(--navy);text-decoration:underline">${r.client}</b></td><td>${r.plan||""}</td><td>${dtstr(r.start)}</td><td>${dtstr(r.end)}</td><td>₹${money(r.grand)}</td><td>${pillHtml(r)}</td><td><div class="rowmenu" data-name="${String(r.client).replace(/"/g,"&quot;")}" data-start="${r.start?keyOf(r.start):""}" data-end="${r.end?keyOf(r.end):""}"><button class="rowmenu-btn" data-menubtn="${r.billNo}">⋮</button><div class="rowmenu-pop" data-menupop="${r.billNo}"><button class="rowmenu-item" data-busage>Check usage</button><button class="rowmenu-item" data-dl="${r.billNo}">Download image</button><button class="rowmenu-item danger" data-delbill="${r.billNo}">Delete bill</button></div></div></td></tr>`).join("")+
       `</tbody></table></div></div></div>`;
   });
   el("d_table").innerHTML=html;
