@@ -147,6 +147,18 @@
   .paybar{position:sticky;bottom:10px;z-index:50;margin-top:12px}
   .paybar button{width:100%;padding:15px;border:none;border-radius:14px;background:var(--accent);color:#fff;font-size:1rem;font-weight:800;cursor:pointer;box-shadow:0 8px 22px rgba(16,185,129,.35)}
   .paybar button:disabled{opacity:.6;cursor:wait}
+  /* ---- bill image viewer ---- */
+  .imgmodal{position:fixed;inset:0;z-index:300;background:rgba(16,24,48,.72);display:flex;align-items:center;justify-content:center;padding:16px}
+  .imgmodal .box{background:#fff;border-radius:18px;max-width:820px;width:100%;max-height:92vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,.35)}
+  .imgmodal .top{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--line)}
+  .imgmodal .top b{flex:1;color:var(--navy);font-size:.95rem}
+  .imgmodal .body{overflow:auto;padding:14px;background:#f4f7fc;text-align:center}
+  .imgmodal img{max-width:100%;border-radius:10px;box-shadow:0 2px 10px rgba(20,33,62,.14)}
+  .imgmodal .act{display:flex;gap:8px;padding:12px 16px;border-top:1px solid var(--line);flex-wrap:wrap}
+  .imgmodal .act a,.imgmodal .act button{flex:1;text-align:center;text-decoration:none;padding:11px;border-radius:11px;font-weight:700;font-size:.88rem;cursor:pointer;border:1.5px solid var(--line);background:#fff;color:var(--navy)}
+  .imgmodal .act a.pri{background:var(--navy);color:#fff;border-color:var(--navy)}
+  .billlink{color:var(--navy);font-weight:700;cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+  .billlink.gen{text-decoration-style:dotted;color:var(--muted)}
 </style>
 </head>
 <body>
@@ -415,6 +427,18 @@
       <div class="status info" id="u_status2"></div>
     </div>
   </section>
+</div>
+
+<div id="imgModal" class="imgmodal hidden">
+  <div class="box">
+    <div class="top"><b id="im_title">Bill</b><span class="drill-x" id="im_close">✕</span></div>
+    <div class="body"><img id="im_pic" alt="" /></div>
+    <div class="act">
+      <a id="im_dl" href="#" download>Download</a>
+      <a id="im_drive" class="pri hidden" href="#" target="_blank" rel="noopener">Open in Drive</a>
+      <button id="im_done">Close</button>
+    </div>
+  </div>
 </div>
 
 <div id="invoiceWrap"><div id="invoice"></div></div>
@@ -1144,6 +1168,44 @@ async function backfillBillImages(){
   applyDashFilter();
   setStatus("d_status",`Backfill finished — ${done} archived${failed?`, ${failed} failed (${lastErr})`:""}${backfillStop?" (stopped early)":""}.`,done?"ok":"err");
 }
+/* Bill-number click: shows the image at once (rendered locally), and archives it
+   to Drive in the background so next time it's just a link. */
+function showImgModal(title,blobUrl,driveUrl){
+  el("im_title").textContent=title;
+  el("im_pic").src=blobUrl;
+  el("im_dl").href=blobUrl;el("im_dl").setAttribute("download",title+".png");
+  const a=el("im_drive");
+  if(driveUrl){a.href=driveUrl;a.classList.remove("hidden");}else a.classList.add("hidden");
+  el("imgModal").classList.remove("hidden");
+}
+function closeImgModal(){
+  el("imgModal").classList.add("hidden");
+  const p=el("im_pic");
+  if(p.src&&p.src.indexOf("blob:")===0)URL.revokeObjectURL(p.src);
+  p.src="";
+}
+async function viewBillImage(billNo,anchor){
+  if(anchor&&anchor.dataset.busy==="1")return;
+  if(anchor){anchor.dataset.busy="1";anchor.textContent="…";}
+  try{
+    if(!billsCache||billsCache.length<2)await fetchBills(false);
+    const idx=billHeaderIndex(billsCache);
+    let raw=null;
+    for(let i=1;i<billsCache.length;i++){if(String(billsCache[i][idx["BillNo"]]).trim()===String(billNo).trim()){raw=billsCache[i];break;}}
+    if(!raw){alert("Bill not found — press Reload first.");return;}
+    const bill=parseBillRow(raw,idx);
+    const {meta,lines,t}=reconstructInvoiceData(bill);
+    buildInvoice(meta,lines,t);
+    const blob=await invoiceBlob();
+    showImgModal(`Bill_${billNo}`,URL.createObjectURL(blob),"");
+    const res=await uploadBillImage(billNo,blob);          // archive so the number becomes a plain link next time
+    if(res.url){
+      const a=el("im_drive");a.href=res.url;a.classList.remove("hidden");
+      applyDashFilter();
+    }else setStatus("d_status",`Shown, but not archived to Drive: ${res.error}`,"err");
+  }catch(e){alert("Couldn't generate the image: "+e.message);}
+  finally{if(anchor){anchor.dataset.busy="";anchor.textContent=billNo;}}
+}
 async function downloadBillImage(billNo){
   try{
     if(!billsCache||billsCache.length<2)await fetchBills(false);
@@ -1355,7 +1417,7 @@ function renderDashboard(orders,inactiveSet){
   if(!follow.length)el("d_followups").innerHTML=`<div class="subtle">Nothing due for renewal.</div>`;
   else{
     el("d_followups").innerHTML=`<div style="overflow-x:auto"><table class="dtable"><thead><tr><th>Client</th><th>Status</th><th>Bill</th><th>Paid</th><th></th></tr></thead><tbody>`+
-      follow.map(r=>`<tr><td><b class="clientlink" data-name="${String(r.client).replace(/"/g,"&quot;")}" style="cursor:pointer;color:var(--navy);text-decoration:underline">${r.client}</b></td><td>${r.complete?'<span class="rowtag exp">due</span>':'<span class="rowtag">'+r.pending+'d left</span>'}</td><td>${r.url?`<a href="${r.url}" target="_blank" rel="noopener" title="Open the bill image" style="color:var(--navy);font-weight:700">${r.billNo}</a>`:r.billNo}</td><td>${pillHtml(r)}</td><td><button class="rm" data-followdis="${r.billNo}" data-ac="${r.activeCount}">×</button></td></tr>`).join("")+
+      follow.map(r=>`<tr><td><b class="clientlink" data-name="${String(r.client).replace(/"/g,"&quot;")}" style="cursor:pointer;color:var(--navy);text-decoration:underline">${r.client}</b></td><td>${r.complete?'<span class="rowtag exp">due</span>':'<span class="rowtag">'+r.pending+'d left</span>'}</td><td>${r.url?`<a href="${r.url}" target="_blank" rel="noopener" class="billlink" title="Open the archived bill image">${r.billNo}</a>`:`<span class="billlink gen" data-genimg="${r.billNo}" title="No image yet — tap to generate and view it">${r.billNo}</span>`}</td><td>${pillHtml(r)}</td><td><button class="rm" data-followdis="${r.billNo}" data-ac="${r.activeCount}">×</button></td></tr>`).join("")+
       `</tbody></table></div>`;
     bindPills("d_followups");
     el("d_followups").querySelectorAll(".clientlink").forEach(nd=>{nd.onclick=()=>openRenewFor(nd.dataset.name);});
@@ -1392,7 +1454,7 @@ function applyDashFilter(){
     var open=searching?true:!!dashMonthOpen[k];
     html+=`<div style="margin-top:8px"><div class="oldhead" data-mk="${k}">${open?"▾":"▸"} ${monthLabel_(k)} (${groups[k].length})</div>`+
       `<div class="monthwrap ${open?"":"hidden"}" data-mw="${k}"><div style="overflow-x:auto"><table class="dtable">${head}<tbody>`+
-      groups[k].map(r=>`<tr><td>${r.url?`<a href="${r.url}" target="_blank" rel="noopener" title="Open the bill image" style="color:var(--navy);font-weight:700">${r.billNo}</a>`:r.billNo}</td><td><b class="clientlink" data-name="${String(r.client).replace(/"/g,"&quot;")}" style="cursor:pointer;color:var(--navy);text-decoration:underline">${r.client}</b></td><td>${r.plan||""}</td><td>${dtstr(r.start)}</td><td>${dtstr(r.end)}</td><td>₹${money(r.grand)}</td><td>${pillHtml(r)}</td><td><div class="rowmenu" data-name="${String(r.client).replace(/"/g,"&quot;")}" data-start="${r.start?keyOf(r.start):""}" data-end="${r.end?keyOf(r.end):""}"><button class="rowmenu-btn" data-menubtn="${r.billNo}">⋮</button><div class="rowmenu-pop" data-menupop="${r.billNo}"><button class="rowmenu-item" data-busage>Check usage</button><button class="rowmenu-item" data-dl="${r.billNo}">Download image</button><button class="rowmenu-item danger" data-delbill="${r.billNo}">Delete bill</button></div></div></td></tr>`).join("")+
+      groups[k].map(r=>`<tr><td>${r.url?`<a href="${r.url}" target="_blank" rel="noopener" class="billlink" title="Open the archived bill image">${r.billNo}</a>`:`<span class="billlink gen" data-genimg="${r.billNo}" title="No image yet — tap to generate and view it">${r.billNo}</span>`}</td><td><b class="clientlink" data-name="${String(r.client).replace(/"/g,"&quot;")}" style="cursor:pointer;color:var(--navy);text-decoration:underline">${r.client}</b></td><td>${r.plan||""}</td><td>${dtstr(r.start)}</td><td>${dtstr(r.end)}</td><td>₹${money(r.grand)}</td><td>${pillHtml(r)}</td><td><div class="rowmenu" data-name="${String(r.client).replace(/"/g,"&quot;")}" data-start="${r.start?keyOf(r.start):""}" data-end="${r.end?keyOf(r.end):""}"><button class="rowmenu-btn" data-menubtn="${r.billNo}">⋮</button><div class="rowmenu-pop" data-menupop="${r.billNo}"><button class="rowmenu-item" data-busage>Check usage</button><button class="rowmenu-item" data-dl="${r.billNo}">Download image</button><button class="rowmenu-item danger" data-delbill="${r.billNo}">Delete bill</button></div></div></td></tr>`).join("")+
       `</tbody></table></div></div></div>`;
   });
   el("d_table").innerHTML=html;
@@ -1431,6 +1493,17 @@ function openRowMenu(btn,pop){
 }
 window.addEventListener("scroll",function(){closeAllRowMenus();},true);
 document.addEventListener("click",function(){closeAllRowMenus();});
+/* delegated so it covers both All bills and Follow-ups, through every re-render */
+document.addEventListener("click",function(e){
+  const g=e.target&&e.target.closest?e.target.closest("[data-genimg]"):null;
+  if(!g)return;
+  e.preventDefault();e.stopPropagation();
+  viewBillImage(g.dataset.genimg,g);
+});
+el("im_close").addEventListener("click",closeImgModal);
+el("im_done").addEventListener("click",closeImgModal);
+el("imgModal").addEventListener("click",function(e){if(e.target===this)closeImgModal();});
+document.addEventListener("keydown",function(e){if(e.key==="Escape"&&!el("imgModal").classList.contains("hidden"))closeImgModal();});
 
 /* ===================== USAGE CHECK ===================== */
 async function runUsageCheck(force){
