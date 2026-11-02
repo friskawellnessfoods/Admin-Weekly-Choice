@@ -1445,7 +1445,12 @@ function applyDashFilter(){
   if(q)rows=rows.filter(r=>normName(r.client).includes(q)||String(r.billNo).includes(q));
   var groups={};rows.forEach(function(r){var mk=monthKey_(r.start);(groups[mk]=groups[mk]||[]).push(r);});
   var keys=Object.keys(groups).sort().reverse();                       // latest month on top
-  keys.forEach(function(k){groups[k].sort(function(a,b){return cmpRows_(a,b,dashSort.col,dashSort.dir);});});
+  // Unpaid always sit above Paid within each month; the chosen column sorts inside each block.
+  keys.forEach(function(k){groups[k].sort(function(a,b){
+    var ap=String(a.paid).toLowerCase()==="paid"?1:0, bp=String(b.paid).toLowerCase()==="paid"?1:0;
+    if(ap!==bp)return ap-bp;
+    return cmpRows_(a,b,dashSort.col,dashSort.dir);
+  });});
   if(dashMonthOpen===null){dashMonthOpen={};if(keys.length)dashMonthOpen[keys[0]]=true;}
   var searching=!!q||f!=="all";
   if(!keys.length){el("d_table").innerHTML=`<div class="subtle">No bills.</div>`;return;}
@@ -1588,6 +1593,15 @@ function fillDatalist(listId,names,q){
   dl.innerHTML=matches.slice(0,20).map(n=>`<option value="${n.replace(/"/g,"&quot;")}">`).join("");
 }
 function masterNames(){return masterCache?masterCache.map(c=>c.name):[];}
+/* Master Client List plus anyone who already has a bill — so the dropdown still
+   works if the Master fetch fails, and covers clients missing from the Master. */
+function allClientNames(){
+  const seen=new Set(),out=[];
+  masterNames().concat(billsNames()).forEach(n=>{
+    const k=normName(n);if(!k||seen.has(k))return;seen.add(k);out.push(n);
+  });
+  return out;
+}
 function fillDatalistAll(listId,names){el(listId).innerHTML=names.slice(0,60).map(n=>`<option value="${n.replace(/"/g,"&quot;")}">`).join("");}
 function billsNames(){if(!billsCache||billsCache.length<2)return [];const idx=billHeaderIndex(billsCache);const ci=idx["Client"];if(ci===undefined)return [];const set=new Set();for(let i=1;i<billsCache.length;i++){const n=String(billsCache[i][ci]||"").trim();if(n)set.add(n);}return Array.from(set);}
 function onClientNameChange(){
@@ -1626,7 +1640,7 @@ el("n_planHead").addEventListener("click",e=>{e.stopPropagation();el("n_planPane
 el("n_planPanel").addEventListener("change",()=>{updatePlanHead();nRender(false);refreshNewRates();});
 document.addEventListener("click",e=>{if(!el("n_planSel").contains(e.target))el("n_planPanel").classList.add("hidden");});
 
-el("n_client").addEventListener("input",e=>{fillDatalist("n_clientNames",masterNames(),e.target.value);onClientNameChange();});
+el("n_client").addEventListener("input",e=>{fillDatalist("n_clientNames",allClientNames(),e.target.value);onClientNameChange();});
 el("n_client").addEventListener("change",onClientNameChange);
 el("n_dur").addEventListener("change",applyDuration);
 el("n_days").addEventListener("input",()=>{nRender(true);newDatesFromStart();});
@@ -1667,7 +1681,7 @@ el("n_wa").addEventListener("click",async()=>{try{const meta=gatherNewMeta();con
 
 el("r_fetch").addEventListener("click",()=>runRenew(false));
 el("r_reload").addEventListener("click",()=>runRenew(true));
-el("r_client").addEventListener("input",e=>fillDatalist("r_clientNames",masterNames(),e.target.value));
+el("r_client").addEventListener("input",e=>fillDatalist("r_clientNames",allClientNames(),e.target.value));
 el("r_client").addEventListener("keydown",e=>{if(e.key==="Enter")runRenew(false);});
 bindLivePrice("r_lines",recalcRenewActual);
 bindLivePrice("r_nextlines",recalcRenewNext);
@@ -1717,7 +1731,7 @@ el("r_wa").addEventListener("click",async()=>{try{if(!renewCtx)return;const{meta
 
 el("u_fetch").addEventListener("click",()=>runUsageCheck(false));
 el("u_reload").addEventListener("click",()=>runUsageCheck(true));
-el("u_client").addEventListener("input",e=>fillDatalist("n_clientNames",masterNames(),e.target.value));
+el("u_client").addEventListener("input",e=>fillDatalist("n_clientNames",allClientNames(),e.target.value));
 el("u_client").addEventListener("keydown",e=>{if(e.key==="Enter")runUsageCheck(false);});
 
 el("d_search").addEventListener("input",applyDashFilter);
@@ -1886,10 +1900,13 @@ if(payIsOn()){
   showTab(tabFromHash());                                      // honour a #tab in the URL on load / refresh
   try{history.replaceState({tab:currentTab},"","#"+currentTab);}catch(e){}
   (async()=>{
-    try{await fetchPrices(false);}catch(e){setStatus("n_status","Couldn't load Prices: "+e.message,"err");}
-    nRender(true);
-    try{await fetchMaster(false);}catch(e){}
-    try{await fetchBills(false);suggestBillNo("n_billno","n_start");}catch(e){}
+    // fire independently — a slow or dead Prices URL must not hold up the client-name list
+    const pPrices=fetchPrices(false).catch(e=>{setStatus("n_status","Couldn't load Prices: "+e.message,"err");});
+    const pMaster=fetchMaster(false).catch(()=>{});
+    const pBills =fetchBills(false).catch(()=>{});
+    await pPrices;nRender(true);
+    await pMaster;
+    await pBills;try{suggestBillNo("n_billno","n_start");}catch(e){}
   })();
 }
 </script>
