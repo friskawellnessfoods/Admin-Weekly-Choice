@@ -409,7 +409,25 @@ function tour(pts){
   return { km, min, last: path[path.length-1], order: path.slice(1) };
 }
 
+/* Local search measures the same route composition many times over, and each
+   measure runs a 2-opt. Cache on the exact set of points plus the inputs that
+   change the answer. */
+let _mCache = new Map(), _mStamp = '';
+function measureKey(rows){
+  return uniqPts(rows).map(ptKey).sort().join('|') + '#' + rows.length;
+}
 function measure(rows){
+  const stamp = num('stopMin') + ',' + num('maxP') + ',' + Object.keys(roadCache).length;
+  if (stamp !== _mStamp){ _mCache = new Map(); _mStamp = stamp; }
+  const k = measureKey(rows);
+  const hit = _mCache.get(k);
+  if (hit) return hit;
+  const v = measureRaw(rows);
+  if (_mCache.size < 4000) _mCache.set(k, v);
+  return v;
+}
+
+function measureRaw(rows){
   const pts = uniqPts(rows);
   const t = tour(pts);
   const stop = rows.length * num('stopMin');
@@ -520,16 +538,103 @@ function ensureZones(pts){
 /* RouteAssign is keyed by date + slot + route, and a rider runs one slot at a
    time, so each slot is packed on its own. Names are prefixed M / A / E so a
    route is identifiable at a glance in kitchen.html and delivery.html. */
+/* ---------- local search: fix what greedy construction got wrong ----------
+ * Building routes one at a time and never revisiting them is what leaves two
+ * clients in the same area on different routes. This pass repeatedly tries
+ * every zone in every route against every other route — move it, or swap it
+ * for one of theirs — and keeps any change that cuts total km while both
+ * routes stay within the limits. Zones move whole, so stability is preserved.
+ * ------------------------------------------------------------------ */
+function zonesOf(rows){
+  const m = new Map();
+  rows.forEach(r=>{
+    const z = (zoneMap[ptKey(r.coord)] || {}).zone || ('P'+ptKey(r.coord));
+    if (!m.has(z)) m.set(z, []);
+    m.get(z).push(r);
+  });
+  return m;
+}
+
+function improveSlot(groups){
+  // groups: array of row-arrays. Returns a better array of row-arrays.
+  let best = groups.map(g=>g.slice());
+  let improved = true, guard = 0;
+
+  const kmOf = g => g.length ? measure(g).km : 0;
+  const okOf = g => !g.length || fits(measure(g));
+
+  while (improved && guard++ < 40){
+    improved = false;
+
+    for (let a = 0; a < best.length; a++){
+      for (let b = 0; b < best.length; b++){
+        if (a === b) continue;
+
+        const za = zonesOf(best[a]);
+        const baseA = kmOf(best[a]), baseB = kmOf(best[b]);
+
+        // --- relocate: move one zone from a into b ---
+        for (const [zn, rowsZ] of za){
+          const restA = best[a].filter(r=>!rowsZ.includes(r));
+          const newB  = best[b].concat(rowsZ);
+          if (!okOf(newB)) continue;
+          if (restA.length && !okOf(restA)) continue;
+
+          const delta = (kmOf(restA) + kmOf(newB)) - (baseA + baseB);
+          // a move that empties a route is worth taking even at equal cost:
+          // one less rider out for the same distance
+          const worth = restA.length ? (delta < -0.05) : (delta < 0.05);
+          if (worth){
+            best[a] = restA; best[b] = newB;
+            best = best.filter(g=>g.length);
+            improved = true;
+            break;
+          }
+        }
+        if (improved) break;
+
+        // --- swap: exchange one zone of a for one zone of b ---
+        const zb = zonesOf(best[b]);
+        for (const [zn1, r1] of za){
+          for (const [zn2, r2] of zb){
+            const newA = best[a].filter(r=>!r1.includes(r)).concat(r2);
+            const newB = best[b].filter(r=>!r2.includes(r)).concat(r1);
+            if (!okOf(newA) || !okOf(newB)) continue;
+
+            const delta = (kmOf(newA) + kmOf(newB)) - (baseA + baseB);
+            if (delta < -0.05){
+              best[a] = newA; best[b] = newB;
+              improved = true;
+              break;
+            }
+          }
+          if (improved) break;
+        }
+        if (improved) break;
+      }
+      if (improved) break;
+    }
+  }
+
+  return best.filter(g=>g.length);
+}
+
 function packRoutes(allRows){
   const out = [];
   SLOT_ORDER.forEach(slot=>{
     const rows = allRows.filter(c=>String(c.slot||'').trim() === slot);
     if (!rows.length) return;
-    packOneSlot(rows).forEach((r,i)=>{
-      r.slot = slot;
-      r.name = SLOT_PREFIX[slot] + (i+1);
-      out.push(r);
-    });
+
+    // greedy build, then local search to undo its mistakes
+    const groups = improveSlot(packOneSlot(rows).map(r=>r.rows));
+
+    groups
+      .map(g=>({ rows:g, m:measure(g) }))
+      .sort((x,y)=> x.m.lastKm - y.m.lastKm)
+      .forEach((g,i)=>{
+        out.push({ name: SLOT_PREFIX[slot] + (i+1), slot: slot, rows: g.rows,
+                   agent:'', agentPhone:'', m: g.m });
+      });
   });
   return out;
 }
@@ -654,17 +759,22 @@ async function load(){
         notRouted.push({ ...c, phone, why:'self pickup' }); return;
       }
 
-      let coord = null;
-      if (c.overrideLat != null && c.overrideLng != null) coord = { lat:+c.overrideLat, lng:+c.overrideLng };
-      else if (loc && l2 && loc === l2) coord = g.loc2;
-      else if (loc && l1 && loc === l1) coord = g.loc1;
-      else coord = g.loc1 || g.loc2;
+      let coord = null, link = '';
+      if (c.overrideLat != null && c.overrideLng != null){
+        coord = { lat:+c.overrideLat, lng:+c.overrideLng };
+        link  = String(c.overrideLink || '').trim();
+      }
+      else if (loc && l2 && loc === l2){ coord = g.loc2; link = g.loc2Link || ''; }
+      else if (loc && l1 && loc === l1){ coord = g.loc1; link = g.loc1Link || ''; }
+      else if (g.loc1){ coord = g.loc1; link = g.loc1Link || ''; }
+      else { coord = g.loc2; link = g.loc2Link || ''; }
 
       if (!inBounds(coord)){
         notRouted.push({ ...c, phone, why: coord ? 'coordinates outside Hyderabad' : 'no coordinates' });
         return;
       }
-      clients.push({ ...c, phone, coord: { lat:+coord.lat, lng:+coord.lng } });
+      clients.push({ ...c, phone, link: String(link||'').trim(),
+                     coord: { lat:+coord.lat, lng:+coord.lng } });
     });
 
     // only the legs among today's points, so the payload never grows unbounded
@@ -1272,9 +1382,17 @@ function routeDetail(i){
 }
 
 /* ---------- the rider's message ---------- */
+/* The saved Google Maps link from Master opens on the real place, with its
+   name and pin, which is what the riders are used to. Only when a client has
+   no saved link do we fall back to raw coordinates. Commas are encoded as
+   %2C so WhatsApp does not cut the link short. */
 function mapLink(c){
+  const saved = String((c && c.link) || '').trim();
+  if (saved) return saved.replace(/,/g, '%2C');
+  const co = (c && c.coord) ? c.coord : c;
+  if (!co || co.lat == null) return '';
   return 'https://www.google.com/maps/search/?api=1&query='
-       + c.lat.toFixed(6) + '%2C' + c.lng.toFixed(6);
+       + co.lat.toFixed(6) + '%2C' + co.lng.toFixed(6);
 }
 
 function routeMessage(r){
@@ -1290,7 +1408,8 @@ function routeMessage(r){
     } else {
       lines.push(x.stop + '. ' + c.name + ' — ' + c.phone);
       if (c.location) lines.push('   ' + c.location);
-      lines.push('   ' + mapLink(c.coord));
+      const ml = mapLink(c);
+      if (ml) lines.push('   ' + ml);
     }
   });
 
