@@ -510,7 +510,12 @@ const grid = document.querySelector(".menu-grid");
 grid.style.gridTemplateColumns = "repeat(3,1fr)";
 grid.style.width = "1200px";
 
-const categories = [
+const prevProtein = activeProtein;
+
+/* ALL tab -> one common page; any other tab -> protein-wise pages */
+const categories = (prevProtein === "all")
+? [ {key:"all",label:"WEEKLY"} ]
+: [
 {key:"veg",label:"VEGETARIAN"},
 {key:"chicken",label:"CHICKEN"},
 {key:"egg",label:"EGG"},
@@ -535,15 +540,19 @@ useCORS:true
 
 const imgData = canvas.toDataURL("image/png");
 
-const pdfWidth = 210;
-const pdfHeight = canvas.height * pdfWidth / canvas.width;
+/* fit image inside A4 (210 x 297) below the title */
+const maxW = 200, maxH = 297 - 20 - 5;
+let w = maxW;
+let h = canvas.height * w / canvas.width;
+if(h > maxH){ h = maxH; w = canvas.width * h / canvas.height; }
+const x = (210 - w) / 2;
 
 if(i>0) pdf.addPage();
 
 pdf.setFontSize(22);
 pdf.text(cat.label + " MENU",105,15,{align:"center"});
 
-pdf.addImage(imgData,"PNG",5,20,200,pdfHeight);
+pdf.addImage(imgData,"PNG",x,20,w,h);
 
 }
 
@@ -556,16 +565,13 @@ alert("Could not build the PDF. Please try again.");
 
 } finally {
 
-/* RESTORE LAYOUT + ALL TAB */
+/* RESTORE LAYOUT + PREVIOUS TAB */
 
 grid.style.gridTemplateColumns = "";
 grid.style.width = "";
 
-activeProtein="all";
+activeProtein = prevProtein;
 renderMenu();
-
-document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
-document.querySelector(".tab").classList.add("active");
 
 text.innerText = "DOWNLOAD MENU";
 spinner.style.display = "none";
