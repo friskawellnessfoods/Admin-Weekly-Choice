@@ -296,6 +296,7 @@ return fallback;
 
 const MENU_ENDPOINT = cfgVal("API_URL", "");
 const MENU_RANGE_ACTION = "getMenuByDate";
+const MENU_WEEK_ACTION  = cfgVal("MENU_ACTION", "getGlideMenu");
 
 /* ================= DATE LIMITS =================
    Min = 1st of current month, Max = last day of next month.
@@ -365,8 +366,12 @@ e = new Date(TODAY.getFullYear(), TODAY.getMonth()+1, 0);
 setRange(ymd(s), ymd(e));
 }
 
-fromInput.addEventListener("change", ()=> setRange(fromInput.value || RANGE_MIN, toInput.value || RANGE_MAX));
-toInput.addEventListener("change",   ()=> setRange(fromInput.value || RANGE_MIN, toInput.value || RANGE_MAX));
+/* load only when BOTH dates are filled */
+function onDateChange(){
+if(fromInput.value && toInput.value) setRange(fromInput.value, toInput.value);
+}
+fromInput.addEventListener("change", onDateChange);
+toInput.addEventListener("change",   onDateChange);
 
 /* ================= DATA ================= */
 
@@ -414,14 +419,17 @@ return;
 }
 
 const from = fromInput.value, to = toInput.value;
-if(!from || !to) return;
+/* no dates -> running week (getGlideMenu); both dates -> range (getMenuByDate) */
+const runningWeek = !(from && to);
 
 showMsg("Loading menu...");
 
 try {
 
-const url = MENU_ENDPOINT
-+ (MENU_ENDPOINT.indexOf("?") >= 0 ? "&" : "?")
+const sep = MENU_ENDPOINT.indexOf("?") >= 0 ? "&" : "?";
+const url = runningWeek
+? MENU_ENDPOINT + sep + "action=" + encodeURIComponent(MENU_WEEK_ACTION) + "&t=" + Date.now()
+: MENU_ENDPOINT + sep
 + "action=" + encodeURIComponent(MENU_RANGE_ACTION)
 + "&start=" + encodeURIComponent(from)
 + "&end="   + encodeURIComponent(to)
@@ -442,6 +450,18 @@ throw new Error("The menu service did not return valid data. Check the deploymen
 if(data && data.error) throw new Error(String(data.error));
 if(!data || typeof data !== "object" || Array.isArray(data))
 throw new Error("Unexpected menu format.");
+
+if(runningWeek){
+if(!Object.keys(data).length){
+weeklyMenu = {};
+showMsg(`No menu has been published for this week yet.
+<br><button onclick="loadMenu()">RETRY</button>`);
+return;
+}
+weeklyMenu = data;   /* getGlideMenu already uses "Chicken: dish" labels */
+renderMenu();
+return;
+}
 
 /* safety: keep only dates inside the selected + allowed range */
 const filtered = {};
@@ -664,7 +684,7 @@ pdf.addImage(imgData,"PNG",x,26,w,h);
 
 }
 
-pdf.save("Menu_" + fromInput.value + "_to_" + toInput.value + ".pdf");
+pdf.save("Menu_" + allDates[0] + "_to_" + allDates[allDates.length-1] + ".pdf");
 
 } catch(err){
 
@@ -687,8 +707,8 @@ btn.disabled = false;
 
 }
 
-/* ================= INIT: default = this week ================= */
-quickRange("week");
+/* ================= INIT: running week, date boxes empty ================= */
+loadMenu();
 
 </script>
 
