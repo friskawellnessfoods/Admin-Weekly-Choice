@@ -26,29 +26,19 @@ background:linear-gradient(
 );
 }
 .spinner{
-
 width:16px;
 height:16px;
-
 border:2px solid rgba(255,255,255,0.4);
 border-top:2px solid white;
-
 border-radius:50%;
-
 display:inline-block;
-
 margin-left:8px;
-
 animation:spin 0.8s linear infinite;
-
 }
 
 @keyframes spin{
-
 0%{ transform:rotate(0deg); }
-
 100%{ transform:rotate(360deg); }
-
 }
 .menu-wrapper{
 max-width:1200px;
@@ -80,7 +70,7 @@ display:flex;
 justify-content:center;
 flex-wrap:wrap;
 gap:10px;
-margin-bottom:35px;
+margin-bottom:18px;
 }
 
 .tab{
@@ -95,6 +85,39 @@ letter-spacing:1px;
 .tab.active{
 background:black;
 color:white;
+}
+
+/* DATE RANGE */
+
+.date-range{
+display:flex;
+justify-content:center;
+align-items:center;
+flex-wrap:wrap;
+gap:10px;
+margin-bottom:35px;
+font-weight:bold;
+letter-spacing:1px;
+font-size:14px;
+}
+
+.date-range input{
+font-family:inherit;
+font-size:14px;
+padding:6px 10px;
+border:1px solid #bbb;
+background:white;
+}
+
+.date-range .quick{
+padding:6px 12px;
+border:1px solid #bbb;
+background:white;
+cursor:pointer;
+font-family:inherit;
+font-weight:bold;
+font-size:12px;
+letter-spacing:1px;
 }
 
 /* DOWNLOAD BUTTON */
@@ -120,29 +143,30 @@ gap:30px;
 /* DAY CARD */
 
 .day-card{
-
 background:
 linear-gradient(rgba(255,255,255,0.85),rgba(255,255,255,0.85)),
 url("bg.webp");
-
 background-size:cover;
 background-position:center;
-
 padding:28px;
-
-border:2px solid #000;   /* BLACK BORDER */
-
+border:2px solid #000;
 border-radius:4px;
-
 box-shadow:0 6px 18px rgba(0,0,0,0.08);
-
 }
 
 .day-card h2{
 text-align:center;
 letter-spacing:4px;
 font-size:26px;
-margin-bottom:25px;
+margin-bottom:4px;
+}
+
+.day-date{
+text-align:center;
+font-size:14px;
+letter-spacing:2px;
+margin-bottom:22px;
+opacity:0.75;
 }
 
 /* SECTION */
@@ -180,6 +204,7 @@ margin:18px 0;
 /* MESSAGE / ERROR STATE */
 
 .menu-msg{
+grid-column:1 / -1;
 text-align:center;
 padding:40px 20px;
 font-size:18px;
@@ -220,13 +245,9 @@ font-size:34px;
 <div class="menu-wrapper">
 
 <div class="menu-header">
-
 <img src="logo.png" class="logo">
-
 <h1 class="menu-title">WEEKLY MENU</h1>
-
 </div>
-
 
 <div class="tabs">
 
@@ -237,21 +258,22 @@ font-size:34px;
 <div class="tab" onclick="switchProtein('seafood',this)">SEAFOOD</div>
 
 <button id="downloadBtn" class="download-btn" onclick="downloadMenuPDF()">
-
 <span id="downloadText">DOWNLOAD MENU</span>
-
 <span id="downloadSpinner" class="spinner" style="display:none;"></span>
-
 </button>
 
 </div>
 
-<div id="menuGrid" class="menu-grid">
-
-<div style="text-align:center;padding:40px;font-size:18px;">
-Loading menu...
+<div class="date-range">
+<label>FROM <input type="date" id="fromDate"></label>
+<label>TO <input type="date" id="toDate"></label>
+<button class="quick" onclick="quickRange('week')">THIS WEEK</button>
+<button class="quick" onclick="quickRange('next')">NEXT WEEK</button>
+<button class="quick" onclick="quickRange('month')">THIS MONTH</button>
 </div>
 
+<div id="menuGrid" class="menu-grid">
+<div class="menu-msg">Loading menu...</div>
 </div>
 
 </div>
@@ -259,18 +281,12 @@ Loading menu...
 <script>
 
 /* ================= CONFIG =================
-   Everything endpoint-related is read from config.js, so changing the
-   deployment URL (or the action name) there is enough - no edit here.
-
    config.js must define:   API_URL
-   config.js may optionally define:
-       MENU_ACTION   - defaults to "getGlideMenu"
-   Works whether config.js declares them with const, let or var.
+   Uses backend action getMenuByDate (start, end) -> reads yearly Menu sheet.
 =========================================== */
 
 function cfgVal(name, fallback){
 try {
-/* covers const/let globals (not on window) and var/window globals */
 const v = eval("typeof " + name + " !== 'undefined' ? " + name + " : undefined");
 return (v === undefined || v === null || v === "") ? fallback : v;
 } catch(e){
@@ -278,8 +294,81 @@ return fallback;
 }
 }
 
-const MENU_ENDPOINT     = cfgVal("API_URL", "");
-const MENU_FETCH_ACTION = cfgVal("MENU_ACTION", "getGlideMenu");
+const MENU_ENDPOINT = cfgVal("API_URL", "");
+const MENU_RANGE_ACTION = "getMenuByDate";
+
+/* ================= DATE LIMITS =================
+   Min = 1st of current month, Max = last day of next month.
+   Rolls automatically every month.
+=============================================== */
+
+function ymd(d){
+return d.getFullYear() + "-" +
+String(d.getMonth()+1).padStart(2,"0") + "-" +
+String(d.getDate()).padStart(2,"0");
+}
+
+function parseYmd(s){
+const [y,m,d] = String(s).split("-").map(Number);
+return new Date(y, m-1, d);
+}
+
+function addDays(d, n){
+const x = new Date(d); x.setDate(x.getDate()+n); return x;
+}
+
+const TODAY     = new Date(); TODAY.setHours(0,0,0,0);
+const RANGE_MIN = ymd(new Date(TODAY.getFullYear(), TODAY.getMonth(), 1));
+const RANGE_MAX = ymd(new Date(TODAY.getFullYear(), TODAY.getMonth()+2, 0));
+
+function clampYmd(s){
+if(!s) return s;
+if(s < RANGE_MIN) return RANGE_MIN;
+if(s > RANGE_MAX) return RANGE_MAX;
+return s;
+}
+
+/* Monday of the week containing d */
+function weekStart(d){
+const x = new Date(d);
+const dow = (x.getDay() + 6) % 7;
+return addDays(x, -dow);
+}
+
+const fromInput = document.getElementById("fromDate");
+const toInput   = document.getElementById("toDate");
+
+[fromInput, toInput].forEach(inp=>{
+inp.min = RANGE_MIN;
+inp.max = RANGE_MAX;
+});
+
+function setRange(from, to){
+from = clampYmd(from);
+to   = clampYmd(to);
+if(from > to){ const t = from; from = to; to = t; }
+fromInput.value = from;
+toInput.value   = to;
+loadMenu();
+}
+
+function quickRange(kind){
+let s, e;
+if(kind === "week"){
+s = weekStart(TODAY); e = addDays(s, 6);
+} else if(kind === "next"){
+s = addDays(weekStart(TODAY), 7); e = addDays(s, 6);
+} else {
+s = new Date(TODAY.getFullYear(), TODAY.getMonth(), 1);
+e = new Date(TODAY.getFullYear(), TODAY.getMonth()+1, 0);
+}
+setRange(ymd(s), ymd(e));
+}
+
+fromInput.addEventListener("change", ()=> setRange(fromInput.value || RANGE_MIN, toInput.value || RANGE_MAX));
+toInput.addEventListener("change",   ()=> setRange(fromInput.value || RANGE_MIN, toInput.value || RANGE_MAX));
+
+/* ================= DATA ================= */
 
 let weeklyMenu = {};
 let activeProtein = "all";
@@ -287,6 +376,32 @@ let activeProtein = "all";
 function showMsg(html){
 document.getElementById("menuGrid").innerHTML =
 `<div class="menu-msg">${html}</div>`;
+}
+
+/* getMenuByDate returns "(Chicken) dish" + plain snack labels.
+   Normalise to "Chicken: dish" / "Snack: dish" to match the old look. */
+function normaliseMenu(data){
+const fixList = arr => (arr || []).map(x=>{
+if(!x || typeof x !== "object") return x;
+const m = String(x.label || "").match(/^\((.+?)\)\s*(.*)$/);
+return m ? Object.assign({}, x, { label: m[1] + ": " + m[2] }) : x;
+});
+const out = {};
+Object.keys(data).forEach(k=>{
+const d = data[k] || {};
+out[k] = {
+breakfast: fixList(d.breakfast),
+option1:   fixList(d.option1),
+option2:   fixList(d.option2),
+snack: (d.snack || []).map(s=>
+(s && typeof s === "object")
+? { label: (s.type ? s.type + ": " : "") + s.label, type: s.type }
+: s),
+juice1: d.juice1 || [],
+juice2: d.juice2 || []
+};
+});
+return out;
 }
 
 async function loadMenu(){
@@ -298,18 +413,21 @@ showMsg(`Configuration missing.
 return;
 }
 
-document.getElementById("menuGrid").innerHTML =
-`<div style="text-align:center;padding:40px;font-size:18px;">Loading menu...</div>`;
+const from = fromInput.value, to = toInput.value;
+if(!from || !to) return;
+
+showMsg("Loading menu...");
 
 try {
 
 const url = MENU_ENDPOINT
 + (MENU_ENDPOINT.indexOf("?") >= 0 ? "&" : "?")
-+ "action=" + encodeURIComponent(MENU_FETCH_ACTION)
++ "action=" + encodeURIComponent(MENU_RANGE_ACTION)
++ "&start=" + encodeURIComponent(from)
++ "&end="   + encodeURIComponent(to)
 + "&t=" + Date.now();
 
 const res = await fetch(url, { cache: "no-store" });
-
 if(!res.ok) throw new Error("HTTP " + res.status);
 
 const text = await res.text();
@@ -318,28 +436,32 @@ let data;
 try {
 data = JSON.parse(text);
 } catch(parseErr){
-/* Apps Script returned HTML - a sign-in page or an error page */
 throw new Error("The menu service did not return valid data. Check the deployment URL and its access setting.");
 }
 
 if(data && data.error) throw new Error(String(data.error));
-
 if(!data || typeof data !== "object" || Array.isArray(data))
 throw new Error("Unexpected menu format.");
 
-if(!Object.keys(data).length){
-showMsg(`No menu has been published for this week yet.
+/* safety: keep only dates inside the selected + allowed range */
+const filtered = {};
+Object.keys(data).forEach(k=>{
+if(k >= from && k <= to && k >= RANGE_MIN && k <= RANGE_MAX) filtered[k] = data[k];
+});
+
+if(!Object.keys(filtered).length){
+weeklyMenu = {};
+showMsg(`No menu published for the selected dates.
 <br><button onclick="loadMenu()">RETRY</button>`);
 return;
 }
 
-weeklyMenu = data;
+weeklyMenu = normaliseMenu(filtered);
 renderMenu();
 
 } catch(err){
 
 console.error("loadMenu failed:", err);
-
 showMsg(`Could not load the menu.
 <br><span style="font-size:14px;opacity:0.75;">${String(err.message || err)}</span>
 <br><button onclick="loadMenu()">RETRY</button>`);
@@ -349,87 +471,62 @@ showMsg(`Could not load the menu.
 }
 
 function switchProtein(type,el){
-
 activeProtein = type;
-
-document.querySelectorAll(".tab")
-.forEach(t=>t.classList.remove("active"));
-
+document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
 el.classList.add("active");
-
-renderMenu();
-
+if(Object.keys(weeklyMenu).length) renderMenu();
 }
 
-function renderMenu(){
+/* ================= RENDER ================= */
+
+function renderMenu(dateList){
 
 const grid = document.getElementById("menuGrid");
 grid.innerHTML="";
 
-const dates = Object.keys(weeklyMenu).sort();
+const dates = dateList || Object.keys(weeklyMenu).sort();
 
 dates.forEach(date=>{
 
 const d = weeklyMenu[date];
+const dt = parseYmd(date);
 
-const dayName = new Date(date)
-.toLocaleDateString('en-US',{weekday:'long'});
+const dayName = dt.toLocaleDateString('en-US',{weekday:'long'});
+const dateLabel = dt.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
 
 function filterProtein(arr){
-
 if(!arr) return "";
-
 return arr
 .filter(x=>{
-
 if(activeProtein==="all") return true;
-
 const p=(x.protein||"").toLowerCase();
 return p===activeProtein;
-
 })
 .map(x=>`<div class="dish">${x.label}</div>`)
 .join("");
-
 }
 
-/* Breakfast appears on ALL, VEGETARIAN and CHICKEN only.
-   Menu proteins are "Breakfast" (standard) and "Veg Breakfast".
-   veg tab      -> Veg Breakfast
-   chicken tab  -> Breakfast
-   egg/seafood  -> nothing */
+/* Breakfast: ALL / VEG (Veg Breakfast) / CHICKEN (Breakfast); none for egg/seafood */
 function filterBreakfast(arr){
-
 if(!arr) return "";
-
 if(activeProtein==="egg" || activeProtein==="seafood") return "";
-
 return arr
 .filter(x=>{
-
 if(activeProtein==="all") return true;
-
 const p=(x.protein||"").toLowerCase();
-
 if(activeProtein==="veg")     return p==="veg breakfast";
 if(activeProtein==="chicken") return p==="breakfast";
-
 return false;
-
 })
 .map(x=>`<div class="dish">${x.label}</div>`)
 .join("");
-
 }
 
 function simpleList(arr){
-
 if(!arr) return "";
-
 return arr
 .map(x=>`<div class="dish">${x.label||x}</div>`)
 .join("");
-
 }
 
 const breakfastHTML = filterBreakfast(d.breakfast);
@@ -438,13 +535,13 @@ const card = `
 <div class="day-card">
 
 <h2>${dayName.toUpperCase()}</h2>
+<div class="day-date">${dateLabel.toUpperCase()}</div>
 
 ${breakfastHTML ? `
 <div class="section">
 <div class="label">BREAKFAST</div>
 ${breakfastHTML}
 </div>
-
 <div class="divider"></div>
 ` : ``}
 
@@ -484,7 +581,15 @@ grid.innerHTML += card;
 
 }
 
-/* PDF DOWNLOAD */
+/* ================= PDF DOWNLOAD =================
+   6 days per A4 page (2 rows x 3) so long ranges stay readable.
+================================================ */
+
+const DAYS_PER_PAGE = 6;
+
+function shortDate(s){
+return parseYmd(s).toLocaleDateString('en-GB',{day:'2-digit',month:'short'});
+}
 
 async function downloadMenuPDF(){
 
@@ -504,15 +609,12 @@ btn.disabled = true;
 const { jsPDF } = window.jspdf;
 const pdf = new jsPDF("p","mm","a4");
 
-/* FORCE DESKTOP LAYOUT */
-
 const grid = document.querySelector(".menu-grid");
 grid.style.gridTemplateColumns = "repeat(3,1fr)";
 grid.style.width = "1200px";
 
 const prevProtein = activeProtein;
 
-/* ALL tab -> one common page; any other tab -> protein-wise pages */
 const categories = (prevProtein === "all")
 ? [ {key:"all",label:"WEEKLY"} ]
 : [
@@ -522,41 +624,47 @@ const categories = (prevProtein === "all")
 {key:"seafood",label:"SEAFOOD"}
 ];
 
+const allDates = Object.keys(weeklyMenu).sort();
+const chunks = [];
+for(let i=0;i<allDates.length;i+=DAYS_PER_PAGE) chunks.push(allDates.slice(i,i+DAYS_PER_PAGE));
+
 try {
 
-for(let i=0;i<categories.length;i++){
+let page = 0;
 
-const cat = categories[i];
+for(const cat of categories){
 
 activeProtein = cat.key;
-renderMenu();
 
+for(const chunk of chunks){
+
+renderMenu(chunk);
 await new Promise(r=>setTimeout(r,400));
 
-const canvas = await html2canvas(grid,{
-scale:2,
-useCORS:true
-});
-
+const canvas = await html2canvas(grid,{ scale:2, useCORS:true });
 const imgData = canvas.toDataURL("image/png");
 
-/* fit image inside A4 (210 x 297) below the title */
-const maxW = 200, maxH = 297 - 20 - 5;
+const maxW = 200, maxH = 297 - 26 - 5;
 let w = maxW;
 let h = canvas.height * w / canvas.width;
 if(h > maxH){ h = maxH; w = canvas.width * h / canvas.height; }
 const x = (210 - w) / 2;
 
-if(i>0) pdf.addPage();
+if(page>0) pdf.addPage();
+page++;
 
 pdf.setFontSize(22);
-pdf.text(cat.label + " MENU",105,15,{align:"center"});
+pdf.text(cat.label + " MENU",105,14,{align:"center"});
+pdf.setFontSize(11);
+pdf.text(shortDate(chunk[0]) + "  -  " + shortDate(chunk[chunk.length-1]),105,21,{align:"center"});
 
-pdf.addImage(imgData,"PNG",x,20,w,h);
+pdf.addImage(imgData,"PNG",x,26,w,h);
 
 }
 
-pdf.save("Weekly_Menu.pdf");
+}
+
+pdf.save("Menu_" + fromInput.value + "_to_" + toInput.value + ".pdf");
 
 } catch(err){
 
@@ -564,8 +672,6 @@ console.error("PDF failed:", err);
 alert("Could not build the PDF. Please try again.");
 
 } finally {
-
-/* RESTORE LAYOUT + PREVIOUS TAB */
 
 grid.style.gridTemplateColumns = "";
 grid.style.width = "";
@@ -581,7 +687,8 @@ btn.disabled = false;
 
 }
 
-loadMenu();
+/* ================= INIT: default = this week ================= */
+quickRange("week");
 
 </script>
 
