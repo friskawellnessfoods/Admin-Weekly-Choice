@@ -107,6 +107,7 @@ font-size:14px;
 padding:6px 10px;
 border:1px solid #bbb;
 background:white;
+cursor:pointer;
 }
 
 .date-range .quick{
@@ -370,6 +371,13 @@ setRange(ymd(s), ymd(e));
 function onDateChange(){
 if(fromInput.value && toInput.value) setRange(fromInput.value, toInput.value);
 }
+/* open the calendar on any click/focus in the box, not just the icon */
+[fromInput, toInput].forEach(inp=>{
+const open = ()=>{ try { inp.showPicker(); } catch(e){} };
+inp.addEventListener("click", open);
+inp.addEventListener("focus", open);
+});
+
 fromInput.addEventListener("change", onDateChange);
 toInput.addEventListener("change",   onDateChange);
 
