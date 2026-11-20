@@ -1,919 +1,2049 @@
-/***********************
- * BILLS + ACCOUNTING BACKEND (standalone)
- ***********************/
-function doPost(e) {
-  // Wrapper: any crash comes back as JSON with the real error (instead of Google's HTML error page)
-  try { return doPostInner_(e); }
-  catch (err) {
-    return jsonOutput({ ok:false, message: 'Server error: ' + (err && err.message ? err.message : err) +
-      (err && err.stack ? ' | ' + String(err.stack).split('\n').slice(0,3).join(' / ') : '') });
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Friska — Billing</title>
+<script src="config.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<style>
+  :root{--navy:#0a1a6e;--navy-deep:#08155a;--accent:#10b981;--accent-soft:#e7f7f1;--bg:#f4f7fc;--card:#fff;--ink:#16213e;--muted:#6b7596;--line:#e2e7f1;--warn-bg:#fff6e6;--warn-line:#f0d9a6;--warn-ink:#8a6112;--pause-bg:#fdeceb;--pause-line:#f1c4c0;--pause-ink:#9a3b34;--credit:#0a7d4f;--debit:#9a3b34;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;line-height:1.45;position:relative;overflow-x:hidden}
+  body::before,body::after{content:"";position:fixed;border-radius:50%;filter:blur(70px);z-index:0;pointer-events:none}
+  body::before{width:340px;height:340px;background:rgba(16,185,129,.16);top:-120px;left:-120px}
+  body::after{width:380px;height:380px;background:rgba(10,26,110,.10);bottom:-160px;right:-140px}
+  .wrap{position:relative;z-index:1;max-width:900px;margin:0 auto;padding:18px 16px 80px}
+  .topbar{display:flex;align-items:center;gap:12px;margin:6px 0 14px}.topbar img{height:40px}.topbar h1{font-size:1.3rem;font-weight:700;color:var(--navy);margin:0}
+  .tabs{display:flex;gap:8px;background:#fff;padding:6px;border-radius:16px;box-shadow:0 10px 30px rgba(20,33,62,.07);margin-bottom:16px;flex-wrap:wrap}
+  .tab{flex:1 1 auto;text-align:center;padding:11px 14px;border-radius:11px;font-weight:700;font-size:.92rem;color:var(--muted);cursor:pointer;border:none;background:transparent}
+  .tab.active{background:var(--navy);color:#fff;box-shadow:0 6px 14px rgba(10,26,110,.22)}
+  .card{background:var(--card);border-radius:20px;padding:20px;margin-bottom:16px;box-shadow:0 16px 40px rgba(20,33,62,.08)}
+  h2.sec{font-size:1.02rem;font-weight:700;margin:0 0 14px;color:var(--navy);display:flex;align-items:center;gap:9px}
+  h2.sec::before{content:"";width:4px;height:16px;background:var(--accent);border-radius:9px}
+  label{display:block;font-size:.76rem;font-weight:600;color:#445;margin:0 0 5px}
+  input,select{width:100%;padding:11px 12px;border:1.5px solid var(--line);border-radius:12px;font-size:.95rem;background:#fbfcfe;color:var(--ink)}
+  input[readonly]{background:#eef1f7;color:var(--muted)}
+  input:focus,select:focus{outline:none;border-color:var(--accent);background:#fff;box-shadow:0 0 0 3px rgba(16,185,129,.12)}
+  .grid{display:grid;gap:12px}.g2{grid-template-columns:1fr 1fr}.g3{grid-template-columns:1fr 1fr 1fr}
+  @media(max-width:560px){.g3{grid-template-columns:1fr 1fr}}
+  .field{min-width:0}.row{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}
+  .chips{display:flex;gap:8px;flex-wrap:wrap}
+  .chk{display:flex;align-items:center;gap:6px;background:#fbfcfe;border:1.5px solid var(--line);border-radius:10px;padding:8px 12px;font-size:.85rem;cursor:pointer}
+  .chk input{width:auto}.chk.on{border-color:var(--accent);background:var(--accent-soft)}
+  .msel{position:relative}
+  .msel-head{width:100%;text-align:left;padding:11px 12px;border:1.5px solid var(--line);border-radius:12px;background:#fbfcfe;font-size:.95rem;cursor:pointer;color:var(--ink)}
+  .msel-panel{position:absolute;z-index:30;top:calc(100% + 4px);left:0;right:0;background:#fff;border:1.5px solid var(--line);border-radius:12px;box-shadow:0 12px 30px rgba(20,33,62,.12);padding:6px;max-height:240px;overflow:auto}
+  .msel-opt{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;font-size:.9rem;cursor:pointer}
+  .msel-opt:hover{background:var(--accent-soft)}.msel-opt input{width:auto}
+  button.btn{font-weight:700;padding:13px 16px;border-radius:13px;border:1.5px solid transparent;cursor:pointer;font-size:.95rem}
+  .btn-primary{background:var(--navy);color:#fff;box-shadow:0 6px 16px rgba(10,26,110,.22)}.btn-primary:active{background:var(--navy-deep)}
+  .btn-ghost{background:#fff;color:var(--navy);border:1.5px solid var(--line)}
+  .btn-wa{background:#25D366;color:#fff}
+  button.btn:disabled{opacity:.5;cursor:not-allowed}
+  .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}.actions .btn{flex:1 1 auto}
+  .status{font-size:.85rem;margin-top:12px;min-height:1.1em}
+  .status.err{color:var(--pause-ink)}.status.ok{color:var(--accent)}.status.info{color:var(--muted)}
+  table.lines{width:100%;border-collapse:collapse;font-size:.9rem}
+  table.lines th{text-align:left;font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);padding:6px 6px;border-bottom:1px solid var(--line)}
+  table.lines td{padding:5px 6px;border-bottom:1px solid #f0f2f7;vertical-align:middle}
+  table.lines input{padding:8px 9px;border-radius:9px;font-size:.9rem}
+  td.num{text-align:right;font-variant-numeric:tabular-nums}
+  td.qtycol{width:84px}td.ratecol{width:104px}td.pricecol{width:92px}td.rmcol{width:34px}
+  .lbl-in{border:none;background:transparent;font-weight:600;padding:8px 2px}
+  .rm{background:#fbecec;color:var(--debit);border:none;border-radius:8px;width:28px;height:28px;cursor:pointer;font-weight:700}
+  .totals{margin-top:14px;border-top:2px solid var(--line);padding-top:10px}
+  .tline{display:flex;justify-content:space-between;padding:5px 2px;font-size:.92rem}
+  .tline .k{color:var(--muted)}.tline .v{font-weight:600;font-variant-numeric:tabular-nums}
+  .tline.grand{font-size:1.15rem;border-top:1.5px dashed var(--line);margin-top:6px;padding-top:10px}
+  .tline.grand .v{color:var(--navy);font-weight:800}
+  .credit{color:var(--credit)!important}.debit{color:var(--debit)!important}
+  .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px}
+  .stat{background:var(--accent-soft);border-radius:13px;padding:11px 12px}
+  .stat .n{font-size:1.35rem;font-weight:800;color:var(--navy);line-height:1.1}
+  .stat .l{font-size:.66rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-top:3px;font-weight:600}
+  .stat.tap{cursor:pointer;transition:box-shadow .12s ease,background .12s ease}
+  .stat.tap:hover{box-shadow:0 0 0 2px rgba(16,185,129,.28) inset}
+  .stat.tap.on{background:var(--navy)}
+  .stat.tap.on .n{color:#fff}.stat.tap.on .l{color:#bfe8d6}
+  .stat .c{font-size:.6rem;opacity:.55;margin-top:2px;font-weight:700}
+  .drill{margin-top:12px;border:1.5px solid var(--line);border-radius:14px;overflow:hidden}
+  .drill-h{background:var(--accent-soft);padding:9px 13px;font-size:.82rem;font-weight:700;color:var(--navy);display:flex;justify-content:space-between;align-items:center}
+  .drill-x{cursor:pointer;color:var(--muted);font-weight:700}
+  .drill-b{max-height:280px;overflow:auto}
+  .drill-b table{width:100%;border-collapse:collapse;font-size:.85rem}
+  .drill-b td{padding:7px 13px;border-bottom:1px solid #f0f2f7}
+  .drill-b tr:last-child td{border-bottom:none}
+  .drill-b td.r{text-align:right;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+  .kv{display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid #f0f2f7;font-size:.9rem}
+  .kv:last-child{border-bottom:none}.kv .k{color:var(--muted)}.kv .v{font-weight:600}
+  .note{border-radius:12px;padding:11px 13px;font-size:.85rem;margin-top:12px}
+  .note.warn{background:var(--warn-bg);border:1px solid var(--warn-line);color:var(--warn-ink)}
+  .note.pause{background:var(--pause-bg);border:1px solid var(--pause-line);color:var(--pause-ink)}
+  .note.info{background:var(--accent-soft);color:#2f6b58}
+  .hidden{display:none}.subtle{color:var(--muted);font-size:.78rem;margin-top:8px}
+  .add-line{margin-top:8px;background:#fff;border:1.5px dashed var(--line);color:var(--navy);border-radius:10px;padding:8px 12px;font-weight:600;font-size:.85rem;cursor:pointer}
+  .dtable{width:100%;border-collapse:collapse;font-size:.88rem}
+  .dtable th{text-align:left;font-size:.68rem;text-transform:uppercase;color:var(--muted);padding:8px 8px;border-bottom:1.5px solid var(--line)}
+  .dtable td{padding:9px 8px;border-bottom:1px solid #f0f2f7}
+  .pill{padding:3px 10px;border-radius:99px;font-size:.74rem;font-weight:700;cursor:pointer;border:1.5px solid transparent;white-space:nowrap}
+  .pill.paid{background:var(--accent-soft);color:var(--credit);border-color:#bfe8d6}.pill.unpaid{background:#fdecec;color:var(--debit);border-color:#f3c9c5}
+  .paidchk{display:inline-flex;align-items:center;gap:6px;font-size:.8rem;font-weight:700;color:var(--muted);cursor:pointer}.paidchk input{width:17px;height:17px;accent-color:var(--accent);cursor:pointer}
+  .oldhead{cursor:pointer;font-weight:700;color:var(--navy);padding:9px 2px;font-size:.92rem;user-select:none}
+  .rowtag{font-size:.68rem;font-weight:700;padding:2px 8px;border-radius:99px;background:var(--warn-bg);color:var(--warn-ink);margin-left:6px}.rowtag.exp{background:var(--pause-bg);color:var(--pause-ink)}
+  .rowmenu{position:relative;display:inline-block}
+  .rowmenu-btn{background:none;border:none;color:var(--muted);font-size:1.15rem;font-weight:700;cursor:pointer;padding:2px 9px;border-radius:7px;line-height:1}
+  .rowmenu-btn:hover{background:var(--accent-soft)}
+  .rowmenu-pop{position:fixed;z-index:200;background:#fff;border:1.5px solid var(--line);border-radius:10px;box-shadow:0 10px 24px rgba(20,33,62,.14);min-width:160px;padding:6px;display:none}
+  .rowmenu-pop.open{display:block}
+  .rowmenu-item{display:block;width:100%;text-align:left;padding:8px 10px;border-radius:8px;border:none;background:none;font-size:.85rem;font-weight:600;color:var(--ink);cursor:pointer}
+  .rowmenu-item:hover{background:var(--accent-soft)}
+  .rowmenu-item.danger{color:var(--debit)}
+  .rowmenu-item.danger:hover{background:var(--pause-bg)}
+  #invoiceWrap{position:fixed;left:-9999px;top:0}
+  #invoice{width:760px;background:#fff;color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Arial,sans-serif;border-radius:18px;overflow:hidden;box-shadow:0 0 0 1px #e6e9f2}
+  #invoice .ihead{background:linear-gradient(135deg,var(--navy) 0%,#16277f 60%,#0f7a55 160%);color:#fff;display:flex;align-items:center;gap:16px;padding:20px 24px}
+  #invoice .ihead img{width:70px;height:70px;object-fit:contain;background:#fff;border-radius:14px;padding:6px}
+  #invoice .ihead h2{margin:0;font-size:26px;font-weight:800}#invoice .ihead .tg{font-size:14px;font-weight:600;color:#bfe8d6;margin:2px 0 6px}
+  #invoice .ihead .reg{font-size:11px;opacity:.85;line-height:1.5}#invoice .ihead .invno{margin-left:auto;text-align:right}
+  #invoice .ihead .invno .lab{font-size:11px;letter-spacing:1px;text-transform:uppercase;opacity:.8}#invoice .ihead .invno .no{font-size:30px;font-weight:800}
+  #invoice .meta{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:#eef1f7;padding:1px}
+  #invoice .meta .cell{background:#fff;padding:11px 16px}#invoice .meta .lab{font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:700}
+  #invoice .meta .val{font-size:14px;font-weight:700;margin-top:2px}#invoice .meta .val.big{font-size:17px;color:var(--navy)}
+  #invoice table.itab{width:100%;border-collapse:collapse}
+  #invoice table.itab th{background:var(--navy);color:#fff;font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;padding:9px 16px;text-align:right}#invoice table.itab th:first-child{text-align:left}
+  #invoice table.itab td{padding:9px 16px;font-size:13.5px;border-bottom:1px solid #eef1f7;text-align:right;font-variant-numeric:tabular-nums}#invoice table.itab td:first-child{text-align:left;font-weight:600}
+  #invoice table.itab tr.sub td{background:#f7f9fc;color:var(--muted);font-weight:600}
+  #invoice .grand{display:flex;justify-content:space-between;align-items:center;background:var(--accent-soft);padding:14px 20px;font-weight:800}
+  #invoice .grand .gl{font-size:14px;color:var(--navy);text-transform:uppercase;letter-spacing:.06em}#invoice .grand .gv{font-size:24px;color:var(--navy)}
+  #invoice .bank{display:flex;gap:18px;padding:14px 20px;border-top:1px solid #eef1f7;font-size:11.5px;line-height:1.7}#invoice .bank .upi{font-weight:800;color:var(--navy);font-size:13px}
+  #invoice .qr{flex:0 0 auto;text-align:center;padding-left:6px;border-left:1px solid #eef1f7;margin-left:4px}
+  #invoice .qr img{width:104px;height:104px;display:block;image-rendering:pixelated}
+  #invoice .qr .cap{font-size:10px;font-weight:800;color:var(--navy);margin-top:4px;line-height:1.3}
+  #invoice .qr .sub{font-size:8.5px;color:var(--muted);line-height:1.3}
+  #invoice .footnote{padding:8px 20px 14px;font-size:10px;color:var(--muted);font-style:italic}
+  /* ---- pay mode (billing.html?pay) ---- */
+  .paynav{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+  .paynav .mo{flex:1;text-align:center;font-weight:800;color:var(--navy);font-size:1.05rem}
+  .paynav button{background:#fff;border:1.5px solid var(--line);border-radius:11px;width:42px;height:42px;font-size:1.1rem;font-weight:700;color:var(--navy);cursor:pointer}
+  .paysum{display:flex;gap:10px;margin-bottom:12px}
+  .paysum div{flex:1;border-radius:13px;padding:10px 12px}
+  .paysum .due{background:var(--pause-bg);color:var(--pause-ink)}
+  .paysum .got{background:var(--accent-soft);color:var(--credit)}
+  .paysum .n{font-size:1.2rem;font-weight:800;line-height:1.1}
+  .paysum .l{font-size:.64rem;text-transform:uppercase;letter-spacing:.05em;font-weight:700;opacity:.8;margin-top:2px}
+  .payhead{font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:700;margin:16px 0 6px}
+  .payrow{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:#fff;border:1.5px solid var(--line);border-left:4px solid var(--debit);border-radius:13px;padding:13px 14px;margin-bottom:8px;cursor:pointer;font:inherit}
+  .payrow:active{transform:scale(.995)}
+  .payrow.ispaid{border-left-color:var(--accent);opacity:.62}
+  .payrow .who{flex:1;min-width:0}
+  .payrow .nm{font-weight:700;font-size:.97rem;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .payrow .sub{font-size:.72rem;color:var(--muted);margin-top:2px}
+  .payrow .amt{font-weight:800;font-variant-numeric:tabular-nums;color:var(--navy);white-space:nowrap}
+  .payrow .tick{width:26px;height:26px;border-radius:50%;border:2px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:.85rem;color:transparent;flex:0 0 auto}
+  .payrow.ispaid .tick{background:var(--accent);border-color:var(--accent);color:#fff}
+  .payrow[disabled]{opacity:.45;cursor:wait}
+  .payrow.sel{border-color:var(--accent);background:var(--accent-soft);border-left-color:var(--accent)}
+  .payrow input[type=checkbox]{width:24px;height:24px;flex:0 0 auto;accent-color:var(--accent);margin:0}
+  .payrow.justdone{border-left-color:var(--accent);opacity:1;background:#f3fbf7}
+  .undo{flex:0 0 auto;background:#fff;border:1.5px solid var(--line);color:var(--muted);border-radius:9px;padding:6px 11px;font-size:.76rem;font-weight:700;cursor:pointer}
+  .undo:hover{border-color:var(--debit);color:var(--debit)}
+  .paybar{position:sticky;bottom:10px;z-index:50;margin-top:12px}
+  .paybar button{width:100%;padding:15px;border:none;border-radius:14px;background:var(--accent);color:#fff;font-size:1rem;font-weight:800;cursor:pointer;box-shadow:0 8px 22px rgba(16,185,129,.35)}
+  .paybar button:disabled{opacity:.6;cursor:wait}
+  /* ---- bill image viewer ---- */
+  .imgmodal{position:fixed;inset:0;z-index:300;background:rgba(16,24,48,.72);display:flex;align-items:center;justify-content:center;padding:16px}
+  .imgmodal.hidden{display:none}   /* .hidden is declared earlier, so it needs the extra specificity to win */
+  .imgmodal .box{background:#fff;border-radius:18px;max-width:820px;width:100%;max-height:92vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,.35)}
+  .imgmodal .top{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--line)}
+  .imgmodal .top b{flex:1;color:var(--navy);font-size:.95rem}
+  .imgmodal .body{overflow:auto;padding:14px;background:#f4f7fc;text-align:center}
+  .imgmodal img{max-width:100%;border-radius:10px;box-shadow:0 2px 10px rgba(20,33,62,.14)}
+  .imgmodal .act{display:flex;gap:8px;padding:12px 16px;border-top:1px solid var(--line);flex-wrap:wrap}
+  .imgmodal .act a,.imgmodal .act button{flex:1;text-align:center;text-decoration:none;padding:11px;border-radius:11px;font-weight:700;font-size:.88rem;cursor:pointer;border:1.5px solid var(--line);background:#fff;color:var(--navy)}
+  .imgmodal .act a.pri{background:var(--navy);color:#fff;border-color:var(--navy)}
+  .billlink{color:var(--navy);font-weight:700;cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+  .billlink.gen{text-decoration-style:dotted;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar"><img src="logo.png" alt="" onerror="this.style.display='none'" /><h1>Friska Billing</h1></div>
+  <!-- PAY MODE — billing.html?pay : fastest path from "client paid" to "marked paid" -->
+  <section id="payView" class="hidden">
+    <div class="card">
+      <div class="paynav">
+        <button id="p_prev" title="Previous month">‹</button>
+        <div class="mo" id="p_month">—</div>
+        <button id="p_next" title="Next month">›</button>
+      </div>
+      <input id="p_search" placeholder="Search name or bill no." autocomplete="off" />
+      <div class="paysum" style="margin-top:12px">
+        <div class="due"><div class="n" id="p_due">₹0</div><div class="l">Unpaid <span id="p_duen"></span></div></div>
+        <div class="got"><div class="n" id="p_got">₹0</div><div class="l">Collected <span id="p_gotn"></span></div></div>
+      </div>
+      <div class="status info" id="p_status">Tick the clients who paid, then press the button.</div>
+      <div id="p_list"></div>
+      <div class="paybar hidden" id="p_bar"><button id="p_submit">Mark paid</button></div>
+      <div class="actions"><button class="btn btn-ghost" id="p_sync" style="flex:1" title="Ask Razorpay which pay links have been paid and tick those bills automatically">Check payments</button><button class="btn btn-ghost" id="p_reload" style="flex:1">Reload</button><a class="btn btn-ghost" id="p_full" href="#" style="flex:1;text-align:center;text-decoration:none;line-height:1.4">Full billing →</a></div>
+    </div>
+  </section>
+
+  <div class="tabs">
+    <button class="tab" data-tab="dash">Dashboard</button>
+    <button class="tab" data-tab="renew">Renew / Reconcile</button>
+    <button class="tab" data-tab="new">New Bill</button>
+    <button class="tab" data-tab="usage">Usage Check</button>
+  </div>
+
+  <!-- NEW BILL -->
+  <section id="tab-new">
+    <div class="card">
+      <h2 class="sec">Client &amp; cycle</h2>
+      <div class="grid g2">
+        <div class="field"><label>Client name</label><input id="n_client" list="n_clientNames" autocomplete="off" /><datalist id="n_clientNames"></datalist></div>
+        <div class="field"><label>Phone</label><input id="n_phone" autocomplete="off" /><select id="n_phoneSel" class="hidden" style="margin-top:6px"></select></div>
+      </div>
+      <div class="grid g3" style="margin-top:12px">
+        <div class="field"><label>Plan(s)</label>
+          <div class="msel" id="n_planSel">
+            <button type="button" class="msel-head" id="n_planHead">Nutri Balance</button>
+            <div class="msel-panel hidden" id="n_planPanel">
+              <label class="msel-opt"><input type="checkbox" value="nb" checked>Nutri Balance</label>
+              <label class="msel-opt"><input type="checkbox" value="hp">High Protein</label>
+              <label class="msel-opt"><input type="checkbox" value="lc">Low Carb</label>
+              <label class="msel-opt"><input type="checkbox" value="hc">High Carb</label>
+              <label class="msel-opt"><input type="checkbox" value="nc">No Carb</label>
+            </div>
+          </div>
+        </div>
+        <div class="field"><label>Duration</label>
+          <select id="n_dur"><option value="d">2 day trial</option><option value="w">Weekly</option><option value="m" selected>1 month</option><option value="q">3 months</option><option value="custom">Custom</option></select>
+        </div>
+        <div class="field"><label>Days</label><input id="n_days" type="number" value="26" min="1" readonly /></div>
+        <div class="field"><label>People</label><input id="n_people" type="number" value="1" min="1" /></div>
+      </div>
+      <div class="grid g2" style="margin-top:12px">
+        <div class="field"><label>Start date</label><input id="n_start" type="date" onclick="this.showPicker&&this.showPicker()" /></div>
+        <div class="field"><label>End date</label><input id="n_end" type="date" onclick="this.showPicker&&this.showPicker()" /></div>
+      </div>
+      <div style="margin-top:14px">
+        <label>Client takes</label>
+        <div class="chips" id="n_items">
+          <label class="chk"><input type="checkbox" value="lunch"/>Lunch</label>
+          <label class="chk"><input type="checkbox" value="dinner"/>Dinner</label>
+          <label class="chk"><input type="checkbox" value="breakfast"/>Breakfast</label>
+          <label class="chk"><input type="checkbox" value="snack"/>Snack</label>
+          <label class="chk"><input type="checkbox" value="juice1x"/>1× Juice</label>
+          <label class="chk"><input type="checkbox" value="juice2x"/>2× Juice</label>
+          <label class="chk"><input type="checkbox" value="seafood"/>Seafood add-on</label>
+        </div>
+        <div class="subtle">Lunch + Dinner together uses the combo rate. 1× / 2× Juice are mutually exclusive.</div>
+      </div>
+      <div class="grid g3" style="margin-top:14px">
+        <div class="field"><label>Delivery slots</label>
+          <div class="chips" id="n_slots">
+            <label class="chk"><input type="checkbox" value="Morning"/>Morning</label>
+            <label class="chk"><input type="checkbox" value="Afternoon"/>Afternoon</label>
+            <label class="chk"><input type="checkbox" value="Evening"/>Evening</label>
+          </div>
+        </div>
+        <div class="field"><label>Delivery distance (km) — not shown to client</label><input id="n_km" type="number" value="0" min="0" step="0.5" /></div>
+        <div class="field"><label>Delivery price (₹/delivery)</label><input id="n_delprice" type="number" value="0" min="0" step="0.5" /></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2 class="sec">Bill items</h2>
+      <table class="lines"><thead><tr><th>Item</th><th>Qty</th><th>Rate</th><th>Price</th><th></th></tr></thead><tbody id="n_lines"></tbody></table>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="add-line" id="n_addmeal">+ Add meal line (GST applies)</button><button class="add-line" id="n_addline">+ Add custom line (no GST)</button></div>
+      <div class="grid g2" style="margin-top:16px">
+        <div class="field"><label>Discount %</label><input id="n_disc" type="number" value="0" min="0" /></div>
+        <div class="field"><label>GST % (food only)</label><input id="n_gst" type="number" value="5" min="0" /></div>
+      </div>
+      <div class="totals" id="n_totals"></div>
+      <div class="grid g3" style="margin-top:16px">
+        <div class="field"><label>Bill no.</label><input id="n_billno" /></div>
+        <div class="field"><label>Bill date</label><input id="n_billdate" type="date" onclick="this.showPicker&&this.showPicker()" /></div>
+        <div class="field"><label>&nbsp;</label><div style="display:flex;gap:8px"><button class="btn btn-ghost" id="n_suggestno" style="flex:1">Refresh no.</button><button class="btn btn-ghost" id="n_clear" style="flex:1">Clear form</button></div></div>
+      </div>
+      <div class="actions">
+        <button class="btn btn-ghost" id="n_save">Save to sheet</button>
+        <button class="btn btn-ghost" id="n_quote">Send as quote (no save)</button>
+        <button class="btn btn-wa" id="n_wa">Bill image → WhatsApp</button>
+      </div>
+      <div class="status info" id="n_status">Choose what the client takes, set quantities, then save or send.</div>
+    </div>
+  </section>
+
+  <!-- RENEW -->
+  <section id="tab-renew" class="hidden">
+    <div class="card">
+      <h2 class="sec">Find client</h2>
+      <div class="row">
+        <div class="field" style="flex:1 1 220px"><label>Client name</label><input id="r_client" list="r_clientNames" autocomplete="off" /><datalist id="r_clientNames"></datalist></div>
+        <button class="btn btn-primary" id="r_fetch" style="flex:0 0 auto">Fetch &amp; reconcile</button>
+        <button class="btn btn-ghost" id="r_reload" style="flex:0 0 auto">Reload</button>
+      </div>
+      <div class="status info" id="r_status">Enter a name (from expiring/expired list) to see their bills.</div>
+    </div>
+    <div class="card hidden" id="r_historyCard">
+      <h2 class="sec">Bills for this client</h2>
+      <div style="overflow-x:auto"><table class="dtable" id="r_history"><tbody></tbody></table></div>
+      <div class="subtle">Latest on top. Tap a bill to reconcile / renew from it.</div>
+    </div>
+    <div class="card hidden" id="r_usageCard">
+      <h2 class="sec">Previous cycle usage</h2>
+      <div id="r_prevline" class="note info" style="margin-top:0"></div>
+      <div class="grid g3" style="margin-top:12px">
+        <div class="field"><label>Count usage from</label><input id="r_winstart" type="date" onclick="this.showPicker&&this.showPicker()" /></div>
+        <div class="field"><label>Count usage to</label><input id="r_winend" type="date" onclick="this.showPicker&&this.showPicker()" /></div>
+        <div class="field"><label>&nbsp;</label><button class="btn btn-ghost" id="r_winreset" style="width:100%">Reset dates</button></div>
+      </div>
+      <div class="subtle" id="r_winnote" style="margin-top:6px"></div>
+      <div class="stat-grid" id="r_stats" style="margin-top:12px"></div>
+      <div id="r_drill"></div>
+      <div id="r_usageKV" style="margin-top:12px"></div>
+      <div id="r_pauseWarn"></div>
+    </div>
+    <div class="card hidden" id="r_reconCard">
+      <h2 class="sec">Actual usage (priced)</h2>
+      <p class="subtle" style="margin-top:0">Only the items the client opted for, counted through the completed cycle, priced from the sheet.</p>
+      <table class="lines"><thead><tr><th>Item</th><th>Qty</th><th>Rate</th><th>Price</th><th></th></tr></thead><tbody id="r_lines"></tbody></table>
+      <div class="totals" id="r_actualTotals"></div>
+      <div class="kv" style="margin-top:10px"><span class="k">Paid for previous cycle</span><span class="v" id="r_paid">—</span></div>
+      <div class="kv"><span class="k">Carry-forward adjustment</span><span class="v" id="r_adj">—</span></div>
+    </div>
+    <div class="card hidden" id="r_nextCard">
+      <h2 class="sec">Next bill</h2>
+      <label class="chk" id="r_settleWrap" style="margin-bottom:14px"><input type="checkbox" id="r_settle"/>Settlement only — bill just the pending amount (client not continuing)</label>
+      <div id="r_nextBody">
+      <div class="grid g3">
+        <div class="field"><label>Start date</label><input id="r_start" type="date" onclick="this.showPicker&&this.showPicker()" /></div>
+        <div class="field"><label>End date</label><input id="r_end" type="date" onclick="this.showPicker&&this.showPicker()" /></div>
+        <div class="field"><label>Days</label><input id="r_days" type="number" value="26" min="1" /></div>
+      </div>
+      <table class="lines" style="margin-top:14px"><thead><tr><th>Item</th><th>Qty</th><th>Rate</th><th>Price</th><th></th></tr></thead><tbody id="r_nextlines"></tbody></table>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="add-line" id="r_addmeal">+ Add meal line (GST applies)</button><button class="add-line" id="r_addline">+ Add custom line (no GST)</button></div>
+      <div class="grid g2" style="margin-top:16px">
+        <div class="field"><label>Discount %</label><input id="r_disc" type="number" value="0" min="0" /></div>
+        <div class="field"><label>GST % (food only)</label><input id="r_gst" type="number" value="5" min="0" /></div>
+      </div>
+      </div>
+      <div class="field" style="margin-top:16px"><label id="r_adjlabel">Prev-cycle adjustment (₹) — 0 to omit</label><input id="r_adjinput" type="number" step="0.5" value="0" /><div class="subtle" style="margin-top:4px">Computed: <b id="r_adjcomputed">₹0</b> · <span id="r_adjreset" style="color:var(--accent);font-weight:700;cursor:pointer">reset</span></div></div>
+      <div class="totals" id="r_nextTotals"></div>
+      <div class="grid g2" style="margin-top:16px">
+        <div class="field"><label>Bill no.</label><input id="r_billno" /></div>
+        <div class="field"><label>Bill date</label><input id="r_billdate" type="date" onclick="this.showPicker&&this.showPicker()" /></div>
+      </div>
+      <div class="actions">
+        <button class="btn btn-ghost" id="r_save">Save to sheet</button>
+        <button class="btn btn-ghost" id="r_quote">Send as quote (no save)</button>
+        <button class="btn btn-wa" id="r_wa">Bill image → WhatsApp</button>
+      </div>
+      <div class="status info" id="r_status2"></div>
+    </div>
+  </section>
+
+  <!-- DASHBOARD -->
+  <section id="tab-dash" class="hidden">
+    <div class="card"><h2 class="sec">Follow-ups — expiring &amp; expired</h2><div id="d_followups"><div class="subtle">Loading…</div></div></div>
+    <div class="card">
+      <h2 class="sec" style="cursor:pointer;user-select:none" id="d_allHead">▾ All bills</h2>
+      <div id="d_allBody"><div class="row" style="margin-bottom:12px">
+        <div class="field" style="flex:1 1 200px"><input id="d_search" placeholder="Search name or bill no." /></div>
+        <select id="d_filter" style="flex:0 0 140px"><option value="all">All</option><option value="unpaid">Unpaid</option><option value="paid">Paid</option></select>
+        <button class="btn btn-ghost" id="d_reload" style="flex:0 0 auto">Reload</button>
+        <button class="btn btn-ghost" id="d_backfill" style="flex:0 0 auto" title="Generate and archive images for every bill that doesn't have one yet, so their bill numbers become links. Safe to re-run — it skips bills already done.">Backfill images</button>
+      </div>
+      <div id="d_table"></div>
+      <div class="status info" id="d_status"></div></div>
+    </div>
+    <div class="card">
+      <h2 class="sec" style="cursor:pointer;user-select:none" id="d_ubHead">▾ Unbilled clients</h2>
+      <div id="d_ubBody">
+      <div style="display:flex;align-items:center;gap:8px;margin:0 0 8px">
+        <button class="rowmenu-btn" id="d_ubSync" title="Re-stamp the Unbilled date (col T) in Master Client List and clear it for anyone now billed. Runs once automatically each time the Dashboard opens. Clients left unbilled past the grace window can't choose meals; set Billing Exempt (col S) to Yes to exclude someone.">↻</button>
+        <span class="subtle" id="d_ubSyncMsg" style="font-size:.76rem"></span>
+      </div>
+      <div id="d_unbilled" title="Clients with orders but no bill at all. Already-billed clients appear in Follow-ups; exempt clients are hidden. Use the ⋮ menu to bill, check usage, or dismiss."><div class="subtle">Loading…</div></div></div>
+    </div>
+  </section>
+
+  <!-- USAGE CHECK -->
+  <section id="tab-usage" class="hidden">
+    <div class="card">
+      <h2 class="sec">Usage check</h2>
+      <p class="subtle" style="margin-top:0">Client + date range → actual usage from Orders_Output. Read-only.</p>
+      <div class="grid g3">
+        <div class="field"><label>Client name</label><input id="u_client" list="n_clientNames" autocomplete="off" /></div>
+        <div class="field"><label>Start date</label><input id="u_start" type="date" onclick="this.showPicker&&this.showPicker()" /></div>
+        <div class="field"><label>End date</label><input id="u_end" type="date" onclick="this.showPicker&&this.showPicker()" /></div>
+      </div>
+      <div class="actions"><button class="btn btn-primary" id="u_fetch">Get usage report</button><button class="btn btn-ghost" id="u_reload">Reload</button></div>
+      <div class="status info" id="u_status">Enter a client and date range, then Get usage report.</div>
+    </div>
+    <div class="card hidden" id="u_card">
+      <h2 class="sec">Usage report</h2>
+      <div id="u_range" class="note info" style="margin-top:0"></div>
+      <div class="stat-grid" id="u_stats" style="margin-top:12px"></div>
+      <div id="u_drill"></div>
+      <div id="u_kv" style="margin-top:12px"></div>
+      <div id="u_slots" style="margin-top:12px"></div>
+      <div id="u_pauseWarn"></div>
+      <div class="actions"><button class="btn btn-primary" id="u_makebill">Make bill from this usage</button></div>
+    </div>
+    <div class="card hidden" id="u_billCard">
+      <h2 class="sec">Bill from usage</h2>
+      <p class="subtle" style="margin-top:0">Priced from what the client actually took over the dates above. For a client who stopped and needs a final bill.</p>
+      <div class="grid g3">
+        <div class="field"><label>Plan(s)</label>
+          <div class="msel" id="u_planSel">
+            <button type="button" class="msel-head" id="u_planHead">Nutri Balance</button>
+            <div class="msel-panel hidden" id="u_planPanel">
+              <label class="msel-opt"><input type="checkbox" value="nb" checked>Nutri Balance</label>
+              <label class="msel-opt"><input type="checkbox" value="hp">High Protein</label>
+              <label class="msel-opt"><input type="checkbox" value="lc">Low Carb</label>
+              <label class="msel-opt"><input type="checkbox" value="hc">High Carb</label>
+              <label class="msel-opt"><input type="checkbox" value="nc">No Carb</label>
+            </div>
+          </div>
+        </div>
+        <div class="field"><label>Rate tier</label>
+          <select id="u_dur"><option value="d">2 day trial</option><option value="w">Weekly</option><option value="m" selected>1 month</option><option value="q">3 months</option></select>
+        </div>
+        <div class="field"><label>Delivery price (₹/delivery)</label><input id="u_delprice" type="number" value="0" min="0" step="0.5" /></div>
+      </div>
+      <table class="lines" style="margin-top:14px"><thead><tr><th>Item</th><th>Qty</th><th>Rate</th><th>Price</th><th></th></tr></thead><tbody id="u_lines"></tbody></table>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="add-line" id="u_addmeal">+ Add meal line (GST applies)</button><button class="add-line" id="u_addline">+ Add custom line (no GST)</button></div>
+      <div class="grid g2" style="margin-top:16px">
+        <div class="field"><label>Discount %</label><input id="u_disc" type="number" value="0" min="0" /></div>
+        <div class="field"><label>GST % (food only)</label><input id="u_gst" type="number" value="5" min="0" /></div>
+      </div>
+      <div class="totals" id="u_totals"></div>
+      <div class="grid g2" style="margin-top:16px">
+        <div class="field"><label>Bill no.</label><input id="u_billno" /></div>
+        <div class="field"><label>Bill date</label><input id="u_billdate" type="date" onclick="this.showPicker&&this.showPicker()" /></div>
+      </div>
+      <div class="actions">
+        <button class="btn btn-ghost" id="u_save">Save to sheet</button>
+        <button class="btn btn-ghost" id="u_quote">Send as quote (no save)</button>
+        <button class="btn btn-wa" id="u_wa">Bill image → WhatsApp</button>
+      </div>
+      <div class="status info" id="u_status2"></div>
+    </div>
+  </section>
+</div>
+
+<div id="imgModal" class="imgmodal hidden">
+  <div class="box">
+    <div class="top"><b id="im_title">Bill</b><span class="drill-x" id="im_close">✕</span></div>
+    <div class="body"><img id="im_pic" alt="" /></div>
+    <div class="act">
+      <a id="im_dl" href="#" download>Download</a>
+      <a id="im_drive" class="pri hidden" href="#" target="_blank" rel="noopener">Open in Drive</a>
+      <button id="im_done">Close</button>
+    </div>
+  </div>
+</div>
+
+<div id="invoiceWrap"><div id="invoice"></div></div>
+
+<script>
+/* Unbilled list only looks at months from here on — auto-billing started Aug 2026,
+   anything earlier was billed by hand and would just be noise. Format: "YYYY-MM". */
+const UNBILLED_FROM="2026-08";
+const BIZ={name:"Friska Wellness",tagline:"Healthy Meals",address:"Moti Nagar, Hyderabad, Telangana 500018",gst:"38AAKFF6850B1ZI",fssai:"23624030000435",upi:"friskawellnessllp@idfcbank",acHolder:"FRISKA WELLNESS LLP",acNumber:"50200087206209",ifsc:"HDFC0005486",branch:"LIBERTY CROSS ROADS",acType:"CURRENT",logo:"logo.png"};
+const ADMIN_PRICES_URL="https://script.google.com/macros/s/AKfycbz82SA1y26hBJ_cd5kFBE3vD73djtTMVh4G_dCs43JKdSlVXzLWDR4DPMbUtHyTIa0/exec";
+const BILLS_API_URL="https://script.google.com/macros/s/AKfycbwI8_v36JJrkAXVhfGIAirSC3IUHbe6l-3WLeeTETg1SGRUcn4M_dPjN9azSCbgTBD1/exec";
+const COL={date:0,name:1,phone:2,slot:5,loc:6,opt1:7,opt2:8,brk:9,snk:10,j1:11,j2:12};
+const MONTH_ABBR=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const MONTHS={jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
+const PLAN_LABEL={nb:"Nutri Balance",hp:"High Protein",lc:"Low Carb",hc:"High Carb",nc:"No Carb"};
+const DUR_LABEL={d:"2 day trial",w:"Weekly",m:"1 month",q:"3 months",custom:"Custom"};
+const DUR_DAYS={d:2,w:6,m:26,q:78,custom:26};
+const PLAN_CODE={},DUR_CODE={};
+Object.keys(PLAN_LABEL).forEach(c=>PLAN_CODE[PLAN_LABEL[c].toLowerCase()]=c);
+Object.keys(DUR_LABEL).forEach(c=>DUR_CODE[DUR_LABEL[c].toLowerCase()]=c);
+let ordersCache=null,billsCache=null,priceMap=null,masterCache=null,statusCache=null;
+
+/* date helpers */
+function dateOnly(d){return new Date(d.getFullYear(),d.getMonth(),d.getDate(),12,0,0,0);}
+function addDays(d,n){const x=dateOnly(d);x.setDate(x.getDate()+n);return dateOnly(x);}
+function keyOf(d){return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");}
+function isSunday(d){return d.getDay()===0;}
+function dtstr(d){return d?String(d.getDate()).padStart(2,"0")+"-"+MONTH_ABBR[d.getMonth()]+"-"+d.getFullYear():"";}
+function serial(n){const e=new Date(1899,11,30,12);e.setDate(e.getDate()+Math.floor(n));return dateOnly(e);}
+function toDt(v){
+  if(v===null||v===undefined||v==="")return null;
+  if(typeof v==="number")return serial(v);
+  let s=String(v).trim();if(!s)return null;
+  if(/^\d+(\.\d+)?$/.test(s))return serial(parseFloat(s));
+  s=s.replace(/^\s*(mon|tue|wed|thu|fri|sat|sun|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\s*,\s*/i,"");
+  let m;
+  m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);if(m)return dateOnly(new Date(+m[1],+m[2]-1,+m[3],12));
+  m=s.match(/^(\d{1,2})[-\s]([A-Za-z]{3,})[-\s](\d{2,4})$/);if(m){const mo=MONTHS[m[2].slice(0,3).toLowerCase()];if(mo!==undefined){let y=+m[3];if(y<100)y+=2000;return dateOnly(new Date(y,mo,+m[1],12));}}
+  m=s.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})$/);if(m){let y=+m[3];if(y<100)y+=2000;return dateOnly(new Date(y,+m[2]-1,+m[1],12));}
+  return null;
+}
+function normName(s){return String(s||"").replace(/\s+/g," ").trim().toLowerCase();}
+function readDate(id){const v=el(id).value;if(!v)return null;const [y,m,d]=v.split("-").map(Number);return dateOnly(new Date(y,m-1,d,12));}
+function setDate(id,d){el(id).value=d?keyOf(d):"";}
+function nextServiceDates(afterDay,needed){const out=[];let cur=addDays(afterDay,1);while(out.length<needed){if(!isSunday(cur))out.push(dateOnly(cur));cur=addDays(cur,1);}return out;}
+function computeDaysExclSunday(start,end){if(!start||!end||end<start)return 0;let n=0,c=dateOnly(start);while(c<=end){if(!isSunday(c))n++;c=addDays(c,1);}return n;}
+function money(n){return String(Math.round((Number(n)||0)*100)/100);}
+function el(id){return document.getElementById(id);}
+function setStatus(id,msg,cls){const s=el(id);if(!s)return;s.textContent=msg;s.className="status "+(cls||"info");}
+
+/* api */
+async function postWithRetry(url,body,label,attempt){
+  attempt=attempt||1;
+  let res,text;
+  try{
+    res=await fetch(url,{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded;charset=UTF-8"},body:body.toString()});
+    text=await res.text();
+  }catch(networkErr){
+    if(attempt<3){await new Promise(r=>setTimeout(r,700*attempt));return postWithRetry(url,body,label,attempt+1);}
+    throw networkErr;
   }
-}
-
-function doPostInner_(e) {
-  var action = (e && e.parameter && e.parameter.action) || '';
-
-  /* ---- ACCOUNTING (accounting.html) ---- */
-  if (action === 'getAll')          return acctGetAll_();
-  if (action === 'importExpenses')  return importExpenses_(e);
-  if (action === 'importCredits')   return importCredits_(e);
-  if (action === 'updateExpense')   return expUpdate_(e);
-  if (action === 'deleteBatch')     return deleteBatch_(e);
-
-  if (action === 'getBillsAll') {
-    var sh = SpreadsheetApp.getActive().getSheetByName('Bills');
-    var tz = Session.getScriptTimeZone();
-    var lr = sh ? sh.getLastRow() : 0, lc = sh ? sh.getLastColumn() : 0;
-    var rows = [];
-    if (lr >= 1) rows = sh.getRange(1,1,lr,lc).getValues().map(function(r){
-      return r.map(function(v){ return (v instanceof Date) ? Utilities.formatDate(v,tz,'yyyy-MM-dd') : (v==null?'':String(v)); });
-    });
-    return jsonOutput({ ok:true, rows: rows });
+  const trimmed=text.trim(),looksJson=trimmed.startsWith("{")||trimmed.startsWith("[");
+  if(!res.ok||!looksJson){
+    if(attempt<3){await new Promise(r=>setTimeout(r,700*attempt));return postWithRetry(url,body,label,attempt+1);}
+    throw new Error(label+" "+res.status+" — "+text.slice(0,160));
   }
-
-  if (action === 'appendBill') {
-    var sh = SpreadsheetApp.getActive().getSheetByName('Bills');
-    if (!sh) return jsonOutput({ ok:false, message:'Bills sheet not found' });
-    if (sh.getLastColumn() < 1) return jsonOutput({ ok:false, message:'Bills has no header row' });
-    var bill = JSON.parse(e.parameter.payload);
-    var headers = sh.getRange(1,1,1,sh.getLastColumn()).getValues()[0].map(function(h){ return String(h).trim(); });
-    sh.appendRow(headers.map(function(h){ return (h in bill) ? bill[h] : ''; }));
-    try { rebuildStatement(); } catch (err) {}
-    return jsonOutput({ ok:true, billNo: bill.BillNo });
-  }
-
-  if (action === 'updateBillStatus') {
-    var sh = SpreadsheetApp.getActive().getSheetByName('Bills');
-    var headers = sh.getRange(1,1,1,sh.getLastColumn()).getValues()[0].map(function(h){ return String(h).trim(); });
-    var billCol = headers.indexOf('BillNo'), statusCol = headers.indexOf('PaidStatus');
-    var ids = sh.getRange(1,billCol+1,sh.getLastRow(),1).getValues();
-    for (var i=1;i<ids.length;i++){
-      if (String(ids[i][0]) === String(e.parameter.billNo)) {
-        sh.getRange(i+1, statusCol+1).setValue(e.parameter.status);
-        try { rebuildStatement(); } catch (err) {}
-        return jsonOutput({ ok:true });
-      }
-    }
-    return jsonOutput({ ok:false, message:'BillNo not found' });
-  }
-
-  if (action === 'rebuildStatement') {
-    try { rebuildStatement(); return jsonOutput({ ok:true }); }
-    catch (err) { return jsonOutput({ ok:false, message: err.message }); }
-  }
-
-  if (action === 'deleteBill') {
-    var sh = SpreadsheetApp.getActive().getSheetByName('Bills');
-    if (!sh) return jsonOutput({ ok:false, message:'Bills sheet not found' });
-    var headers = sh.getRange(1,1,1,sh.getLastColumn()).getValues()[0].map(function(h){ return String(h).trim(); });
-    var billCol = headers.indexOf('BillNo');
-    if (billCol < 0) return jsonOutput({ ok:false, message:'BillNo column not found' });
-    var lastRow = sh.getLastRow();
-    var ids = sh.getRange(1,billCol+1,lastRow,1).getValues();
-    for (var i=1;i<ids.length;i++){
-      if (String(ids[i][0]) === String(e.parameter.billNo)) {
-        sh.deleteRow(i+1);
-        try { rebuildStatement(); } catch (err) {}
-        return jsonOutput({ ok:true });
-      }
-    }
-    return jsonOutput({ ok:false, message:'BillNo not found' });
-  }
-
-  if (action === 'saveBillImage') {
-    var billNo = String(e.parameter.billNo || '').trim();
-    var b64 = e.parameter.image || '';
-    if (!billNo || !b64) return jsonOutput({ ok:false, message:'billNo and image required' });
-    var name = 'Bill_' + billNo + '.png';
-    var folder = billImageFolder_();
-    var old = folder.getFilesByName(name);                 // re-sending a bill replaces its image
-    while (old.hasNext()) old.next().setTrashed(true);
-    var file = folder.createFile(Utilities.newBlob(Utilities.base64Decode(b64), 'image/png', name));
-    var url = file.getUrl();
-    var bsh = SpreadsheetApp.getActive().getSheetByName('Bills');
-    if (bsh) {
-      var bhead = bsh.getRange(1,1,1,bsh.getLastColumn()).getValues()[0].map(function(h){ return String(h).trim(); });
-      var bi = bhead.indexOf('BillNo'), ui = bhead.indexOf('BillUrl');
-      if (bi >= 0 && ui >= 0) {
-        var bids = bsh.getRange(1,bi+1,bsh.getLastRow(),1).getValues();
-        for (var bx=1; bx<bids.length; bx++) {
-          if (String(bids[bx][0]).trim() === billNo) { bsh.getRange(bx+1, ui+1).setValue(url); break; }
-        }
-      }
-    }
-    return jsonOutput({ ok:true, url:url, name:name });
-  }
-
-  /* ---- RAZORPAY PAYMENT LINKS ---- */
-  if (action === 'createPayLink') return rzpCreateLink_(e);
-  if (action === 'syncPayments')  return rzpSyncPayments_(e);
-  if (action === 'rzpHook')       return rzpWebhook_(e);
-
-  /* ---- LEGACY / EXPENSES (kept for other tools) ---- */
-  if (action === 'getLegacyCreditsAll') return legacyGetAll_();
-  if (action === 'appendLegacyCredit')   return legacyAppend_(e);
-  if (action === 'deleteLegacyCredit')   return legacyDelete_(e);
-  if (action === 'getExpensesAll')  return expGetAll_();
-  if (action === 'appendExpense')   return expAppend_(e);
-  if (action === 'deleteExpense')   return expDelete_(e);
-  if (action === 'getExpenseMeta')  return expMeta_();
-
-  return jsonOutput({ success: false });
-}
-
-function doGet(e) {
-  return ContentService
-    .createTextOutput(JSON.stringify({ status: "Bills API running" }))
-    .setMimeType(ContentService.MimeType.JSON);
-}
-
-function jsonOutput(obj) {
-  return ContentService
-    .createTextOutput(JSON.stringify(obj))
-    .setMimeType(ContentService.MimeType.JSON);
-}
-
-/***********************************************************************
- * ACCOUNTING — single-call loader for accounting.html
- * Returns { bills, expenses, legacy } as {h:[headers], r:[[row]...]}
- * Bills are projected to the columns accounting needs (no LineItemsJSON).
- ***********************************************************************/
-var BILL_COLS_FOR_ACCT = ['BillNo','Date','Client','Plan','Duration','Food','Discount',
-  'Delivery','Adjustment','GrandTotal','PaidStatus','Gst','Month','Items'];
-
-function sheetTable_(sh, keepCols, dateFmt) {
-  var tz = Session.getScriptTimeZone();
-  if (!sh || sh.getLastRow() < 1 || sh.getLastColumn() < 1) return { h:[], r:[] };
-  var data = sh.getRange(1,1,sh.getLastRow(),sh.getLastColumn()).getValues();
-  var head = data[0].map(function(h){ return String(h).trim(); });
-  var idx = [];
-  head.forEach(function(h,i){ if (h && (!keepCols || keepCols.indexOf(h) >= 0)) idx.push(i); });
-  var out = [];
-  for (var r = 1; r < data.length; r++) {
-    var row = data[r];
-    if (row[0] === '' || row[0] == null) continue;          // skip blank rows
-    out.push(idx.map(function(i){
-      var v = row[i];
-      return (v instanceof Date) ? Utilities.formatDate(v, tz, dateFmt) : (v == null ? '' : v);
-    }));
-  }
-  return { h: idx.map(function(i){ return head[i]; }), r: out };
-}
-
-function acctGetAll_() {
-  var ss = SpreadsheetApp.getActive();
-  return jsonOutput({
-    ok: true,
-    bills:    sheetTable_(ss.getSheetByName('Bills'), BILL_COLS_FOR_ACCT, 'yyyy-MM-dd'),
-    expenses: sheetTable_(ensureExpensesSheet(), null, 'yyyy-MM-dd'),
-    legacy:   sheetTable_(ensureLegacyCreditsSheet(), null, 'yyyy-MM-dd'),
-    categories: EXPENSE_CATEGORIES
-  });
-}
-
-/* Bank-statement import: debit rows → Expenses
-   payload: { batch, rows:[{Date, Amount, Category, Description, Method}] } */
-function importExpenses_(e) {
-  var lock = LockService.getScriptLock();
-  try { lock.waitLock(30000); } catch(err){ return jsonOutput({ok:false,message:'Busy, retry'}); }
-  try {
-    var p = JSON.parse(e.parameter.payload || '{}');
-    var rows = p.rows || [], batch = String(p.batch || '');
-    var sh = ensureExpensesSheet();
-    var headers = expHeaders_(sh);
-    var counters = seedExpCounters_(sh, headers);
-    var out = [], skipped = 0;
-    rows.forEach(function(r){
-      var d = parseLooseDate_(r.Date);
-      var amt = Math.abs(Number(String(r.Amount).replace(/[^0-9.\-]/g,'')));
-      if (!d || !isFinite(amt) || amt <= 0) { skipped++; return; }
-      var ym = d.slice(0,4) + d.slice(5,7);
-      counters[ym] = (counters[ym] || 0) + 1;
-      var rec = {
-        ExpenseId: 'EXP-' + ym + '-' + ('000' + counters[ym]).slice(-3),
-        Timestamp: d + ' 00:00:00',
-        Amount: amt,
-        Category: normalizeCategory_(r.Category),
-        Description: String(r.Description || '').trim(),
-        PaidBy: r.PaidBy || p.paidBy || 'Bank',
-        PaymentMethod: r.Method || 'Bank',
-        Batch: batch
-      };
-      out.push(headers.map(function(h){ return (h in rec) ? rec[h] : ''; }));
-    });
-    if (out.length) sh.getRange(sh.getLastRow()+1, 1, out.length, headers.length).setValues(out);
-    return jsonOutput({ ok:true, imported: out.length, skipped: skipped });
-  } catch(err){ return jsonOutput({ok:false,message:err.message}); }
-  finally { try { lock.releaseLock(); } catch(e2){} }
-}
-
-/* Bank-statement import: credit rows → LegacyCredits (Paid)
-   payload: { batch, rows:[{Date, Client, Amount}] } */
-function importCredits_(e) {
-  var lock = LockService.getScriptLock();
-  try { lock.waitLock(30000); } catch(err){ return jsonOutput({ok:false,message:'Busy, retry'}); }
-  try {
-    var p = JSON.parse(e.parameter.payload || '{}');
-    var rows = p.rows || [], batch = String(p.batch || '');
-    var sh = ensureLegacyCreditsSheet();
-    var headers = expHeaders_(sh);
-    var max = maxLegacyId_(sh, headers);
-    var out = [], skipped = 0;
-    rows.forEach(function(r){
-      var d = parseLooseDate_(r.Date);
-      var amt = Math.abs(Number(String(r.Amount).replace(/[^0-9.\-]/g,'')));
-      if (!d || !isFinite(amt) || amt <= 0) { skipped++; return; }
-      max++;
-      var rec = { LegacyId:'LEG-' + ('0000'+max).slice(-4), Date:d,
-                  Client:String(r.Client || '').trim(), Amount:amt, PaidStatus:'Paid', Batch:batch };
-      out.push(headers.map(function(h){ return (h in rec) ? rec[h] : ''; }));
-    });
-    if (out.length) sh.getRange(sh.getLastRow()+1, 1, out.length, headers.length).setValues(out);
-    return jsonOutput({ ok:true, imported: out.length, skipped: skipped });
-  } catch(err){ return jsonOutput({ok:false,message:err.message}); }
-  finally { try { lock.releaseLock(); } catch(e2){} }
-}
-
-/* Re-categorise / re-describe one expense */
-function expUpdate_(e) {
-  var sh = ensureExpensesSheet();
-  var headers = expHeaders_(sh);
-  var row = expFindRow_(sh, headers, e.parameter.expenseId);
-  if (row < 0) return jsonOutput({ok:false,message:'ExpenseId not found'});
-  if (e.parameter.category != null && e.parameter.category !== '') {
-    sh.getRange(row, headers.indexOf('Category')+1).setValue(normalizeCategory_(e.parameter.category));
-  }
-  if (e.parameter.description != null) {
-    sh.getRange(row, headers.indexOf('Description')+1).setValue(e.parameter.description);
-  }
-  return jsonOutput({ok:true});
-}
-
-/* Undo an import: removes every row with this Batch from Expenses or LegacyCredits */
-function deleteBatch_(e) {
-  var lock = LockService.getScriptLock();
-  try { lock.waitLock(30000); } catch(err){ return jsonOutput({ok:false,message:'Busy, retry'}); }
-  try {
-    var batch = String(e.parameter.batch || '');
-    if (!batch) return jsonOutput({ok:false,message:'Batch required'});
-    var sh = e.parameter.kind === 'credit' ? ensureLegacyCreditsSheet() : ensureExpensesSheet();
-    var headers = expHeaders_(sh);
-    var ib = headers.indexOf('Batch');
-    var lr = sh.getLastRow();
-    if (ib < 0 || lr < 2) return jsonOutput({ok:true, removed:0});
-    var rng = sh.getRange(2, 1, lr-1, headers.length);
-    var data = rng.getValues();
-    var keep = data.filter(function(r){ return String(r[ib]) !== batch; });
-    var removed = data.length - keep.length;
-    if (removed) {
-      rng.clearContent();
-      if (keep.length) sh.getRange(2, 1, keep.length, headers.length).setValues(keep);
-    }
-    return jsonOutput({ok:true, removed:removed});
-  } catch(err){ return jsonOutput({ok:false,message:err.message}); }
-  finally { try { lock.releaseLock(); } catch(e2){} }
-}
-
-function seedExpCounters_(sh, headers) {
-  var counters = {};
-  var iId = headers.indexOf('ExpenseId');
-  var lr = sh.getLastRow();
-  if (iId >= 0 && lr > 1) {
-    var existing = sh.getRange(2, iId+1, lr-1, 1).getValues();
-    for (var x = 0; x < existing.length; x++) {
-      var mm = String(existing[x][0] || '').match(/^EXP-(\d{6})-(\d+)$/);
-      if (mm) { var n = parseInt(mm[2],10); if (!counters[mm[1]] || n > counters[mm[1]]) counters[mm[1]] = n; }
-    }
-  }
-  return counters;
-}
-
-function maxLegacyId_(sh, headers) {
-  var iId = headers.indexOf('LegacyId'), max = 0, lr = sh.getLastRow();
-  if (iId >= 0 && lr > 1) {
-    var ids = sh.getRange(2, iId+1, lr-1, 1).getValues();
-    for (var i=0;i<ids.length;i++){
-      var mm = String(ids[i][0]||'').match(/^LEG-(\d+)$/);
-      if (mm){ var n=parseInt(mm[1],10); if(n>max) max=n; }
-    }
-  }
-  return max;
-}
-
-function batchLabel_(prefix) {
-  return prefix + '-' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMdd-HHmm');
-}
-
-/***********************************************************************
- * BILL IMAGES — archived to one Drive folder, created on first use.
- * Files stay private: only this account can open the links.
- ***********************************************************************/
-var BILL_IMAGE_FOLDER = 'Friska Bill Images';
-function billImageFolder_() {
-  var it = DriveApp.getFoldersByName(BILL_IMAGE_FOLDER);
-  return it.hasNext() ? it.next() : DriveApp.createFolder(BILL_IMAGE_FOLDER);
-}
-
-/* RUN THIS ONCE from the Apps Script editor to approve Drive access.
-   A web app can't show a consent screen, so without this every saveBillImage
-   call fails. Private functions (trailing _) don't appear in the Run menu,
-   which is why this public wrapper exists. */
-function grantDriveAccess() {
-  var f = billImageFolder_();
-  Logger.log('Drive OK — folder "' + f.getName() + '" at ' + f.getUrl());
-  return f.getUrl();
-}
-
-/***********************
- * STATEMENT
- ***********************/
-/***********************************************************************
- * RAZORPAY PAYMENT LINKS
- *
- * Why links at all: a UPI QR scanned out of the phone gallery is capped at
- * ₹2,000, and our bills go to clients as WhatsApp images. An https link has
- * no such cap and lets the client pay by UPI / GPay / PhonePe / card.
- *
- * Setup — Project Settings > Script Properties:
- *   RZP_KEY_ID      live key id   (rzp_live_...)
- *   RZP_KEY_SECRET  live key secret
- *   RZP_HOOK_TOKEN  any long random string you invent, also put in the
- *                   webhook URL as &token=...
- * Bills sheet needs two more headers: PayLink, PayLinkId
- ***********************************************************************/
-function rzpKeys_() {
-  var p = PropertiesService.getScriptProperties();
-  return { id: p.getProperty('RZP_KEY_ID'), secret: p.getProperty('RZP_KEY_SECRET') };
-}
-function rzpCall_(method, path, body) {
-  var k = rzpKeys_();
-  if (!k.id || !k.secret) throw new Error('Razorpay keys missing — set RZP_KEY_ID and RZP_KEY_SECRET in Script Properties');
-  var opt = {
-    method: method,
-    headers: { Authorization: 'Basic ' + Utilities.base64Encode(k.id + ':' + k.secret) },
-    muteHttpExceptions: true
-  };
-  if (body) { opt.contentType = 'application/json'; opt.payload = JSON.stringify(body); }
-  var res  = UrlFetchApp.fetch('https://api.razorpay.com' + path, opt);
-  var code = res.getResponseCode(), text = res.getContentText();
-  var json = null; try { json = JSON.parse(text); } catch (x) {}
-  if (code < 200 || code >= 300) {
-    var msg = (json && json.error && json.error.description) ? json.error.description : String(text).slice(0, 300);
-    throw new Error('Razorpay ' + code + ': ' + msg);
+  let json;try{json=JSON.parse(text);}catch(e){
+    if(attempt<3){await new Promise(r=>setTimeout(r,700*attempt));return postWithRetry(url,body,label,attempt+1);}
+    throw new Error("Non-JSON "+label+" response: "+text.slice(0,160));
   }
   return json;
 }
-/* Bills sheet helpers — everything is matched by header name, never position. */
-function billsSheet_() {
-  var sh = SpreadsheetApp.getActive().getSheetByName('Bills');
-  if (!sh) throw new Error('Bills sheet not found');
-  var head = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(function (h) { return String(h).trim(); });
-  return { sh: sh, head: head, col: function (n) { return head.indexOf(n); } };
+async function apiCall(action,params){
+  if(typeof API_URL==="undefined"||!API_URL)throw new Error("API_URL not found (config.js).");
+  const body=new URLSearchParams();body.set("action",action);
+  if(params)for(const k in params)body.set(k,params[k]);
+  return postWithRetry(API_URL,body,"Server");
 }
-function billRow_(b, billNo) {
-  var bi = b.col('BillNo');
-  if (bi < 0) return -1;
-  var ids = b.sh.getRange(1, bi + 1, b.sh.getLastRow(), 1).getValues();
-  for (var i = 1; i < ids.length; i++) if (String(ids[i][0]).trim() === String(billNo).trim()) return i + 1;
-  return -1;
+async function billsApiCall(action,params){
+  const body=new URLSearchParams();body.set("action",action);
+  if(params)for(const k in params)body.set(k,params[k]);
+  return postWithRetry(BILLS_API_URL,body,"Bills server");
 }
-function rzpCreateLink_(e) {
-  try {
-    var billNo = String(e.parameter.billNo || '').trim();
-    var amt    = Number(e.parameter.amount);
-    if (!billNo) return jsonOutput({ ok: false, message: 'billNo required' });
-    if (!isFinite(amt) || amt <= 0) return jsonOutput({ ok: false, message: 'amount must be greater than 0' });
+async function fetchOrders(force){if(ordersCache&&!force)return ordersCache;const j=await apiCall("getOrdersOutputAll");ordersCache=Array.isArray(j)?j:(j.rows||[]);return ordersCache;}
+async function fetchBills(force){if(billsCache&&!force)return billsCache;const j=await billsApiCall("getBillsAll");billsCache=Array.isArray(j)?j:(j.rows||[]);return billsCache;}
+async function fetchMaster(force){if(masterCache&&!force)return masterCache;const j=await apiCall("getMasterClientsAll");masterCache=(j&&j.clients)||[];return masterCache;}
+async function fetchStatus(force){if(statusCache&&!force)return statusCache;const j=await apiCall("getMasterClientStatusAll");statusCache=(j&&j.clients)||[];return statusCache;}
+/* The billing-hold list straight from the backend: clients with an Unbilled date (col T),
+   already filtered for Billing Exempt (col S) using the same rule the client app enforces. */
+async function fetchHoldList(){const j=await apiCall("getUnbilledList");return (j&&j.ok)?j:null;}
+function phoneForClient(name){
+  const k=normName(name);
+  const hit=(masterCache||[]).find(c=>normName(c.name)===k);
+  return hit?hit.phone:"";
+}
+async function fetchPrices(force){
+  if(priceMap&&!force)return priceMap;
+  const res=await fetch(ADMIN_PRICES_URL+"?t="+Date.now(),{method:"GET",cache:"no-store"});
+  const text=await res.text();
+  let j;try{j=JSON.parse(text);}catch(e){throw new Error("Non-JSON price response: "+text.slice(0,160));}
+  if(j&&j.error)throw new Error(j.error);
+  const map={};
+  for(const k in j){if(!Object.prototype.hasOwnProperty.call(j,k))continue;const num=Number(j[k]);if(!isNaN(num))map[String(k).toLowerCase()]=num;}
+  priceMap=map;return map;
+}
+function rate(plan,dur,item){const k=(plan+"_"+dur+"_"+item).toLowerCase();return priceMap&&(k in priceMap)?priceMap[k]:0;}
+function gRate(item){return priceMap&&(item in priceMap)?priceMap[item]:0;}
+function lockedRate(prev,id,fallback){if(prev&&prev.lineItems&&prev.lineItems.length){const m=prev.lineItems.find(l=>l.id===id);if(m)return m.rate;}return fallback;}
 
-    var b = billsSheet_();
-    var li = b.col('PayLink'), ii = b.col('PayLinkId');
-    if (li < 0 || ii < 0) return jsonOutput({ ok: false, message: 'Add "PayLink" and "PayLinkId" columns to the Bills sheet' });
-    var row = billRow_(b, billNo);
-    if (row < 0) return jsonOutput({ ok: false, message: 'Bill ' + billNo + ' not found' });
+/* usage computation */
+/* Orders_Output is an append-only log, so scanning all of it once per client is
+   the dashboard's main cost. Index it by client once and reuse. */
+let _oIdx=null,_oIdxSrc=null;
+function ordersFor(data,clientName){
+  if(_oIdxSrc!==data){
+    const m=new Map();
+    for(const row of data){
+      if(!row||row.length<2)continue;
+      const k=normName(row[COL.name]);if(!k)continue;
+      let a=m.get(k);if(!a){a=[];m.set(k,a);}
+      a.push(row);
+    }
+    _oIdx=m;_oIdxSrc=data;
+  }
+  return _oIdx.get(normName(clientName))||[];
+}
+function countUsage(data,start,end,clientName){
+  data=ordersFor(data,clientName);      // only this client's rows
+  const key=normName(clientName);const totals={meal1:0,meal2:0,snack:0,j1:0,j2:0,brk:0,seafood:0};
+  const activeSet=new Set();const slotDates={};let lastActive=null;const paused=[];
+  const byDate={};        // dateKey -> per-day item tallies, for the drill-down lists
+  const delSeen={};       // 'dateKey|slot' -> location, so each delivery is counted once
+  const service=[];let cur=dateOnly(start);
+  while(cur<=end){if(!isSunday(cur))service.push(dateOnly(cur));cur=addDays(cur,1);}
+  for(const row of data){
+    if(!row||row.length<2)continue;
+    const dt=toDt(row[COL.date]);if(!dt)continue;const rd=dateOnly(dt);
+    if(!(start<=rd&&rd<=end))continue;if(isSunday(rd))continue;
+    if(normName(row[COL.name])!==key)continue;
+    const c=i=>(i<row.length?String(row[i]).trim():"");
+    const o1=c(COL.opt1),o2=c(COL.opt2),brk=c(COL.brk),snk=c(COL.snk),j1=c(COL.j1),j2=c(COL.j2);
+    const dk=keyOf(rd);const d=byDate[dk]=byDate[dk]||{meals:0,brk:0,snack:0,juices:0};
+    let mc=0;
+    if(o1&&o1!=="N/A"){totals.meal1++;mc++;d.meals++;if(normName(o1)==="seafood 1")totals.seafood++;}
+    if(o2&&o2!=="N/A"){totals.meal2++;mc++;d.meals++;if(normName(o2)==="seafood 2")totals.seafood++;}
+    if(brk&&brk!=="N/A"){totals.brk++;mc++;d.brk++;}
+    if(snk&&snk!=="N/A"){totals.snack++;mc++;d.snack++;}
+    if(j1&&j1!=="N/A"){totals.j1++;mc++;d.juices++;}
+    if(j2&&j2!=="N/A"){totals.j2++;mc++;d.juices++;}
+    if(mc>0){
+      activeSet.add(dk);
+      let slot=(row.length>COL.slot?String(row[COL.slot]).trim():"")||"No slot";
+      (slotDates[slot]=slotDates[slot]||new Set()).add(dk);
+      const dsk=dk+"|"+slot;const lv=(row.length>COL.loc?String(row[COL.loc]).trim():"");
+      if(!delSeen[dsk])delSeen[dsk]=lv;                 // first row wins; a later row only fills a blank
+      else if(!delSeen[dsk]&&lv)delSeen[dsk]=lv;
+      if(!lastActive||rd>lastActive)lastActive=rd;
+    }
+  }
+  for(const d of service){if(!activeSet.has(keyOf(d)))paused.push(dateOnly(d));}
+  totals.meals_total=totals.meal1+totals.meal2;totals.juices_total=totals.j1+totals.j2;
+  const slotCounts={};let deliveries=0;for(const s in slotDates){slotCounts[s]=slotDates[s].size;deliveries+=slotCounts[s];}
+  const activeDatesSorted=Array.from(activeSet).sort().map(k=>dtFromKey(k));
+  const mealsDetail=Object.keys(byDate).filter(k=>byDate[k].meals>0).sort().map(k=>({date:dtFromKey(k),n:byDate[k].meals}));
+  const activeDetail=Array.from(activeSet).sort().map(k=>({date:dtFromKey(k),d:byDate[k]||{meals:0,brk:0,snack:0,juices:0}}));
+  const deliveryDetail=Object.keys(delSeen).sort().map(k=>{const p=k.split("|");return {date:dtFromKey(p[0]),slot:p[1],loc:delSeen[k]};});
+  return {totals,activeDays:activeSet.size,activeDatesSorted,pausedDays:paused.length,totalDays:service.length,pausedDates:paused,lastActiveDate:lastActive,slotCounts,deliveries,byDate,mealsDetail,activeDetail,deliveryDetail,serviceDates:service};
+}
+function dtFromKey(k){const [y,m,d]=k.split("-").map(Number);return dateOnly(new Date(y,m-1,d,12));}
+function hasActivityAfter(data,name,date){
+  const key=normName(name);
+  for(const row of ordersFor(data,name)){if(!row||row.length<2)continue;const dt=toDt(row[COL.date]);if(!dt)continue;if(dateOnly(dt)<=date)continue;
+    for(const i of[7,8,9,10,11,12]){if(i<row.length){const v=String(row[i]).trim();if(v&&v!=="N/A")return true;}}}
+  return false;
+}
+// Roll forward from the bill start, counting actual active service days up to today (never beyond).
+// The cycle completes when optedDays active days are reached; new bill is due only then.
+function computeRenew(data,name,prev,winStart,winEnd){
+  const today=dateOnly(new Date());
+  const optedDays=prevDaysOf(prev);
+  if(winStart||winEnd){
+    // manual window — count exactly what falls inside it (used for long-pause clients)
+    const ws=winStart||prev.start, we=winEnd||today;
+    const billing=countUsage(data,ws,we,name);
+    const activeDates=billing.activeDatesSorted;
+    const complete=activeDates.length>=optedDays;
+    const completionDate=complete?activeDates[optedDays-1]:null;
+    const pending=complete?0:(optedDays-activeDates.length);
+    const f=nextServiceDates(we,optedDays);
+    return {today,optedDays,activeDates,complete,completionDate,billingEnd:we,billing,pending,nextStart:f[0],nextEnd:f[f.length-1],scan:billing,winStart:ws,manual:true};
+  }
+  const scan=countUsage(data,prev.start,today,name);
+  const activeDates=scan.activeDatesSorted;
+  const complete=activeDates.length>=optedDays;
+  const completionDate=complete?activeDates[optedDays-1]:null;
+  const billingEnd=complete?completionDate:today;
+  const billing=countUsage(data,prev.start,billingEnd,name);
+  const pending=complete?0:(optedDays-activeDates.length);
+  const base=complete?completionDate:today;
+  const f=nextServiceDates(base,optedDays);
+  return {today,optedDays,activeDates,complete,completionDate,billingEnd,billing,pending,nextStart:f[0],nextEnd:f[f.length-1],scan,winStart:prev.start,manual:false};
+}
 
-    var existing = String(b.sh.getRange(row, li + 1).getValue() || '').trim();
-    if (existing && String(e.parameter.force || '') !== '1')
-      return jsonOutput({ ok: true, url: existing, reused: true });   // one link per bill unless forced
-
-    var payload = {
-      amount: Math.round(amt * 100),                      // paise
-      currency: 'INR',
-      description: 'Friska Wellness — Bill ' + billNo,
-      reference_id: 'BILL-' + billNo + '-' + Date.now(),  // must be unique per link
-      customer: { name: String(e.parameter.client || '').slice(0, 100) },
-      notify: { sms: false, email: false },               // we send it ourselves on WhatsApp
-      reminder_enable: false,
-      notes: { billNo: billNo }
+/* line table */
+function lineRowHtml(line,editable){
+  const editLbl=line.custom||line.extra||editable;
+  const lbl=editLbl
+    ?`<input class="lbl-in" value="${(line.label||"").replace(/<[^>]*>/g,"").replace(/"/g,"&quot;")}" data-f="label">`
+    :`<span style="font-weight:600" data-meal="${line._meal||""}" data-plans="${line._plans||""}" data-dur="${line._dur||""}" data-days="${line._days||""}">${line.label}</span>`;
+  const rm=(line.custom||line.extra||editable)?`<button class="rm" data-rm>×</button>`:"";
+  return `<tr data-id="${line.id}" data-food="${line.food===false?0:1}" data-custom="${line.custom?1:0}" data-extra="${line.extra?1:0}"><td>${lbl}</td><td class="qtycol"><input type="number" min="0" value="${line.qty}" data-f="qty"></td><td class="ratecol"><input type="number" min="0" step="0.5" value="${line.rate}" data-f="rate"></td><td class="pricecol num" data-price>${money(line.qty*line.rate)}</td><td class="rmcol">${rm}</td></tr>`;
+}
+function renderLines(tbodyId,lines,editable){el(tbodyId).innerHTML=lines.map(l=>lineRowHtml(l,editable)).join("");}
+function readLines(tbodyId){
+  const out=[];
+  el(tbodyId).querySelectorAll("tr").forEach(tr=>{
+    const id=tr.getAttribute("data-id");const get=f=>tr.querySelector(`[data-f="${f}"]`);
+    const labelEl=get("label");const label=labelEl?labelEl.value:(tr.querySelector("span")?tr.querySelector("span").textContent:"");
+    out.push({id,label,qty:parseFloat(get("qty").value)||0,rate:parseFloat(get("rate").value)||0,custom:tr.dataset.custom==="1",extra:tr.dataset.extra==="1",food:tr.dataset.food!=="0"});
+  });
+  return out;
+}
+function computeTotals(lines,discPct,gstPct,adjustment){
+  let food=0,delivery=0,other=0;const otherLines=[];
+  lines.forEach(l=>{const amt=l.qty*l.rate;
+    if(l.id==="delivery")delivery+=amt;
+    else if(l.custom||l.food===false){other+=amt;if(amt)otherLines.push({label:l.label||"Custom item",amt});}  // non-GST lines, listed by their own name
+    else food+=amt;});
+  const discAmt=food*(discPct||0)/100;const foodAfter=food-discAmt;const gst=foodAfter*(gstPct||0)/100;
+  return {food,discAmt,foodAfter,gst,delivery,other,otherLines,adjustment:adjustment||0,grand:foodAfter+gst+delivery+other+(adjustment||0)};
+}
+function renderTotals(containerId,t){
+  let h=`<div class="tline"><span class="k">Food subtotal</span><span class="v">₹${money(t.food)}</span></div>`;
+  if(t.discAmt>0)h+=`<div class="tline"><span class="k">Discount</span><span class="v credit">−₹${money(t.discAmt)}</span></div>`;
+  h+=`<div class="tline"><span class="k">GST (food only)</span><span class="v">₹${money(t.gst)}</span></div>`;
+  if(t.delivery>0)h+=`<div class="tline"><span class="k">Delivery</span><span class="v">₹${money(t.delivery)}</span></div>`;
+  if(t.otherLines&&t.otherLines.length)t.otherLines.forEach(o=>{h+=`<div class="tline"><span class="k">${o.label}</span><span class="v ${o.amt<0?"credit":""}">${o.amt<0?"−":""}₹${money(Math.abs(o.amt))}</span></div>`;});
+  else if(t.other)h+=`<div class="tline"><span class="k">Other / adjustments</span><span class="v ${t.other<0?"credit":""}">${t.other<0?"−":""}₹${money(Math.abs(t.other))}</span></div>`;
+  if(t.adjustment)h+=`<div class="tline"><span class="k">Prev-cycle adjustment</span><span class="v ${t.adjustment<0?'credit':'debit'}">${t.adjustment<0?'−':'+'}₹${money(Math.abs(t.adjustment))}</span></div>`;
+  h+=`<div class="tline grand"><span class="k">Grand total</span><span class="v">₹${money(t.grand)}</span></div>`;
+  el(containerId).innerHTML=h;
+}
+function bindLivePrice(tbodyId,onChange){
+  el(tbodyId).addEventListener("input",e=>{const tr=e.target.closest("tr");if(tr){const q=tr.querySelector('[data-f="qty"]'),r=tr.querySelector('[data-f="rate"]'),p=tr.querySelector('[data-price]');if(q&&r&&p)p.textContent=money((parseFloat(q.value)||0)*(parseFloat(r.value)||0));}onChange&&onChange();});
+  el(tbodyId).addEventListener("click",e=>{if(e.target.dataset.rm!==undefined){e.target.closest("tr").remove();onChange&&onChange();}});
+}
+function statBox(n,l,key){
+  if(!key)return `<div class="stat"><div class="n">${n}</div><div class="l">${l}</div></div>`;
+  return `<div class="stat tap" data-stat="${key}"><div class="n">${n}</div><div class="l">${l}</div><div class="c">tap for list</div></div>`;
+}
+/* ---- stat drill-downs: tap a tile, the list opens right under the tiles ---- */
+const DRILL_TITLE={meals:"Meals by date",active:"Active days",deliveries:"Deliveries",paused:"Paused days"};
+function drillRows(u,key){
+  if(key==="meals")return (u.mealsDetail||[]).map(r=>[dtstr(r.date),r.n+(r.n===1?" meal":" meals")]);
+  if(key==="active")return (u.activeDetail||[]).map(r=>{
+    const p=[];if(r.d.meals)p.push(r.d.meals+"× meal");if(r.d.brk)p.push(r.d.brk+"× breakfast");if(r.d.snack)p.push(r.d.snack+"× snack");if(r.d.juices)p.push(r.d.juices+"× juice");
+    return [dtstr(r.date),p.join(" · ")||"—"];
+  });
+  if(key==="deliveries")return (u.deliveryDetail||[]).map(r=>[dtstr(r.date)+(r.slot&&r.slot!=="No slot"?` · ${r.slot}`:""),r.loc||"—"]);
+  if(key==="paused")return (u.pausedDates||[]).map(d=>[dtstr(d),""]);
+  return [];
+}
+function renderDrill(hostId,u,key){
+  const host=el(hostId);if(!host)return;
+  if(!key){host.innerHTML="";return;}
+  const rows=drillRows(u,key);
+  host.innerHTML=`<div class="drill"><div class="drill-h"><span>${DRILL_TITLE[key]||""} (${rows.length})</span><span class="drill-x" data-drillx>✕</span></div>`+
+    (rows.length?`<div class="drill-b"><table><tbody>`+rows.map(r=>`<tr><td>${r[0]}</td><td class="r">${r[1]}</td></tr>`).join("")+`</tbody></table></div>`
+                :`<div class="drill-b"><table><tbody><tr><td style="color:var(--muted)">None.</td></tr></tbody></table></div>`)+
+    `</div>`;
+}
+function bindStatDrill(gridId,hostId,getUsage){
+  const grid=el(gridId);if(!grid)return;
+  grid.querySelectorAll(".stat.tap").forEach(function(box){
+    box.onclick=function(){
+      const key=box.dataset.stat;const was=box.classList.contains("on");
+      grid.querySelectorAll(".stat.tap").forEach(b=>b.classList.remove("on"));
+      if(was){renderDrill(hostId,getUsage(),null);return;}
+      box.classList.add("on");renderDrill(hostId,getUsage(),key);
+      const x=el(hostId).querySelector("[data-drillx]");
+      if(x)x.onclick=function(){grid.querySelectorAll(".stat.tap").forEach(b=>b.classList.remove("on"));renderDrill(hostId,getUsage(),null);};
     };
-    var ph = String(e.parameter.phone || '').replace(/\D/g, '').slice(-10);
-    if (ph) payload.customer.contact = '+91' + ph;
+  });
+}
+function kvRow(k,v){return `<div class="kv"><span class="k">${k}</span><span class="v">${v}</span></div>`;}
+function stripPlan(label){return label.indexOf("· ")>=0?label.split("· ").slice(1).join("· "):label;}
+function itemsReadable(lines){return lines.filter(l=>l.qty>0&&l.id!=="delivery").map(l=>`${stripPlan(l.label)} ×${l.qty}`).join(" · ");}
 
-    var j = rzpCall_('post', '/v1/payment_links', payload);
-    if (!j || !j.short_url) return jsonOutput({ ok: false, message: 'Razorpay returned no short_url' });
-    b.sh.getRange(row, li + 1).setValue(j.short_url);
-    b.sh.getRange(row, ii + 1).setValue(j.id);
-    return jsonOutput({ ok: true, url: j.short_url, id: j.id });
-  } catch (err) { return jsonOutput({ ok: false, message: err.message }); }
+/* ===================== NEW BILL ===================== */
+function nPlans(){return Array.from(el("n_planPanel").querySelectorAll("input:checked")).map(c=>c.value);}
+function nChosen(){return Array.from(el("n_items").querySelectorAll("input:checked")).map(c=>c.value);}
+function nSlots(){return el("n_slots").querySelectorAll("input:checked").length;}
+function nDays(){return parseInt(el("n_days").value)||0;}
+function nPeople(){return Math.max(1,parseInt(el("n_people").value)||1);}
+function mealLabel(plan,both,onlyLunch){return `${PLAN_LABEL[plan]} · `+(both?"Lunch + Dinner":(onlyLunch?"Lunch":"Dinner"));}
+function domLines(tbodyId){const m={};readLines(tbodyId).forEach(l=>m[l.id]=l);return m;}
+function buildNewLines(resetQty,freshMains,freshJuice){
+  const prev=domLines("n_lines");
+  const plans=nPlans(),chosen=nChosen(),dur=el("n_dur").value,days=nDays();
+  const hasLunch=chosen.includes("lunch"),hasDinner=chosen.includes("dinner"),both=hasLunch&&hasDinner;
+  const keepQ=(id,def)=>(prev[id]&&!resetQty)?prev[id].qty:def;
+  const keepR=(id,def)=>prev[id]?prev[id].rate:def;
+  const out=[];
+  if(hasLunch||hasDinner){const pl=plans.length?plans:["nb"];const ppl=nPeople();const def=(both?days*2:days)*ppl;const sfx=ppl>1?" ("+ppl+" members)":"";const label=pl.map(p=>PLAN_LABEL[p]).join(" + ")+" · "+(both?"Lunch + Dinner":(hasLunch?"Lunch":"Dinner"))+sfx;out.push({id:"main",label,qty:freshMains?def:keepQ("main",def),rate:keepR("main",both?rate(pl[0],dur,"combo"):rate(pl[0],dur,"lunch")),food:true});}
+  if(chosen.includes("breakfast"))out.push({id:"breakfast",label:"Breakfast",qty:keepQ("breakfast",days),rate:keepR("breakfast",plans.length?rate(plans[0],dur,"breakfast"):gRate("breakfast")),food:true});
+  if(chosen.includes("snack"))out.push({id:"snack",label:"Snack",qty:keepQ("snack",days),rate:keepR("snack",plans.length?rate(plans[0],dur,"snack"):gRate("snack")),food:true});
+  const jx=chosen.includes("juice2x")?2:(chosen.includes("juice1x")?1:0);
+  if(jx>0)out.push({id:"juices",label:"Juices",qty:freshJuice?days*jx:keepQ("juices",days*jx),rate:keepR("juices",plans.length?rate(plans[0],dur,"juice1"):gRate("juice1")),food:true});
+  if(chosen.includes("seafood"))out.push({id:"seafood",label:"Seafood add-on",qty:keepQ("seafood",days),rate:keepR("seafood",gRate("seafood")),food:true});
+  Object.values(prev).filter(l=>l.extra).forEach(l=>out.push(l));   // extra meal lines (2nd plan for a couple etc) — food-rated, GST applies
+  Object.values(prev).filter(l=>l.custom).forEach(l=>out.push(l));
+  const delprice=parseFloat(el("n_delprice").value)||0;
+  const slotNames=Array.from(el("n_slots").querySelectorAll("input:checked")).map(c=>c.value);const delLabel=slotNames.length?"Delivery · "+slotNames.join(" + "):"Delivery";
+  out.push({id:"delivery",label:delLabel,qty:days*nSlots(),rate:delprice,food:false});
+  return out;
 }
-/* Writes Paid only when Razorpay itself says the link is paid. */
-function rzpMarkPaid_(billNo) {
-  var b = billsSheet_();
-  var si = b.col('PaidStatus');
-  if (si < 0) return false;
-  var row = billRow_(b, billNo);
-  if (row < 0) return false;
-  if (String(b.sh.getRange(row, si + 1).getValue() || '').trim().toLowerCase() === 'paid') return false;
-  b.sh.getRange(row, si + 1).setValue('Paid');
-  try { rebuildStatement(); } catch (err) {}
-  return true;
+function refreshNewRates(){
+  const plans=nPlans(),dur=el("n_dur").value,chosen=nChosen();const both=chosen.includes("lunch")&&chosen.includes("dinner");
+  const lines=readLines("n_lines");
+  lines.forEach(l=>{
+    if(l.id==="main"){const p=plans[0]||"nb";l.rate=both?rate(p,dur,"combo"):rate(p,dur,"lunch");}
+    else if(l.id==="breakfast")l.rate=plans.length?rate(plans[0],dur,"breakfast"):gRate("breakfast");
+    else if(l.id==="snack")l.rate=plans.length?rate(plans[0],dur,"snack"):gRate("snack");
+    else if(l.id==="juices")l.rate=plans.length?rate(plans[0],dur,"juice1"):gRate("juice1");
+    else if(l.id==="seafood")l.rate=gRate("seafood");
+    else if(l.id==="delivery")l.rate=parseFloat(el("n_delprice").value)||0;
+  });
+  renderLines("n_lines",lines);recalcNew();
 }
-/* Poll: every unpaid bill that has a link, ask Razorpay whether it is paid yet.
-   Works with no webhook at all, and repairs anything a webhook missed. */
-function rzpSyncPayments_(e) {
-  try {
-    var b = billsSheet_();
-    var bi = b.col('BillNo'), si = b.col('PaidStatus'), ii = b.col('PayLinkId');
-    if (bi < 0 || si < 0 || ii < 0) return jsonOutput({ ok: false, message: 'Bills needs BillNo, PaidStatus and PayLinkId columns' });
-    var last = b.sh.getLastRow();
-    if (last < 2) return jsonOutput({ ok: true, checked: 0, paid: 0 });
-    var data = b.sh.getRange(2, 1, last - 1, b.sh.getLastColumn()).getValues();
-    var cap = Math.min(Number(e.parameter.max) || 60, 100);   // stay inside the 6-minute script limit
-    var checked = 0, paid = 0, names = [], errs = 0;
-    for (var i = 0; i < data.length && checked < cap; i++) {
-      var plid = String(data[i][ii] || '').trim();
-      if (!plid) continue;
-      if (String(data[i][si] || '').trim().toLowerCase() === 'paid') continue;
-      checked++;
-      try {
-        var j = rzpCall_('get', '/v1/payment_links/' + encodeURIComponent(plid), null);
-        if (j && String(j.status).toLowerCase() === 'paid') {
-          b.sh.getRange(i + 2, si + 1).setValue('Paid');
-          paid++; names.push(String(data[i][bi]).trim());
+function nRender(resetQty,freshMains,freshJuice){renderLines("n_lines",buildNewLines(resetQty,freshMains,freshJuice));recalcNew();}
+function recalcNew(){renderTotals("n_totals",computeTotals(readLines("n_lines"),parseFloat(el("n_disc").value)||0,parseFloat(el("n_gst").value)||0,0));}
+function newDatesFromStart(){const s=readDate("n_start");const days=nDays();if(s){const f=nextServiceDates(addDays(s,-1),days);setDate("n_end",f[f.length-1]);}}
+function applyDuration(){const dur=el("n_dur").value;if(dur==="custom")el("n_days").removeAttribute("readonly");else{el("n_days").value=DUR_DAYS[dur];el("n_days").setAttribute("readonly","readonly");}nRender(true);refreshNewRates();newDatesFromStart();}
+function updatePlanHead(){const p=nPlans();el("n_planHead").textContent=p.length?p.map(x=>PLAN_LABEL[x]).join(", "):"Select plan(s)";}
+
+/* ===================== RENEW ===================== */
+let renewCtx=null;
+function billHeaderIndex(rows){const h=rows[0].map(x=>String(x).trim());const idx={};h.forEach((n,i)=>idx[n]=i);return idx;}
+function billNoExists(no){if(!billsCache||billsCache.length<2)return false;const idx=billHeaderIndex(billsCache);const bi=idx["BillNo"];if(bi===undefined)return false;for(let i=1;i<billsCache.length;i++){if(String(billsCache[i][bi]).trim()===String(no).trim())return true;}return false;}
+function planCodesOf(prev){return String(prev.plan||"").split(",").map(s=>PLAN_CODE[normName(s)]).filter(Boolean);}
+function durCodeOf(prev){return DUR_CODE[normName(prev.duration)]||"m";}
+function prevDaysOf(prev){if(prev.start&&prev.end){let n=0,c=dateOnly(prev.start);while(c<=prev.end){if(!isSunday(c))n++;c=addDays(c,1);}return n||DUR_DAYS[durCodeOf(prev)];}return DUR_DAYS[durCodeOf(prev)];}
+function prevSlotCount(prev){return String(prev.slots||"").split(",").map(s=>s.trim()).filter(Boolean).length;}
+function prevDeliveryUnit(prev){const dn=prevDaysOf(prev)*Math.max(1,prevSlotCount(prev));return dn>0?(prev.deliveryTotal||0)/dn:0;}
+function parseItems(text,days){
+  const op={main:null,breakfast:false,snack:false,juices:0,seafood:false};
+  String(text||"").split("·").forEach(part=>{
+    const p=part.trim().toLowerCase();const m=p.match(/×\s*(\d+)/);const qty=m?parseInt(m[1]):0;
+    if(p.indexOf("lunch")>=0&&p.indexOf("dinner")>=0)op.main="both";
+    else if(p.indexOf("lunch")>=0)op.main="lunch";
+    else if(p.indexOf("dinner")>=0)op.main="dinner";
+    if(p.indexOf("breakfast")>=0)op.breakfast=true;
+    if(p.indexOf("snack")>=0)op.snack=true;
+    if(p.indexOf("seafood")>=0)op.seafood=true;
+    if(p.indexOf("juice")>=0)op.juices=(qty>days)?2:1;
+  });
+  return op;
+}
+function parseBillRow(row,idx){
+  const get=k=>{const j=idx[k];return (j===undefined||j>=row.length)?"":row[j];};
+  let lineItems=[];
+  try{const raw=get("LineItemsJSON");if(raw)lineItems=JSON.parse(raw);}catch(e){lineItems=[];}
+  return {raw:row,idx,billNo:get("BillNo"),plan:get("Plan"),duration:get("Duration"),slots:get("Slots"),items:get("Items"),client:get("Client"),phone:get("Phone"),start:toDt(get("Start")),end:toDt(get("End")),grandTotal:parseFloat(get("GrandTotal"))||0,deliveryTotal:parseFloat(get("Delivery"))||0,discPct:parseFloat(get("Discount"))||0,gstPct:5,paid:String(get("PaidStatus")||"Unpaid"),adjustment:parseFloat(get("Adjustment"))||0,lineItems};
+}
+function allBillsForClient(rows,name){
+  if(!rows||rows.length<2)return [];const idx=billHeaderIndex(rows);const ci=idx["Client"];if(ci===undefined)return [];
+  const key=normName(name);const out=[];
+  for(let i=1;i<rows.length;i++){if(normName(rows[i][ci])===key)out.push(parseBillRow(rows[i],idx));}
+  out.sort((a,b)=>{const av=a.start?a.start.getTime():0,bv=b.start?b.start.getTime():0;return bv-av;}); // latest first
+  return out;
+}
+function lastBillForClient(rows,name){const l=allBillsForClient(rows,name);return l.length?l[0]:null;}
+let renewList=null,renewOrders=null,renewName="";
+async function runRenew(force){
+  const name=el("r_client").value.trim();
+  if(!name){setStatus("r_status","Enter a client name.","err");return;}
+  setStatus("r_status","Loading…","info");
+  try{
+    const [bills]=await Promise.all([fetchBills(force),fetchPrices(force)]);
+    const list=allBillsForClient(bills,name);
+    if(!list.length){setStatus("r_status",`No bills found for "${name}".`,"err");return;}
+    renewOrders=await fetchOrders(force);renewList=list;renewName=name;
+    renderHistory(0);
+    selectRenewBill(0);
+    setStatus("r_status",`${list.length} bill(s) found.`,"ok");
+  }catch(err){setStatus("r_status","Error: "+err.message,"err");}
+}
+function renderHistory(sel){
+  el("r_historyCard").classList.remove("hidden");
+  el("r_history").innerHTML=`<thead><tr><th>Bill</th><th>Start</th><th>End</th><th>Total</th><th>Status</th></tr></thead><tbody>`+
+    renewList.map((bl,i)=>`<tr data-i="${i}" style="cursor:pointer;${i===sel?"background:var(--accent-soft)":""}"><td><b>${bl.billNo}</b></td><td>${dtstr(bl.start)}</td><td>${dtstr(bl.end)}</td><td>₹${money(bl.grandTotal)}</td><td>${bl.paid}</td></tr>`).join("")+`</tbody>`;
+  el("r_history").querySelectorAll("tr[data-i]").forEach(tr=>tr.onclick=()=>{const i=parseInt(tr.dataset.i);renderHistory(i);selectRenewBill(i);});
+}
+function selectRenewBill(i){
+  const prev=renewList[i];
+  if(!prev.start||!prev.end){setStatus("r_status","That bill has no readable Start/End.","err");["r_usageCard","r_reconCard","r_nextCard"].forEach(id=>el(id).classList.add("hidden"));return;}
+  renewCtx={prev,rc:computeRenew(renewOrders,renewName,prev)};
+  renderRenew();
+}
+/* Re-run the reconciliation over a hand-picked window (long-pause clients). */
+function applyRenewWindow(){
+  if(!renewCtx)return;
+  const ws=readDate("r_winstart"),we=readDate("r_winend");
+  if(!ws||!we){setStatus("r_status","Enter both usage dates.","err");return;}
+  if(we<ws){setStatus("r_status","Usage 'to' date is before 'from' date.","err");return;}
+  renewCtx.rc=computeRenew(renewOrders,renewName,renewCtx.prev,ws,we);
+  renderRenew();
+  setStatus("r_status",`Recounted ${dtstr(ws)} → ${dtstr(we)}.`,"ok");
+}
+function resetRenewWindow(){
+  if(!renewCtx)return;
+  renewCtx.rc=computeRenew(renewOrders,renewName,renewCtx.prev);
+  renderRenew();
+  setStatus("r_status","Window reset to the bill's own dates.","ok");
+}
+function renderRenew(){
+  const prev=renewCtx.prev,rc=renewCtx.rc,b=rc.billing,plans=planCodesOf(prev),dur=durCodeOf(prev),p0=plans[0]||"nb";
+  let op=parseItems(prev.items,prevDaysOf(prev));
+  if(!(op.main||op.breakfast||op.snack||op.juices||op.seafood)){ // old bill without Items column: infer opted from usage
+    op.main=b.totals.meal2>0?"both":(b.totals.meal1>0?"lunch":null);
+    op.breakfast=b.totals.brk>0;op.snack=b.totals.snack>0;op.juices=b.totals.juices_total>0?1:0;op.seafood=b.totals.seafood>0;
+  }
+  el("r_usageCard").classList.remove("hidden");
+  el("r_prevline").innerHTML=`Started <b>${dtstr(prev.start)}</b> · ${prev.plan||"—"} · ${rc.optedDays} opted days`;
+  setDate("r_winstart",rc.winStart||prev.start);setDate("r_winend",rc.billingEnd);
+  el("r_winnote").innerHTML=rc.manual
+    ?`<span style="color:var(--warn-ink);font-weight:600">Manual window</span> — usage below is counted over these dates, and the next bill starts the day after.`
+    :`Auto window — from the bill's start to ${rc.complete?"the day the cycle completed":"today"}. Edit either date to override.`;
+  el("r_stats").innerHTML=statBox(b.totals.meals_total,"Meals","meals")+statBox(rc.activeDates.length,"Active days","active")+statBox(rc.pending,"Pending days","paused")+statBox(b.deliveries,"Deliveries","deliveries");
+  el("r_drill").innerHTML="";
+  bindStatDrill("r_stats","r_drill",()=>renewCtx.rc.billing);
+  let kv="";if(b.totals.brk>0)kv+=kvRow("Breakfast",b.totals.brk);if(b.totals.snack>0)kv+=kvRow("Snack",b.totals.snack);if(b.totals.juices_total>0)kv+=kvRow("Juices",b.totals.juices_total);if(b.totals.seafood>0)kv+=kvRow("Seafood",b.totals.seafood);
+  el("r_usageKV").innerHTML=kv;
+  if(!rc.complete)el("r_pauseWarn").innerHTML=`<div class="note pause"><b>Previous plan still pending.</b> ${rc.activeDates.length} of ${rc.optedDays} opted days completed as of ${rc.manual?dtstr(rc.billingEnd):"today"} — ${rc.pending} pending. A new bill is usually generated once the cycle completes.</div>`;
+  else el("r_pauseWarn").innerHTML=`<div class="note info">Cycle completed on <b>${dtstr(rc.completionDate)}</b> after ${rc.optedDays} active days.</div>`;
+
+  // actual usage — every item the client actually took (qty>0), priced from the locked bill rate when it was on the previous bill, else the current sheet rate
+  const both=op.main==="both", plabel=(plans.length?plans:[p0]).map(p=>PLAN_LABEL[p]).join(" + "), actual=[];
+  if(b.totals.meals_total>0&&op.main)actual.push({id:"main",label:plabel+" · "+(both?"Lunch + Dinner":op.main==="lunch"?"Lunch":"Dinner"),qty:b.totals.meals_total,rate:lockedRate(prev,"main",both?rate(p0,dur,"combo"):rate(p0,dur,"lunch")),food:true});
+  if(b.totals.brk>0)actual.push({id:"breakfast",label:"Breakfast",qty:b.totals.brk,rate:lockedRate(prev,"breakfast",rate(p0,dur,"breakfast")),food:true});
+  if(b.totals.snack>0)actual.push({id:"snack",label:"Snack",qty:b.totals.snack,rate:lockedRate(prev,"snack",rate(p0,dur,"snack")),food:true});
+  if(b.totals.juices_total>0)actual.push({id:"juices",label:"Juices",qty:b.totals.juices_total,rate:lockedRate(prev,"juices",rate(p0,dur,"juice1")),food:true});
+  if(b.totals.seafood>0)actual.push({id:"seafood",label:"Seafood add-on",qty:b.totals.seafood,rate:lockedRate(prev,"seafood",gRate("seafood")),food:true});
+  if(b.deliveries>0)actual.push({id:"delivery",label:"Delivery",qty:b.deliveries,rate:lockedRate(prev,"delivery",prevDeliveryUnit(prev)),food:false});
+  el("r_reconCard").classList.remove("hidden");renderLines("r_lines",actual);recalcRenewActual();
+
+  // next bill — rebuilt from opted items + plans + carried-forward locked rates
+  el("r_nextCard").classList.remove("hidden");
+  el("r_settle").checked=false;el("r_nextBody").style.display="";el("r_settleWrap").classList.remove("on");
+  el("r_adjlabel").textContent="Prev-cycle adjustment (₹) — 0 to omit";
+  const newDays=prevDaysOf(prev),slots=Math.max(1,prevSlotCount(prev));
+  el("r_days").value=newDays;el("r_disc").value=prev.discPct||0;el("r_gst").value=5;el("r_billdate").value=keyOf(dateOnly(new Date()));
+  setDate("r_start",rc.nextStart);setDate("r_end",rc.nextEnd);
+  renderLines("r_nextlines",reconstructNextLines(prev,newDays,slots,op),true);
+  suggestBillNo("r_billno","r_start");recalcRenewNext();
+}
+function reconstructNextLines(prev,days,slots,op){
+  const plans=planCodesOf(prev),dur=durCodeOf(prev),p0=plans[0]||"nb";const out=[];
+  if(op.main){const both=op.main==="both";const pl=plans.length?plans:["nb"];const base=pl.map(p=>PLAN_LABEL[p]).join(" + ");const meal=both?"Lunch + Dinner":(op.main==="lunch"?"Lunch":"Dinner");const label=base+" · "+meal;out.push({id:"main",label,qty:both?days*2:days,rate:lockedRate(prev,"main",both?rate(pl[0],dur,"combo"):rate(pl[0],dur,"lunch")),food:true,_meal:op.main,_plans:pl.join(","),_dur:dur,_days:days});}
+  if(op.breakfast)out.push({id:"breakfast",label:"Breakfast",qty:days,rate:lockedRate(prev,"breakfast",rate(p0,dur,"breakfast")),food:true});
+  if(op.snack)out.push({id:"snack",label:"Snack",qty:days,rate:lockedRate(prev,"snack",rate(p0,dur,"snack")),food:true});
+  if(op.juices)out.push({id:"juices",label:"Juices",qty:days*op.juices,rate:lockedRate(prev,"juices",rate(p0,dur,"juice1")),food:true});
+  if(op.seafood)out.push({id:"seafood",label:"Seafood add-on",qty:days,rate:lockedRate(prev,"seafood",gRate("seafood")),food:true});
+  // carry forward any extra meal lines from the previous bill (e.g. a second plan for a couple), at their locked rate
+  if(prev&&prev.lineItems&&prev.lineItems.length)prev.lineItems.filter(l=>String(l.id||"").indexOf("meal_")===0).forEach(l=>out.push({id:l.id,label:l.label,qty:l.qty,rate:l.rate,food:true,extra:true}));
+  out.push({id:"delivery",label:"Delivery",qty:days*slots,rate:prevDeliveryUnit(prev),food:false});
+  return out;
+}
+function recalcRenewActual(){
+  if(!renewCtx)return;
+  const t=computeTotals(readLines("r_lines"),renewCtx.prev.discPct||0,5,0);renderTotals("r_actualTotals",t);
+  const paidTotal=renewCtx.prev.grandTotal;
+  const paidBaseline=paidTotal-(renewCtx.prev.adjustment||0); // exclude any carried-forward correction already baked into this bill, so we compare against this cycle's own regular billing only
+  const adj=(Math.round(t.grand*100)/100)-paidBaseline;renewCtx.computedAdj=adj;
+  el("r_paid").textContent="₹"+money(paidTotal);
+  el("r_adj").innerHTML=adj===0?"₹0":`<span class="${adj<0?'credit':'debit'}">${adj<0?'−':'+'}₹${money(Math.abs(adj))} ${adj<0?'(credit to client)':'(client owes)'}</span>`;
+  el("r_adjcomputed").textContent="₹"+money(adj);
+  el("r_adjinput").value=money(adj);   // seed the editable field; user can override or zero it out
+  recalcRenewNext();
+}
+function renewAdj(){const v=parseFloat(el("r_adjinput").value);return isNaN(v)?0:v;}
+function isSettle(){return el("r_settle").checked;}
+/* Settlement-only bill: no new cycle, the whole bill IS the outstanding balance.
+   Lines are empty and the amount sits in Adjustment so the sheet columns still reconcile. */
+function settleTotals(){return computeTotals([],0,0,renewAdj());}
+function applySettleMode(){
+  const on=isSettle();
+  el("r_nextBody").style.display=on?"none":"";
+  el("r_settleWrap").classList.toggle("on",on);
+  el("r_adjlabel").textContent=on?"Settlement amount (₹) — what the client still owes":"Prev-cycle adjustment (₹) — 0 to omit";
+  if(renewCtx){
+    if(on){const d=renewCtx.rc.billingEnd||dateOnly(new Date());setDate("r_start",d);setDate("r_end",d);el("r_days").value=0;}
+    else{setDate("r_start",renewCtx.rc.nextStart);setDate("r_end",renewCtx.rc.nextEnd);el("r_days").value=prevDaysOf(renewCtx.prev);}
+  }
+  recalcRenewNext();
+}
+function recalcRenewNext(){
+  if(!renewCtx)return;
+  if(isSettle()){
+    const i=settleInfo();
+    let h=`<div class="tline"><span class="k">Meals actually taken${i.billNo?` (since Bill ${i.billNo})`:""}</span><span class="v">₹${money(i.t.grand)}</span></div>`+
+      `<div class="tline"><span class="k">Less: already paid</span><span class="v credit">−₹${money(i.paid)}</span></div>`;
+    if(i.prevAdj)h+=`<div class="tline"><span class="k">Add back: carry-forward in that bill</span><span class="v">${i.prevAdj<0?"−":"+"}₹${money(Math.abs(i.prevAdj))}</span></div>`;
+    if(i.diff)h+=`<div class="tline"><span class="k">Adjustment</span><span class="v">${i.diff<0?"−":"+"}₹${money(Math.abs(i.diff))}</span></div>`;
+    h+=`<div class="tline grand"><span class="k">${i.amount<0?"Refund due":"Balance payable"}</span><span class="v">₹${money(Math.abs(i.amount))}</span></div>`;
+    el("r_nextTotals").innerHTML=h;
+    return;
+  }
+  renderTotals("r_nextTotals",computeTotals(readLines("r_nextlines"),parseFloat(el("r_disc").value)||0,parseFloat(el("r_gst").value)||0,renewAdj()));
+}
+function renewDatesFromStart(){const s=readDate("r_start");const days=parseInt(el("r_days").value)||26;if(s){const f=nextServiceDates(addDays(s,-1),days);setDate("r_end",f[f.length-1]);}}
+
+/* bill number */
+function suggestBillNoFor(billnoId,startDate){
+  const sd=startDate||dateOnly(new Date());const month=sd.getMonth()+1;const prefix=month*100;let maxSeq=0;
+  if(billsCache&&billsCache.length>1){const idx=billHeaderIndex(billsCache);const bi=idx["BillNo"];
+    if(bi!==undefined)for(let i=1;i<billsCache.length;i++){const n=parseInt(String(billsCache[i][bi]).replace(/\D/g,""));if(!isNaN(n)&&Math.floor(n/100)===month)maxSeq=Math.max(maxSeq,n-prefix);}}
+  el(billnoId).value=prefix+(maxSeq+1);
+}
+function suggestBillNo(billnoId,startId){suggestBillNoFor(billnoId,readDate(startId));}
+async function refreshNum(billnoId,startId){try{await fetchBills(false);}catch(e){}suggestBillNo(billnoId,startId);}
+
+/* invoice */
+/* A plain UPI QR — any UPI app the client scans with (GPay, PhonePe, Paytm…)
+   opens with our VPA and this bill's amount already filled in. */
+function upiPayUri(amount,note){
+  // %20 not "+" (strict UPI parsers read + literally), plain ASCII note, @ left bare in pa
+  const enc=s=>encodeURIComponent(String(s)).replace(/%20/g,"%20");
+  const tn=String(note||"").replace(/[^\x20-\x7E]+/g," ").replace(/\s+/g," ").trim().slice(0,50);
+  const parts=[
+    "pa="+String(BIZ.upi).trim(),
+    "pn="+enc(BIZ.acHolder),
+    "cu=INR",
+    "am="+(Math.round((Number(amount)||0)*100)/100).toFixed(2)
+  ];
+  if(tn)parts.push("tn="+enc(tn));
+  return "upi://pay?"+parts.join("&");
+}
+function upiQrBlock(amount,note,payUrl){
+  const amt=Number(amount)||0;
+  if(amt<=0)return "";                                     // nothing to collect (refund / zero bill)
+  if(typeof qrcode!=="function")return "";                 // CDN blocked — bill still prints, just without the QR
+  try{
+    // A Razorpay link is an ordinary web QR, so the ₹2,000 gallery-scan cap on
+    // UPI QRs does not apply. Fall back to a upi:// QR when there is no link.
+    const q=qrcode(0,"M");q.addData(payUrl||upiPayUri(amt,note));q.make();
+    return `<div class="qr"><img src="${q.createDataURL(4,1)}" alt="UPI QR">`+
+      `<div class="cap">Scan to pay</div>`+
+      `<div class="sub">${payUrl?"UPI · card · wallet":"Any UPI app"}</div></div>`;
+  }catch(e){return "";}
+}
+function buildInvoice(meta,lines,t){
+  let rows="";
+  if(meta.settle&&meta.info){
+    // Settlement: show what was actually used this cycle, less what was already paid, so the balance is self-explanatory.
+    const i=meta.info;
+    i.lines.filter(l=>l.id!=="delivery"&&l.food!==false&&l.qty>0).forEach(l=>{
+      rows+=`<tr><td>${l.label}</td><td>${l.qty}</td><td>${l.rate?money(l.rate):""}</td><td>${money(l.qty*l.rate)}</td></tr>`;});
+    if(i.t.discAmt>0)rows+=`<tr class="sub"><td>Discount (${i.discPct}%)</td><td></td><td></td><td>−${money(i.t.discAmt)}</td></tr>`;
+    rows+=`<tr class="sub"><td>GST (5%, food only)</td><td></td><td></td><td>${money(i.t.gst)}</td></tr>`;
+    if(i.t.delivery>0){const dl=i.lines.find(l=>l.id==="delivery");rows+=`<tr><td>Delivery</td><td>${dl?dl.qty:""}</td><td>${dl&&dl.rate?money(dl.rate):""}</td><td>${money(i.t.delivery)}</td></tr>`;}
+    rows+=`<tr class="sub"><td><b>Total for meals actually taken</b></td><td></td><td></td><td><b>${money(i.t.grand)}</b></td></tr>`;
+    rows+=`<tr class="sub"><td>Less: already paid${i.billNo?` (Bill ${i.billNo})`:""}</td><td></td><td></td><td>−${money(i.paid)}</td></tr>`;
+    if(i.prevAdj)rows+=`<tr class="sub"><td>Add back: carry-forward included in that bill</td><td></td><td></td><td>${i.prevAdj<0?'−':'+'}${money(Math.abs(i.prevAdj))}</td></tr>`;
+    if(i.diff)rows+=`<tr class="sub"><td>Adjustment</td><td></td><td></td><td>${i.diff<0?'−':'+'}${money(Math.abs(i.diff))}</td></tr>`;
+  }else{
+    // GST-bearing lines (incl. added meal lines) sit above the GST row; non-GST custom lines go below Delivery.
+    const food=lines.filter(l=>l.id!=="delivery"&&l.food!==false&&!l.custom&&l.qty>0);
+    food.forEach(l=>{rows+=`<tr><td>${l.label}</td><td>${l.qty}</td><td>${l.rate?money(l.rate):""}</td><td>${money(l.qty*l.rate)}</td></tr>`;});
+    if(t.discAmt>0)rows+=`<tr class="sub"><td>Discount (${meta.discPct}%)</td><td></td><td></td><td>−${money(t.discAmt)}</td></tr>`;
+    rows+=`<tr class="sub"><td>GST (${meta.gstPct}%, food only)</td><td></td><td></td><td>${money(t.gst)}</td></tr>`;
+    if(t.delivery>0){const dl=lines.find(l=>l.id==="delivery");rows+=`<tr><td>Delivery</td><td>${dl?dl.qty:""}</td><td>${dl&&dl.rate?money(dl.rate):""}</td><td>${money(t.delivery)}</td></tr>`;}
+    lines.filter(l=>(l.custom||l.food===false)&&l.id!=="delivery"&&l.qty>0).forEach(l=>{
+      rows+=`<tr><td>${l.label}</td><td>${l.qty}</td><td>${l.rate?money(l.rate):""}</td><td>${money(l.qty*l.rate)}</td></tr>`;});
+    if(t.adjustment)rows+=`<tr class="sub"><td>Prev-cycle adjustment</td><td></td><td></td><td>${t.adjustment<0?'−':'+'}${money(Math.abs(t.adjustment))}</td></tr>`;
+  }
+  el("invoice").innerHTML=`
+    <div class="ihead"><img src="${BIZ.logo}" onerror="this.style.display='none'"><div><h2>${BIZ.name}</h2><div class="tg">${BIZ.tagline}</div><div class="reg">${BIZ.address}<br>GST ${BIZ.gst} · FSSAI ${BIZ.fssai}</div></div><div class="invno"><div class="lab">${meta.quote?"Quotation":(meta.settle?"Final settlement":"Invoice")}</div><div class="no">${meta.quote?"":(meta.billNo||"")}</div></div></div>
+    <div class="meta">
+      <div class="cell"><div class="lab">Client</div><div class="val big">${meta.client||""}</div></div>
+      <div class="cell"><div class="lab">Plan</div><div class="val">${meta.plan||""}</div></div>
+      <div class="cell"><div class="lab">Bill date</div><div class="val">${dtstr(meta.billDate)}</div></div>
+      <div class="cell"><div class="lab">${meta.settle?"Period from":"Cycle start"}</div><div class="val">${dtstr(meta.settle&&meta.info?meta.info.start:meta.start)}</div></div>
+      <div class="cell"><div class="lab">${meta.settle?"Period to":"Cycle end"}</div><div class="val">${dtstr(meta.settle&&meta.info?meta.info.end:meta.end)}</div></div>
+      <div class="cell"><div class="lab">${meta.settle?"Days served":"Days"}</div><div class="val">${meta.settle&&meta.info?meta.info.activeDays:meta.days}</div></div></div>
+    <table class="itab"><thead><tr><th>Description</th><th>Qty</th><th>Rate</th><th>Price</th></tr></thead><tbody>${rows}</tbody></table>
+    <div class="grand"><span class="gl">${meta.quote?"Estimated total":(meta.settle?(t.grand<0?"Refund due":"Balance payable"):(meta.paidStatus==="Paid"?"Paid":"Total payable"))}</span><span class="gv">₹${money(Math.abs(t.grand))}</span></div>
+    <div class="bank"><div style="flex:1"><div class="upi">UPI : ${BIZ.upi}</div>${BIZ.acHolder}<br>A/C ${BIZ.acNumber} · ${BIZ.acType}</div><div style="flex:1">IFSC ${BIZ.ifsc}<br>${BIZ.branch}</div>${upiQrBlock(t.grand,(meta.quote?"Quote":"Bill")+(meta.billNo?" "+meta.billNo:"")+" · "+(meta.client||""),meta.quote?"":payLinkFor(meta.billNo))}</div>
+    <div class="footnote">*Please read all Terms &amp; Conditions on delivery timings, meal storage &amp; shelf life — refunds, substitutions &amp; cancellation policy on our website.</div>`;
+}
+function invoiceImagesReady(){            // logo + UPI QR must be decoded or they rasterise blank
+  const imgs=Array.from(el("invoice").querySelectorAll("img"));
+  return Promise.all(imgs.map(im=>(im.complete&&im.naturalWidth)?Promise.resolve()
+    :new Promise(r=>{im.onload=r;im.onerror=r;setTimeout(r,2000);})));
+}
+async function invoiceBlob(){
+  await invoiceImagesReady();
+  const c=await html2canvas(el("invoice"),{scale:2,backgroundColor:"#ffffff"});
+  return await new Promise((resolve,reject)=>c.toBlob(b=>b?resolve(b):reject(new Error("image failed")),"image/png"));
+}
+function waPhone(p){
+  let d=String(p||"").replace(/\D/g,"").replace(/^0+/,"");   // drop STD-style leading zeros
+  if(!d)return "";
+  if(d.length>10)d=d.slice(-10);                             // keep the last 10 digits, whatever prefix came with it
+  return d.length===10?("91"+d):"";                          // anything shorter isn't a dialable number
+}
+/* wa.me lets the OS choose between WhatsApp and WhatsApp Business. On Android an intent URL
+   targets the Business package directly; anywhere else (and if it isn't installed) wa.me takes over. */
+const WA_PACKAGE="com.whatsapp.w4b";   // "com.whatsapp" for personal WhatsApp instead
+/* An intent: URL hands off to the app in place, so it must NOT open a tab;
+   the https fallback still does, to avoid navigating away from the billing page. */
+function waWebUrl(phone,text){const ph=waPhone(phone);if(!ph)return "";const m=encodeURIComponent(text||"");return `https://wa.me/${ph}${m?`?text=${m}`:""}`;}
+function waLink(phone,text){
+  const ph=waPhone(phone);if(!ph)return "";
+  const msg=encodeURIComponent(text||"");
+  if(/Android/i.test(navigator.userAgent))
+    return `intent://send?phone=${ph}${msg?`&text=${msg}`:""}#Intent;scheme=whatsapp;package=${WA_PACKAGE};S.browser_fallback_url=${encodeURIComponent(waWebUrl(phone,text))};end`;
+  return `whatsapp://send?phone=${ph}${msg?`&text=${msg}`:""}`;   // desktop/iOS: straight to the app, no wa.me page
+}
+/* Hands off to the app without opening a tab. If the app never takes over
+   (not installed / protocol unregistered) the page stays visible, so after a
+   short wait we fall back to wa.me in a tab. */
+function openWa(phone,text){
+  const app=waLink(phone,text);if(!app)return;
+  let handed=false;
+  const mark=()=>{handed=true;};
+  window.addEventListener("blur",mark,{once:true});
+  document.addEventListener("visibilitychange",mark,{once:true});
+  try{location.href=app;}catch(e){}
+  setTimeout(()=>{
+    window.removeEventListener("blur",mark);
+    document.removeEventListener("visibilitychange",mark);
+    if(!handed&&!document.hidden){const w=waWebUrl(phone,text);if(w)window.open(w,"_blank","noopener");}
+  },2000);
+}
+/* Rendered as a real link (so copy / long-press still work) but click is
+   intercepted and routed through openWa. */
+function waAnchor(phone,text,inner,style){
+  if(!waPhone(phone))return inner;
+  return `<a href="${waWebUrl(phone,text)}" data-wa="${waPhone(phone)}" data-watxt="${encodeURIComponent(text||"")}" style="${style||""}">${inner}</a>`;
+}
+document.addEventListener("click",function(e){
+  const a=e.target&&e.target.closest?e.target.closest("a[data-wa]"):null;
+  if(!a)return;
+  e.preventDefault();
+  openWa(a.dataset.wa,decodeURIComponent(a.dataset.watxt||""));
+});
+/* Razorpay payment link. An https link dodges the ₹2,000 cap that applies to a UPI
+   QR scanned out of the gallery, and the checkout offers UPI / GPay / PhonePe / card. */
+async function createPayLink(meta,t,force){
+  if(!meta.billNo||!(t.grand>0))return {url:"",error:"nothing to collect"};
+  try{
+    const r=await billsApiCall("createPayLink",{billNo:meta.billNo,amount:String(Math.round(t.grand*100)/100),
+      client:meta.client||"",phone:meta.phone||"",force:force?"1":""});
+    if(r&&r.ok&&r.url){
+      if(billsCache&&billsCache.length>1){                 // keep the cache in step so the dashboard shows it
+        const idx=billHeaderIndex(billsCache),bi=idx["BillNo"],li=idx["PayLink"];
+        if(bi!==undefined&&li!==undefined)for(let i=1;i<billsCache.length;i++){
+          if(String(billsCache[i][bi]).trim()===String(meta.billNo).trim()){billsCache[i][li]=r.url;break;}}
+      }
+      return {url:r.url,error:""};
+    }
+    return {url:"",error:(r&&r.message)||"no link returned"};
+  }catch(e){return {url:"",error:(e&&e.message)||String(e)};}
+}
+function payLinkFor(billNo){
+  if(!billsCache||billsCache.length<2)return "";
+  const idx=billHeaderIndex(billsCache),bi=idx["BillNo"],li=idx["PayLink"];
+  if(bi===undefined||li===undefined)return "";
+  for(let i=1;i<billsCache.length;i++)if(String(billsCache[i][bi]).trim()===String(billNo).trim())
+    return String(billsCache[i][li]||"").trim();
+  return "";
+}
+function waMessage(client,isQuote,payUrl){
+  const pay=payUrl?`\n\nPay here: ${payUrl}`:"";
+  return isQuote
+    ? `Hi ${client||""}, here is your quote. Let us know if you'd like to go ahead and we'll confirm your plan. Thank you!`
+    : `Hi ${client||""}, your bill has been generated. Please process the payment at your earliest convenience. Thank you!${pay}`;
+}
+function showWaChatLink(statusId,meta,fname){
+  const ph=waPhone(meta.phone);
+  const s=el(statusId);if(!s)return;
+  const saved=`${meta.quote?"Quote":"Bill"} saved${fname?` as <b>${fname}</b>`:""}${meta.quote?" (not written to the sheet)":""}.`;
+  if(!ph){s.innerHTML=`${saved} <span class="subtle">No phone on file — open the chat manually.</span>`;s.className="status info";return;}
+  const link=waAnchor(meta.phone,waMessage(meta.client,meta.quote,meta.quote?"":payLinkFor(meta.billNo)),`Open ${meta.client||"client"}'s chat →`,"color:var(--accent);font-weight:700");
+  s.innerHTML=`${saved} Opening WhatsApp — attach it from Downloads. ${link}`;
+  s.className="status ok";
+}
+/* Bill images are archived to Drive and the URL written back into the Bills row,
+   so the dashboard can link each bill number to its image. Quotes aren't archived. */
+function blobToBase64(blob){
+  return new Promise((res,rej)=>{const fr=new FileReader();fr.onload=()=>res(String(fr.result).split(",")[1]||"");fr.onerror=rej;fr.readAsDataURL(blob);});
+}
+/* Returns {url, error} — never throws, but never hides the reason either. */
+async function uploadBillImage(billNo,blob){
+  if(!billNo)return {url:"",error:"no bill number"};
+  try{
+    const r=await billsApiCall("saveBillImage",{billNo:billNo,image:await blobToBase64(blob)});
+    if(r&&r.ok&&r.url){
+      if(billsCache&&billsCache.length>1){                 // patch the cache so the link appears without a reload
+        const idx=billHeaderIndex(billsCache),bi=idx["BillNo"],ui=idx["BillUrl"];
+        if(bi!==undefined&&ui!==undefined)for(let i=1;i<billsCache.length;i++){
+          if(String(billsCache[i][bi]).trim()===String(billNo).trim()){billsCache[i][ui]=r.url;break;}}
+      }
+      return {url:r.url,error:""};
+    }
+    return {url:"",error:(r&&(r.message||r.error))||"backend returned no URL"};
+  }catch(e){return {url:"",error:(e&&e.message)||String(e)};}
+}
+function waHint(msg){
+  const m=String(msg||"").toLowerCase();
+  if(m.indexOf("permission")>=0||m.indexOf("authoriz")>=0||m.indexOf("authentic")>=0||m.indexOf("drive")>=0)
+    return "\n\nDrive access hasn't been approved yet. Open the Bills Apps Script project, pick grantDriveAccess in the function dropdown, press Run, and approve the prompt. Then try again.";
+  if(m.indexOf("billurl")>=0)return "\n\nAdd a 'BillUrl' header column to the Bills sheet.";
+  return "";
+}
+function downloadBlob(blob,fname){
+  const u=URL.createObjectURL(blob);const a=document.createElement("a");
+  a.href=u;a.download=fname;document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(u),4000);
+}
+/* One tap: save the image to Downloads, then open the client's chat so the
+   attach button is one step away. The manual link stays as a fallback in case
+   the browser blocks the hand-off. */
+async function sendWhatsApp(meta,t,statusId){
+  const safe=String(meta.client||"client").replace(/[^A-Za-z0-9]+/g,"_");
+  const fname=meta.quote?`Quote_${safe}.png`:`Bill_${meta.billNo}.png`;
+  const blob=await invoiceBlob();
+  downloadBlob(blob,fname);
+  if(!meta.quote)uploadBillImage(meta.billNo,blob).then(r=>{   // archive in the background, don't delay the hand-off
+    if(!r.url&&statusId){const s=el(statusId);if(s)s.innerHTML+=` <span style="color:var(--debit)">· not archived to Drive (${r.error})</span>`;}
+  });
+  if(statusId)showWaChatLink(statusId,meta,fname);
+  if(!waPhone(meta.phone))return;
+  setTimeout(()=>{openWa(meta.phone,waMessage(meta.client,meta.quote,meta.quote?"":payLinkFor(meta.billNo)));},700);   // let the download commit before handing off
+}
+
+/* rebuild invoice meta/lines/totals from an already-saved bill row — used for the dashboard download/delete menu */
+function reconstructInvoiceData(bill){
+  const idx=bill.idx;
+  const g=k=>{const j=idx[k];return (j===undefined||j>=bill.raw.length)?"":bill.raw[j];};
+  const food=parseFloat(g("Food"))||0;
+  const discPct=bill.discPct||0;
+  const discAmt=food*discPct/100;
+  const foodAfter=food-discAmt;
+  const gst=parseFloat(g("Gst"))||0;
+  const delivery=parseFloat(g("Delivery"))||0;
+  const adjustment=parseFloat(g("Adjustment"))||0;
+  const grand=bill.grandTotal;
+  const gstPct=foodAfter>0?Math.round((gst/foodAfter)*1000)/10:0;
+  const t={food,discAmt,foodAfter,gst,delivery,other:0,adjustment,grand};
+  let lines=(bill.lineItems&&bill.lineItems.length)?bill.lineItems.map(l=>({id:l.id,label:l.label,qty:l.qty,rate:l.rate})):[];
+  if(!lines.length){ // old bill saved before LineItemsJSON existed — coarse fallback so the image still totals correctly
+    if(food>0)lines.push({id:"items_summary",label:bill.items||"Items",qty:1,rate:food,food:true});
+    if(delivery>0)lines.push({id:"delivery",label:"Delivery",qty:1,rate:delivery,food:false});
+  }
+  const days=prevDaysOf({start:bill.start,end:bill.end,duration:bill.duration});
+  const meta={billNo:bill.billNo,billDate:toDt(g("Date"))||bill.start||dateOnly(new Date()),client:bill.client,plan:bill.plan,start:bill.start,end:bill.end,days,discPct,gstPct,paidStatus:bill.paid};
+  return {meta,lines,t};
+}
+/* Generates + archives an image for every bill that has no BillUrl yet.
+   Sequential on purpose — each one renders a canvas and posts to Apps Script. */
+let backfillRunning=false,backfillStop=false;
+async function backfillBillImages(){
+  const btn=el("d_backfill");
+  if(backfillRunning){backfillStop=true;btn.textContent="Stopping…";return;}
+  try{await fetchBills(true);}catch(e){}
+  if(!billsCache||billsCache.length<2){alert("No bills loaded.");return;}
+  const idx=billHeaderIndex(billsCache);
+  if(idx["BillUrl"]===undefined){alert('The Bills sheet has no "BillUrl" column — add that header first.');return;}
+  const todo=[];
+  for(let i=1;i<billsCache.length;i++){
+    const no=String(billsCache[i][idx["BillNo"]]||"").trim();
+    const u=String(billsCache[i][idx["BillUrl"]]||"").trim();
+    if(no&&!u)todo.push(no);
+  }
+  if(!todo.length){setStatus("d_status","Every bill already has an image.","ok");return;}
+  if(!confirm(`Generate and archive images for ${todo.length} bill(s)?\n\nThis runs one at a time and can take a few minutes — keep this tab open. You can stop it at any point; progress is kept.`))return;
+  backfillRunning=true;backfillStop=false;
+  let done=0,failed=0,lastErr='';
+  for(let n=0;n<todo.length;n++){
+    if(backfillStop)break;
+    const no=todo[n];
+    btn.textContent=`Stop (${n+1}/${todo.length})`;
+    setStatus("d_status",`Archiving bill ${no}… ${done} done${failed?`, ${failed} failed`:""}`,"info");
+    try{
+      let raw=null;
+      for(let i=1;i<billsCache.length;i++){if(String(billsCache[i][idx["BillNo"]]).trim()===no){raw=billsCache[i];break;}}
+      if(!raw){failed++;continue;}
+      const bill=parseBillRow(raw,idx);
+      const {meta,lines,t}=reconstructInvoiceData(bill);
+      buildInvoice(meta,lines,t);
+      const blob=await invoiceBlob();
+      const res=await uploadBillImage(no,blob);
+      if(res.url)done++;
+      else{
+        failed++;lastErr=res.error;
+        if(done===0){          // first one failed — something is wrong for all of them, don't grind through 175
+          backfillRunning=false;btn.textContent="Backfill images";
+          setStatus("d_status",`Backfill stopped — bill ${no} failed: ${lastErr}`,"err");
+          alert(`Couldn't archive bill ${no}.\n\n${lastErr}${waHint(lastErr)}`);
+          return;
         }
-      } catch (err) { errs++; }
-    }
-    if (paid) { try { rebuildStatement(); } catch (err) {} }
-    return jsonOutput({ ok: true, checked: checked, paid: paid, bills: names, errors: errs });
-  } catch (err) { return jsonOutput({ ok: false, message: err.message }); }
-}
-/* Webhook. Apps Script cannot read request headers, so Razorpay's
-   X-Razorpay-Signature is unavailable: instead the URL carries a secret token
-   AND we re-ask Razorpay whether the link is really paid before writing. A
-   forged call therefore gets rejected at the second check. */
-function rzpWebhook_(e) {
-  try {
-    var want = PropertiesService.getScriptProperties().getProperty('RZP_HOOK_TOKEN');
-    if (!want || String(e.parameter.token || '') !== want) return jsonOutput({ ok: false, message: 'bad token' });
-
-    var body = {};
-    try { body = JSON.parse((e.postData && e.postData.contents) || '{}'); } catch (x) {}
-    var ent = body && body.payload && body.payload.payment_link && body.payload.payment_link.entity;
-    if (!ent) return jsonOutput({ ok: true, ignored: 'no payment_link entity' });
-
-    var billNo = (ent.notes && ent.notes.billNo) ? String(ent.notes.billNo).trim() : '';
-    if (!billNo && ent.reference_id) {
-      var m = String(ent.reference_id).match(/^BILL-([^-]+)/);
-      if (m) billNo = m[1];
-    }
-    if (!billNo) return jsonOutput({ ok: true, ignored: 'no billNo' });
-
-    var confirmed = ent.id ? rzpCall_('get', '/v1/payment_links/' + encodeURIComponent(ent.id), null) : null;
-    if (!confirmed || String(confirmed.status).toLowerCase() !== 'paid')
-      return jsonOutput({ ok: true, ignored: 'not paid per Razorpay' });
-
-    return jsonOutput({ ok: true, billNo: billNo, marked: rzpMarkPaid_(billNo) });
-  } catch (err) { return jsonOutput({ ok: false, message: err.message }); }
-}
-
-function rebuildStatement() {
-  var ss = SpreadsheetApp.getActive();
-  var bills = ss.getSheetByName('Bills');
-  if (!bills) return;
-  var tz = Session.getScriptTimeZone();
-  var lastRow = bills.getLastRow(), lastCol = bills.getLastColumn();
-
-  var stmt = ss.getSheetByName('Statement');
-  if (!stmt) stmt = ss.insertSheet('Statement');
-  stmt.clear();
-
-  if (lastRow < 2) return;
-
-  var data = bills.getRange(1, 1, lastRow, lastCol).getValues();
-  var headers = data[0].map(function(h){ return String(h).trim(); });
-  var iDate = headers.indexOf('Date');
-  var iClient = headers.indexOf('Client');
-  var iGrand = headers.indexOf('GrandTotal');
-  var iPaid = headers.indexOf('PaidStatus');
-  if (iDate < 0 || iClient < 0 || iGrand < 0 || iPaid < 0) return;
-
-  var groups = {};
-  for (var r = 1; r < data.length; r++) {
-    var row = data[r];
-    var dRaw = row[iDate];
-    if (!dRaw) continue;
-    var d = (dRaw instanceof Date) ? dRaw : new Date(dRaw);
-    if (isNaN(d)) continue;
-    var mk = Utilities.formatDate(d, tz, 'yyyy-MM');
-    var label = Utilities.formatDate(d, tz, 'MMMM yyyy');
-    if (!groups[mk]) groups[mk] = { label: label, rows: [] };
-    var status = row[iPaid] || 'Unpaid';
-    groups[mk].rows.push([row[iClient] || '', Number(row[iGrand]) || 0, status, d.getTime()]);
+      }
+    }catch(e){failed++;lastErr=(e&&e.message)||String(e);}
   }
-
-  var monthKeys = Object.keys(groups).sort().reverse();
-  if (!monthKeys.length) return;
-
-  var out = [];
-  var monthRows = [], subheadRows = [], paidTotalRows = [], unpaidTotalRows = [], subtotalRows = [];
-  var rIdx = 1;
-
-  monthKeys.forEach(function(mk) {
-    var g = groups[mk];
-    g.rows.sort(function(a,b){
-      var ap = a[2] === 'Paid' ? 0 : 1, bp = b[2] === 'Paid' ? 0 : 1;
-      if (ap !== bp) return ap - bp;
-      return a[3] - b[3];
-    });
-    out.push([g.label, '', '']); monthRows.push(rIdx); rIdx++;
-    out.push(['Client', 'Amount', 'Status']); subheadRows.push(rIdx); rIdx++;
-    var paidTotal = 0, unpaidTotal = 0;
-    g.rows.forEach(function(rr) {
-      out.push([rr[0], rr[1], rr[2]]);
-      if (rr[2] === 'Paid') paidTotal += rr[1]; else unpaidTotal += rr[1];
-      rIdx++;
-    });
-    out.push(['Paid Total', paidTotal, '']); paidTotalRows.push(rIdx); rIdx++;
-    out.push(['Unpaid Total', unpaidTotal, '']); unpaidTotalRows.push(rIdx); rIdx++;
-    out.push(['Subtotal', paidTotal + unpaidTotal, '']); subtotalRows.push(rIdx); rIdx++;
-    out.push(['', '', '']); rIdx++;
-  });
-
-  stmt.getRange(1, 1, out.length, 3).setValues(out);
-  stmt.getRange(2, 2, out.length - 1, 1).setNumberFormat('#,##0.##');
-  monthRows.forEach(function(rw){ stmt.getRange(rw,1,1,3).setFontWeight('bold').setFontSize(12).setBackground('#0a1a6e').setFontColor('#ffffff'); });
-  subheadRows.forEach(function(rw){ stmt.getRange(rw,1,1,3).setFontWeight('bold').setBackground('#e7f7f1'); });
-  paidTotalRows.forEach(function(rw){ stmt.getRange(rw,1,1,3).setFontWeight('bold').setBackground('#e7f7f1').setFontColor('#0a7d4f'); });
-  unpaidTotalRows.forEach(function(rw){ stmt.getRange(rw,1,1,3).setFontWeight('bold').setBackground('#fdeceb').setFontColor('#9a3b34'); });
-  subtotalRows.forEach(function(rw){ stmt.getRange(rw,1,1,3).setFontWeight('bold').setBackground('#fbecec'); });
-  stmt.setColumnWidth(1,220); stmt.setColumnWidth(2,110); stmt.setColumnWidth(3,110);
-  stmt.setFrozenRows(0);
+  backfillRunning=false;btn.textContent="Backfill images";
+  applyDashFilter();
+  setStatus("d_status",`Backfill finished — ${done} archived${failed?`, ${failed} failed (${lastErr})`:""}${backfillStop?" (stopped early)":""}.`,done?"ok":"err");
 }
-
-function onEdit(e) {
-  try { if (e && e.range && e.range.getSheet().getName() === 'Bills') rebuildStatement(); } catch (err) {}
+/* Bill-number click: shows the image at once (rendered locally), and archives it
+   to Drive in the background so next time it's just a link. */
+function showImgModal(title,blobUrl,driveUrl){
+  el("im_title").textContent=title;
+  el("im_pic").src=blobUrl;
+  el("im_dl").href=blobUrl;el("im_dl").setAttribute("download",title+".png");
+  const a=el("im_drive");
+  if(driveUrl){a.href=driveUrl;a.classList.remove("hidden");}else a.classList.add("hidden");
+  el("imgModal").classList.remove("hidden");
 }
-
-function onOpen() {
-  SpreadsheetApp.getUi().createMenu('Bills Tools')
-    .addItem('Rebuild Statement', 'rebuildStatement')
-    .addItem('Ensure Expenses Sheet', 'ensureExpensesSheet')
-    .addItem('Ensure Legacy Credits Sheet', 'ensureLegacyCreditsSheet')
-    .addItem('Import Legacy Credits', 'importLegacyCredits')
-    .addItem('Import Legacy Expenses', 'importLegacyExpenses')
-    .addToUi();
+function closeImgModal(){
+  el("imgModal").classList.add("hidden");
+  const p=el("im_pic");
+  if(p.src&&p.src.indexOf("blob:")===0)URL.revokeObjectURL(p.src);
+  p.src="";
 }
-
-/***********************************************************************
- * LEGACY CREDITS
- * Sheet: "LegacyCredits" — bank-statement credits / backfill. Never
- * touches the Bills sheet. accounting.html merges these into its
- * revenue view (deduped against real Bills by Client + Amount).
- * Schema: LegacyId | Date | Client | Amount | PaidStatus | Batch
- ***********************************************************************/
-var LEGACY_CREDITS_SHEET = 'LegacyCredits';
-var LEGACY_CREDITS_HEADERS = ['LegacyId','Date','Client','Amount','PaidStatus','Batch'];
-
-function ensureLegacyCreditsSheet() {
-  var ss = SpreadsheetApp.getActive();
-  var sh = ss.getSheetByName(LEGACY_CREDITS_SHEET);
-  if (!sh) {
-    sh = ss.insertSheet(LEGACY_CREDITS_SHEET);
-    sh.getRange(1,1,1,LEGACY_CREDITS_HEADERS.length).setValues([LEGACY_CREDITS_HEADERS])
-      .setFontWeight('bold').setBackground('#0a1a6e').setFontColor('#ffffff');
-    sh.setFrozenRows(1);
-    sh.setColumnWidth(1,110); sh.setColumnWidth(3,200);
-    var rule = SpreadsheetApp.newDataValidation().requireValueInList(['Paid','Unpaid'],true).build();
-    sh.getRange(2,5,998,1).setDataValidation(rule);
-  }
-  var lc = Math.max(sh.getLastColumn(),1);
-  var have = sh.getRange(1,1,1,lc).getValues()[0].map(function(h){ return String(h).trim(); });
-  LEGACY_CREDITS_HEADERS.forEach(function(h){
-    if (have.indexOf(h) === -1) {
-      var nc = sh.getLastColumn()+1;
-      sh.getRange(1,nc).setValue(h).setFontWeight('bold').setBackground('#0a1a6e').setFontColor('#ffffff');
-      have.push(h);
-    }
-  });
-  return sh;
+async function viewBillImage(billNo,anchor){
+  if(anchor&&anchor.dataset.busy==="1")return;
+  if(anchor){anchor.dataset.busy="1";anchor.textContent="…";}
+  try{
+    if(!billsCache||billsCache.length<2)await fetchBills(false);
+    const idx=billHeaderIndex(billsCache);
+    let raw=null;
+    for(let i=1;i<billsCache.length;i++){if(String(billsCache[i][idx["BillNo"]]).trim()===String(billNo).trim()){raw=billsCache[i];break;}}
+    if(!raw){alert("Bill not found — press Reload first.");return;}
+    const bill=parseBillRow(raw,idx);
+    const {meta,lines,t}=reconstructInvoiceData(bill);
+    buildInvoice(meta,lines,t);
+    const blob=await invoiceBlob();
+    showImgModal(`Bill_${billNo}`,URL.createObjectURL(blob),"");
+    const res=await uploadBillImage(billNo,blob);          // archive so the number becomes a plain link next time
+    if(res.url){
+      const a=el("im_drive");a.href=res.url;a.classList.remove("hidden");
+      applyDashFilter();
+    }else setStatus("d_status",`Shown, but not archived to Drive: ${res.error}`,"err");
+  }catch(e){alert("Couldn't generate the image: "+e.message);}
+  finally{if(anchor){anchor.dataset.busy="";anchor.textContent=billNo;}}
 }
-
-function legacyGetAll_(){
-  var sh = ensureLegacyCreditsSheet();
-  var tz = Session.getScriptTimeZone();
-  var lr = sh.getLastRow(), lc = sh.getLastColumn();
-  var rows = [];
-  if (lr >= 1) rows = sh.getRange(1,1,lr,lc).getValues().map(function(r){
-    return r.map(function(v){ return (v instanceof Date) ? Utilities.formatDate(v,tz,'yyyy-MM-dd') : (v==null?'':String(v)); });
-  });
-  return jsonOutput({ ok:true, rows:rows });
-}
-
-function legacyAppend_(e){
-  var lock = LockService.getScriptLock();
-  try { lock.waitLock(20000); } catch(err){ return jsonOutput({ok:false,message:'Busy, retry'}); }
-  try {
-    var sh = ensureLegacyCreditsSheet();
-    var rec = JSON.parse(e.parameter.payload || '{}');
-    if (!rec.Date) return jsonOutput({ok:false,message:'Date required'});
-    var amt = Number(rec.Amount);
-    if (!isFinite(amt) || amt <= 0) return jsonOutput({ok:false,message:'Amount must be > 0'});
-    if (!rec.PaidStatus) rec.PaidStatus = 'Unpaid';
-
-    var headers = expHeaders_(sh);
-    var id = 'LEG-' + ('0000'+(maxLegacyId_(sh, headers)+1)).slice(-4);
-    var row = { LegacyId:id, Date:rec.Date, Client:rec.Client||'', Amount:amt, PaidStatus:rec.PaidStatus, Batch:'' };
-    sh.appendRow(headers.map(function(h){ return (h in row) ? row[h] : ''; }));
-    return jsonOutput({ ok:true, legacyId:id });
-  } catch(err){ return jsonOutput({ok:false,message:err.message}); }
-  finally { try { lock.releaseLock(); } catch(e2){} }
-}
-
-function legacyDelete_(e){
-  var sh = ensureLegacyCreditsSheet();
-  var headers = expHeaders_(sh);
-  var iId = headers.indexOf('LegacyId');
-  if (iId < 0 || sh.getLastRow() < 2) return jsonOutput({ok:false,message:'LegacyId not found'});
-  var ids = sh.getRange(2,iId+1,sh.getLastRow()-1,1).getValues();
-  for (var i=0;i<ids.length;i++){
-    if (String(ids[i][0]) === String(e.parameter.legacyId)) {
-      sh.deleteRow(i+2);
-      return jsonOutput({ok:true});
-    }
-  }
-  return jsonOutput({ok:false,message:'LegacyId not found'});
-}
-
-/***********************************************************************
- * EXPENSES BACKEND
- * Schema: ExpenseId | Timestamp | Category | Amount | Description | PaidBy | PaymentMethod | Batch
- ***********************************************************************/
-var EXPENSE_SHEET = 'Expenses';
-var EXPENSE_HEADERS = ['ExpenseId','Timestamp','Category','Amount','Description','PaidBy','PaymentMethod','Batch'];
-var EXPENSE_CATEGORIES = [
-  'Hyperpure','Local Purchase','Delivery','Salary','Rent & Utilities','Cylinder',
-  'Packaging','Marketing','Equipment & Repairs','Essentials','Misc'
-];
-
-function ensureExpensesSheet() {
-  var ss = SpreadsheetApp.getActive();
-  var sh = ss.getSheetByName(EXPENSE_SHEET);
-  if (!sh) {
-    sh = ss.insertSheet(EXPENSE_SHEET);
-    sh.getRange(1,1,1,EXPENSE_HEADERS.length).setValues([EXPENSE_HEADERS])
-      .setFontWeight('bold').setBackground('#0a1a6e').setFontColor('#ffffff');
-    sh.setFrozenRows(1);
-    sh.setColumnWidth(1,140); sh.setColumnWidth(2,170); sh.setColumnWidth(5,240);
-  }
-  // Additive header repair
-  var lc = Math.max(sh.getLastColumn(),1);
-  var have = sh.getRange(1,1,1,lc).getValues()[0].map(function(h){ return String(h).trim(); });
-  EXPENSE_HEADERS.forEach(function(h){
-    if (have.indexOf(h) === -1) {
-      var nc = sh.getLastColumn()+1;
-      sh.getRange(1,nc).setValue(h).setFontWeight('bold').setBackground('#0a1a6e').setFontColor('#ffffff');
-      have.push(h);
-    }
-  });
-  return sh;
-}
-
-function expHeaders_(sh){
-  return sh.getRange(1,1,1,sh.getLastColumn()).getValues()[0].map(function(h){ return String(h).trim(); });
-}
-
-function expNextId_(sh){
-  var tz = Session.getScriptTimeZone();
-  var prefix = 'EXP-' + Utilities.formatDate(new Date(), tz, 'yyyyMM') + '-';
-  var headers = expHeaders_(sh);
-  var iId = headers.indexOf('ExpenseId');
-  var lr = sh.getLastRow(), max = 0;
-  if (iId >= 0 && lr > 1) {
-    var ids = sh.getRange(2,iId+1,lr-1,1).getValues();
-    for (var i=0;i<ids.length;i++){
-      var v = String(ids[i][0]||'');
-      if (v.indexOf(prefix)===0){ var n=parseInt(v.slice(prefix.length),10); if(!isNaN(n)&&n>max) max=n; }
-    }
-  }
-  return prefix + ('000'+(max+1)).slice(-3);
-}
-
-function expFindRow_(sh, headers, expenseId){
-  var iId = headers.indexOf('ExpenseId');
-  if (iId < 0 || sh.getLastRow() < 2) return -1;
-  var ids = sh.getRange(2,iId+1,sh.getLastRow()-1,1).getValues();
-  for (var i=0;i<ids.length;i++) if (String(ids[i][0])===String(expenseId)) return i+2;
-  return -1;
-}
-
-function expGetAll_(){
-  var sh = ensureExpensesSheet();
-  var tz = Session.getScriptTimeZone();
-  var lr = sh.getLastRow(), lc = sh.getLastColumn();
-  var rows = [];
-  if (lr >= 1) rows = sh.getRange(1,1,lr,lc).getValues().map(function(r){
-    return r.map(function(v){ return (v instanceof Date) ? Utilities.formatDate(v,tz,'yyyy-MM-dd HH:mm:ss') : (v==null?'':String(v)); });
-  });
-  return jsonOutput({ ok:true, rows:rows });
-}
-
-function expAppend_(e){
-  var lock = LockService.getScriptLock();
-  try { lock.waitLock(20000); } catch(err){ return jsonOutput({ok:false,message:'Busy, retry'}); }
-  try {
-    var sh = ensureExpensesSheet();
-    var exp = JSON.parse(e.parameter.payload || '{}');
-    var amt = Number(exp.Amount);
-    if (!isFinite(amt) || amt <= 0) return jsonOutput({ok:false,message:'Amount must be > 0'});
-    if (!exp.Category) return jsonOutput({ok:false,message:'Category required'});
-    if (!exp.PaidBy) return jsonOutput({ok:false,message:'PaidBy required'});
-    if (!exp.PaymentMethod) return jsonOutput({ok:false,message:'PaymentMethod required'});
-
-    var id = expNextId_(sh);
-    var tz = Session.getScriptTimeZone();
-    var now = new Date();
-    var dateStr = exp.Date ? String(exp.Date).slice(0,10) : Utilities.formatDate(now, tz, 'yyyy-MM-dd');
-    var timeStr = Utilities.formatDate(now, tz, 'HH:mm:ss');
-    var row = { ExpenseId:id, Timestamp:dateStr + ' ' + timeStr, Amount:amt,
-                Category:exp.Category, Description:exp.Description,
-                PaidBy:exp.PaidBy, PaymentMethod:exp.PaymentMethod, Batch:'' };
-    var headers = expHeaders_(sh);
-    sh.appendRow(headers.map(function(h){ return (h in row) ? row[h] : ''; }));
-    return jsonOutput({ ok:true, expenseId:id });
-  } catch(err){ return jsonOutput({ok:false,message:err.message}); }
-  finally { try { lock.releaseLock(); } catch(e2){} }
-}
-
-function expDelete_(e){
-  var sh = ensureExpensesSheet();
-  var headers = expHeaders_(sh);
-  var row = expFindRow_(sh, headers, e.parameter.expenseId);
-  if (row < 0) return jsonOutput({ok:false,message:'ExpenseId not found'});
-  sh.deleteRow(row);
-  return jsonOutput({ok:true});
-}
-
-function expMeta_(){
-  // Default categories + any other category already used in the Expenses sheet
-  var cats = EXPENSE_CATEGORIES.slice();
-  try {
-    var sh = ensureExpensesSheet(), h = expHeaders_(sh), ic = h.indexOf('Category'), lr = sh.getLastRow();
-    if (ic >= 0 && lr > 1) sh.getRange(2, ic+1, lr-1, 1).getValues().forEach(function(r){
-      var c = String(r[0] || '').trim();
-      if (c && cats.map(function(x){return x.toLowerCase();}).indexOf(c.toLowerCase()) < 0) cats.push(c);
-    });
-  } catch (err) {}
-  return jsonOutput({ ok:true, categories:cats, paymentMethods:['UPI','Cash','Bank'] });
-}
-
-/***********************************************************************
- * SHEET-BASED IMPORT (fallback — the web Import tab is preferred)
- * Expenses_Import headers: Date | Category | Amount | Description  (matched by header name, any order)
- * LegacyCredits_Import headers: Date | Description | Amount
- * Each run is tagged with a Batch so it can be undone from accounting.html.
- ***********************************************************************/
-var IMPORT_DEFAULT_PAIDBY = 'Legacy';
-var IMPORT_DEFAULT_METHOD = 'Cash';
-
-/* Parses mixed date input to 'yyyy-MM-dd'. Day-first (Indian) assumed. */
-function parseLooseDate_(v) {
-  var tz = Session.getScriptTimeZone();
-  if (v instanceof Date && !isNaN(v)) return Utilities.formatDate(v, tz, 'yyyy-MM-dd');
-  var s = String(v || '').trim();
-  if (!s) return '';
-  var iso = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
-  if (iso) return iso[1] + '-' + pad2_(iso[2]) + '-' + pad2_(iso[3]);
-  var m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/);
-  if (m) {
-    var d = parseInt(m[1], 10), mo = parseInt(m[2], 10), y = parseInt(m[3], 10);
-    if (y < 100) y += 2000;
-    if (d > 31 || mo > 12) return '';
-    return y + '-' + pad2_(mo) + '-' + pad2_(d);
-  }
-  var fallback = new Date(s);
-  if (!isNaN(fallback)) return Utilities.formatDate(fallback, tz, 'yyyy-MM-dd');
-  return '';
-}
-
-function pad2_(n) { return ('0' + n).slice(-2); }
-
-/* Matches loose category text to the canonical EXPENSE_CATEGORIES list. */
-function normalizeCategory_(v) {
-  // Keep the category exactly as written in the sheet. Only fixes letter case
-  // when it matches a known category (e.g. "hyperpure" -> "Hyperpure").
-  var raw = String(v || '').trim();
-  if (!raw) return 'Misc';
-  var s = raw.toLowerCase();
-  for (var i = 0; i < EXPENSE_CATEGORIES.length; i++) {
-    if (EXPENSE_CATEGORIES[i].toLowerCase() === s) return EXPENSE_CATEGORIES[i];
-  }
-  return raw;
-}
-
-function importLegacyExpenses() {
-  var ss = SpreadsheetApp.getActive();
-  var src = ss.getSheetByName('Expenses_Import');
-  var ui = SpreadsheetApp.getUi();
-  if (!src) { ui.alert('Create a sheet named "Expenses_Import" first.'); return; }
-
-  var lr = src.getLastRow(), lc = src.getLastColumn();
-  if (lr < 2) { ui.alert('Expenses_Import has no data rows.'); return; }
-
-  var data = src.getRange(1, 1, lr, lc).getValues();
-  var sh = data[0].map(function(h){ return String(h).trim().toLowerCase(); });
-  var iDate = sh.indexOf('date'), iAmt = sh.indexOf('amount');
-  var iCat = sh.indexOf('category'), iDesc = sh.indexOf('description');
-  if (iDate < 0 || iAmt < 0 || iCat < 0) {
-    ui.alert('Expenses_Import needs headers: Date, Category, Amount, Description');
+async function payLinkAction(billNo){
+  const have=payLinkFor(billNo);
+  if(have){
+    try{await navigator.clipboard.writeText(have);setStatus("d_status",`Pay link for ${billNo} copied.`,"ok");}
+    catch(e){prompt("Pay link for bill "+billNo,have);}
     return;
   }
-
-  var dest = ensureExpensesSheet();
-  var headers = expHeaders_(dest);
-  var counters = seedExpCounters_(dest, headers);
-  var batch = batchLabel_('SHEET');
-  var out = [], skipped = [];
-
-  for (var r = 1; r < data.length; r++) {
-    var row = data[r];
-    var dateStr = parseLooseDate_(row[iDate]);
-    var amt = Number(String(row[iAmt]).replace(/[^0-9.\-]/g, ''));
-    if (!dateStr || !isFinite(amt) || amt <= 0) {
-      skipped.push('Row ' + (r + 1) + ': ' + row[iDate] + ' / ' + row[iAmt]);
-      continue;
-    }
-    var ym = dateStr.slice(0, 4) + dateStr.slice(5, 7);
-    counters[ym] = (counters[ym] || 0) + 1;
-    var rec = {
-      ExpenseId: 'EXP-' + ym + '-' + ('000' + counters[ym]).slice(-3),
-      Timestamp: dateStr + ' 00:00:00',
-      Amount: amt,
-      Category: normalizeCategory_(row[iCat]),
-      Description: iDesc >= 0 ? String(row[iDesc] || '').trim() : '',
-      PaidBy: IMPORT_DEFAULT_PAIDBY,
-      PaymentMethod: IMPORT_DEFAULT_METHOD,
-      Batch: batch
-    };
-    out.push(headers.map(function(h){ return (h in rec) ? rec[h] : ''; }));
-  }
-
-  if (out.length) dest.getRange(dest.getLastRow() + 1, 1, out.length, headers.length).setValues(out);
-  ui.alert('Imported ' + out.length + ' row(s) as batch ' + batch + '.' +
-    (skipped.length ? '\n\nSkipped ' + skipped.length + ':\n' + skipped.slice(0, 15).join('\n') : ''));
+  setStatus("d_status",`Creating pay link for ${billNo}…`,"info");
+  const rows=dashRows().filter(r=>String(r.billNo).trim()===String(billNo).trim());
+  if(!rows.length){setStatus("d_status","Bill not found — press Reload.","err");return;}
+  const r=rows[0];
+  const res=await createPayLink({billNo:billNo,client:r.client,phone:phoneForClient(r.client)},{grand:parseFloat(r.grand)||0},false);
+  if(res.url){applyDashFilter();setStatus("d_status",`Pay link ready for ${billNo}.`,"ok");}
+  else setStatus("d_status",`Pay link failed: ${res.error}`,"err");
+}
+async function downloadBillImage(billNo){
+  try{
+    if(!billsCache||billsCache.length<2)await fetchBills(false);
+    const idx=billHeaderIndex(billsCache);
+    let raw=null;for(let i=1;i<billsCache.length;i++){if(String(billsCache[i][idx["BillNo"]])===String(billNo)){raw=billsCache[i];break;}}
+    if(!raw){alert("Bill not found — try Reload first.");return;}
+    const bill=parseBillRow(raw,idx);
+    const {meta,lines,t}=reconstructInvoiceData(bill);
+    buildInvoice(meta,lines,t);
+    const blob=await invoiceBlob();
+    downloadBlob(blob,`Bill_${billNo}.png`);
+    uploadBillImage(billNo,blob).then(r=>{if(r.url)applyDashFilter();else alert("Image downloaded, but archiving to Drive failed.\n\n"+r.error+waHint(r.error));});
+  }catch(e){alert("Couldn't generate image: "+e.message);}
+}
+async function deleteBillPrompt(billNo){
+  if(!confirm(`Delete bill ${billNo}? This cannot be undone.`))return;
+  try{
+    const res=await billsApiCall("deleteBill",{billNo});
+    if(!res||!res.ok){alert("Delete failed: "+(res&&res.message||"unknown"));return;}
+    await fetchBills(true);
+    applyDashFilter();
+  }catch(e){alert("Error: "+e.message);}
 }
 
-function importLegacyCredits() {
-  var ss = SpreadsheetApp.getActive();
-  var src = ss.getSheetByName('LegacyCredits_Import');
-  var ui = SpreadsheetApp.getUi();
-  if (!src) { ui.alert('Create a sheet named "LegacyCredits_Import" first.'); return; }
-
-  var lr = src.getLastRow(), lc = src.getLastColumn();
-  if (lr < 2) { ui.alert('LegacyCredits_Import has no data rows.'); return; }
-
-  var data = src.getRange(1, 1, lr, lc).getValues();
-  var sh = data[0].map(function(h){ return String(h).trim().toLowerCase(); });
-  var iDate = sh.indexOf('date'), iDesc = sh.indexOf('description'), iAmt = sh.indexOf('amount');
-  if (iDate < 0 || iAmt < 0) {
-    ui.alert('LegacyCredits_Import needs headers: Date, Description, Amount');
-    return;
-  }
-
-  var dest = ensureLegacyCreditsSheet();
-  var headers = expHeaders_(dest);
-  var max = maxLegacyId_(dest, headers);
-  var batch = batchLabel_('SHEET');
-  var out = [], skipped = [];
-
-  for (var r = 1; r < data.length; r++) {
-    var row = data[r];
-    var dateStr = parseLooseDate_(row[iDate]);
-    var amt = Number(String(row[iAmt]).replace(/[^0-9.\-]/g, ''));
-    if (!dateStr || !isFinite(amt) || amt <= 0) {
-      skipped.push('Row ' + (r + 1) + ': ' + row[iDate] + ' / ' + row[iAmt]);
-      continue;
-    }
-    max++;
-    var rec = {
-      LegacyId: 'LEG-' + ('0000' + max).slice(-4),
-      Date: dateStr,
-      Client: iDesc >= 0 ? String(row[iDesc] || '').trim() : '',
-      Amount: amt,
-      PaidStatus: 'Paid',
-      Batch: batch
-    };
-    out.push(headers.map(function(h){ return (h in rec) ? rec[h] : ''; }));
-  }
-
-  if (out.length) dest.getRange(dest.getLastRow() + 1, 1, out.length, headers.length).setValues(out);
-  ui.alert('Imported ' + out.length + ' row(s) as batch ' + batch + '.' +
-    (skipped.length ? '\n\nSkipped ' + skipped.length + ':\n' + skipped.slice(0, 15).join('\n') : ''));
+/* meta + save */
+function gatherNewMeta(){
+  return {billNo:el("n_billno").value.trim(),billDate:readDate("n_billdate")||dateOnly(new Date()),client:el("n_client").value.trim(),phone:el("n_phone").value.trim(),plan:nPlans().map(p=>PLAN_LABEL[p]).join(", "),duration:DUR_LABEL[el("n_dur").value]||el("n_dur").value,days:nDays(),start:readDate("n_start"),end:readDate("n_end"),slots:Array.from(el("n_slots").querySelectorAll("input:checked")).map(c=>c.value).join(", "),discPct:parseFloat(el("n_disc").value)||0,gstPct:parseFloat(el("n_gst").value)||5,paidStatus:"Unpaid"};
 }
+const MONTH_FULL=["January","February","March","April","May","June","July","August","September","October","November","December"];
+function monthNameOf(d){return d?MONTH_FULL[d.getMonth()]:"";}
+function billObject(meta,lines,t){
+  return {BillNo:meta.billNo,Date:keyOf(meta.billDate),Client:meta.client,Phone:meta.phone,Plan:meta.plan,Duration:meta.duration,Slots:meta.slots,Start:meta.start?keyOf(meta.start):"",End:meta.end?keyOf(meta.end):"",Items:meta.settle?settleItemsText(meta):itemsReadable(lines),LineItemsJSON:JSON.stringify(lines.filter(l=>l.qty>0).map(l=>({id:l.id,label:l.label,qty:l.qty,rate:l.rate}))),Food:money(t.food),Discount:meta.discPct,Gst:money(t.gst),Delivery:money(t.delivery),Adjustment:money(t.adjustment),GrandTotal:money(t.grand),PaidStatus:meta.paidStatus,Month:monthNameOf(meta.start)};
+}
+async function validateAndSave(meta,lines,t,statusId){
+  if(!meta.client){setStatus(statusId,"Enter client name.","err");return false;}
+  if(!meta.billNo){setStatus(statusId,"Set a bill number.","err");return false;}
+  setStatus(statusId,"Checking…","info");
+  await fetchBills(true);                                   // always validate against the live sheet
+  if(billNoExists(meta.billNo)){setStatus(statusId,`Bill no ${meta.billNo} already exists — choose another.`,"err");return false;}
+  setStatus(statusId,"Saving…","info");
+  const obj=billObject(meta,lines,t);
+  const res=await billsApiCall("appendBill",{payload:JSON.stringify(obj)});
+  if(res&&res.ok){
+    if(billsCache&&billsCache.length){const headers=billsCache[0].map(h=>String(h).trim());billsCache.push(headers.map(h=>(h in obj)?obj[h]:""));} // keep cache live so the next number advances
+    // they have a bill now - lift the ordering hold at once, without waiting
+    // for the next Sync. Best effort: a failure here must not fail the save.
+    try{ apiCall("clearUnbilled",{phone:meta.phone||"",client:meta.client||""}); }catch(e){}
+    setStatus(statusId,`Saved bill ${meta.billNo}. Making pay link…`,"info");
+    const pl=await createPayLink(meta,t,false);          // before the invoice renders, so the QR can carry it
+    if(!pl.url)setStatus(statusId,`Saved bill ${meta.billNo}. Pay link failed: ${pl.error}`,"err");
+    else setStatus(statusId,`Saved bill ${meta.billNo}.`,"ok");
+    if(statusId==="n_status"){resetNewBill();setStatus(statusId,`Saved bill ${meta.billNo}.${pl.url?"":" Pay link failed: "+pl.error}`,pl.url?"ok":"err");}
+    else if(statusId==="r_status2")suggestBillNo("r_billno","r_start");
+    return true;
+  }
+  setStatus(statusId,"Save failed: "+(res&&res.message||"unknown"),"err");return false;
+}
+
+/* ===================== DASHBOARD ===================== */
+/* Reconciles the Unbilled column in Master Client List. One heavy pass here,
+   so the client app only ever reads a cached column at login. */
+async function syncUnbilledHold(quiet){
+  const btn=el("d_ubSync"), msg=el("d_ubSyncMsg");
+  if(btn)btn.disabled=true;
+  if(msg&&!quiet){msg.textContent="Syncing…";msg.style.color="";}
+  try{
+    const r=await apiCall("reconcileUnbilled");
+    if(r&&r.ok){
+      markHoldSynced();
+      if(msg){msg.textContent="Synced";msg.style.color="var(--accent)";setTimeout(()=>{if(msg.textContent==="Synced")msg.textContent="";},3000);}
+      if(!quiet)await loadDashboard(true);               // the auto-run is already inside loadDashboard
+    } else if(msg){
+      msg.textContent="Sync failed";msg.style.color="var(--debit)";
+    }
+  }catch(e){
+    if(msg){msg.textContent="Sync failed";msg.style.color="var(--debit)";}
+  }finally{
+    if(btn)btn.disabled=false;
+  }
+}
+
+function followDismissed(){try{return JSON.parse(localStorage.getItem("friska_follow_dismiss")||"{}");}catch(e){return {};}}
+function followDismissSave(o){try{localStorage.setItem("friska_follow_dismiss",JSON.stringify(o));}catch(e){}}
+function openRenewFor(name){switchTab("renew");el("r_client").value=name;runRenew(false);}
+function resetNewBill(){
+  el("n_client").value="";
+  el("n_phone").value="";
+  el("n_phoneSel").classList.add("hidden");el("n_phoneSel").innerHTML="";
+  el("n_clientNames").innerHTML="";
+  el("n_planPanel").querySelectorAll("input").forEach(c=>{c.checked=(c.value==="nb");});
+  updatePlanHead();
+  el("n_dur").value="m";
+  el("n_days").value=DUR_DAYS.m;el("n_days").setAttribute("readonly","readonly");
+  el("n_people").value=1;
+  el("n_start").value="";el("n_end").value="";
+  el("n_items").querySelectorAll("input").forEach(c=>{c.checked=false;c.closest(".chk").classList.remove("on");});
+  el("n_slots").querySelectorAll("input").forEach(c=>{c.checked=false;c.closest(".chk").classList.remove("on");});
+  el("n_km").value=0;el("n_delprice").value=0;
+  el("n_disc").value=0;el("n_gst").value=5;
+  el("n_billdate").value=keyOf(dateOnly(new Date()));
+  el("n_lines").innerHTML="";   // drop any added meal / custom lines too
+  nRender(true,true,true);
+  suggestBillNo("n_billno","n_start");
+}
+function openNewBillFor(name,phone,dateKey){
+  switchTab("new");
+  resetNewBill();
+  el("n_client").value=name;
+  onClientNameChange();
+  if(phone)el("n_phone").value=phone;
+  if(dateKey){el("n_start").value=dateKey;newDatesFromStart();refreshNum("n_billno","n_start");}
+}
+function openUsageCheckFor(name,startKey,endKey){
+  switchTab("usage");
+  el("u_client").value=name;
+  if(startKey)el("u_start").value=startKey;
+  el("u_end").value=endKey||keyOf(dateOnly(new Date()));
+  runUsageCheck(false);
+}
+let dashSyncedOnce=false;
+/* reconcileUnbilled is a heavy server pass that rewrites column T. Once every few
+   hours is plenty — saving a bill already clears its own client immediately. */
+const HOLD_SYNC_EVERY=6*3600*1000;
+function holdSyncedRecently(){try{return (Date.now()-(+localStorage.getItem("friska_hold_sync")||0))<HOLD_SYNC_EVERY;}catch(e){return false;}}
+function markHoldSynced(){try{localStorage.setItem("friska_hold_sync",String(Date.now()));}catch(e){}}
+async function loadDashboard(force){
+  const t0=Date.now();
+  setStatus("d_status","Loading…","info");
+  try{
+    if(!dashSyncedOnce){
+      dashSyncedOnce=true;
+      if(!holdSyncedRecently()){try{await syncUnbilledHold(true);}catch(e){}}
+    }
+    const [bills,orders,st,hold]=await Promise.all([      // one round trip, not four in a row
+      fetchBills(force),
+      fetchOrders(force).catch(()=>[]),
+      fetchStatus(force).catch(()=>[]),
+      fetchHoldList().catch(()=>null)
+    ]);
+    const inactiveSet=new Set((st||[]).filter(c=>c.status==="inactive").map(c=>normName(c.name)));
+    renderDashboard(orders||[],inactiveSet);
+    try{renderUnbilled(hold);}catch(e){el("d_unbilled").innerHTML='<div class="subtle">Unbilled list failed to load.</div>';}
+    setStatus("d_status",`${Math.max(0,bills.length-1)} bills · loaded in ${((Date.now()-t0)/1000).toFixed(1)}s`,"ok");
+  }catch(err){setStatus("d_status","Error: "+err.message,"err");el("d_followups").innerHTML="";}
+}
+function unbilledDismissed(){try{return new Set(JSON.parse(localStorage.getItem("friska_unbilled_dismiss")||"[]"));}catch(e){return new Set();}}
+function dismissUnbilled(k){const s=unbilledDismissed();s.add(k);try{localStorage.setItem("friska_unbilled_dismiss",JSON.stringify([...s]));}catch(e){}}
+function renderUnbilled(hold){
+  const host=el("d_unbilled");
+  if(!hold){host.innerHTML='<div class="subtle">Hold list unavailable — tap ↻ to retry.</div>';return;}
+  const dismissed=unbilledDismissed();
+  const rows=(hold.clients||[]).map(function(c){
+    const d=toDt(c.since);
+    return {name:c.name||"",phone:c.phone||"",date:d,days:c.days,blocked:!!c.blocked,key:normName(c.name)};
+  }).filter(function(r){
+    if(!r.date)return false;
+    if(monthKey_(r.date)<UNBILLED_FROM)return false;   // pre-automation, billed by hand
+    return !dismissed.has(r.key);
+  });
+  if(!rows.length){host.innerHTML='<div class="subtle">Nothing unbilled.</div>';return;}
+  rows.sort(function(a,b){return (b.days==null?-1:b.days)-(a.days==null?-1:a.days);});   // most overdue first
+  host.innerHTML='<div style="overflow-x:auto"><table class="dtable"><thead><tr><th>Client</th><th>Phone</th><th>First order</th><th>Month</th><th></th></tr></thead><tbody>'+
+    rows.map(function(r){
+      const tag=r.blocked?' <span class="rowtag exp">on hold</span>':(r.days!=null?` <span class="rowtag">${r.days}d</span>`:"");
+      const ph=r.phone?waAnchor(r.phone,"",`${r.phone} <span style="opacity:.6">↗</span>`,"color:var(--accent);font-weight:600;text-decoration:none;white-space:nowrap"):"";
+      return `<tr><td><b>${r.name}</b>${tag}</td><td>${ph}</td><td>${dtstr(r.date)}</td><td>${monthLabel_(monthKey_(r.date))}</td><td style="white-space:nowrap"><div class="rowmenu" data-name="${String(r.name).replace(/"/g,"&quot;")}" data-phone="${r.phone}" data-date="${keyOf(r.date)}"><button class="rowmenu-btn" data-ubmenubtn="${r.key}">⋮</button><div class="rowmenu-pop" data-ubmenupop="${r.key}"><button class="rowmenu-item" data-ubnew>Make new bill</button><button class="rowmenu-item" data-ubusage>Check usage</button><button class="rowmenu-item danger" data-ubdis="${r.key}">Dismiss</button></div></div></td></tr>`;
+    }).join("")+
+    '</tbody></table></div>';
+  host.querySelectorAll("button[data-ubmenubtn]").forEach(function(b){
+    b.onclick=function(e){e.stopPropagation();openRowMenu(b,host.querySelector('[data-ubmenupop="'+b.dataset.ubmenubtn+'"]'));};
+  });
+  host.querySelectorAll("button[data-ubnew]").forEach(function(b){
+    b.onclick=function(e){e.stopPropagation();closeAllRowMenus();var w=b.closest(".rowmenu");openNewBillFor(w.dataset.name,w.dataset.phone,w.dataset.date);};
+  });
+  host.querySelectorAll("button[data-ubusage]").forEach(function(b){
+    b.onclick=function(e){e.stopPropagation();closeAllRowMenus();var w=b.closest(".rowmenu");openUsageCheckFor(w.dataset.name,w.dataset.date);};
+  });
+  host.querySelectorAll("button[data-ubdis]").forEach(function(b){
+    b.onclick=function(e){e.stopPropagation();closeAllRowMenus();dismissUnbilled(b.dataset.ubdis);renderUnbilled(hold);};
+  });
+}
+function dashRows(){
+  if(!billsCache||billsCache.length<2)return [];
+  const idx=billHeaderIndex(billsCache);const out=[];
+  for(let i=1;i<billsCache.length;i++){const r=billsCache[i];const g=k=>{const j=idx[k];return (j===undefined||j>=r.length)?"":r[j];};
+    out.push({billNo:g("BillNo"),client:g("Client"),plan:g("Plan"),start:toDt(g("Start")),end:toDt(g("End")),grand:g("GrandTotal"),paid:String(g("PaidStatus")||"Unpaid"),url:String(g("BillUrl")||"").trim(),url2:String(g("PayLink")||"").trim()});}
+  return out;
+}
+function pillHtml(r){return `<label class="paidchk"><input type="checkbox" data-bill="${r.billNo}" ${r.paid.toLowerCase()==="paid"?"checked":""}><span>Paid</span></label>`;}
+function bindPills(scopeId){
+  el(scopeId).querySelectorAll('input[type="checkbox"][data-bill]').forEach(cb=>{cb.onchange=async()=>{
+    const billNo=cb.dataset.bill;const next=cb.checked?"Paid":"Unpaid";
+    const idx=billHeaderIndex(billsCache);const bi=idx["BillNo"],si=idx["PaidStatus"];
+    const setLocal=v=>{for(let i=1;i<billsCache.length;i++){if(String(billsCache[i][bi])===String(billNo)){billsCache[i][si]=v;break;}}};
+    setLocal(next);cb.disabled=true;                       // optimistic, no re-render → instant
+    try{const res=await billsApiCall("updateBillStatus",{billNo,status:next});if(!res||!res.ok)throw 0;}
+    catch(e){cb.checked=!cb.checked;setLocal(cb.checked?"Paid":"Unpaid");}
+    finally{cb.disabled=false;}
+  };});
+}
+function followTag(r,today){const expired=r.end<today,isToday=keyOf(r.end)===keyOf(today);return expired?`<span class="rowtag exp">expired</span>`:(isToday?`<span class="rowtag">today</span>`:`<span class="rowtag">${Math.round((r.end-today)/86400000)}d</span>`);}
+function renderDashboard(orders,inactiveSet){
+  const rows=dashRows();
+  const latestEnd={};rows.forEach(r=>{if(r.end){const k=normName(r.client);if(!latestEnd[k]||r.end>latestEnd[k])latestEnd[k]=r.end;}});
+  const latestRows=rows.filter(r=>r.end&&latestEnd[normName(r.client)]&&keyOf(latestEnd[normName(r.client)])===keyOf(r.end));
+  const idx=(billsCache&&billsCache.length)?billHeaderIndex(billsCache):null;
+  const dismissed=followDismissed();
+  const follow=[];
+  if(idx&&orders&&orders.length){
+    latestRows.forEach(r=>{
+      if(inactiveSet&&inactiveSet.has(normName(r.client)))return; // explicitly marked inactive — not renewing
+      let raw=null;for(let i=1;i<billsCache.length;i++){if(String(billsCache[i][idx["BillNo"]])===String(r.billNo)){raw=billsCache[i];break;}}
+      if(!raw)return;
+      const prev=parseBillRow(raw,idx);
+      if(!prev.start||!prev.end)return;
+      const rc=computeRenew(orders,r.client,prev);
+      if(rc.pending>3)return; // not actually due yet — client likely paused, exclude from follow-ups
+      const key=String(r.billNo);
+      if(dismissed[key]!==undefined&&rc.activeDates.length<=dismissed[key])return; // snoozed, no new activity since
+      follow.push(Object.assign({},r,{pending:rc.pending,complete:rc.complete,activeCount:rc.activeDates.length}));
+    });
+  }
+  follow.sort((a,b)=>a.pending-b.pending);
+  if(!follow.length)el("d_followups").innerHTML=`<div class="subtle">Nothing due for renewal.</div>`;
+  else{
+    el("d_followups").innerHTML=`<div style="overflow-x:auto"><table class="dtable"><thead><tr><th>Client</th><th>Status</th><th>Bill</th><th>Paid</th><th></th></tr></thead><tbody>`+
+      follow.map(r=>`<tr><td><b class="clientlink" data-name="${String(r.client).replace(/"/g,"&quot;")}" style="cursor:pointer;color:var(--navy);text-decoration:underline">${r.client}</b></td><td>${r.complete?'<span class="rowtag exp">due</span>':'<span class="rowtag">'+r.pending+'d left</span>'}</td><td>${r.url?`<a href="${r.url}" target="_blank" rel="noopener" class="billlink" title="Open the archived bill image">${r.billNo}</a>`:`<span class="billlink gen" data-genimg="${r.billNo}" title="No image yet — tap to generate and view it">${r.billNo}</span>`}</td><td>${pillHtml(r)}</td><td><button class="rm" data-followdis="${r.billNo}" data-ac="${r.activeCount}">×</button></td></tr>`).join("")+
+      `</tbody></table></div>`;
+    bindPills("d_followups");
+    el("d_followups").querySelectorAll(".clientlink").forEach(nd=>{nd.onclick=()=>openRenewFor(nd.dataset.name);});
+    el("d_followups").querySelectorAll("button[data-followdis]").forEach(b=>{b.onclick=()=>{const o=followDismissed();o[b.dataset.followdis]=parseInt(b.dataset.ac)||0;followDismissSave(o);renderDashboard(orders,inactiveSet);};});
+  }
+  applyDashFilter();
+}
+function monthKey_(d){return d?(d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")):"0000-00";}
+function monthLabel_(k){if(k==="0000-00")return "No start date";const p=k.split("-");return ["January","February","March","April","May","June","July","August","September","October","November","December"][(+p[1])-1]+" "+p[0];}
+let dashMonthOpen=null,dashSort={col:"start",dir:"asc"};
+function cmpRows_(a,b,col,dir){
+  let av,bv;
+  if(col==="billNo"){av=parseFloat(String(a.billNo).replace(/\D/g,""))||0;bv=parseFloat(String(b.billNo).replace(/\D/g,""))||0;}
+  else if(col==="grand"){av=parseFloat(a.grand)||0;bv=parseFloat(b.grand)||0;}
+  else if(col==="start"){av=a.start?a.start.getTime():0;bv=b.start?b.start.getTime():0;}
+  else if(col==="end"){av=a.end?a.end.getTime():0;bv=b.end?b.end.getTime():0;}
+  else{av=String(a[col]||"").toLowerCase();bv=String(b[col]||"").toLowerCase();}
+  if(av<bv)return dir==="asc"?-1:1;if(av>bv)return dir==="asc"?1:-1;return 0;
+}
+function thSort_(col,label){const on=dashSort.col===col;return `<th class="sortth" data-col="${col}" style="cursor:pointer;white-space:nowrap">${label}${on?(dashSort.dir==="asc"?" ▲":" ▼"):""}</th>`;}
+function applyDashFilter(){
+  const q=normName(el("d_search").value);const f=el("d_filter").value;let rows=dashRows();
+  if(f!=="all")rows=rows.filter(r=>r.paid.toLowerCase()===f);
+  if(q)rows=rows.filter(r=>normName(r.client).includes(q)||String(r.billNo).includes(q));
+  var groups={};rows.forEach(function(r){var mk=monthKey_(r.start);(groups[mk]=groups[mk]||[]).push(r);});
+  var keys=Object.keys(groups).sort().reverse();                       // latest month on top
+  // Unpaid always sit above Paid within each month; the chosen column sorts inside each block.
+  keys.forEach(function(k){groups[k].sort(function(a,b){
+    var ap=String(a.paid).toLowerCase()==="paid"?1:0, bp=String(b.paid).toLowerCase()==="paid"?1:0;
+    if(ap!==bp)return ap-bp;
+    return cmpRows_(a,b,dashSort.col,dashSort.dir);
+  });});
+  if(dashMonthOpen===null){dashMonthOpen={};if(keys.length)dashMonthOpen[keys[0]]=true;}
+  var searching=!!q||f!=="all";
+  if(!keys.length){el("d_table").innerHTML=`<div class="subtle">No bills.</div>`;return;}
+  var head=`<thead><tr>${thSort_("billNo","Bill")}${thSort_("client","Client")}${thSort_("plan","Plan")}${thSort_("start","Start")}${thSort_("end","End")}${thSort_("grand","Total")}${thSort_("paid","Status")}<th></th></tr></thead>`;
+  var html="";
+  keys.forEach(function(k){
+    var open=searching?true:!!dashMonthOpen[k];
+    html+=`<div style="margin-top:8px"><div class="oldhead" data-mk="${k}">${open?"▾":"▸"} ${monthLabel_(k)} (${groups[k].length})</div>`+
+      `<div class="monthwrap ${open?"":"hidden"}" data-mw="${k}"><div style="overflow-x:auto"><table class="dtable">${head}<tbody>`+
+      groups[k].map(r=>`<tr><td>${r.url?`<a href="${r.url}" target="_blank" rel="noopener" class="billlink" title="Open the archived bill image">${r.billNo}</a>`:`<span class="billlink gen" data-genimg="${r.billNo}" title="No image yet — tap to generate and view it">${r.billNo}</span>`}</td><td><b class="clientlink" data-name="${String(r.client).replace(/"/g,"&quot;")}" style="cursor:pointer;color:var(--navy);text-decoration:underline">${r.client}</b></td><td>${r.plan||""}</td><td>${dtstr(r.start)}</td><td>${dtstr(r.end)}</td><td>₹${money(r.grand)}</td><td>${pillHtml(r)}</td><td><div class="rowmenu" data-name="${String(r.client).replace(/"/g,"&quot;")}" data-start="${r.start?keyOf(r.start):""}" data-end="${r.end?keyOf(r.end):""}"><button class="rowmenu-btn" data-menubtn="${r.billNo}">⋮</button><div class="rowmenu-pop" data-menupop="${r.billNo}"><button class="rowmenu-item" data-busage>Check usage</button><button class="rowmenu-item" data-paylink="${r.billNo}">${r.url2?"Copy pay link":"Create pay link"}</button><button class="rowmenu-item" data-dl="${r.billNo}">Download image</button><button class="rowmenu-item danger" data-delbill="${r.billNo}">Delete bill</button></div></div></td></tr>`).join("")+
+      `</tbody></table></div></div></div>`;
+  });
+  el("d_table").innerHTML=html;
+  bindPills("d_table");
+  el("d_table").querySelectorAll(".oldhead[data-mk]").forEach(function(h){h.onclick=function(){var k=h.dataset.mk;dashMonthOpen[k]=!(searching?true:dashMonthOpen[k]);applyDashFilter();};});
+  el("d_table").querySelectorAll(".sortth").forEach(function(th){th.onclick=function(){var c=th.dataset.col;if(dashSort.col===c)dashSort.dir=dashSort.dir==="asc"?"desc":"asc";else dashSort={col:c,dir:"asc"};applyDashFilter();};});
+  el("d_table").querySelectorAll(".clientlink").forEach(function(nd){nd.onclick=function(){openRenewFor(nd.dataset.name);};});
+  el("d_table").querySelectorAll("button[data-menubtn]").forEach(function(b){
+    b.onclick=function(e){
+      e.stopPropagation();
+      var pop=el("d_table").querySelector('[data-menupop="'+b.dataset.menubtn+'"]');
+      openRowMenu(b,pop);
+    };
+  });
+  el("d_table").querySelectorAll("button[data-busage]").forEach(function(b){
+    b.onclick=function(e){e.stopPropagation();closeAllRowMenus();var w=b.closest(".rowmenu");openUsageCheckFor(w.dataset.name,w.dataset.start,w.dataset.end);};
+  });
+  el("d_table").querySelectorAll("button[data-paylink]").forEach(function(b){
+    b.onclick=function(e){e.stopPropagation();closeAllRowMenus();payLinkAction(b.dataset.paylink);};
+  });
+  el("d_table").querySelectorAll("button[data-dl]").forEach(function(b){b.onclick=function(e){e.stopPropagation();closeAllRowMenus();downloadBillImage(b.dataset.dl);};});
+  el("d_table").querySelectorAll("button[data-delbill]").forEach(function(b){b.onclick=function(e){e.stopPropagation();closeAllRowMenus();deleteBillPrompt(b.dataset.delbill);};});
+}
+function closeAllRowMenus(except){document.querySelectorAll(".rowmenu-pop.open").forEach(function(p){if(p!==except)p.classList.remove("open");});}
+function openRowMenu(btn,pop){
+  var willOpen=!pop.classList.contains("open");
+  closeAllRowMenus();
+  if(willOpen){
+    var rect=btn.getBoundingClientRect();
+    var popW=170;
+    var left=Math.min(Math.max(8,rect.right-popW),window.innerWidth-popW-8);
+    pop.style.left=left+"px";pop.style.top="0px";
+    pop.classList.add("open");
+    var h=pop.offsetHeight||90;                                  // measure actual height — menus vary in item count
+    var top=rect.bottom+4;
+    if(top+h>window.innerHeight)top=Math.max(8,rect.top-h-4);    // flip above the button if it would overflow the bottom
+    pop.style.top=top+"px";
+  }
+}
+window.addEventListener("scroll",function(){closeAllRowMenus();},true);
+document.addEventListener("click",function(){closeAllRowMenus();});
+/* delegated so it covers both All bills and Follow-ups, through every re-render */
+document.addEventListener("click",function(e){
+  const g=e.target&&e.target.closest?e.target.closest("[data-genimg]"):null;
+  if(!g)return;
+  e.preventDefault();e.stopPropagation();
+  viewBillImage(g.dataset.genimg,g);
+});
+el("im_close").addEventListener("click",closeImgModal);
+el("im_done").addEventListener("click",closeImgModal);
+el("imgModal").addEventListener("click",function(e){if(e.target===this)closeImgModal();});
+document.addEventListener("keydown",function(e){if(e.key==="Escape"&&!el("imgModal").classList.contains("hidden"))closeImgModal();});
+
+/* ===================== USAGE CHECK ===================== */
+async function runUsageCheck(force){
+  const name=el("u_client").value.trim();const start=readDate("u_start"),end=readDate("u_end");
+  if(!name){setStatus("u_status","Enter a client name.","err");return;}
+  if(!start||!end){setStatus("u_status","Enter both dates.","err");return;}
+  if(start>end){setStatus("u_status","Start date is after end date.","err");return;}
+  setStatus("u_status","Computing…","info");
+  try{const orders=await fetchOrders(force);const u=countUsage(orders,start,end,name);const continued=hasActivityAfter(orders,name,end);renderUsageReport(u,start,end,continued);setStatus("u_status",`Done — scanned ${orders.length} rows.`,"ok");}
+  catch(e){setStatus("u_status","Error: "+e.message,"err");}
+}
+function renderUsageReport(u,start,end,continued){
+  const t=u.totals;el("u_card").classList.remove("hidden");
+  usageCtx={u,start,end,client:el("u_client").value.trim()};
+  el("u_billCard").classList.add("hidden");   // a fresh report invalidates any half-built bill
+  el("u_range").innerHTML=`Usage for <b>${dtstr(start)} → ${dtstr(end)}</b> (Sundays excluded)`;
+  el("u_stats").innerHTML=statBox(t.meals_total,"Meals","meals")+statBox(u.activeDays,"Active days","active")+statBox(u.pausedDays,"Paused days","paused")+statBox(u.totalDays,"Total days")+statBox(u.deliveries,"Deliveries","deliveries");
+  el("u_drill").innerHTML="";
+  bindStatDrill("u_stats","u_drill",()=>u);
+  let kv=kvRow("Lunch (option 1)",t.meal1)+kvRow("Dinner (option 2)",t.meal2);
+  if(t.seafood>0)kv+=kvRow("Seafood",t.seafood);if(t.brk>0)kv+=kvRow("Breakfast",t.brk);if(t.snack>0)kv+=kvRow("Snack",t.snack);if(t.juices_total>0)kv+=kvRow("Juices",t.juices_total);
+  el("u_kv").innerHTML=kv;
+  const slots=Object.keys(u.slotCounts).sort();
+  el("u_slots").innerHTML=slots.length?`<div class="subtle" style="font-weight:600;margin-bottom:4px">Slot deliveries</div><div class="chips">`+slots.map(s=>`<span class="chip" style="border:1.5px solid var(--line);border-radius:999px;padding:4px 12px">${s}: <b>${u.slotCounts[s]}</b></span>`).join("")+`</div>`:"";
+  if(continued)el("u_pauseWarn").innerHTML=`<div class="note info">Client has orders after this range — they're continuing, so paused days here are likely made up later.</div>`;
+  else if(u.lastActiveDate&&u.lastActiveDate<end)el("u_pauseWarn").innerHTML=`<div class="note pause">Last meal on <b>${dtstr(u.lastActiveDate)}</b>; no meals after that in this range.</div>`;
+  else el("u_pauseWarn").innerHTML="";
+}
+
+/* ===================== BILL FROM USAGE ===================== */
+let usageCtx=null;
+function uPlans(){return Array.from(el("u_planPanel").querySelectorAll("input:checked")).map(c=>c.value);}
+function updateUPlanHead(){const p=uPlans();el("u_planHead").textContent=p.length?p.map(x=>PLAN_LABEL[x]).join(", "):"Select plan(s)";}
+function buildUsageLines(keep){
+  const prev=keep?domLines("u_lines"):{};
+  const b=usageCtx.u,tt=b.totals,pl=uPlans().length?uPlans():["nb"],p0=pl[0],dur=el("u_dur").value;
+  const both=tt.meal1>0&&tt.meal2>0;
+  const keepR=(id,def)=>prev[id]?prev[id].rate:def;
+  const out=[];
+  if(tt.meals_total>0)out.push({id:"main",label:pl.map(p=>PLAN_LABEL[p]).join(" + ")+" · "+(both?"Lunch + Dinner":(tt.meal1>0?"Lunch":"Dinner")),qty:tt.meals_total,rate:keepR("main",both?rate(p0,dur,"combo"):rate(p0,dur,"lunch")),food:true});
+  if(tt.brk>0)out.push({id:"breakfast",label:"Breakfast",qty:tt.brk,rate:keepR("breakfast",rate(p0,dur,"breakfast")),food:true});
+  if(tt.snack>0)out.push({id:"snack",label:"Snack",qty:tt.snack,rate:keepR("snack",rate(p0,dur,"snack")),food:true});
+  if(tt.juices_total>0)out.push({id:"juices",label:"Juices",qty:tt.juices_total,rate:keepR("juices",rate(p0,dur,"juice1")),food:true});
+  if(tt.seafood>0)out.push({id:"seafood",label:"Seafood add-on",qty:tt.seafood,rate:keepR("seafood",gRate("seafood")),food:true});
+  Object.values(prev).filter(l=>l.extra).forEach(l=>out.push(l));
+  Object.values(prev).filter(l=>l.custom).forEach(l=>out.push(l));
+  if(b.deliveries>0)out.push({id:"delivery",label:"Delivery",qty:b.deliveries,rate:parseFloat(el("u_delprice").value)||0,food:false});
+  return out;
+}
+function uRender(keep){renderLines("u_lines",buildUsageLines(keep),true);recalcUsageBill();}
+function recalcUsageBill(){if(!usageCtx)return;renderTotals("u_totals",computeTotals(readLines("u_lines"),parseFloat(el("u_disc").value)||0,parseFloat(el("u_gst").value)||0,0));}
+function openUsageBill(){
+  if(!usageCtx){setStatus("u_status","Run a usage report first.","err");return;}
+  if(!usageCtx.client){setStatus("u_status","Enter a client name.","err");return;}
+  el("u_billCard").classList.remove("hidden");
+  el("u_delprice").value=0;el("u_disc").value=0;el("u_gst").value=5;
+  el("u_billdate").value=keyOf(dateOnly(new Date()));
+  updateUPlanHead();
+  uRender(false);
+  suggestBillNoFor("u_billno",usageCtx.start);
+  setStatus("u_status2","Set the plan and rates, then save or send.","info");
+  el("u_billCard").scrollIntoView({behavior:"smooth",block:"start"});
+}
+function gatherUsageMeta(){
+  const slots=Object.keys(usageCtx.u.slotCounts||{}).filter(s=>s&&s!=="No slot");
+  return {billNo:el("u_billno").value.trim(),billDate:readDate("u_billdate")||dateOnly(new Date()),
+    client:usageCtx.client,phone:phoneForClient(usageCtx.client),
+    plan:uPlans().map(p=>PLAN_LABEL[p]).join(", "),duration:DUR_LABEL[el("u_dur").value]||"",
+    slots:slots.join(", "),days:usageCtx.u.activeDays,start:usageCtx.start,end:usageCtx.end,
+    discPct:parseFloat(el("u_disc").value)||0,gstPct:parseFloat(el("u_gst").value)||5,paidStatus:"Unpaid"};
+}
+function usagePayload(){const meta=gatherUsageMeta();const lines=readLines("u_lines");return {meta,lines,t:computeTotals(lines,meta.discPct,meta.gstPct,0)};}
+
+/* ===================== NAME AUTOCOMPLETE ===================== */
+function fillDatalist(listId,names,q){
+  const dl=el(listId);const nq=normName(q);
+  if(nq.length<2){dl.innerHTML="";return;}
+  if(names.some(n=>normName(n)===nq)){dl.innerHTML="";return;} // full name chosen → close the dropdown
+  const matches=names.filter(n=>normName(n).includes(nq));
+  matches.sort((a,b)=>{const ai=normName(a).startsWith(nq)?0:1,bi=normName(b).startsWith(nq)?0:1;return ai-bi||a.localeCompare(b);}); // best (startsWith) on top
+  dl.innerHTML=matches.slice(0,20).map(n=>`<option value="${n.replace(/"/g,"&quot;")}">`).join("");
+}
+function masterNames(){return masterCache?masterCache.map(c=>c.name):[];}
+/* Master Client List plus anyone who already has a bill — so the dropdown still
+   works if the Master fetch fails, and covers clients missing from the Master. */
+function allClientNames(){
+  const seen=new Set(),out=[];
+  masterNames().concat(billsNames()).forEach(n=>{
+    const k=normName(n);if(!k||seen.has(k))return;seen.add(k);out.push(n);
+  });
+  return out;
+}
+function fillDatalistAll(listId,names){el(listId).innerHTML=names.slice(0,60).map(n=>`<option value="${n.replace(/"/g,"&quot;")}">`).join("");}
+function billsNames(){if(!billsCache||billsCache.length<2)return [];const idx=billHeaderIndex(billsCache);const ci=idx["Client"];if(ci===undefined)return [];const set=new Set();for(let i=1;i<billsCache.length;i++){const n=String(billsCache[i][ci]||"").trim();if(n)set.add(n);}return Array.from(set);}
+function onClientNameChange(){
+  const sel=el("n_phoneSel");if(!masterCache)return;
+  const matches=masterCache.filter(c=>normName(c.name)===normName(el("n_client").value));
+  if(matches.length===0){sel.classList.add("hidden");el("n_phone").value="";}
+  else if(matches.length===1){sel.classList.add("hidden");el("n_phone").value=matches[0].phone;}
+  else{sel.classList.remove("hidden");sel.innerHTML=matches.map(c=>`<option value="${c.phone}">${c.phone}</option>`).join("");el("n_phone").value=matches[0].phone;sel.onchange=()=>{el("n_phone").value=sel.value;};}
+}
+
+/* ===================== WIRING ===================== */
+const TABS=["dash","renew","new","usage"];
+let currentTab=null;
+function showTab(name){
+  if(TABS.indexOf(name)<0)name="dash";
+  currentTab=name;
+  document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("active",t.dataset.tab===name));
+  el("tab-new").classList.toggle("hidden",name!=="new");
+  el("tab-renew").classList.toggle("hidden",name!=="renew");
+  el("tab-dash").classList.toggle("hidden",name!=="dash");
+  el("tab-usage").classList.toggle("hidden",name!=="usage");
+  if(name==="dash")loadDashboard(false);
+}
+/* Each tab change is a history entry, so the phone's Back button steps back
+   through tabs instead of leaving the app. */
+function switchTab(name){
+  if(name===currentTab)return;
+  showTab(name);
+  try{history.pushState({tab:name},"","#"+name);}catch(e){}
+}
+function tabFromHash(){const h=(location.hash||"").replace(/^#/,"");return TABS.indexOf(h)>=0?h:"dash";}
+window.addEventListener("popstate",function(e){showTab((e.state&&e.state.tab)||tabFromHash());});
+document.querySelectorAll(".tab").forEach(t=>t.addEventListener("click",()=>switchTab(t.dataset.tab)));
+
+el("n_planHead").addEventListener("click",e=>{e.stopPropagation();el("n_planPanel").classList.toggle("hidden");});
+el("n_planPanel").addEventListener("change",()=>{updatePlanHead();nRender(false);refreshNewRates();});
+document.addEventListener("click",e=>{if(!el("n_planSel").contains(e.target))el("n_planPanel").classList.add("hidden");});
+
+el("n_client").addEventListener("input",e=>{fillDatalist("n_clientNames",allClientNames(),e.target.value);onClientNameChange();});
+el("n_client").addEventListener("change",onClientNameChange);
+el("n_dur").addEventListener("change",applyDuration);
+el("n_days").addEventListener("input",()=>{nRender(true);newDatesFromStart();});
+el("n_people").addEventListener("input",()=>nRender(true));
+el("n_start").addEventListener("change",()=>{newDatesFromStart();refreshNum("n_billno","n_start");});
+el("n_end").addEventListener("change",()=>{
+  if(el("n_dur").value==="custom"){
+    const s=readDate("n_start"),en=readDate("n_end");
+    if(s&&en&&en>=s){el("n_days").value=computeDaysExclSunday(s,en);nRender(true);}
+  }
+});
+el("n_items").addEventListener("change",e=>{
+  const v=e.target.value;
+  const isJuice=(v==="juice1x"||v==="juice2x");
+  if(v==="juice2x"&&e.target.checked){const o=el("n_items").querySelector('input[value="juice1x"]');o.checked=false;o.closest(".chk").classList.remove("on");}
+  if(v==="juice1x"&&e.target.checked){const o=el("n_items").querySelector('input[value="juice2x"]');o.checked=false;o.closest(".chk").classList.remove("on");}
+  e.target.closest(".chk").classList.toggle("on",e.target.checked);nRender(false,(v==="lunch"||v==="dinner"),isJuice);
+});
+el("n_slots").addEventListener("change",e=>{e.target.closest(".chk").classList.toggle("on",e.target.checked);nRender(false);});
+el("n_km").addEventListener("input",()=>{el("n_delprice").value=money((parseFloat(el("n_km").value)||0)*gRate("delivery"));nRender(false);});
+el("n_delprice").addEventListener("input",()=>nRender(false));
+el("n_disc").addEventListener("input",recalcNew);el("n_gst").addEventListener("input",recalcNew);
+bindLivePrice("n_lines",recalcNew);
+el("n_addmeal").addEventListener("click",()=>{el("n_lines").insertAdjacentHTML("beforeend",lineRowHtml({id:"meal_"+Date.now(),label:"High Protein · Lunch",qty:nDays(),rate:0,food:true,extra:true}));recalcNew();});
+el("n_addline").addEventListener("click",()=>{el("n_lines").insertAdjacentHTML("beforeend",lineRowHtml({id:"custom_"+Date.now(),label:"Custom item",qty:0,rate:0,food:true,custom:true}));recalcNew();});
+el("n_suggestno").addEventListener("click",async()=>{try{await fetchBills(true);suggestBillNo("n_billno","n_start");}catch(e){setStatus("n_status","Couldn't load Bills: "+e.message,"err");}});
+el("n_billdate").addEventListener("change",()=>refreshNum("n_billno","n_start"));
+el("n_clear").addEventListener("click",()=>{resetNewBill();setStatus("n_status","Form cleared.","info");});
+el("n_save").addEventListener("click",async()=>{try{const meta=gatherNewMeta();const lines=readLines("n_lines");const t=computeTotals(lines,meta.discPct,meta.gstPct,0);await validateAndSave(meta,lines,t,"n_status");}catch(e){setStatus("n_status","Error: "+e.message,"err");}});
+el("n_quote").addEventListener("click",async()=>{try{
+  const meta=gatherNewMeta();meta.quote=true;
+  if(!meta.client){setStatus("n_status","Enter client name.","err");return;}
+  const lines=readLines("n_lines");const t=computeTotals(lines,meta.discPct,meta.gstPct,0);
+  setStatus("n_status","Building quote…","info");
+  buildInvoice(meta,lines,t);await sendWhatsApp(meta,t,"n_status");   // quote only — nothing written to the Bills sheet
+}catch(e){setStatus("n_status","Error: "+e.message,"err");}});
+el("n_wa").addEventListener("click",async()=>{try{const meta=gatherNewMeta();const lines=readLines("n_lines");const t=computeTotals(lines,meta.discPct,meta.gstPct,0);if(!await validateAndSave(meta,lines,t,"n_status"))return;buildInvoice(meta,lines,t);await sendWhatsApp(meta,t,"n_status");}catch(e){setStatus("n_status","Error: "+e.message,"err");}});
+
+el("r_fetch").addEventListener("click",()=>runRenew(false));
+el("r_reload").addEventListener("click",()=>runRenew(true));
+el("r_client").addEventListener("input",e=>fillDatalist("r_clientNames",allClientNames(),e.target.value));
+el("r_client").addEventListener("keydown",e=>{if(e.key==="Enter")runRenew(false);});
+bindLivePrice("r_lines",recalcRenewActual);
+bindLivePrice("r_nextlines",recalcRenewNext);
+el("r_disc").addEventListener("input",recalcRenewNext);el("r_gst").addEventListener("input",recalcRenewNext);
+el("r_winstart").addEventListener("change",applyRenewWindow);
+el("r_winend").addEventListener("change",applyRenewWindow);
+el("r_winreset").addEventListener("click",resetRenewWindow);
+el("r_settle").addEventListener("change",applySettleMode);
+el("r_adjinput").addEventListener("input",recalcRenewNext);
+el("r_adjreset").addEventListener("click",()=>{if(!renewCtx)return;el("r_adjinput").value=money(renewCtx.computedAdj||0);recalcRenewNext();});
+el("r_start").addEventListener("change",()=>{renewDatesFromStart();refreshNum("r_billno","r_start");});
+el("r_days").addEventListener("input",renewDatesFromStart);
+el("r_addmeal").addEventListener("click",()=>{el("r_nextlines").insertAdjacentHTML("beforeend",lineRowHtml({id:"meal_"+Date.now(),label:"High Protein · Lunch",qty:parseInt(el("r_days").value)||26,rate:0,food:true,extra:true}));recalcRenewNext();});
+el("r_addline").addEventListener("click",()=>{el("r_nextlines").insertAdjacentHTML("beforeend",lineRowHtml({id:"custom_"+Date.now(),label:"Custom item",qty:0,rate:0,food:true,custom:true}));recalcRenewNext();});
+el("r_billdate").addEventListener("change",()=>refreshNum("r_billno","r_start"));
+function gatherRenewMeta(){const p=renewCtx.prev;return {billNo:el("r_billno").value.trim(),billDate:readDate("r_billdate")||dateOnly(new Date()),client:p.client||"",phone:p.phone||"",plan:p.plan,duration:p.duration,slots:p.slots,days:isSettle()?0:(parseInt(el("r_days").value)||26),start:readDate("r_start"),end:readDate("r_end"),discPct:isSettle()?0:(parseFloat(el("r_disc").value)||0),gstPct:isSettle()?0:(parseFloat(el("r_gst").value)||5),paidStatus:"Unpaid",settle:isSettle()};}
+function settleItemsText(meta){
+  const i=meta.info;
+  if(!i)return "Settlement — previous cycle balance";
+  return `Settlement${i.billNo?` of Bill ${i.billNo}`:""} · used ₹${money(i.t.grand)} · paid ₹${money(i.paid)} · ${itemsReadable(i.lines)}`;
+}
+function settleInfo(){
+  const p=renewCtx.prev,rc=renewCtx.rc;
+  const usageLines=readLines("r_lines");
+  const ut=computeTotals(usageLines,p.discPct||0,5,0);
+  const paid=p.grandTotal||0, prevAdj=p.adjustment||0;
+  const baseline=paid-prevAdj;                                     // what the last bill charged for its own cycle
+  const amount=renewAdj();
+  return {billNo:p.billNo,start:rc.winStart||p.start,end:rc.billingEnd,activeDays:rc.activeDates.length,
+          lines:usageLines,t:ut,discPct:p.discPct||0,paid,prevAdj,baseline,amount,
+          diff:Math.round((amount-(ut.grand-baseline))*100)/100};
+}
+function renewPayload(){
+  const meta=gatherRenewMeta();
+  if(meta.settle){meta.info=settleInfo();return {meta,lines:[],t:settleTotals()};}  // settlement: no cycle lines, balance sits in Adjustment
+  const lines=readLines("r_nextlines");
+  return {meta,lines,t:computeTotals(lines,meta.discPct,meta.gstPct,renewAdj())};
+}
+el("r_save").addEventListener("click",async()=>{try{if(!renewCtx)return;const{meta,lines,t}=renewPayload();await validateAndSave(meta,lines,t,"r_status2");}catch(e){setStatus("r_status2","Error: "+e.message,"err");}});
+el("r_quote").addEventListener("click",async()=>{try{
+  if(!renewCtx)return;
+  const{meta,lines,t}=renewPayload();meta.quote=true;
+  setStatus("r_status2","Building quote…","info");
+  buildInvoice(meta,lines,t);await sendWhatsApp(meta,t,"r_status2");   // quote only — nothing written to the Bills sheet
+}catch(e){setStatus("r_status2","Error: "+e.message,"err");}});
+el("r_wa").addEventListener("click",async()=>{try{if(!renewCtx)return;const{meta,lines,t}=renewPayload();if(!await validateAndSave(meta,lines,t,"r_status2"))return;buildInvoice(meta,lines,t);await sendWhatsApp(meta,t,"r_status2");}catch(e){setStatus("r_status2","Error: "+e.message,"err");}});
+
+el("u_fetch").addEventListener("click",()=>runUsageCheck(false));
+el("u_reload").addEventListener("click",()=>runUsageCheck(true));
+el("u_client").addEventListener("input",e=>fillDatalist("n_clientNames",allClientNames(),e.target.value));
+el("u_client").addEventListener("keydown",e=>{if(e.key==="Enter")runUsageCheck(false);});
+
+el("d_search").addEventListener("input",applyDashFilter);
+el("d_filter").addEventListener("change",applyDashFilter);
+el("d_reload").addEventListener("click",()=>loadDashboard(true));
+el("d_backfill").addEventListener("click",backfillBillImages);
+el("d_allHead").addEventListener("click",()=>{const b=el("d_allBody"),h=el("d_allHead");const o=!b.classList.toggle("hidden");h.textContent=(o?"▾":"▸")+" All bills";});
+el("d_ubHead").addEventListener("click",()=>{const b=el("d_ubBody"),h=el("d_ubHead");const o=!b.classList.toggle("hidden");h.textContent=(o?"▾":"▸")+" Unbilled clients";});
+el("d_ubSync").addEventListener("click",()=>syncUnbilledHold(false));
+
+/* bill-from-usage */
+el("u_makebill").addEventListener("click",openUsageBill);
+el("u_planHead").addEventListener("click",e=>{e.stopPropagation();el("u_planPanel").classList.toggle("hidden");});
+el("u_planPanel").addEventListener("change",()=>{updateUPlanHead();uRender(false);});
+document.addEventListener("click",e=>{if(!el("u_planSel").contains(e.target))el("u_planPanel").classList.add("hidden");});
+el("u_dur").addEventListener("change",()=>uRender(false));
+el("u_delprice").addEventListener("input",()=>uRender(true));
+el("u_disc").addEventListener("input",recalcUsageBill);
+el("u_gst").addEventListener("input",recalcUsageBill);
+bindLivePrice("u_lines",recalcUsageBill);
+el("u_addmeal").addEventListener("click",()=>{el("u_lines").insertAdjacentHTML("beforeend",lineRowHtml({id:"meal_"+Date.now(),label:"High Protein · Lunch",qty:usageCtx?usageCtx.u.activeDays:0,rate:0,food:true,extra:true}));recalcUsageBill();});
+el("u_addline").addEventListener("click",()=>{el("u_lines").insertAdjacentHTML("beforeend",lineRowHtml({id:"custom_"+Date.now(),label:"Custom item",qty:0,rate:0,food:true,custom:true}));recalcUsageBill();});
+el("u_save").addEventListener("click",async()=>{try{if(!usageCtx)return;const{meta,lines,t}=usagePayload();await validateAndSave(meta,lines,t,"u_status2");}catch(e){setStatus("u_status2","Error: "+e.message,"err");}});
+el("u_quote").addEventListener("click",async()=>{try{
+  if(!usageCtx)return;
+  const{meta,lines,t}=usagePayload();meta.quote=true;
+  if(!meta.client){setStatus("u_status2","Enter client name.","err");return;}
+  setStatus("u_status2","Building quote…","info");
+  buildInvoice(meta,lines,t);await sendWhatsApp(meta,t,"u_status2");   // quote only — nothing written to the Bills sheet
+}catch(e){setStatus("u_status2","Error: "+e.message,"err");}});
+el("u_wa").addEventListener("click",async()=>{try{if(!usageCtx)return;const{meta,lines,t}=usagePayload();if(!await validateAndSave(meta,lines,t,"u_status2"))return;buildInvoice(meta,lines,t);await sendWhatsApp(meta,t,"u_status2");}catch(e){setStatus("u_status2","Error: "+e.message,"err");}});
+
+/* ===================== PAY MODE ===================== */
+let payMonth=null;
+let payChecked=new Set();   // ticked but not yet submitted
+let paySession=[];          // marked paid in this session, newest first — stays pinned with an Undo
+/* Accepts ?pay, &pay, #pay and #dash?pay — the hash is checked too, since
+   appending ?pay to a URL that already ends in #dash puts it inside the hash. */
+function payIsOn(){return /(^|[?&#])pay(=|&|#|$)/.test(location.search+location.hash);}
+function payMonths(){
+  const s=new Set();dashRows().forEach(r=>{if(r.start)s.add(monthKey_(r.start));});
+  return Array.from(s).sort();
+}
+function payShift(step){
+  const ms=payMonths();if(!ms.length)return;
+  let i=ms.indexOf(payMonth);
+  if(i<0)i=ms.length-1;
+  i=Math.min(ms.length-1,Math.max(0,i+step));
+  payMonth=ms[i];renderPay();
+}
+function renderPay(){
+  const ms=payMonths();
+  if(!payMonth)payMonth=ms.length?ms[ms.length-1]:monthKey_(dateOnly(new Date()));
+  el("p_month").textContent=monthLabel_(payMonth);
+  const i=ms.indexOf(payMonth);
+  el("p_prev").disabled=(i<=0);el("p_next").disabled=(i<0||i>=ms.length-1);
+  const q=normName(el("p_search").value);
+  let rows=dashRows().filter(r=>r.start&&monthKey_(r.start)===payMonth);
+  if(q)rows=rows.filter(r=>normName(r.client).includes(q)||String(r.billNo).includes(q));
+  const amt=r=>parseFloat(r.grand)||0;
+  const isPaid=r=>r.paid.toLowerCase()==="paid";
+  const byName=(a,b)=>String(a.client||"").localeCompare(String(b.client||""));
+  const unpaid=rows.filter(r=>!isPaid(r)).sort(byName);
+  const just=paySession.map(no=>rows.find(r=>String(r.billNo)===String(no))).filter(r=>r&&isPaid(r));   // newest first
+  const justSet=new Set(just.map(r=>String(r.billNo)));
+  const paid=rows.filter(r=>isPaid(r)&&!justSet.has(String(r.billNo))).sort(byName);
+  el("p_due").textContent="₹"+money(unpaid.reduce((s,r)=>s+amt(r),0));
+  el("p_got").textContent="₹"+money(rows.filter(isPaid).reduce((s,r)=>s+amt(r),0));
+  el("p_duen").textContent=unpaid.length?`· ${unpaid.length}`:"";
+  el("p_gotn").textContent=rows.filter(isPaid).length?`· ${rows.filter(isPaid).length}`:"";
+  const meta=r=>`<span class="sub">#${r.billNo} · ${dtstr(r.start)}${r.end?" → "+dtstr(r.end):""}</span>`;
+  const pickRow=r=>{
+    const on=payChecked.has(String(r.billNo));
+    return `<label class="payrow${on?" sel":""}"><input type="checkbox" data-chk="${r.billNo}"${on?" checked":""}>`+
+      `<span class="who"><span class="nm">${r.client||"—"}</span>${meta(r)}</span>`+
+      `<span class="amt">₹${money(r.grand)}</span></label>`;
+  };
+  const doneRow=(r,fresh)=>`<div class="payrow ispaid${fresh?" justdone":""}">`+
+      `<span class="tick">✓</span><span class="who"><span class="nm">${r.client||"—"}</span>${meta(r)}</span>`+
+      `<span class="amt">₹${money(r.grand)}</span><button class="undo" data-undo="${r.billNo}">Undo</button></div>`;
+  let h="";
+  if(!rows.length)h=`<div class="subtle" style="padding:14px 2px">No bills${q?" match that search":""} in ${monthLabel_(payMonth)}.</div>`;
+  else{
+    if(just.length)h+=`<div class="payhead">Marked paid just now</div>`+just.map(r=>doneRow(r,true)).join("");
+    if(unpaid.length)h+=`<div class="payhead">Unpaid — tick who paid</div>`+unpaid.map(pickRow).join("");
+    if(paid.length)h+=`<div class="payhead">Already paid</div>`+paid.map(r=>doneRow(r,false)).join("");
+  }
+  el("p_list").innerHTML=h;
+  el("p_list").querySelectorAll("input[data-chk]").forEach(c=>{
+    c.onchange=()=>{
+      const no=String(c.dataset.chk);
+      if(c.checked)payChecked.add(no);else payChecked.delete(no);
+      c.closest(".payrow").classList.toggle("sel",c.checked);
+      payBar();
+    };
+  });
+  el("p_list").querySelectorAll("button[data-undo]").forEach(b=>{b.onclick=()=>payUndo(b.dataset.undo,b);});
+  payBar();
+}
+function payBar(){
+  const n=payChecked.size, bar=el("p_bar");
+  bar.classList.toggle("hidden",n===0);
+  if(n)el("p_submit").textContent=`Mark ${n} as paid`;
+}
+function paySetLocal(billNo,v){
+  const idx=billHeaderIndex(billsCache),bi=idx["BillNo"],si=idx["PaidStatus"];
+  if(bi===undefined||si===undefined)return;
+  for(let i=1;i<billsCache.length;i++){if(String(billsCache[i][bi]).trim()===String(billNo).trim()){billsCache[i][si]=v;break;}}
+}
+async function paySubmit(){
+  const list=[...payChecked];
+  if(!list.length)return;
+  const btn=el("p_submit");btn.disabled=true;
+  let ok=0,fail=0,lastErr="";
+  for(let n=0;n<list.length;n++){
+    const no=list[n];
+    btn.textContent=`Saving ${n+1} of ${list.length}…`;
+    try{
+      const res=await billsApiCall("updateBillStatus",{billNo:no,status:"Paid"});
+      if(!res||!res.ok)throw new Error((res&&res.message)||"server said no");
+      paySetLocal(no,"Paid");payChecked.delete(no);
+      paySession=paySession.filter(x=>String(x)!==String(no));paySession.unshift(no);
+      ok++;
+    }catch(e){fail++;lastErr=(e&&e.message)||String(e);}
+  }
+  btn.disabled=false;
+  renderPay();
+  setStatus("p_status",fail?`${ok} marked paid, ${fail} failed (${lastErr}) — the failed ones are still ticked.`:`${ok} marked paid.`,fail?"err":"ok");
+}
+async function payUndo(billNo,btn){
+  btn.disabled=true;btn.textContent="…";
+  try{
+    const res=await billsApiCall("updateBillStatus",{billNo,status:"Unpaid"});
+    if(!res||!res.ok)throw new Error((res&&res.message)||"server said no");
+    paySetLocal(billNo,"Unpaid");
+    paySession=paySession.filter(x=>String(x)!==String(billNo));
+    renderPay();
+    setStatus("p_status",`#${billNo} set back to Unpaid.`,"ok");
+  }catch(e){
+    btn.disabled=false;btn.textContent="Undo";
+    setStatus("p_status",`Couldn't undo #${billNo}: ${e.message}`,"err");
+  }
+}
+
+async function paySync(){
+  const b=el("p_sync");b.disabled=true;const was=b.textContent;b.textContent="Checking…";
+  setStatus("p_status","Asking Razorpay which links are paid…","info");
+  try{
+    const r=await billsApiCall("syncPayments",{});
+    if(!r||!r.ok)throw new Error((r&&r.message)||"sync failed");
+    if(r.paid){
+      await fetchBills(true);
+      (r.bills||[]).forEach(no=>{const k=String(no);if(!paySession.some(x=>String(x)===k))paySession.unshift(k);});
+      renderPay();
+    }
+    setStatus("p_status",r.paid?`${r.paid} newly paid of ${r.checked} checked.`:`Nothing new — ${r.checked} link(s) still unpaid.`,"ok");
+  }catch(e){setStatus("p_status","Couldn't check payments: "+e.message,"err");}
+  finally{b.disabled=false;b.textContent=was;}
+}
+async function payInit(){
+  el("payView").classList.remove("hidden");
+  document.querySelector(".tabs").classList.add("hidden");
+  ["tab-new","tab-renew","tab-dash","tab-usage"].forEach(id=>el(id).classList.add("hidden"));
+  el("p_full").href=location.pathname+"#dash";                 // same file, whatever it's called / wherever it lives
+  el("p_prev").onclick=()=>payShift(-1);
+  el("p_next").onclick=()=>payShift(1);
+  el("p_search").addEventListener("input",renderPay);
+  el("p_submit").onclick=paySubmit;
+  el("p_sync").onclick=paySync;
+  el("p_reload").onclick=async()=>{setStatus("p_status","Reloading…","info");try{await fetchBills(true);renderPay();setStatus("p_status","Up to date.","ok");}catch(e){setStatus("p_status","Error: "+e.message,"err");}};
+  setStatus("p_status","Loading bills…","info");
+  try{await fetchBills(false);renderPay();setStatus("p_status","Tick the clients who paid, then press the button.","info");}
+  catch(e){setStatus("p_status","Couldn't load bills: "+e.message,"err");}
+}
+
+// init
+el("n_billdate").value=keyOf(dateOnly(new Date()));
+updatePlanHead();
+if(payIsOn()){
+  payInit();                                                   // ?pay — bills only, nothing else loads
+}else{
+  showTab(tabFromHash());                                      // honour a #tab in the URL on load / refresh
+  try{history.replaceState({tab:currentTab},"","#"+currentTab);}catch(e){}
+  (async()=>{
+    // fire independently — a slow or dead Prices URL must not hold up the client-name list
+    const pPrices=fetchPrices(false).catch(e=>{setStatus("n_status","Couldn't load Prices: "+e.message,"err");});
+    const pMaster=fetchMaster(false).catch(()=>{});
+    const pBills =fetchBills(false).catch(()=>{});
+    await pPrices;nRender(true);
+    await pMaster;
+    await pBills;try{suggestBillNo("n_billno","n_start");}catch(e){}
+  })();
+}
+</script>
+</body>
+</html>
