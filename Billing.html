@@ -6,6 +6,7 @@
 <title>Friska — Billing</title>
 <script src="config.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <style>
   :root{--navy:#0a1a6e;--navy-deep:#08155a;--accent:#10b981;--accent-soft:#e7f7f1;--bg:#f4f7fc;--card:#fff;--ink:#16213e;--muted:#6b7596;--line:#e2e7f1;--warn-bg:#fff6e6;--warn-line:#f0d9a6;--warn-ink:#8a6112;--pause-bg:#fdeceb;--pause-line:#f1c4c0;--pause-ink:#9a3b34;--credit:#0a7d4f;--debit:#9a3b34;}
   *{box-sizing:border-box}
@@ -117,6 +118,10 @@
   #invoice .grand{display:flex;justify-content:space-between;align-items:center;background:var(--accent-soft);padding:14px 20px;font-weight:800}
   #invoice .grand .gl{font-size:14px;color:var(--navy);text-transform:uppercase;letter-spacing:.06em}#invoice .grand .gv{font-size:24px;color:var(--navy)}
   #invoice .bank{display:flex;gap:18px;padding:14px 20px;border-top:1px solid #eef1f7;font-size:11.5px;line-height:1.7}#invoice .bank .upi{font-weight:800;color:var(--navy);font-size:13px}
+  #invoice .qr{flex:0 0 auto;text-align:center;padding-left:6px;border-left:1px solid #eef1f7;margin-left:4px}
+  #invoice .qr img{width:104px;height:104px;display:block;image-rendering:pixelated}
+  #invoice .qr .cap{font-size:10px;font-weight:800;color:var(--navy);margin-top:4px;line-height:1.3}
+  #invoice .qr .sub{font-size:8.5px;color:var(--muted);line-height:1.3}
   #invoice .footnote{padding:8px 20px 14px;font-size:10px;color:var(--muted);font-style:italic}
   /* ---- pay mode (billing.html?pay) ---- */
   .paynav{display:flex;align-items:center;gap:10px;margin-bottom:12px}
@@ -550,7 +555,24 @@ function gRate(item){return priceMap&&(item in priceMap)?priceMap[item]:0;}
 function lockedRate(prev,id,fallback){if(prev&&prev.lineItems&&prev.lineItems.length){const m=prev.lineItems.find(l=>l.id===id);if(m)return m.rate;}return fallback;}
 
 /* usage computation */
+/* Orders_Output is an append-only log, so scanning all of it once per client is
+   the dashboard's main cost. Index it by client once and reuse. */
+let _oIdx=null,_oIdxSrc=null;
+function ordersFor(data,clientName){
+  if(_oIdxSrc!==data){
+    const m=new Map();
+    for(const row of data){
+      if(!row||row.length<2)continue;
+      const k=normName(row[COL.name]);if(!k)continue;
+      let a=m.get(k);if(!a){a=[];m.set(k,a);}
+      a.push(row);
+    }
+    _oIdx=m;_oIdxSrc=data;
+  }
+  return _oIdx.get(normName(clientName))||[];
+}
 function countUsage(data,start,end,clientName){
+  data=ordersFor(data,clientName);      // only this client's rows
   const key=normName(clientName);const totals={meal1:0,meal2:0,snack:0,j1:0,j2:0,brk:0,seafood:0};
   const activeSet=new Set();const slotDates={};let lastActive=null;const paused=[];
   const byDate={};        // dateKey -> per-day item tallies, for the drill-down lists
@@ -594,7 +616,7 @@ function countUsage(data,start,end,clientName){
 function dtFromKey(k){const [y,m,d]=k.split("-").map(Number);return dateOnly(new Date(y,m-1,d,12));}
 function hasActivityAfter(data,name,date){
   const key=normName(name);
-  for(const row of data){if(!row||row.length<2)continue;const dt=toDt(row[COL.date]);if(!dt)continue;if(dateOnly(dt)<=date)continue;if(normName(row[COL.name])!==key)continue;
+  for(const row of ordersFor(data,name)){if(!row||row.length<2)continue;const dt=toDt(row[COL.date]);if(!dt)continue;if(dateOnly(dt)<=date)continue;
     for(const i of[7,8,9,10,11,12]){if(i<row.length){const v=String(row[i]).trim();if(v&&v!=="N/A")return true;}}}
   return false;
 }
@@ -946,6 +968,32 @@ function suggestBillNo(billnoId,startId){suggestBillNoFor(billnoId,readDate(star
 async function refreshNum(billnoId,startId){try{await fetchBills(false);}catch(e){}suggestBillNo(billnoId,startId);}
 
 /* invoice */
+/* A plain UPI QR — any UPI app the client scans with (GPay, PhonePe, Paytm…)
+   opens with our VPA and this bill's amount already filled in. */
+function upiPayUri(amount,note){
+  // %20 not "+" (strict UPI parsers read + literally), plain ASCII note, @ left bare in pa
+  const enc=s=>encodeURIComponent(String(s)).replace(/%20/g,"%20");
+  const tn=String(note||"").replace(/[^\x20-\x7E]+/g," ").replace(/\s+/g," ").trim().slice(0,50);
+  const parts=[
+    "pa="+String(BIZ.upi).trim(),
+    "pn="+enc(BIZ.acHolder),
+    "cu=INR",
+    "am="+(Math.round((Number(amount)||0)*100)/100).toFixed(2)
+  ];
+  if(tn)parts.push("tn="+enc(tn));
+  return "upi://pay?"+parts.join("&");
+}
+function upiQrBlock(amount,note){
+  const amt=Number(amount)||0;
+  if(amt<=0)return "";                                     // nothing to collect (refund / zero bill)
+  if(typeof qrcode!=="function")return "";                 // CDN blocked — bill still prints, just without the QR
+  try{
+    const q=qrcode(0,"M");q.addData(upiPayUri(amt,note));q.make();
+    return `<div class="qr"><img src="${q.createDataURL(4,1)}" alt="UPI QR">`+
+      `<div class="cap">Scan to pay</div>`+
+      `<div class="sub">Any UPI app</div></div>`;
+  }catch(e){return "";}
+}
 function buildInvoice(meta,lines,t){
   let rows="";
   if(meta.settle&&meta.info){
@@ -982,10 +1030,19 @@ function buildInvoice(meta,lines,t){
       <div class="cell"><div class="lab">${meta.settle?"Days served":"Days"}</div><div class="val">${meta.settle&&meta.info?meta.info.activeDays:meta.days}</div></div></div>
     <table class="itab"><thead><tr><th>Description</th><th>Qty</th><th>Rate</th><th>Price</th></tr></thead><tbody>${rows}</tbody></table>
     <div class="grand"><span class="gl">${meta.quote?"Estimated total":(meta.settle?(t.grand<0?"Refund due":"Balance payable"):(meta.paidStatus==="Paid"?"Paid":"Total payable"))}</span><span class="gv">₹${money(Math.abs(t.grand))}</span></div>
-    <div class="bank"><div style="flex:1"><div class="upi">UPI : ${BIZ.upi}</div>${BIZ.acHolder}<br>A/C ${BIZ.acNumber} · ${BIZ.acType}</div><div style="flex:1">IFSC ${BIZ.ifsc}<br>${BIZ.branch}</div></div>
+    <div class="bank"><div style="flex:1"><div class="upi">UPI : ${BIZ.upi}</div>${BIZ.acHolder}<br>A/C ${BIZ.acNumber} · ${BIZ.acType}</div><div style="flex:1">IFSC ${BIZ.ifsc}<br>${BIZ.branch}</div>${upiQrBlock(t.grand,(meta.quote?"Quote":"Bill")+(meta.billNo?" "+meta.billNo:"")+" · "+(meta.client||""))}</div>
     <div class="footnote">*Please read all Terms &amp; Conditions on delivery timings, meal storage &amp; shelf life — refunds, substitutions &amp; cancellation policy on our website.</div>`;
 }
-function invoiceBlob(){return new Promise((resolve,reject)=>{html2canvas(el("invoice"),{scale:2,backgroundColor:"#ffffff"}).then(c=>c.toBlob(b=>b?resolve(b):reject(new Error("image failed")),"image/png")).catch(reject);});}
+function invoiceImagesReady(){            // logo + UPI QR must be decoded or they rasterise blank
+  const imgs=Array.from(el("invoice").querySelectorAll("img"));
+  return Promise.all(imgs.map(im=>(im.complete&&im.naturalWidth)?Promise.resolve()
+    :new Promise(r=>{im.onload=r;im.onerror=r;setTimeout(r,2000);})));
+}
+async function invoiceBlob(){
+  await invoiceImagesReady();
+  const c=await html2canvas(el("invoice"),{scale:2,backgroundColor:"#ffffff"});
+  return await new Promise((resolve,reject)=>c.toBlob(b=>b?resolve(b):reject(new Error("image failed")),"image/png"));
+}
 function waPhone(p){
   let d=String(p||"").replace(/\D/g,"").replace(/^0+/,"");   // drop STD-style leading zeros
   if(!d)return "";
@@ -1272,6 +1329,7 @@ async function syncUnbilledHold(quiet){
   try{
     const r=await apiCall("reconcileUnbilled");
     if(r&&r.ok){
+      markHoldSynced();
       if(msg){msg.textContent="Synced";msg.style.color="var(--accent)";setTimeout(()=>{if(msg.textContent==="Synced")msg.textContent="";},3000);}
       if(!quiet)await loadDashboard(true);               // the auto-run is already inside loadDashboard
     } else if(msg){
@@ -1323,18 +1381,29 @@ function openUsageCheckFor(name,startKey,endKey){
   runUsageCheck(false);
 }
 let dashSyncedOnce=false;
+/* reconcileUnbilled is a heavy server pass that rewrites column T. Once every few
+   hours is plenty — saving a bill already clears its own client immediately. */
+const HOLD_SYNC_EVERY=6*3600*1000;
+function holdSyncedRecently(){try{return (Date.now()-(+localStorage.getItem("friska_hold_sync")||0))<HOLD_SYNC_EVERY;}catch(e){return false;}}
+function markHoldSynced(){try{localStorage.setItem("friska_hold_sync",String(Date.now()));}catch(e){}}
 async function loadDashboard(force){
-  setStatus("d_status","Loading bills…","info");
+  const t0=Date.now();
+  setStatus("d_status","Loading…","info");
   try{
-    if(!dashSyncedOnce){dashSyncedOnce=true;try{await syncUnbilledHold(true);}catch(e){}}   // stamp the hold column once per page load
-    const bills=await fetchBills(force);
-    let orders=[];try{orders=await fetchOrders(force);}catch(e){}
-    let inactiveSet=new Set();
-    try{const st=await fetchStatus(force);inactiveSet=new Set(st.filter(c=>c.status==="inactive").map(c=>normName(c.name)));}catch(e){}
-    renderDashboard(orders,inactiveSet);
-    let hold=null;try{hold=await fetchHoldList();}catch(e){}
+    if(!dashSyncedOnce){
+      dashSyncedOnce=true;
+      if(!holdSyncedRecently()){try{await syncUnbilledHold(true);}catch(e){}}
+    }
+    const [bills,orders,st,hold]=await Promise.all([      // one round trip, not four in a row
+      fetchBills(force),
+      fetchOrders(force).catch(()=>[]),
+      fetchStatus(force).catch(()=>[]),
+      fetchHoldList().catch(()=>null)
+    ]);
+    const inactiveSet=new Set((st||[]).filter(c=>c.status==="inactive").map(c=>normName(c.name)));
+    renderDashboard(orders||[],inactiveSet);
     try{renderUnbilled(hold);}catch(e){el("d_unbilled").innerHTML='<div class="subtle">Unbilled list failed to load.</div>';}
-    setStatus("d_status",`${Math.max(0,bills.length-1)} bills.`,"ok");
+    setStatus("d_status",`${Math.max(0,bills.length-1)} bills · loaded in ${((Date.now()-t0)/1000).toFixed(1)}s`,"ok");
   }catch(err){setStatus("d_status","Error: "+err.message,"err");el("d_followups").innerHTML="";}
 }
 function unbilledDismissed(){try{return new Set(JSON.parse(localStorage.getItem("friska_unbilled_dismiss")||"[]"));}catch(e){return new Set();}}
