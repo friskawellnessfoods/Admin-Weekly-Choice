@@ -2,274 +2,399 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Friska — Delivery Routes</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#15306b">
+<title>Friska — Dispatch</title>
 <script src="config.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root{
-    --c-bg:#eef2f6; --c-surface:#ffffff; --c-ink:#1f2a37; --c-muted:#5b6b7b; --c-line:#d7e0ea;
-    --grad-a:#0ea5a3; --grad-b:#2563eb; --c-primary:#0ea5a3; --c-primary-d:#0b8482;
-    --wa:#25D366; --warn:#b45309; --bad:#dc2626; --ok:#0b8482;
-    --radius:12px; --shadow:0 6px 24px rgba(20,40,70,.10);
+    /* Friska's navy, kept properly blue rather than drifting to black, with
+       the house green for your own riders and amber for Porter. */
+    --ink:#15306b;          /* structure, headings, body */
+    --ink-2:#56699a;        /* secondary */
+    --ink-3:#8b9cc2;        /* tertiary */
+    --paper:#ebf0fa;        /* page, tinted blue not grey */
+    --surface:#ffffff;
+    --rule:#cfdaf0;         /* hairlines carry the structure */
+    --rule-2:#e4ebf8;
+    --tint:#f6f9ff;         /* quiet panels inside cards */
+    --signal:#0d9488;       /* your own riders */
+    --signal-bg:#dcf3f0;
+    --porter:#a4620a;       /* a different carrier class */
+    --porter-bg:#fdf1dd;
+    --alarm:#c2282c;
+    --alarm-bg:#fdeaea;
+    --deep:linear-gradient(145deg,#15306b 0%,#1d3f8f 58%,#1b4fa8 100%);
+    --tap:46px;             /* nothing interactive is smaller */
   }
-  *{ box-sizing:border-box; }
-  body{ font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif; margin:0;
-    background:var(--c-bg); color:var(--c-ink); -webkit-text-size-adjust:100%; }
-
-  .bar{ background:var(--c-surface); }
-  body.landing .bar{
-    position:static; min-height:100vh; display:flex; flex-direction:column; align-items:center;
-    justify-content:center; gap:18px; padding:32px 20px;
-    background:
-      radial-gradient(1200px 500px at 50% -10%, rgba(37,99,235,.10), transparent 60%),
-      radial-gradient(900px 500px at 50% 110%, rgba(14,165,163,.12), transparent 60%),
-      var(--c-bg);
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html{ -webkit-text-size-adjust:100%; }
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+    font-size:15px; line-height:1.45;
+    font-variant-numeric:tabular-nums; font-feature-settings:"tnum" 1;
   }
-  body.landing .content{ display:none; }
-  body.working .bar{
-    position:sticky; top:0; z-index:10; flex-direction:row; min-height:auto; padding:10px 16px;
-    display:flex; gap:10px; align-items:center; flex-wrap:wrap;
-    background:var(--c-surface); border-bottom:1px solid var(--c-line); box-shadow:0 1px 0 rgba(0,0,0,.02);
-  }
+  input,button,select{ font:inherit; color:inherit; font-variant-numeric:tabular-nums; }
 
-  .brand{ display:flex; align-items:center; gap:12px; }
-  .brand img{ height:36px; width:auto; }
-  .brand span{ font-size:16px; font-weight:800; letter-spacing:.2px;
-    background:linear-gradient(90deg,var(--grad-a),var(--grad-b));
-    -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
-  body.landing .brand{ flex-direction:column; gap:10px; margin-bottom:4px; }
-  body.landing .brand img{ height:64px; }
-  body.landing .brand span{ font-size:26px; }
+  /* ─── opening screen: one question, which day ─── */
+  body.landing .top, body.landing .deck, body.landing .footbar{ display:none; }
+  body.working .gate{ display:none; }
 
-  .hero-sub{ display:none; }
-  body.landing .hero-sub{ display:block; color:var(--c-muted); font-size:14px; margin-top:-6px; text-align:center; }
+  .gate{ min-height:100dvh; display:flex; flex-direction:column; justify-content:center;
+    align-items:center; gap:22px; padding:30px 22px calc(30px + env(safe-area-inset-bottom)); }
+  .mark{ display:flex; flex-direction:column; align-items:center; gap:12px; }
+  .mark img{ height:54px; width:auto; }
+  .mark b{ font-size:27px; font-weight:700; letter-spacing:-.02em; }
+  .mark span{ font-size:14px; color:var(--ink-2); }
+  .gate .form{ width:100%; max-width:330px; display:flex; flex-direction:column; gap:12px; }
 
-  .controls{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
-  body.landing .controls{ flex-direction:column; width:100%; max-width:340px; }
-  body.landing .controls > *{ width:100%; }
-  .field{ position:relative; display:flex; align-items:center; }
-  body.landing .field{ width:100%; }
-  input[type=date], select, input[type=text], input[type=number]{
-    padding:11px 13px; border:1.5px solid var(--c-line); border-radius:var(--radius); font-size:15px;
-    background:var(--c-surface); color:var(--c-ink); font-family:inherit; transition:border-color .15s, box-shadow .15s; }
-  input[type=date]{ cursor:pointer; width:100%; }
-  input:focus, select:focus{ outline:none; border-color:var(--c-primary); box-shadow:0 0 0 3px rgba(14,165,163,.16); }
+  /* ─── working header ─── */
+  .top{ position:sticky; top:0; z-index:30; background:var(--deep); color:#fff;
+    padding:calc(10px + env(safe-area-inset-top)) 14px 10px; }
+  .top .line1{ display:flex; align-items:center; gap:10px; }
+  .top .day{ font-size:16px; font-weight:600; letter-spacing:-.01em; }
+  .top .sub{ font-size:12.5px; color:#a9bfe6; margin-top:1px; }
+  .top .grow{ flex:1; }
+  .iconbtn{ width:var(--tap); height:var(--tap); border:0; background:rgba(255,255,255,.1);
+    color:#fff; border-radius:11px; font-size:13px; font-weight:600; cursor:pointer; }
+  .iconbtn:active{ background:rgba(255,255,255,.2); }
+  .iconbtn.on{ background:#fff; color:var(--ink); }
+  .iconbtn.back{ display:none; width:38px; font-size:21px; line-height:1; padding:0; }
+  body.inslot .iconbtn.back{ display:block; }
+  body.inslot #cards{ display:none; }   /* the day total is noise inside one slot */
 
-  .btn{ padding:11px 17px; border:0; border-radius:var(--radius); font-size:15px; font-weight:700;
-    cursor:pointer; color:#fff; font-family:inherit; transition:transform .08s, filter .15s;
-    background:linear-gradient(90deg,var(--grad-a),var(--grad-b)); box-shadow:0 4px 14px rgba(37,99,235,.25); }
-  .btn:hover:not(:disabled){ filter:brightness(1.05); }
+  /* ─── controls ─── */
+  input[type=date], input[type=text], input[type=tel], input[type=number], select{
+    width:100%; min-height:var(--tap); padding:11px 13px; font-size:16px;
+    background:var(--surface); color:var(--ink);
+    border:1px solid var(--rule); border-radius:11px; }
+  input[type=date]{ cursor:pointer; }
+  input:focus, select:focus{ outline:none; border-color:var(--signal);
+    box-shadow:0 0 0 3px rgba(15,143,132,.15); }
+
+  .btn{ min-height:var(--tap); padding:12px 18px; border:0; border-radius:11px;
+    font-size:15.5px; font-weight:600; cursor:pointer; background:var(--ink); color:#fff; }
   .btn:active:not(:disabled){ transform:translateY(1px); }
-  .btn.alt{ background:var(--c-surface); color:var(--c-primary-d); border:1.5px solid var(--c-line); box-shadow:none; }
-  .btn.alt:hover:not(:disabled){ border-color:var(--c-primary); }
-  .btn.sm{ padding:7px 12px; font-size:13px; border-radius:9px; box-shadow:none; }
-  .btn.wa{ background:var(--wa); box-shadow:0 4px 14px rgba(37,211,102,.25); }
-  .btn.danger{ background:var(--bad); box-shadow:none; }
-  .btn:disabled{ opacity:.45; cursor:default; box-shadow:none; }
-  body.landing .btn{ padding:14px 18px; font-size:16px; }
+  .btn.go{ background:var(--signal); }
+  .btn.line{ background:var(--surface); color:var(--ink); border:1px solid var(--rule); }
+  .btn.line:active{ background:var(--rule-2); }
+  .btn.sm{ min-height:38px; padding:8px 13px; font-size:13.5px; border-radius:9px; }
+  .btn:disabled{ opacity:.4; }
 
-  .agents{ display:flex; align-items:center; gap:6px; font-size:13px; color:var(--c-muted);
-    background:var(--c-surface); border:1.5px solid var(--c-line); border-radius:var(--radius);
-    padding:0 12px 0 13px; }
-  .agents input{ width:52px; border:0; padding:11px 0; font-size:15px; font-weight:700;
-    color:var(--c-ink); background:transparent; }
-  .agents input:focus{ outline:none; box-shadow:none; }
-  body.landing .agents{ width:100%; justify-content:space-between; }
+  /* day / slot picker, used on both screens */
+  .slots{ display:grid; grid-template-columns:repeat(3,1fr); gap:6px; }
+  .slots label{ display:flex; align-items:center; justify-content:center; gap:7px;
+    min-height:var(--tap); border:1px solid var(--rule); border-radius:11px;
+    background:var(--surface); font-size:14px; font-weight:500; color:var(--ink-2);
+    cursor:pointer; user-select:none; }
+  .slots label:has(input:checked){ border-color:var(--signal); background:var(--signal-bg);
+    color:var(--signal); font-weight:600; }
+  .slots input{ display:none; }
+  .slots .tick{ width:16px; height:16px; border-radius:5px; border:1.5px solid var(--rule);
+    display:flex; align-items:center; justify-content:center; font-size:11px; color:transparent; }
+  .slots label:has(input:checked) .tick{ background:var(--signal); border-color:var(--signal); color:#fff; }
 
-  .status{ display:flex; align-items:center; gap:8px; font-size:13px; color:var(--c-muted); }
-  .spinner{ width:14px; height:14px; border:2px solid var(--c-line); border-top-color:var(--c-primary);
-    border-radius:50%; animation:spin .7s linear infinite; display:none; flex:none; }
-  .status.busy .spinner{ display:block; }
-  @keyframes spin{ to{ transform:rotate(360deg); } }
+  .riders-in{ display:flex; align-items:center; gap:0; border:1px solid var(--rule);
+    border-radius:11px; background:var(--surface); overflow:hidden; min-height:var(--tap); }
+  .riders-in span{ padding-left:14px; font-size:14px; color:var(--ink-2); white-space:nowrap; }
+  .riders-in input{ border:0; text-align:center; font-weight:700; font-size:17px;
+    width:100%; background:transparent; }
+  .riders-in input:focus{ box-shadow:none; }
 
-  .content{ max-width:980px; margin:0 auto; padding:18px 16px 60px; }
+  /* ─── deck ─── */
+  .deck{ max-width:720px; margin:0 auto;
+    padding:14px 14px calc(96px + env(safe-area-inset-bottom)); }
 
-  .cards{ display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px; }
-  .card{ background:var(--c-surface); border:1px solid var(--c-line); border-radius:var(--radius);
-    padding:11px 15px; min-width:96px; box-shadow:var(--shadow); }
-  .card .n{ font-size:20px; font-weight:800; }
-  .card .l{ font-size:10.5px; color:var(--c-muted); text-transform:uppercase; letter-spacing:.06em; margin-top:2px; }
-  .card.bad .n{ color:var(--bad); } .card.ok .n{ color:var(--ok); } .card.info .n{ color:var(--grad-b); }
+  .say{ font-size:13px; color:var(--ink-2); min-height:19px; margin-bottom:12px; }
+  .say b{ color:var(--ink); font-weight:600; }
 
-  .slotcard, .routecard{ background:var(--c-surface); border:1px solid var(--c-line); border-radius:var(--radius);
-    box-shadow:var(--shadow); margin-bottom:12px; transition:border-color .15s; }
-  .slotcard{ padding:16px; cursor:pointer; }
-  .slotcard:hover{ border-color:var(--c-primary); }
-  .slotcard:active{ transform:translateY(1px); }
+  /* coverage — the one loud thing on the page */
+  .cover{ background:var(--deep); color:#fff; border-radius:16px;
+    padding:18px 18px 16px; margin-bottom:18px; }
+  .cover .big{ font-size:40px; font-weight:700; letter-spacing:-.035em; line-height:1; }
+  .cover .big em{ font-style:normal; color:#8fa9da; font-weight:600; }
+  .cover .cap{ font-size:14px; color:#bacde9; margin-top:5px; }
+  .cover .meter{ height:7px; border-radius:99px; background:rgba(255,255,255,.2);
+    margin-top:14px; display:flex; gap:2px; overflow:hidden; }
+  .cover .meter i{ display:block; height:100%; }
+  .cover .meter .a{ background:#3ad6c4; }
+  .cover .meter .b{ background:#f0ad45; }
+  .cover .key{ display:flex; gap:16px; margin-top:11px; font-size:12.5px; color:#bacde9; }
+  .cover .key u{ text-decoration:none; display:inline-flex; align-items:center; gap:6px; }
+  .cover .key i{ width:8px; height:8px; border-radius:2px; display:inline-block; }
 
-  .riderbox{ background:#f8fafc; border:1px solid var(--c-line); border-radius:10px;
-    padding:10px 12px; margin-bottom:12px; }
-  .riderrow{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-  .riderrow + .riderrow{ margin-top:8px; }
-  .riderrow input{ flex:1; min-width:120px; padding:8px 10px; font-size:14px; }
-  .riderlbl{ font-size:10.5px; font-weight:800; letter-spacing:.06em; text-transform:uppercase;
-    color:var(--c-muted); }
-  .ridernow{ font-size:12.5px; font-weight:700; color:var(--c-primary-d); }
-  .ridernow.dim{ color:var(--c-muted); font-weight:500; }
+  /* a slot is a ruled band, not a card */
+  .band{ display:flex; align-items:baseline; gap:10px; margin:22px 0 2px;
+    padding-bottom:9px; border-bottom:2px solid var(--ink); }
+  .band h2{ margin:0; font-size:17px; font-weight:700; letter-spacing:-.015em; }
+  .band .n{ margin-left:auto; font-size:13px; color:var(--ink-2); }
 
-  .secthead{ font-size:11px; font-weight:800; letter-spacing:.07em; text-transform:uppercase;
-    color:var(--c-primary-d); margin:18px 0 9px; padding-bottom:6px;
-    border-bottom:1.5px solid var(--c-line); }
-  .secthead.porter{ color:var(--warn); }
-  .routecard.porter{ border-left:3px solid var(--warn); }
+  .rowlink{ display:block; width:100%; text-align:left; background:var(--surface);
+    border:0; border-bottom:1px solid var(--rule); padding:15px 16px; cursor:pointer; }
+  .rowlink:first-of-type{ border-radius:13px 13px 0 0; }
+  .rowlink:active{ background:var(--rule-2); }
+  .slotgrp{ border:1px solid var(--rule); border-radius:14px; overflow:hidden; background:var(--surface); }
+  .slotgrp .rowlink:last-child{ border-bottom:0; }
+  .rowlink .t{ display:flex; align-items:center; gap:10px; }
+  .rowlink .t b{ font-size:16.5px; font-weight:600; letter-spacing:-.01em; }
+  .rowlink .t .arr{ margin-left:auto; color:var(--ink-3); font-size:15px; }
+  .rowlink .s{ font-size:13px; color:var(--ink-2); margin-top:4px; }
 
-  .rc-head{ padding:14px 16px; cursor:pointer; user-select:none; }
-  .rc-head:hover{ background:#f8fafc; }
-  .routecard.open{ border-color:var(--c-primary); }
-  .routecard.open .rc-head{ border-bottom:1px solid var(--c-line); background:#f8fafc; }
-  .rc-body{ padding:14px 16px 16px; }
-  .chev{ font-size:11px; margin-left:4px; }
-  .msghead{ font-size:10.5px; color:var(--c-muted); text-transform:uppercase; letter-spacing:.06em;
-    font-weight:700; margin:16px 0 8px; }
-  .sc-top{ display:flex; align-items:baseline; justify-content:space-between; gap:10px; }
-  .sc-name{ font-size:18px; font-weight:800; color:var(--c-primary-d); }
-  .rc-name{ font-size:16px; font-weight:800; }
-  .sc-sub{ font-size:12.5px; color:var(--c-muted); margin-top:4px; }
-  .routecard.over{ border-color:var(--bad); }
+  /* ─── one route ─── */
+  .route{ background:var(--surface); border:1px solid var(--rule);
+    border-radius:14px; margin-bottom:10px; overflow:hidden; }
+  .route.open{ border-color:var(--ink); }
+  .route.porter{ border-left:3px solid var(--porter); }
+  .route.over{ border-color:var(--alarm); }
 
-  .chips{ display:flex; gap:7px; flex-wrap:wrap; margin-top:10px; }
-  .chip{ font-size:11px; font-weight:700; padding:4px 10px; border-radius:999px;
-    background:#eef2f6; color:var(--c-muted); white-space:nowrap; }
-  .chip.bad{ background:#fee2e2; color:var(--bad); }
-  .chip.ok{ background:#d1fae5; color:var(--ok); }
-  .pill{ display:inline-block; font-size:10px; font-weight:700; padding:2px 7px; border-radius:999px;
-    background:#eef2f6; color:var(--c-muted); }
+  .rhead{ padding:13px 15px; cursor:pointer; user-select:none; min-height:var(--tap); }
+  .route.open .rhead{ background:var(--tint); border-bottom:1px solid var(--rule); }
+  .rtitle{ display:flex; align-items:center; gap:9px; }
+  .rname{ font-size:17px; font-weight:700; letter-spacing:-.015em; color:var(--ink);
+    background:transparent; border:1px solid transparent; border-radius:8px;
+    padding:4px 8px; margin:-4px 0 -4px -8px; width:auto; max-width:9.5em; min-height:0; }
+  .rname:focus{ border-color:var(--signal); background:var(--surface); }
+  .rwho{ margin-left:auto; display:flex; align-items:center; gap:8px;
+    font-size:13.5px; color:var(--ink-2); }
+  .rwho .tag{ font-size:11.5px; font-weight:600; padding:3px 8px; border-radius:6px;
+    background:var(--signal-bg); color:var(--signal); }
+  .route.porter .rwho .tag{ background:var(--porter-bg); color:var(--porter); }
+  .rwho .none{ color:var(--ink-3); }
+  .chev{ color:var(--ink-3); font-size:12px; }
 
-  .back{ display:inline-flex; align-items:center; gap:6px; font-size:13.5px; font-weight:700;
-    color:var(--c-primary-d); cursor:pointer; margin-bottom:12px; }
-  .back:hover{ text-decoration:underline; }
+  /* the numbers, spaced rather than bulleted */
+  .facts{ display:flex; gap:18px; margin-top:7px; font-size:13px; color:var(--ink-2);
+    flex-wrap:wrap; }
+  .facts b{ color:var(--ink); font-weight:600; }
+  .facts .hot b{ color:var(--alarm); }
 
-  .panel{ background:var(--c-surface); border:1px solid var(--c-line); border-radius:var(--radius);
-    box-shadow:var(--shadow); padding:16px; margin-bottom:14px; }
-  .panel h3{ margin:0 0 10px; font-size:14px; font-weight:800; }
-  .panel.warn{ border-color:#fcd34d; } .panel.warn h3{ color:var(--warn); }
-  .panel.info{ border-color:var(--grad-b); } .panel.info h3{ color:var(--grad-b); }
-  .panel.bad{ border-color:var(--bad); } .panel.bad h3{ color:var(--bad); }
+  .rbody{ padding:14px 15px 16px; }
 
-  table{ border-collapse:collapse; width:100%; font-size:13px; }
-  th,td{ border-bottom:1px solid var(--c-line); padding:7px 8px; text-align:left; vertical-align:middle; }
-  th{ font-size:10.5px; color:var(--c-muted); text-transform:uppercase; letter-spacing:.05em; font-weight:700; }
-  tr:last-child td{ border-bottom:none; }
-  td.num, th.num{ text-align:right; font-variant-numeric:tabular-nums; }
-  tr.same td{ color:var(--c-muted); }
-  .rowx{ background:none; border:0; color:var(--c-muted); font-size:17px; cursor:pointer; padding:0 4px; }
-  .rowx:hover{ color:var(--bad); }
-  input[type=checkbox]{ width:15px; height:15px; accent-color:var(--grad-b); }
+  /* rider */
+  .rider{ display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+    padding:11px 12px; background:var(--tint); border:1px solid var(--rule);
+    border-radius:11px; margin-bottom:13px; }
+  .rider select{ flex:1; min-width:130px; }
+  .rider .lock{ min-height:var(--tap); display:flex; align-items:center; padding:0 13px;
+    background:var(--rule-2); border-radius:10px; color:var(--ink-2);
+    font-size:14px; min-width:112px; justify-content:center; }
+  .rider .phin{ width:138px; flex:none; }
 
-  .hint{ font-size:11.5px; color:var(--c-muted); margin-top:8px; line-height:1.5; }
-  .actrow{ display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; }
+  /* stops: two lines each, no table */
+  .stops{ border-top:1px solid var(--rule); }
+  .stop{ display:flex; gap:12px; padding:11px 0; border-bottom:1px solid var(--rule-2); }
+  .stop:last-child{ border-bottom:0; }
+  .stop.same{ padding-top:0; }
+  .sn{ flex:none; width:26px; height:26px; border-radius:8px; background:var(--ink);
+    color:#fff; font-size:12.5px; font-weight:600;
+    display:flex; align-items:center; justify-content:center; margin-top:1px; }
+  .stop.same .sn{ background:transparent; color:var(--ink-3); }
+  .sbody{ flex:1; min-width:0; }
+  .sname{ font-weight:600; font-size:15px; }
+  .saddr{ font-size:13px; color:var(--ink-2); margin-top:1px;
+    overflow:hidden; text-overflow:ellipsis; display:-webkit-box;
+    -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+  .skm{ flex:none; font-size:13px; color:var(--ink-2); padding-top:2px; text-align:right; min-width:52px; }
+  .sx{ flex:none; width:34px; height:34px; border:0; background:none; color:var(--ink-3);
+    font-size:19px; cursor:pointer; border-radius:8px; }
+  .sx:active{ background:var(--alarm-bg); color:var(--alarm); }
+  .stop input[type=checkbox]{ width:19px; height:19px; accent-color:var(--signal);
+    margin:3px 0 0; flex:none; }
 
-  .msgbox{ background:#f8fafc; border:1px solid var(--c-line); border-radius:10px; padding:12px;
-    font-size:12.5px; white-space:pre-wrap; word-break:break-word; max-height:280px; overflow:auto;
-    font-family:ui-monospace,Menlo,Consolas,monospace; }
+  .acts{ display:flex; gap:8px; flex-wrap:wrap; margin-top:13px; }
+  .acts .btn{ flex:1 1 auto; }
 
-  .addpanel{ background:#f8fafc; border:1px solid var(--c-line); border-radius:10px; padding:10px; margin-bottom:12px; }
-  .addpanel input{ width:100%; margin-bottom:8px; }
-  .addlist{ max-height:210px; overflow:auto; }
-  .addrow{ display:flex; gap:9px; align-items:center; padding:7px 8px; border-radius:7px;
-    cursor:pointer; font-size:12.5px; }
-  .addrow:hover{ background:#eef2f6; }
-  .addrow span:first-child{ flex:1; }
-  .dim{ color:var(--c-muted); font-size:11px; }
+  .msg{ margin-top:16px; }
+  .msg h4{ margin:0 0 7px; font-size:13px; font-weight:600; color:var(--ink-2); }
+  .msgbox{ background:var(--tint); border:1px solid var(--rule); border-radius:11px;
+    padding:12px; font-family:"IBM Plex Mono",ui-monospace,monospace; font-size:12px;
+    line-height:1.55; white-space:pre-wrap; word-break:break-word;
+    max-height:240px; overflow:auto; color:var(--ink); }
 
-  .adv{ background:var(--c-surface); border:1px solid var(--c-line); border-radius:var(--radius);
-    box-shadow:var(--shadow); padding:14px; margin-bottom:16px; }
-  .advrow{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:10px; }
-  .advrow:last-of-type{ margin-bottom:0; }
-  .adv label{ display:flex; gap:6px; align-items:center; font-size:12px; color:var(--c-muted); }
-  .adv input[type=number]{ width:78px; padding:8px 10px; font-size:14px; }
+  /* add-client search */
+  .finder{ background:var(--tint); border:1px solid var(--rule); border-radius:11px;
+    padding:10px; margin-bottom:13px; }
+  .finder input{ margin-bottom:8px; }
+  .flist{ max-height:230px; overflow:auto; }
+  .frow{ display:flex; gap:10px; align-items:center; min-height:42px; padding:7px 9px;
+    border-radius:8px; cursor:pointer; font-size:14px; }
+  .frow:active{ background:var(--rule-2); }
+  .frow .g{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .frow .from{ font-size:11.5px; color:var(--ink-2); background:var(--rule-2);
+    padding:2px 7px; border-radius:6px; }
 
-  .note{ border-radius:10px; padding:10px 13px; margin-bottom:12px; font-size:12.5px; }
-  .note.draft{ background:#eff6ff; border:1px solid var(--grad-b); color:#1d4ed8; }
-  .note.live{ background:#fef2f2; border:1px solid var(--bad); color:var(--bad); }
+  /* notices and panels */
+  .panel{ background:var(--surface); border:1px solid var(--rule); border-radius:14px;
+    padding:14px 15px; margin-bottom:12px; }
+  .panel h3{ margin:0 0 10px; font-size:14.5px; font-weight:600; }
+  .panel.warn{ border-color:#e6c36a; background:#fffcf3; }
+  .panel.warn h3{ color:var(--porter); }
+  .panel.info{ border-color:#9ab7e8; background:#f2f7ff; }
+  .panel.alarm{ border-color:var(--alarm); background:var(--alarm-bg); }
+  .panel.alarm h3{ color:var(--alarm); }
+  .hint{ font-size:12.5px; color:var(--ink-2); line-height:1.5; }
 
-  .toast{ position:fixed; bottom:22px; left:50%; transform:translateX(-50%); background:var(--c-ink);
-    color:#fff; padding:11px 20px; border-radius:11px; font-size:13.5px; font-weight:600;
-    opacity:0; transition:opacity .3s; pointer-events:none; z-index:100; max-width:90%; text-align:center; }
+  .note{ border-radius:11px; padding:11px 13px; margin-bottom:13px; font-size:13px;
+    display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .note.saved{ background:var(--signal-bg); color:#09685f; }
+  .note.fresh{ background:#dde6f7; color:#3b5590; }
+  .note .grow{ flex:1; }
+
+  /* settings and riders live in sheets, not inline clutter */
+  .sheet{ position:fixed; inset:0; z-index:60; display:none; }
+  .sheet.on{ display:block; }
+  .sheet .veil{ position:absolute; inset:0; background:rgba(21,48,107,.5); }
+  .sheet .card{ position:absolute; left:0; right:0; bottom:0; background:var(--paper);
+    border-radius:18px 18px 0 0; padding:16px 16px calc(20px + env(safe-area-inset-bottom));
+    max-height:86dvh; overflow:auto; }
+  .sheet .grip{ width:38px; height:4px; border-radius:99px; background:var(--rule);
+    margin:0 auto 14px; }
+  .sheet h3{ margin:0 0 14px; font-size:18px; font-weight:700; letter-spacing:-.015em; }
+  .field{ margin-bottom:12px; }
+  .field label{ display:block; font-size:13px; color:var(--ink-2); margin-bottom:5px; }
+  .field .why{ font-size:12px; color:var(--ink-3); margin-top:4px; }
+  .pair{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .rrow{ display:flex; gap:8px; align-items:center; margin-bottom:9px; }
+  .rrow input:first-child{ flex:1.4; }
+  .rrow input:nth-child(2){ flex:1; }
+
+  /* fixed bar where the thumb is */
+  .footbar{ position:fixed; left:0; right:0; bottom:0; z-index:40;
+    background:rgba(246,249,255,.95); backdrop-filter:blur(10px);
+    border-top:1px solid var(--rule);
+    padding:10px 14px calc(10px + env(safe-area-inset-bottom));
+    display:flex; gap:9px; max-width:720px; margin:0 auto; }
+  .footbar .btn{ flex:1; }
+  .footbar .btn.wide{ flex:2.2; }
+
+  .empty{ text-align:center; color:var(--ink-2); padding:50px 18px; font-size:14.5px;
+    background:var(--surface); border:1px solid var(--rule); border-radius:14px; }
+
+  .toast{ position:fixed; left:50%; bottom:calc(84px + env(safe-area-inset-bottom));
+    transform:translateX(-50%); background:var(--ink); color:#fff;
+    padding:12px 20px; border-radius:11px; font-size:14px; font-weight:500;
+    opacity:0; transition:opacity .25s; pointer-events:none; z-index:80;
+    max-width:88%; text-align:center; }
   .toast.show{ opacity:1; }
 
-  .empty{ text-align:center; color:var(--c-muted); padding:44px 16px; font-size:14px;
-    background:var(--c-surface); border-radius:var(--radius); box-shadow:var(--shadow); }
+  .spin{ width:15px; height:15px; border:2px solid rgba(255,255,255,.3);
+    border-top-color:#fff; border-radius:50%; animation:sp .7s linear infinite; display:none; }
+  .busy .spin{ display:block; }
+  @keyframes sp{ to{ transform:rotate(360deg); } }
+  @media (prefers-reduced-motion:reduce){ *{ animation:none !important; transition:none !important; } }
 
-  @media (max-width:560px){
-    .content{ padding:14px 12px 60px; }
-    th,td{ padding:6px 5px; font-size:12px; }
+  @media (min-width:640px){
+    .deck{ padding-top:18px; }
+    .footbar{ border-radius:14px 14px 0 0; }
   }
 </style>
 </head>
 <body class="landing">
 
-  <div class="bar">
-    <div class="brand">
-      <img src="logo.png" alt="Friska Wellness Foods">
-      <span>Delivery Routes</span>
-    </div>
-    <div class="hero-sub">Pick a date to build the day's delivery routes.</div>
-    <div class="controls">
-      <div class="field"><input type="date" id="date"></div>
-      <select id="slot">
-        <option value="">All slots</option>
-        <option>Morning</option><option>Afternoon</option><option>Evening</option>
-      </select>
-      <label class="agents" title="how many of your own riders are running today">
-        riders <input type="number" id="agents" value="3" min="0" max="12"></label>
-      <button id="load" class="btn">Generate</button>
-      <button id="save" class="btn alt" disabled>Save routes</button>
-      <button id="ridersBtn" class="btn alt">Riders</button>
-      <button id="undo" class="btn alt" disabled>Undo</button>
-      <button id="advToggle" class="btn alt">Settings</button>
-      <span class="status" id="statusWrap"><span class="spinner"></span><span id="status">Pick a date to begin.</span></span>
-      <span id="cover"></span>
-    </div>
+<!-- which day -->
+<div class="gate">
+  <div class="mark">
+    <img src="logo.png" alt="Friska">
+    <b>Dispatch</b>
+    <span>Build today's delivery routes</span>
   </div>
-
-  <input type="hidden" id="api">
-
-  <div id="content" class="content">
-
-    <div class="adv" id="adv" hidden>
-      <div class="advrow">
-        <label title="most parcels one rider carries">max parcels <input type="number" id="maxP" value="20" min="1"></label>
-        <label title="total driving across the whole route. 0 = no limit">max km driven <input type="number" id="maxTotKm" value="40" min="0"></label>
-      </div>
-      <div class="advrow">
-        <label title="the 2pm cutoff. Lower this on a late dispatch.">max minutes <input type="number" id="maxMin" value="180" min="10"></label>
-        <label title="time spent at each door">min/stop <input type="number" id="stopMin" value="2" min="0" step="0.5"></label>
-        <label title="clients closer together than this always ride together, never split across routes">min km between clients <input type="number" id="zr" value="1" min="0.1" step="0.1"></label>
-      </div>
-      <div class="advrow">
-        <button class="btn sm" id="saveSettings">Save settings for everyone</button>
-        <button class="btn alt sm" id="measure">Measure distances</button>
-        <button class="btn alt sm" id="rebuild" disabled>Rebuild zones</button>
-      </div>
-      <div class="hint">Saved settings live in the spreadsheet, so every device and the automatic run use the same rules.
-        Limits apply on the next Generate; zone radius and measure-within take effect when you measure or rebuild.</div>
+  <div class="form">
+    <input type="date" id="date">
+    <div class="slots">
+      <label><input type="checkbox" class="slotbox" value="Morning" checked><i class="tick">&#10003;</i>Morning</label>
+      <label><input type="checkbox" class="slotbox" value="Afternoon" checked><i class="tick">&#10003;</i>Afternoon</label>
+      <label><input type="checkbox" class="slotbox" value="Evening" checked><i class="tick">&#10003;</i>Evening</label>
     </div>
-
-    <div class="adv" id="riders" hidden>
-      <div class="advrow" style="justify-content:space-between">
-        <b style="font-size:13px">Delivery riders</b>
-        <span class="dim">saved for everyone &mdash; they appear in every route's dropdown</span>
-      </div>
-      <div id="riderList"></div>
-      <div class="advrow">
-        <input type="text" id="newRName" placeholder="name" style="flex:1;min-width:130px">
-        <input type="text" id="newRPhone" placeholder="phone" inputmode="numeric" style="flex:1;min-width:120px">
-        <button class="btn alt sm" id="addRider">Add rider</button>
-        <span style="flex:1"></span>
-        <button class="btn sm" id="saveRiders">Save riders</button>
-      </div>
-    </div>
-
-    <div id="modeNote"></div>
-    <div id="cards" class="cards"></div>
-    <div id="notRouted"></div>
-    <div id="pool"></div>
-    <div id="routes"></div>
-
+    <div class="riders-in"><span>Riders out today</span><input type="number" id="agents" value="3" min="0" max="12"></div>
+    <button class="btn go" id="load">Build routes</button>
+    <div class="say" id="gateSay" style="text-align:center"></div>
   </div>
+</div>
 
-  <div class="toast" id="toast"></div>
+<!-- working -->
+<div class="top">
+  <div class="line1">
+    <button class="iconbtn back" id="backBtn" onclick="go('summary')" aria-label="All slots">&lsaquo;</button>
+    <div>
+      <div class="day" id="hDay">—</div>
+      <div class="sub" id="hSub"></div>
+    </div>
+    <span class="grow"></span>
+    <span class="spin" id="spin"></span>
+    <button class="iconbtn" id="ridersBtn" title="Riders">Riders</button>
+    <button class="iconbtn" id="advToggle" title="Limits">Limits</button>
+  </div>
+</div>
+
+<div class="deck">
+  <div class="say" id="status"></div>
+  <div id="modeNote"></div>
+  <div id="cards"></div>
+  <div id="notRouted"></div>
+  <div id="pool"></div>
+  <div id="routes"></div>
+</div>
+
+<div class="footbar">
+  <button class="btn line" id="undo" disabled>Undo</button>
+  <button class="btn line" id="rebuild" disabled>Zones</button>
+  <button class="btn go wide" id="save" disabled>Save routes</button>
+</div>
+
+<!-- limits -->
+<div class="sheet" id="adv">
+  <div class="veil" onclick="closeSheet('adv')"></div>
+  <div class="card">
+    <div class="grip"></div>
+    <h3>Route limits</h3>
+    <div class="pair">
+      <div class="field"><label>Parcels per route</label>
+        <input type="number" id="maxP" value="20" min="1"></div>
+      <div class="field"><label>Minutes per route</label>
+        <input type="number" id="maxMin" value="180" min="10"></div>
+      <div class="field"><label>Km driven per route</label>
+        <input type="number" id="maxTotKm" value="40" min="0"></div>
+      <div class="field"><label>Minutes at each door</label>
+        <input type="number" id="stopMin" value="2" min="0" step="0.5"></div>
+    </div>
+    <div class="field"><label>Clients closer than this always ride together (km)</label>
+      <input type="number" id="zr" value="1" min="0.1" step="0.1">
+      <div class="why">One building never gets split across two routes.</div></div>
+    <div class="field">
+      <button class="btn go" id="saveSettings" style="width:100%">Save limits for everyone</button>
+      <div class="why">Stored in the spreadsheet, so every device builds to the same rules.
+        Changes take effect on the next build.</div>
+    </div>
+    <button class="btn line" style="width:100%" onclick="closeSheet('adv')">Close</button>
+    <input type="hidden" id="api">
+  </div>
+</div>
+
+<!-- riders -->
+<div class="sheet" id="riders">
+  <div class="veil" onclick="closeSheet('riders')"></div>
+  <div class="card">
+    <div class="grip"></div>
+    <h3>Delivery riders</h3>
+    <div id="riderList"></div>
+    <div class="rrow" style="margin-top:12px">
+      <input type="text" id="newRName" placeholder="Name">
+      <input type="tel" id="newRPhone" placeholder="Phone" inputmode="numeric">
+      <button class="btn line sm" id="addRider">Add</button>
+    </div>
+    <button class="btn go" id="saveRiders" style="width:100%;margin-top:8px">Save riders</button>
+    <div class="why" style="margin:8px 0 14px">Riders appear in every route's picker.
+      A rider needs a number before you can send them their list.</div>
+    <button class="btn line" style="width:100%" onclick="closeSheet('riders')">Close</button>
+  </div>
+</div>
+
+<button id="measure" hidden aria-hidden="true"></button>
+<div class="toast" id="toast"></div>
 
 <script>
 const KITCHEN = { lat: 17.452623115758335, lng: 78.41967516576499 };
@@ -277,7 +402,10 @@ const BOUNDS  = { latMin:17.0, latMax:17.8, lngMin:78.0, lngMax:78.8 };
 const SECTORS = ['N','NE','E','SE','S','SW','W','NW'];
 const SLOT_ORDER  = ['Morning','Afternoon','Evening'];
 const SLOT_PREFIX = { Morning:'M', Afternoon:'A', Evening:'E' };
-const slotsWanted = () => $('slot').value ? [$('slot').value] : SLOT_ORDER;
+const slotsWanted = () => {
+  const on = [...document.querySelectorAll('.slotbox:checked')].map(b=>b.value);
+  return on.length ? on : SLOT_ORDER;   // nothing ticked means everything
+};
 const LIMIT_FIELDS = ['maxP','maxTotKm','maxMin','stopMin','zr','agents'];
 
 /* Settings that were dials but never earned one.
@@ -297,7 +425,7 @@ const $ = id => document.getElementById(id) || {
   addEventListener(){}, insertAdjacentHTML(){}, focus(){}, click(){}, select(){}
 };
 let cacheNote = '', autoMeasured = false, refined = false;
-let fromSaved = false, savedForDate = null, forceRebuild = false;
+let fromSaved = false, savedForDate = null, forceRebuild = false, setStatusText = '';
 let clients = [], notRouted = [], routes = [], zoneMap = {}, roadCache = {},
     agents = [], measured = null, unassigned = [], addOpen = null, addFilter = '';
 
@@ -325,11 +453,12 @@ $('saveSettings').addEventListener('click', async () => {
 });
 
 /* ---------- rider roster ---------- */
+function openSheet(id){ $(id).classList.add('on'); document.body.style.overflow='hidden'; }
+function closeSheet(id){ $(id).classList.remove('on'); document.body.style.overflow=''; }
+
 $('ridersBtn').addEventListener('click', async ()=>{
-  const p = $('riders');
-  p.hidden = !p.hidden;
-  $('ridersBtn').textContent = p.hidden ? 'Riders' : 'Hide riders';
-  if (!p.hidden){
+  openSheet('riders');
+  {
     if (!agents.length){
       try {
         const r = await api('getAgentRoster');
@@ -343,13 +472,14 @@ $('ridersBtn').addEventListener('click', async ()=>{
 function renderRiders(){
   $('riderList').innerHTML = agents.length
     ? agents.map((a,i)=>
-        '<div class="advrow">'+
-          '<input type="text" value="'+esc(a.name)+'" oninput="editRider('+i+',\'name\',this.value)" style="flex:1;min-width:130px">'+
-          '<input type="text" value="'+esc(a.phone||'')+'" inputmode="numeric" placeholder="phone" '+
-            'oninput="editRider('+i+',\'phone\',this.value)" style="flex:1;min-width:120px">'+
-          '<button class="rowx" title="remove" onclick="dropRider('+i+')">&times;</button>'+
+        '<div class="rrow">'+
+          '<input type="text" value="'+esc(a.name)+'" aria-label="Rider name" '+
+            'oninput="editRider('+i+',\'name\',this.value)">'+
+          '<input type="tel" value="'+esc(a.phone||'')+'" inputmode="numeric" placeholder="Phone" '+
+            'aria-label="Rider phone" oninput="editRider('+i+',\'phone\',this.value)">'+
+          '<button class="sx" onclick="dropRider('+i+')" aria-label="Remove">&times;</button>'+
         '</div>').join('')
-    : '<div class="hint">No riders yet. Add one below.</div>';
+    : '<div class="hint">No riders yet. Add the first one below.</div>';
 }
 
 function editRider(i, field, v){
@@ -388,14 +518,13 @@ $('saveRiders').addEventListener('click', async ()=>{
   $('saveRiders').disabled = false;
 });
 
-$('advToggle').addEventListener('click', ()=>{
-  const a = $('adv');
-  a.hidden = !a.hidden;
-  $('advToggle').textContent = a.hidden ? 'Settings' : 'Hide settings';
-});
+$('advToggle').addEventListener('click', ()=>openSheet('adv'));
 
-const setStatus = m => { $('status').textContent = m; };
-function busy(on){ $('statusWrap').classList.toggle('busy', !!on); }
+const setStatus = m => {
+  $('status').textContent = m;
+  if (document.body.classList.contains('landing')) $('gateSay').textContent = m;
+};
+function busy(on){ document.body.classList.toggle('busy', !!on); }
 const num = id => {
   if (id === 'porterMax') return PORTER_MAX;
   if (id === 'nearKm')    return MEASURE_NEAR;
@@ -877,6 +1006,57 @@ function improveGroups(groups, parcelCap){
   return best.filter(g=>g.length);
 }
 
+/* A route you named "Hitec" should still be "Hitec" tomorrow. Match each new
+ * route to the one it most overlaps with on the last date that had routes, and
+ * take its name. Only names that were set by hand carry over — a plain A1 is
+ * left to be renumbered. */
+async function inheritNames(){
+  let prev;
+  try { prev = await api('getPreviousRouteAssignments', { date: $('date').value }); }
+  catch(e){ return 0; }
+  if (!prev || !prev.ok || !prev.found) return 0;
+
+  // who was on each old route, by slot||phone
+  const oldSets = Object.keys(prev.routes || {}).map(name=>({
+    name,
+    keys: new Set((prev.routes[name]||[]).map(e=>
+      String(e.slot||'').trim()+'||'+String(e.phone||'').replace(/\D/g,'').slice(-10)))
+  })).filter(o=>o.keys.size);
+
+  if (!oldSets.length) return 0;
+
+  const taken = new Set();
+  let n = 0;
+
+  // best overlap first, so the strongest match claims its name
+  const pairs = [];
+  routes.forEach((r,ri)=>{
+    const keys = r.rows.map(c=>c.slot+'||'+c.phone);
+    oldSets.forEach(o=>{
+      let hit = 0;
+      keys.forEach(k=>{ if (o.keys.has(k)) hit++; });
+      if (!hit) return;
+      const share = hit / Math.max(keys.length, o.keys.size);
+      pairs.push({ ri, name:o.name, share });
+    });
+  });
+  pairs.sort((a,b)=>b.share-a.share);
+
+  const done = new Set();
+  pairs.forEach(p=>{
+    if (done.has(p.ri) || taken.has(p.name)) return;
+    if (p.share < 0.5) return;                       // not really the same route
+    if (/^[MAE]P?\d+$/.test(p.name)) {               // never named by hand
+      done.add(p.ri); taken.add(p.name); return;
+    }
+    routes[p.ri].name = p.name;
+    routes[p.ri].renamed = true;
+    done.add(p.ri); taken.add(p.name); n++;
+  });
+
+  return n;
+}
+
 /* Rebuild the route objects from what was saved for this date. Clients who
  * paused since are simply absent; clients who are new today land in the
  * unassigned pool so they are impossible to miss. */
@@ -1004,7 +1184,7 @@ async function load(){
               + (sheetErr ? '  ' + sheetErr : '');
     if (sheetErr) console.warn(sheetErr);
 
-    unassigned = []; addOpen = null; addFilter = ''; newAgentFor = null;
+    unassigned = []; addOpen = null; addFilter = ''; newAgentFor = null; editPhoneFor = null;
     fromSaved = false;
 
     // A date that was saved before comes back exactly as it was left, hand
@@ -1102,9 +1282,15 @@ function buildAndRender(){
   $('rebuild').disabled = false;
   $('save').disabled = false;
   render(); renderMode();
-  setStatus('Built ' + routes.length + ' routes from ' + clients.length + ' parcels, nothing measured this run.  '
-    + cacheNote
-    + (newlyZoned ? '  ' + newlyZoned + ' new location(s) placed into zones — press Rebuild zones to keep that.' : ''));
+
+  setStatusText = 'Built ' + routes.length + ' routes from ' + clients.length + ' parcels.  ' + cacheNote
+    + (newlyZoned ? '  ' + newlyZoned + ' new location(s) placed into zones.' : '');
+  setStatus(setStatusText);
+
+  // a route you named by hand keeps that name the next day
+  inheritNames().then(n=>{
+    if (n){ render(); setStatus(setStatusText + '  ' + n + ' name(s) carried over from last time.'); }
+  });
 }
 
 /* ---------- measure: full pairwise matrix, cached forever ---------- */
@@ -1233,36 +1419,14 @@ $('save').addEventListener('click', async () => {
 function renderMode(){
   if (!routes.length){ $('modeNote').innerHTML = ''; return; }
   $('modeNote').innerHTML = fromSaved
-    ? '<div class="note draft"><b>Loaded from the saved copy</b> for ' + esc($('date').value) +
-      ', including any changes made by hand. '
-      + '<button class="btn alt sm" style="margin-left:6px" onclick="rebuildFresh()">Rebuild from scratch</button></div>'
-    : '<div class="note live"><b>Newly built</b> &mdash; nothing is stored until you press '
-      + '<b>Save routes</b>. Saving writes RouteAssign and DeliveryAgents, which kitchen.html '
-      + 'and the client app read.</div>';
+    ? '<div class="note saved"><span class="grow">Loaded what was saved for this day, '
+      + 'including anything you changed by hand.</span>'
+      + '<button class="btn line sm" onclick="rebuildFresh()">Build again</button></div>'
+    : '<div class="note fresh"><span class="grow">Newly built. Nothing is stored until you save.</span></div>';
 }
+
 
 /* ---------- split ---------- */
-function autoSplit(ri, size){
-  snapshot();
-  const r = routes[ri];
-  const pts = r.m.order;
-  const ordered = [];
-  pts.forEach(p=>{ r.rows.forEach(x=>{ if (ptKey(x.coord)===ptKey(p)) ordered.push(x); }); });
-  r.rows.forEach(x=>{ if (!ordered.includes(x)) ordered.push(x); });
-
-  const nGroups = Math.ceil(ordered.length/size);
-  const per = Math.ceil(ordered.length/nGroups);   // balanced, so 5 -> 3+2 not 4+1
-  const chunks = [];
-  for (let i=0;i<ordered.length;i+=per) chunks.push(ordered.slice(i,i+per));
-
-  routes.splice(ri, 1, ...chunks.map((rows,i)=>({
-    name: r.name+'-'+String.fromCharCode(97+i), rows, renamed: true,
-    slot: r.slot, kind: r.kind, agent:r.agent, agentPhone:r.agentPhone, m: measure(rows)
-  })));
-  renumber(); render();
-  setStatus('Split into '+chunks.length+' bookings. Press Undo to put it back.');
-}
-
 function manualSplit(ri){
   const picked = [...document.querySelectorAll('input.pick[data-r="'+ri+'"]:checked')]
     .map(el=>el.dataset.p);
@@ -1277,19 +1441,6 @@ function manualSplit(ri){
     { name:r.name+'-b', rows:out, slot:r.slot, kind:r.kind,
       agent:'', agentPhone:'', m:measure(out) });
   renumber(); render();
-}
-
-function mergeInto(ri, sel){
-  const ti = parseInt(sel.value);
-  sel.value = '';
-  if (isNaN(ti) || ti === ri) return;
-  snapshot();
-  const target = routes[ti], src = routes[ri];
-  const rows = target.rows.concat(src.rows);
-  routes[ti] = { ...target, rows, m: measure(rows) };
-  routes.splice(ri, 1);
-  renumber(); render();
-  setStatus('Merged into ' + routes[ti > ri ? ti-1 : ti].name + '. Undo is available.');
 }
 
 /* ---------- undo ---------- */
@@ -1398,17 +1549,19 @@ function addListHtml(ri){
 
 /* Route names end up in RouteAssign, DeliveryAgents, delivery.html and
    kitchen.html, so a name you choose here is the name everyone sees. */
-function renameRoute(i){
-  const cur = routes[i].name;
-  const next = (prompt('Route name', cur) || '').replace(/\s+/g,' ').trim();
-  if (!next || next === cur) return;
+function renameRoute(i, value){
+  const cur  = routes[i].name;
+  const next = String(value == null ? '' : value).replace(/\s+/g,' ').trim();
+  if (!next || next === cur){ render(); return; }
   if (routes.some((r,j)=>j!==i && r.name.toLowerCase() === next.toLowerCase())){
-    setStatus('A route called "'+next+'" already exists.'); return;
+    setStatus('A route called "'+next+'" already exists.'); render(); return;
   }
   snapshot();
+  if (view.open === cur) view.open = next;
   routes[i].name = next;
   routes[i].renamed = true;      // survives renumber()
   render();
+  setStatus('Renamed to '+next+'. Save routes to keep it for next time.');
 }
 
 function renumber(){
@@ -1441,101 +1594,147 @@ function go(mode, slot){
 function renderChrome(){
   routes.forEach(r=>{ r.m = measure(r.rows); });
 
-  let driven = 0, drivenReal = 0;
-  routes.forEach(r=>{
-    let prev = KITCHEN;
-    (r.m.order || []).forEach(p=>{
-      const hit = roadCache[roadKey(prev,p)] || roadCache[roadKey(p,prev)];
-      driven++; if (hit) drivenReal++;
-      prev = p;
-    });
-  });
-  const pct = driven ? Math.round(drivenReal/driven*100) : 0;
-  $('cover').innerHTML = driven
-    ? '<span class="chip'+(pct<100?' bad':' ok')+'" title="'+drivenReal+' of '+driven+
-      ' legs on the built routes come from Google">'+pct+'% measured</span>' : '';
-
+  const fx  = routes.filter(r=>r.kind!=='porter');
+  const px  = routes.filter(r=>r.kind==='porter');
+  const totP = routes.reduce((s,r)=>s+r.m.parcels,0);
+  const fxP  = fx.reduce((s,r)=>s+r.m.parcels,0);
+  const pxP  = px.reduce((s,r)=>s+r.m.parcels,0);
   const totKm = routes.reduce((s,r)=>s+r.m.km,0);
-  const totP  = routes.reduce((s,r)=>s+r.m.parcels,0);
-  const over  = routes.filter(r=>!fits(r.m)).length;
 
-  const fx = routes.filter(r=>r.kind!=='porter');
-  const px = routes.filter(r=>r.kind==='porter');
-  const fxP = fx.reduce((s,r)=>s+r.m.parcels,0);
+  // header shows the day and what it adds up to
+  const d = $('date').value;
+  $('hDay').textContent = d ? prettyDay(d) : 'Dispatch';
+  $('hSub').textContent = routes.length
+    ? routes.length + plural(routes.length,' route') + ', ' + totP + plural(totP,' parcel') + ', ' + totKm.toFixed(0) + ' km'
+    : '';
 
-  $('cards').innerHTML = routes.length ? [
-    cardEl(fxP + ' / ' + totP, 'on your riders', fxP===totP?'ok':'info'),
-    cardEl(fx.length,'rider routes'),
-    cardEl(px.length,'porter bookings', px.length?'':'ok'),
-    cardEl(totKm.toFixed(1)+' km','driven'),
-    cardEl(totP?(totKm/totP).toFixed(2):'0','km / parcel','info'),
-    cardEl(notRouted.length,'not routed', notRouted.length?'bad':''),
-    cardEl(over,'over limit', over?'bad':'ok')
-  ].join('') : '';
+  if (!routes.length){ $('cards').innerHTML = ''; return; }
+
+  const fxPct = totP ? (fxP/totP*100) : 0;
+  const pxPct = totP ? (pxP/totP*100) : 0;
+
+  $('cards').innerHTML =
+    '<div class="cover">'+
+      '<div class="big">'+fxP+' <em>of '+totP+'</em></div>'+
+      '<div class="cap">parcels on your own riders'+
+        (px.length ? ', '+px.length+' porter booking'+(px.length===1?'':'s')+' for the rest'
+                   : ' — no porter needed today')+'</div>'+
+      '<div class="meter">'+
+        '<i class="a" style="width:'+fxPct.toFixed(1)+'%"></i>'+
+        (pxPct ? '<i class="b" style="width:'+pxPct.toFixed(1)+'%"></i>' : '')+
+      '</div>'+
+      '<div class="key">'+
+        '<u><i style="background:#3ad6c4"></i>'+fx.length+' rider route'+(fx.length===1?'':'s')+'</u>'+
+        (px.length ? '<u><i style="background:#f0ad45"></i>'+px.length+' porter</u>' : '')+
+        '<u>'+(totP ? (totKm/totP).toFixed(1) : '0')+' km each</u>'+
+      '</div>'+
+    '</div>';
+}
+
+const plural = (n, word) => word + (n === 1 ? '' : 's');
+
+function prettyDay(ymd){
+  const p = String(ymd).split('-');
+  const dt = new Date(+p[0], +p[1]-1, +p[2]);
+  if (isNaN(dt)) return ymd;
+  const dow = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][dt.getDay()];
+  const mon = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][dt.getMonth()];
+  const t = new Date(); t.setHours(0,0,0,0);
+  const diff = Math.round((dt - t) / 86400000);
+  const when = diff === 0 ? 'Today' : diff === 1 ? 'Tomorrow' : diff === -1 ? 'Yesterday' : dow;
+  return when + ', ' + dt.getDate() + ' ' + mon;
 }
 
 function render(){
   renderChrome();
+  document.body.classList.toggle('inslot', view.mode === 'slot' && !!view.slot);
   if (view.mode === 'slot' && view.slot) return renderSlot();
   view = { mode:'summary', slot:null, open:null };
   renderSummary();
 }
 
-/* ---------- screen 1: slots ---------- */
+/* ---------- which slot ---------- */
 function renderSummary(){
   $('notRouted').innerHTML = notRouted.length ? (
-    '<div class="panel warn"><h3>Not routed &mdash; '+notRouted.length+'</h3><table>'+
-    '<tr><th>name</th><th>phone</th><th>slot</th><th>location</th><th>reason</th></tr>'+
-    notRouted.map(c=>'<tr><td>'+esc(c.name)+'</td><td>'+c.phone+'</td><td>'+esc(c.slot||'')+'</td><td>'+
-      esc(c.location||'—')+'</td><td><span class="pill">'+c.why+'</span></td></tr>').join('')+
-    '</table><div class="hint">Self-pickup clients belong here. Anything else needs its Master location fixed.</div></div>'
+    '<div class="panel warn"><h3>'+notRouted.length+' not on a route</h3>'+
+    notRouted.map(c=>
+      '<div class="stop"><div class="sbody">'+
+        '<div class="sname">'+esc(c.name)+'</div>'+
+        '<div class="saddr">'+esc(c.slot||'')+' &nbsp; '+esc(c.location||'no location')+'</div>'+
+      '</div><div class="skm">'+esc(c.why)+'</div></div>').join('')+
+    '<div class="hint">Self-pickup belongs here. Anything else needs its location fixed in Master.</div></div>'
   ) : '';
 
   $('pool').innerHTML = unassigned.length ? (
-    '<div class="panel info"><h3>Unassigned &mdash; '+unassigned.length+
-    ' <span class="dim">(these will NOT be saved)</span></h3><table>'+
-    '<tr><th>name</th><th>phone</th><th class="num">km</th><th>location</th><th>send to</th></tr>'+
+    '<div class="panel info"><h3>'+unassigned.length+' waiting to be placed</h3>'+
+    '<div class="hint" style="margin-bottom:10px">These will not be saved. Send each one to a route.</div>'+
     unassigned.slice().sort((a,b)=>roadPair(KITCHEN,a.coord).km-roadPair(KITCHEN,b.coord).km)
-      .map(c=>'<tr><td>'+esc(c.name)+'</td><td>'+c.phone+'</td>'+
-        '<td class="num">'+roadPair(KITCHEN,c.coord).km.toFixed(1)+'</td>'+
-        '<td>'+esc(c.location||'')+'</td>'+
-        '<td><select onchange="assignFromPool(\''+c.phone+'\',this)">'+
-          '<option value="">route…</option>'+
-          routes.map((o,oi)=>'<option value="'+oi+'">'+esc(o.name)+'</option>').join('')+
-        '</select> <button class="btn alt sm" onclick="poolToNewRoute(\''+c.phone+'\')">new route</button></td></tr>').join('')+
-    '</table></div>'
+      .map(c=>'<div class="stop"><div class="sbody">'+
+        '<div class="sname">'+esc(c.name)+'</div>'+
+        '<div class="saddr">'+esc(c.location||'')+'</div>'+
+        '<div style="margin-top:7px;display:flex;gap:7px;flex-wrap:wrap">'+
+          '<select onchange="assignFromPool(\''+c.phone+'\',this)" style="flex:1;min-width:120px">'+
+            '<option value="">Send to…</option>'+
+            routes.map((o,oi)=>'<option value="'+oi+'">'+esc(o.name)+'</option>').join('')+
+          '</select>'+
+          '<button class="btn line sm" onclick="poolToNewRoute(\''+c.phone+'\')">Own route</button>'+
+        '</div></div>'+
+        '<div class="skm">'+roadPair(KITCHEN,c.coord).km.toFixed(1)+' km</div></div>').join('')+
+    '</div>'
   ) : '';
 
   if (!routes.length){ $('routes').innerHTML = ''; return; }
 
   const slots = SLOT_ORDER.filter(s => routes.some(r=>r.slot===s));
   $('routes').innerHTML = slots.map(s=>{
-    const rs = routes.filter(r=>r.slot===s);
-    const fxr = rs.filter(r=>r.kind!=='porter'), pxr = rs.filter(r=>r.kind==='porter');
-    const p  = rs.reduce((a,r)=>a+r.m.parcels,0);
-    const fp = fxr.reduce((a,r)=>a+r.m.parcels,0);
-    const km = rs.reduce((a,r)=>a+r.m.km,0);
+    const rs  = routes.filter(r=>r.slot===s);
+    const fxr = rs.filter(r=>r.kind!=='porter');
+    const pxr = rs.filter(r=>r.kind==='porter');
+    const p   = rs.reduce((a,r)=>a+r.m.parcels,0);
+    const km  = rs.reduce((a,r)=>a+r.m.km,0);
     const bad = rs.filter(r=>!fits(r.m)).length;
-    return '<div class="slotcard" onclick="go(\'slot\',\''+s+'\')">'+
-      '<div class="sc-top"><span class="sc-name">'+esc(s)+'</span>'+
-        '<span class="dim">'+rs.length+' route'+(rs.length>1?'s':'')+' &rsaquo;</span></div>'+
-      '<div class="sc-sub">'+p+' parcels &middot; '+km.toFixed(1)+' km driven</div>'+
-      '<div class="chips">'+
-        '<span class="chip ok">'+fp+' on '+fxr.length+' rider route'+(fxr.length===1?'':'s')+'</span>'+
-        (pxr.length ? '<span class="chip">'+pxr.length+' porter booking'+(pxr.length===1?'':'s')+'</span>'
-                    : '<span class="chip ok">no porter needed</span>')+
-        (bad ? '<span class="chip bad">'+bad+' over limit</span>' : '')+
-      '</div></div>';
+    const meal = { Morning:'Breakfast', Afternoon:'Lunch', Evening:'Dinner' }[s] || s;
+
+    return '<div class="band"><h2>'+esc(meal)+'</h2><span class="n">'+p+' parcels</span></div>'+
+      '<div class="slotgrp">'+
+        '<button class="rowlink" onclick="go(\'slot\',\''+s+'\')">'+
+          '<div class="t"><b>'+rs.length+' route'+(rs.length===1?'':'s')+'</b>'+
+            '<span class="arr">&rsaquo;</span></div>'+
+          '<div class="s">'+
+            fxr.length+' on your riders'+
+            (pxr.length ? ', '+pxr.length+' by porter' : '')+
+            ' &nbsp;&nbsp; '+km.toFixed(0)+' km'+
+            (bad ? ' &nbsp;&nbsp; '+bad+' over limit' : '')+
+          '</div>'+
+        '</button>'+
+      '</div>';
   }).join('');
 }
 
-/* ---------- screen 2: routes in a slot, one expanding inline ---------- */
+/* ---------- routes in one slot ---------- */
 function toggleRoute(i){
   const name = routes[i] && routes[i].name;
+  const cards = document.querySelectorAll('#routes .route');
+  const vi = visualIndex(i);
+  const before = cards[vi] ? cards[vi].getBoundingClientRect().top : null;
+
   view.open = (view.open === name) ? null : name;
   render();
+
+  if (before != null){
+    const after = document.querySelectorAll('#routes .route')[vi];
+    if (after) window.scrollBy(0, after.getBoundingClientRect().top - before);
+  }
 }
 function isOpen(i){ return !!routes[i] && routes[i].name === view.open; }
+
+function visualIndex(i){
+  const slot = routes[i] && routes[i].slot;
+  const order = routes.map((r,k)=>k).filter(k=>routes[k].slot===slot);
+  const fx = order.filter(k=>routes[k].kind!=='porter');
+  const px = order.filter(k=>routes[k].kind==='porter');
+  return fx.concat(px).indexOf(i);
+}
 
 function renderSlot(){
   $('notRouted').innerHTML = ''; $('pool').innerHTML = '';
@@ -1544,117 +1743,109 @@ function renderSlot(){
   const fxi = idxs.filter(i=>routes[i].kind!=='porter');
   const pxi = idxs.filter(i=>routes[i].kind==='porter');
   const par = ar => ar.reduce((a,i)=>a+routes[i].m.parcels,0);
+  const meal = { Morning:'Breakfast', Afternoon:'Lunch', Evening:'Dinner' }[s] || s;
 
   const card = i => {
     const r = routes[i], m = r.m, bad = !fits(m), open = isOpen(i);
-    return '<div class="routecard'+(bad?' over':'')+(open?' open':'')+
+    return '<div class="route'+(bad?' over':'')+(open?' open':'')+
              (r.kind==='porter'?' porter':'')+'">'+
-      '<div class="rc-head" onclick="toggleRoute('+i+')">'+
-        '<div class="sc-top"><span class="rc-name">'+esc(r.name)+'</span>'+
-          '<span class="dim">'+(r.agent ? esc(r.agent) : (r.kind==='porter'?'porter':'no rider'))+
-          ' <span class="chev">'+(open?'&#9652;':'&#9662;')+'</span></span></div>'+
-        '<div class="chips">'+
-          chip(m.parcels+' parcels', m.parcels>num('maxP'))+
-          chip(m.km.toFixed(1)+' km driven', num('maxTotKm')>0 && m.km>num('maxTotKm'))+
-          chip(Math.round(m.total)+' min', m.total>num('maxMin'))+
-          chip('spread '+m.spread.toFixed(1)+' km')+
-          chip(m.kmpp.toFixed(2)+' km/p')+
+      '<div class="rhead" onclick="toggleRoute('+i+')">'+
+        '<div class="rtitle">'+
+          '<input class="rname" value="'+esc(r.name)+'" '+
+            'onclick="event.stopPropagation()" onchange="renameRoute('+i+',this.value)" '+
+            'onkeydown="if(event.key===\'Enter\')this.blur()" aria-label="Route name">'+
+          '<span class="rwho">'+
+            (r.agent ? '<span class="tag">'+esc(r.agent)+'</span>'
+                     : '<span class="none">'+(r.kind==='porter'?'porter':'no rider')+'</span>')+
+            '<span class="chev">'+(open?'&#9650;':'&#9660;')+'</span>'+
+          '</span>'+
+        '</div>'+
+        '<div class="facts">'+
+          '<span><b>'+m.parcels+'</b>'+plural(m.parcels,' parcel')+'</span>'+
+          '<span'+(num('maxTotKm')>0 && m.km>num('maxTotKm')?' class="hot"':'')+'><b>'+m.km.toFixed(1)+'</b> km</span>'+
+          '<span'+(m.total>num('maxMin')?' class="hot"':'')+'><b>'+Math.round(m.total)+'</b> min</span>'+
+          '<span><b>'+m.kmpp.toFixed(1)+'</b> km each</span>'+
         '</div>'+
       '</div>'+
-      (open ? '<div class="rc-body">'+routeDetail(i)+'</div>' : '')+
+      (open ? '<div class="rbody">'+routeDetail(i)+'</div>' : '')+
     '</div>';
   };
 
   $('routes').innerHTML =
-    '<span class="back" onclick="go(\'summary\')">&lsaquo; All slots</span>'+
-
-    '<div class="panel"><h3>'+esc(s)+' &mdash; '+par(idxs)+' parcels</h3>'+
-      '<div class="hint">'+par(fxi)+' on '+fxi.length+' rider route'+(fxi.length===1?'':'s')+
-      (pxi.length ? ', '+par(pxi)+' across '+pxi.length+' porter booking'+(pxi.length===1?'':'s') : ', no porter needed')+
-      '. Tap a route to open it.</div></div>'+
-
-    (fxi.length ? '<div class="secthead">Your riders</div>' + fxi.map(card).join('') : '')+
-    (pxi.length ? '<div class="secthead porter">Porter bookings &mdash; max '+
-                  Math.round(num('porterMax'))+' parcels each</div>' + pxi.map(card).join('') : '');
+    '<div class="band" style="margin-top:4px"><h2>'+esc(meal)+'</h2><span class="n">'+par(idxs)+' parcels</span></div>'+
+    (fxi.length ? fxi.map(card).join('')
+                : '<div class="empty">No rider routes in this slot.</div>')+
+    (pxi.length ? '<div class="band" style="border-bottom-color:var(--porter)">'+
+                    '<h2 style="color:var(--porter)">Porter</h2>'+
+                    '<span class="n">'+par(pxi)+plural(par(pxi),' parcel')+', up to '+PORTER_MAX+' each</span></div>'+
+                  pxi.map(card).join('') : '');
 }
 
-/* the expanded contents of one route card */
+/* ---------- inside one route ---------- */
 function routeDetail(i){
   const r = routes[i];
 
-  const agentOpts = ['<option value="">— pick a rider —</option>']
-    .concat(agents.map(a=>'<option value="'+esc(a.name)+'"'+
-       (a.name===r.agent?' selected':'')+'>'+esc(a.name)+
-       (a.phone?' · '+esc(a.phone):'')+'</option>'))
-    .concat('<option value="__new">+ someone new…</option>').join('');
+  // a rider saved against this route may not be in the roster yet; show them
+  // anyway, or the picker would look empty on a route that has one
+  const names = agents.map(a=>a.name);
+  if (r.agent && !names.some(n=>n===r.agent)) names.unshift(r.agent);
+  const opts = ['<option value="">Pick a rider</option>']
+    .concat(names.map(n=>'<option value="'+esc(n)+'"'+
+       (n===r.agent?' selected':'')+'>'+esc(n)+'</option>'))
+    .concat('<option value="__new">Someone new…</option>').join('');
 
-  const riderBox =
-    '<div class="riderbox">'+
-      '<div class="riderrow">'+
-        '<span class="riderlbl">Rider</span>'+
-        '<select onchange="pickAgent('+i+',this)">'+agentOpts+'</select>'+
-        (r.agent
-          ? '<span class="ridernow">'+esc(r.agent)+
-            (r.agentPhone ? ' &middot; '+esc(r.agentPhone) : ' &middot; <em>no number</em>')+'</span>'
-          : '<span class="ridernow dim">not assigned yet</span>')+
-      '</div>'+
-      (newAgentFor === i
-        ? '<div class="riderrow">'+
-            '<input id="naName" placeholder="name" value="">'+
-            '<input id="naPhone" placeholder="phone" inputmode="numeric" value="">'+
-            '<button class="btn sm" onclick="addAgent('+i+')">Add</button>'+
-            '<button class="btn alt sm" onclick="cancelNewAgent()">Cancel</button>'+
-          '</div>'
-        : (r.agent
-            ? '<div class="riderrow">'+
-                '<input id="apPhone'+i+'" placeholder="phone for '+esc(r.agent)+'" '+
-                  'inputmode="numeric" value="'+esc(r.agentPhone||'')+'">'+
-                '<button class="btn alt sm" onclick="setAgentPhone('+i+')">Save number</button>'+
-                '<span class="dim">used for the WhatsApp button below</span>'+
-              '</div>'
-            : ''))+
-    '</div>';
+  const phone = !r.agent ? ''
+    : (editPhoneFor === i
+        ? '<input class="phin" id="apPhone'+i+'" inputmode="numeric" '+
+            'value="'+esc(r.agentPhone||'')+'" placeholder="Phone">'+
+          '<button class="btn go sm" onclick="saveAgentPhone('+i+')">Save</button>'
+        : '<span class="lock">'+esc(r.agentPhone || 'no number')+'</span>'+
+          '<button class="btn line sm" onclick="openPhoneEdit('+i+')">Change</button>');
 
-  return riderBox +
+  return '<div class="rider">'+
+      '<select onchange="pickAgent('+i+',this)">'+opts+'</select>'+ phone +
+    '</div>'+
+    (newAgentFor === i
+      ? '<div class="rider">'+
+          '<input id="naName" placeholder="Name" style="flex:1.3">'+
+          '<input id="naPhone" placeholder="Phone" inputmode="numeric" style="flex:1">'+
+          '<button class="btn go sm" onclick="addAgent('+i+')">Add</button>'+
+          '<button class="btn line sm" onclick="cancelNewAgent()">Cancel</button>'+
+        '</div>' : '')+
 
-    '<div class="actrow">'+
-      '<button class="btn alt sm" onclick="renameRoute('+i+')">Rename</button>'+
-      '<button class="btn alt sm" onclick="toggleAdd('+i+')">'+(addOpen===i?'Close':'+ Add client')+'</button>'+
-      '<button class="btn alt sm" onclick="autoSplit('+i+','+Math.round(num('porterMax'))+')">Split into '+Math.round(num('porterMax'))+'s</button>'+
-      '<button class="btn alt sm" onclick="manualSplit('+i+')">Move ticked out</button>'+
-      (routes.filter(x=>x.slot===r.slot).length>1
-        ? '<select onchange="mergeInto('+i+',this)"><option value="">merge into…</option>'+
-          routes.map((o,oi)=>(oi===i||o.slot!==r.slot)?''
-            :'<option value="'+oi+'">'+esc(o.name)+(o.kind!==r.kind?' ('+(o.kind==='porter'?'porter':'rider')+')':'')+'</option>').join('')+
-          '</select>' : '')+
+    '<div class="acts">'+
+      '<button class="btn line sm" onclick="toggleAdd('+i+')">'+(addOpen===i?'Close search':'Add a client')+'</button>'+
+      '<button class="btn line sm" onclick="manualSplit('+i+')">Move ticked out</button>'+
+      '<button class="btn line sm" onclick="sendAgentLink('+i+')">Send link</button>'+
     '</div>'+
 
-    (addOpen===i ? '<div class="addpanel">'+
-       '<input id="addSearch" placeholder="search name or phone…" oninput="onAddFilter(this.value)">'+
-       '<div id="addList" class="addlist">'+addListHtml(i)+'</div></div>' : '')+
+    (addOpen===i ? '<div class="finder" style="margin-top:13px">'+
+       '<input id="addSearch" placeholder="Search name or phone" oninput="onAddFilter(this.value)">'+
+       '<div id="addList" class="flist">'+addListHtml(i)+'</div></div>' : '')+
 
-    '<table>'+
-      '<tr><th class="num">#</th><th></th><th>name</th><th>phone</th><th>zone</th>'+
-      '<th class="num">leg km</th><th>location</th><th></th></tr>'+
+    '<div class="stops" style="margin-top:13px">'+
       inDriveOrder(r).map(x=>{
-        const c=x.c, z=(zoneMap[ptKey(c.coord)]||{}).zone||'—';
-        return '<tr'+(x.same?' class="same"':'')+'>'+
-          '<td class="num">'+(x.same?'&#8226;':x.stop)+'</td>'+
-          '<td><input type="checkbox" class="pick" data-r="'+i+'" data-p="'+c.phone+'"></td>'+
-          '<td>'+esc(c.name)+'</td><td>'+c.phone+'</td>'+
-          '<td><span class="pill">'+z+'</span></td>'+
-          '<td class="num">'+(x.same?'—':x.legKm.toFixed(1))+'</td>'+
-          '<td>'+esc(c.location||'')+'</td>'+
-          '<td><button class="rowx" title="remove from route" onclick="removeClient('+i+',\''+c.phone+'\')">&times;</button></td></tr>';
+        const c = x.c;
+        return '<div class="stop'+(x.same?' same':'')+'">'+
+          '<input type="checkbox" class="pick" data-r="'+i+'" data-p="'+c.phone+'" aria-label="Select '+esc(c.name)+'">'+
+          '<div class="sn">'+(x.same?'&#8226;':x.stop)+'</div>'+
+          '<div class="sbody">'+
+            '<div class="sname">'+esc(c.name)+'</div>'+
+            '<div class="saddr">'+esc(c.location||'')+'</div>'+
+          '</div>'+
+          '<div class="skm">'+(x.same?'':x.legKm.toFixed(1)+' km')+'</div>'+
+          '<button class="sx" onclick="removeClient('+i+',\''+c.phone+'\')" aria-label="Remove '+esc(c.name)+'">&times;</button>'+
+        '</div>';
       }).join('')+
-    '</table>'+
+    '</div>'+
 
-    '<div class="msghead">Message for the rider</div>'+
-    '<div class="msgbox">'+esc(routeMessage(r))+'</div>'+
-    '<div class="actrow">'+
-      '<button class="btn alt sm" onclick="copyRouteMsg('+i+')">Copy</button>'+
-      '<button class="btn wa sm" onclick="shareRouteMsg('+i+')">'+
-        (r.agentPhone ? 'Send to '+esc(r.agent) : 'Share on WhatsApp')+'</button>'+
+    '<div class="msg"><h4>What the rider gets</h4>'+
+      '<div class="msgbox">'+esc(routeMessage(r))+'</div>'+
+      '<div class="acts">'+
+        '<button class="btn line sm" onclick="copyRouteMsg('+i+')">Copy</button>'+
+        '<button class="btn go sm" onclick="shareRouteMsg('+i+')">'+
+          (r.agentPhone ? 'Send to '+esc(r.agent) : 'Share on WhatsApp')+'</button>'+
+      '</div>'+
     '</div>';
 }
 
@@ -1753,7 +1944,7 @@ function inDriveOrder(r){
   return out;
 }
 
-let newAgentFor = null;
+let newAgentFor = null, editPhoneFor = null;
 
 function pickAgent(i, sel){
   if (sel.value === '__new'){
@@ -1787,16 +1978,44 @@ function addAgent(i){
             '. Saved to the sheet when you press Save routes in Live mode.');
 }
 
-/* a number typed against an existing rider updates them everywhere */
-function setAgentPhone(i){
+function openPhoneEdit(i){ editPhoneFor = i; render();
+  const f = $('apPhone'+i); if (f && f.focus) f.focus(); }
+
+/* a number changed here follows the person, not the route */
+function saveAgentPhone(i){
   const ph = ($('apPhone'+i).value || '').replace(/\D/g,'');
+  const who = routes[i].agent;
   routes[i].agentPhone = ph;
-  const a = agents.find(x=>x.name === routes[i].agent);
+  const a = agents.find(x=>x.name === who);
   if (a) a.phone = ph;
-  routes.forEach(r=>{ if (r.agent === routes[i].agent) r.agentPhone = ph; });
+  routes.forEach(r=>{ if (r.agent === who) r.agentPhone = ph; });
+  editPhoneFor = null;
   render();
-  setStatus(ph ? ('Number saved for ' + routes[i].agent + '.')
-               : ('Number cleared for ' + routes[i].agent + '.'));
+  setStatus(ph ? ('Number saved for ' + who + '. Save routes to store it.')
+               : ('Number cleared for ' + who + '.'));
+}
+
+/* Send the rider their own page. WhatsApp Business first, since that is the
+   app the riders are messaged from; the web link is the fallback when the
+   intent is not understood (desktop, iPhone). */
+function sendAgentLink(i){
+  const r = routes[i];
+  if (!r.agentPhone){
+    setStatus('Set ' + (r.agent || 'the rider') + "'s number first — Change no. above.");
+    return;
+  }
+  const link = location.href.replace(/[^/]*$/, 'agent.html').split('?')[0];
+  const msg  = 'Hi ' + (r.agent||'') + ', here is your delivery list for today.\n'
+             + 'Open this link and enter your phone number ' + r.agentPhone + '\n\n' + link;
+  const num  = r.agentPhone.length === 10 ? '91'+r.agentPhone : r.agentPhone;
+
+  const intent = 'intent://send?phone=' + num + '&text=' + encodeURIComponent(msg)
+               + '#Intent;scheme=smsto;package=com.whatsapp.w4b;end';
+  const web    = 'https://wa.me/' + num + '?text=' + encodeURIComponent(msg);
+
+  const w = window.open(intent, '_blank');
+  if (!w) window.open(web, '_blank');
+  setStatus('Sending the agent link to ' + (r.agent||'the rider') + '.');
 }
 
 /* readAgents_ returns an object keyed by route, and one person can cover
