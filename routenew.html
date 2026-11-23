@@ -462,15 +462,13 @@ function closeSheet(id){ $(id).classList.remove('on'); document.body.style.overf
 
 $('ridersBtn').addEventListener('click', async ()=>{
   openSheet('riders');
-  {
-    if (!agents.length){
-      try {
-        const r = await api('getAgentRoster');
-        if (r && r.ok) agents = r.agents || [];
-      } catch(e){ setStatus('Could not load the rider list: '+e.message); }
-    }
-    renderRiders();
+  if (!agents.length){
+    try {
+      const r = await api('getAgentRoster');
+      if (r && r.ok) agents = r.agents || [];
+    } catch(e){ setStatus('Could not load the rider list: '+e.message); }
   }
+  renderRiders();
 });
 
 function renderRiders(){
@@ -515,9 +513,20 @@ $('saveRiders').addEventListener('click', async ()=>{
   $('saveRiders').disabled = true;
   try {
     const r = await api('saveAgentRoster', { roster: JSON.stringify(agents) });
-    setStatus(r && r.ok ? ('Saved '+r.saved+' rider(s) for everyone.')
-                        : ('Could not save riders: '+JSON.stringify(r)));
-    if (r && r.ok) { agents = r.agents || agents; renderRiders(); render(); }
+    if (r && r.ok){
+      agents = r.agents || agents;
+      // a number corrected here follows the person onto routes already built
+      routes.forEach(rt=>{
+        const a = agents.find(x=>x.name === rt.agent);
+        if (a) rt.agentPhone = a.phone || '';
+      });
+      renderRiders(); render();
+      setStatus('Saved ' + r.saved + plural(r.saved,' rider') +
+        (r.routesUpdated ? ', and corrected the number on ' + r.routesUpdated +
+                           plural(r.routesUpdated,' route') + '.' : '.'));
+    } else {
+      setStatus('Could not save riders: ' + JSON.stringify(r));
+    }
   } catch(e){ setStatus('Could not save riders: '+e.message); }
   $('saveRiders').disabled = false;
 });
@@ -1137,13 +1146,29 @@ async function load(){
     if (boot.limits){
       LIMIT_FIELDS.forEach(k=>{ if (boot.limits[k] != null) $(k).value = boot.limits[k]; });
     }
-    agents      = normAgents((boot.agents && boot.agents.agents) || []);
+    /* Two different things, and mixing them up is what hid newly added riders:
+         boot.agents  — DeliveryAgents, keyed by route, so a rider only appears
+                        once they are already on one
+         boot.roster  — the people themselves, which is what the picker needs
+       The roster is fetched separately when the backend predates it, so this
+       works whether or not getRouteBootstrap has been redeployed. */
     savedAgentsByRoute = {};
     const rawAg = (boot.agents && boot.agents.agents) || {};
     Object.keys(rawAg).forEach(k=>{
       const a = rawAg[k];
       if (a && a.route) savedAgentsByRoute[String(a.route).toLowerCase().trim()] = a;
     });
+
+    if (Array.isArray(boot.roster)){
+      agents = boot.roster.map(a=>({ name:String(a.name||''), phone:String(a.phone||'') }))
+                          .filter(a=>a.name);
+    } else {
+      try {
+        const rr = await api('getAgentRoster');
+        agents = (rr && rr.ok && rr.agents) ? rr.agents : normAgents(rawAg);
+      } catch(e){ agents = normAgents(rawAg); }
+    }
+    agents.sort((x,y)=>x.name.localeCompare(y.name));
 
     const want = slotsWanted();
     const all = ((boot.orders && boot.orders.clients) || [])
