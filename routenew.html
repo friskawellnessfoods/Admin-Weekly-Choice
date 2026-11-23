@@ -97,6 +97,16 @@
   .slotcard:hover{ border-color:var(--c-primary); }
   .slotcard:active{ transform:translateY(1px); }
 
+  .riderbox{ background:#f8fafc; border:1px solid var(--c-line); border-radius:10px;
+    padding:10px 12px; margin-bottom:12px; }
+  .riderrow{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .riderrow + .riderrow{ margin-top:8px; }
+  .riderrow input{ flex:1; min-width:120px; padding:8px 10px; font-size:14px; }
+  .riderlbl{ font-size:10.5px; font-weight:800; letter-spacing:.06em; text-transform:uppercase;
+    color:var(--c-muted); }
+  .ridernow{ font-size:12.5px; font-weight:700; color:var(--c-primary-d); }
+  .ridernow.dim{ color:var(--c-muted); font-weight:500; }
+
   .secthead{ font-size:11px; font-weight:800; letter-spacing:.07em; text-transform:uppercase;
     color:var(--c-primary-d); margin:18px 0 9px; padding-bottom:6px;
     border-bottom:1.5px solid var(--c-line); }
@@ -204,11 +214,8 @@
       <label class="agents" title="how many of your own riders are running today">
         riders <input type="number" id="agents" value="3" min="0" max="12"></label>
       <button id="load" class="btn">Generate</button>
-      <select id="mode" title="Draft writes to a sheet nothing reads. Live is what delivery and kitchen read.">
-        <option value="draft">Draft (safe)</option>
-        <option value="live">Live — used by kitchen</option>
-      </select>
       <button id="save" class="btn alt" disabled>Save routes</button>
+      <button id="ridersBtn" class="btn alt">Riders</button>
       <button id="undo" class="btn alt" disabled>Undo</button>
       <button id="advToggle" class="btn alt">Settings</button>
       <span class="status" id="statusWrap"><span class="spinner"></span><span id="status">Pick a date to begin.</span></span>
@@ -216,32 +223,42 @@
     </div>
   </div>
 
+  <input type="hidden" id="api">
+
   <div id="content" class="content">
 
     <div class="adv" id="adv" hidden>
       <div class="advrow">
         <label title="most parcels one rider carries">max parcels <input type="number" id="maxP" value="20" min="1"></label>
         <label title="total driving across the whole route. 0 = no limit">max km driven <input type="number" id="maxTotKm" value="40" min="0"></label>
-        <label title="kitchen to the final parcel. 0 = no limit">max km reach <input type="number" id="maxKm" value="0" min="0"></label>
-        <label title="refuse a route with a single hop longer than this. 0 = no limit">max leg km <input type="number" id="maxLegKm" value="0" min="0" step="0.5"></label>
       </div>
       <div class="advrow">
         <label title="the 2pm cutoff. Lower this on a late dispatch.">max minutes <input type="number" id="maxMin" value="180" min="10"></label>
         <label title="time spent at each door">min/stop <input type="number" id="stopMin" value="2" min="0" step="0.5"></label>
         <label title="clients closer together than this always ride together, never split across routes">min km between clients <input type="number" id="zr" value="1" min="0.1" step="0.1"></label>
-        <label title="two clients further apart than this are never put on the same route. 0 = no limit">max km between clients <input type="number" id="maxSpread" value="12" min="0" step="0.5"></label>
-        <label title="most parcels in one Porter booking">porter group <input type="number" id="porterMax" value="4" min="1"></label>
-        <label title="only buy distances between points this close. A spending limit, not a routing rule.">measure within km <input type="number" id="nearKm" value="6" min="1" step="0.5"></label>
       </div>
       <div class="advrow">
         <button class="btn sm" id="saveSettings">Save settings for everyone</button>
         <button class="btn alt sm" id="measure">Measure distances</button>
         <button class="btn alt sm" id="rebuild" disabled>Rebuild zones</button>
-        <label style="flex:1; min-width:220px;">web app URL
-          <input type="text" id="api" placeholder="from config.js" style="flex:1; min-width:140px;"></label>
       </div>
       <div class="hint">Saved settings live in the spreadsheet, so every device and the automatic run use the same rules.
         Limits apply on the next Generate; zone radius and measure-within take effect when you measure or rebuild.</div>
+    </div>
+
+    <div class="adv" id="riders" hidden>
+      <div class="advrow" style="justify-content:space-between">
+        <b style="font-size:13px">Delivery riders</b>
+        <span class="dim">saved for everyone &mdash; they appear in every route's dropdown</span>
+      </div>
+      <div id="riderList"></div>
+      <div class="advrow">
+        <input type="text" id="newRName" placeholder="name" style="flex:1;min-width:130px">
+        <input type="text" id="newRPhone" placeholder="phone" inputmode="numeric" style="flex:1;min-width:120px">
+        <button class="btn alt sm" id="addRider">Add rider</button>
+        <span style="flex:1"></span>
+        <button class="btn sm" id="saveRiders">Save riders</button>
+      </div>
     </div>
 
     <div id="modeNote"></div>
@@ -261,7 +278,16 @@ const SECTORS = ['N','NE','E','SE','S','SW','W','NW'];
 const SLOT_ORDER  = ['Morning','Afternoon','Evening'];
 const SLOT_PREFIX = { Morning:'M', Afternoon:'A', Evening:'E' };
 const slotsWanted = () => $('slot').value ? [$('slot').value] : SLOT_ORDER;
-const LIMIT_FIELDS = ['maxP','maxTotKm','maxKm','maxLegKm','maxMin','stopMin','zr','nearKm','maxSpread','porterMax','agents'];
+const LIMIT_FIELDS = ['maxP','maxTotKm','maxMin','stopMin','zr','agents'];
+
+/* Settings that were dials but never earned one.
+   PORTER_MAX   a Porter booking takes four parcels.
+   MEASURE_NEAR how far apart two points can be and still be worth buying the
+                distance for. Pure cost control; the refine pass buys every leg
+                inside a finished route anyway, so this only shapes the first
+                pass. */
+const PORTER_MAX   = 4;
+const MEASURE_NEAR = 8;
 
 /* A missing element used to throw and blank the page. Return a harmless stub
    instead, so a UI change can never take the whole tool down. */
@@ -271,6 +297,7 @@ const $ = id => document.getElementById(id) || {
   addEventListener(){}, insertAdjacentHTML(){}, focus(){}, click(){}, select(){}
 };
 let cacheNote = '', autoMeasured = false, refined = false;
+let fromSaved = false, savedForDate = null, forceRebuild = false;
 let clients = [], notRouted = [], routes = [], zoneMap = {}, roadCache = {},
     agents = [], measured = null, unassigned = [], addOpen = null, addFilter = '';
 
@@ -297,6 +324,70 @@ $('saveSettings').addEventListener('click', async () => {
   $('saveSettings').disabled = false;
 });
 
+/* ---------- rider roster ---------- */
+$('ridersBtn').addEventListener('click', async ()=>{
+  const p = $('riders');
+  p.hidden = !p.hidden;
+  $('ridersBtn').textContent = p.hidden ? 'Riders' : 'Hide riders';
+  if (!p.hidden){
+    if (!agents.length){
+      try {
+        const r = await api('getAgentRoster');
+        if (r && r.ok) agents = r.agents || [];
+      } catch(e){ setStatus('Could not load the rider list: '+e.message); }
+    }
+    renderRiders();
+  }
+});
+
+function renderRiders(){
+  $('riderList').innerHTML = agents.length
+    ? agents.map((a,i)=>
+        '<div class="advrow">'+
+          '<input type="text" value="'+esc(a.name)+'" oninput="editRider('+i+',\'name\',this.value)" style="flex:1;min-width:130px">'+
+          '<input type="text" value="'+esc(a.phone||'')+'" inputmode="numeric" placeholder="phone" '+
+            'oninput="editRider('+i+',\'phone\',this.value)" style="flex:1;min-width:120px">'+
+          '<button class="rowx" title="remove" onclick="dropRider('+i+')">&times;</button>'+
+        '</div>').join('')
+    : '<div class="hint">No riders yet. Add one below.</div>';
+}
+
+function editRider(i, field, v){
+  if (!agents[i]) return;
+  agents[i][field] = (field === 'phone') ? String(v).replace(/\D/g,'') : v;
+}
+
+function dropRider(i){
+  const gone = agents[i] && agents[i].name;
+  agents.splice(i,1);
+  renderRiders();
+  if (gone) setStatus('Removed ' + gone + ' from the list. Press Save riders to keep that.');
+}
+
+$('addRider').addEventListener('click', ()=>{
+  const nm = ($('newRName').value||'').trim();
+  const ph = ($('newRPhone').value||'').replace(/\D/g,'');
+  if (!nm){ setStatus('Give the rider a name.'); return; }
+  if (agents.some(a=>a.name.toLowerCase()===nm.toLowerCase())){
+    setStatus(nm + ' is already on the list.'); return;
+  }
+  agents.push({ name:nm, phone:ph });
+  agents.sort((x,y)=>x.name.localeCompare(y.name));
+  $('newRName').value=''; $('newRPhone').value='';
+  renderRiders();
+});
+
+$('saveRiders').addEventListener('click', async ()=>{
+  $('saveRiders').disabled = true;
+  try {
+    const r = await api('saveAgentRoster', { roster: JSON.stringify(agents) });
+    setStatus(r && r.ok ? ('Saved '+r.saved+' rider(s) for everyone.')
+                        : ('Could not save riders: '+JSON.stringify(r)));
+    if (r && r.ok) { agents = r.agents || agents; renderRiders(); render(); }
+  } catch(e){ setStatus('Could not save riders: '+e.message); }
+  $('saveRiders').disabled = false;
+});
+
 $('advToggle').addEventListener('click', ()=>{
   const a = $('adv');
   a.hidden = !a.hidden;
@@ -305,7 +396,12 @@ $('advToggle').addEventListener('click', ()=>{
 
 const setStatus = m => { $('status').textContent = m; };
 function busy(on){ $('statusWrap').classList.toggle('busy', !!on); }
-const num = id => parseFloat($(id).value) || 0;
+const num = id => {
+  if (id === 'porterMax') return PORTER_MAX;
+  if (id === 'nearKm')    return MEASURE_NEAR;
+  if (id === 'maxSpread') return 0;          // no spread limit; see fits()
+  return parseFloat($(id).value) || 0;
+};
 
 async function api(action, params={}) {
   const body = new URLSearchParams({ action, ...params });
@@ -435,7 +531,7 @@ function measureKey(rows){
   return uniqPts(rows).map(ptKey).sort().join('|') + '#' + rows.length;
 }
 function measure(rows){
-  const stamp = num('stopMin') + ',' + num('maxP') + ',' + num('maxSpread') + ',' + Object.keys(roadCache).length;
+  const stamp = num('stopMin') + ',' + num('maxP') + ',' + num('maxTotKm') + ',' + num('maxMin') + ',' + Object.keys(roadCache).length;
   if (stamp !== _mStamp){ _mCache = new Map(); _mStamp = stamp; }
   const k = measureKey(rows);
   const hit = _mCache.get(k);
@@ -473,16 +569,15 @@ function uniqPts(rows){
   rows.forEach(r=>{ const k=ptKey(r.coord); if(!seen[k]){seen[k]=1;out.push(r.coord);} });
   return out;
 }
+/* Total km driven and total minutes are what actually bind a route. The
+   spread (widest gap between two stops) is shown on the card so a stretched
+   route is visible, but it is not a limit. */
 function fits(m, parcelCap){
-  const cap = num('maxTotKm'), reach = num('maxKm'), leg = num('maxLegKm');
-  const spread = num('maxSpread');
-  const pc = parcelCap || num('maxP');
+  const cap = num('maxTotKm');
+  const pc  = parcelCap || num('maxP');
   return m.parcels <= pc
       && m.total <= num('maxMin')
-      && (cap    <= 0 || m.km      <= cap)
-      && (reach  <= 0 || m.lastKm  <= reach)
-      && (leg    <= 0 || m.maxLeg  <= leg)
-      && (spread <= 0 || m.spread  <= spread);
+      && (cap <= 0 || m.km <= cap);
 }
 
 /* ---------- zones: stable clusters of points ---------- */
@@ -782,6 +877,53 @@ function improveGroups(groups, parcelCap){
   return best.filter(g=>g.length);
 }
 
+/* Rebuild the route objects from what was saved for this date. Clients who
+ * paused since are simply absent; clients who are new today land in the
+ * unassigned pool so they are impossible to miss. */
+function routesFromSaved(byRoute){
+  const byKey = new Map();
+  clients.forEach(c=>byKey.set(c.slot + '||' + c.phone, c));
+
+  const used = new Set();
+  const out = [];
+
+  Object.keys(byRoute).sort((a,b)=>a.localeCompare(b, undefined, {numeric:true}))
+    .forEach(name=>{
+      const rows = [];
+      (byRoute[name]||[]).forEach(e=>{
+        const k = String(e.slot||'').trim() + '||' + String(e.phone||'').replace(/\D/g,'').slice(-10);
+        const c = byKey.get(k);
+        if (c && !used.has(c)){ rows.push(c); used.add(c); }
+      });
+      if (!rows.length) return;
+      const slot = rows[0].slot;
+      const ag = agents.find(a=>a.name && routeAgentName(name) === a.name);
+      out.push({ name, slot,
+                 kind: /P\d/.test(name) ? 'porter' : 'fixed',
+                 rows, renamed: true,
+                 agent: ag ? ag.name : '', agentPhone: ag ? (ag.phone||'') : '',
+                 m: measure(rows) });
+    });
+
+  const extra = clients.filter(c=>!used.has(c));
+  return { routes: out, extra, placed: used.size };
+}
+
+/* DeliveryAgents is keyed by route, and the roster call already folded those
+ * people in, so a saved route finds its rider by name when one was set. */
+function routeAgentName(routeName){
+  const hit = (savedAgentsByRoute || {})[String(routeName).toLowerCase().trim()];
+  return hit ? hit.name : '';
+}
+let savedAgentsByRoute = {};
+
+function rebuildFresh(){
+  if (!confirm('Throw away the saved routes for this date and build them again from scratch?\n\n'
+    + 'Any changes you made by hand will be lost.')) return;
+  forceRebuild = true;
+  load();
+}
+
 /* ---------- load ---------- */
 $('load').addEventListener('click', load);
 
@@ -805,6 +947,12 @@ async function load(){
       LIMIT_FIELDS.forEach(k=>{ if (boot.limits[k] != null) $(k).value = boot.limits[k]; });
     }
     agents      = normAgents((boot.agents && boot.agents.agents) || []);
+    savedAgentsByRoute = {};
+    const rawAg = (boot.agents && boot.agents.agents) || {};
+    Object.keys(rawAg).forEach(k=>{
+      const a = rawAg[k];
+      if (a && a.route) savedAgentsByRoute[String(a.route).toLowerCase().trim()] = a;
+    });
 
     const want = slotsWanted();
     const all = ((boot.orders && boot.orders.clients) || [])
@@ -856,7 +1004,35 @@ async function load(){
               + (sheetErr ? '  ' + sheetErr : '');
     if (sheetErr) console.warn(sheetErr);
 
-    unassigned = []; addOpen = null; addFilter = '';
+    unassigned = []; addOpen = null; addFilter = ''; newAgentFor = null;
+    fromSaved = false;
+
+    // A date that was saved before comes back exactly as it was left, hand
+    // edits included, and costs no measuring at all.
+    if (!forceRebuild){
+      try {
+        const sv = await api('getRouteAssignments', { date: $('date').value });
+        const built = sv && sv.ok ? routesFromSaved(sv.routes || {}) : null;
+        if (built && built.routes.length){
+          routes = built.routes;
+          unassigned = built.extra;
+          savedForDate = $('date').value;
+          fromSaved = true;
+          document.body.className = 'working';
+          history = []; $('undo').disabled = true;
+          $('rebuild').disabled = false;
+          $('save').disabled = false;
+          render(); renderMode();
+          setStatus('Loaded ' + routes.length + ' saved routes for ' + $('date').value +
+            ' (' + built.placed + ' of ' + clients.length + ' of today\'s parcels matched)' +
+            (built.extra.length ? ', ' + built.extra.length + ' new client(s) not in the saved copy' : '') + '.');
+          $('load').disabled = false;
+          busy(false);
+          return;
+        }
+      } catch(e){ /* no saved copy, or the call failed: just build */ }
+    }
+    forceRebuild = false;
     autoMeasured = false; refined = false;
     history = []; $('undo').disabled = true;
     routes = [];
@@ -925,7 +1101,7 @@ function buildAndRender(){
 
   $('rebuild').disabled = false;
   $('save').disabled = false;
-  render();
+  render(); renderMode();
   setStatus('Built ' + routes.length + ' routes from ' + clients.length + ' parcels, nothing measured this run.  '
     + cacheNote
     + (newlyZoned ? '  ' + newlyZoned + ' new location(s) placed into zones — press Rebuild zones to keep that.' : ''));
@@ -1020,65 +1196,50 @@ $('rebuild').addEventListener('click', async () => {
 });
 
 $('save').addEventListener('click', async () => {
-  const date = $('date').value, live = $('mode').value === 'live';
+  const date = $('date').value;
   const slotsHere = [...new Set(routes.map(r=>r.slot).filter(Boolean))];
 
-  if (unassigned.length && !confirm(unassigned.length+' client(s) are still unassigned and will NOT be saved.\n\nContinue anyway?')) return;
-
   if (!slotsHere.length){ setStatus('Nothing to save.'); return; }
+  if (unassigned.length &&
+      !confirm(unassigned.length+' client(s) are still unassigned and will NOT be saved.\n\nContinue anyway?')) return;
 
-  if (live){
-    if (!confirm('LIVE SAVE\n\nThis writes RouteAssign, which overrides Master Client List. '
-      + 'delivery.html and kitchen.html will immediately show these routes for '
-      + date + ' — ' + slotsHere.join(', ') + '.\n\nProceed?')) return;
-  } else {
-    if (!confirm('Save '+routes.length+' routes as a DRAFT for '+date+'\n('
-      + slotsHere.join(', ') + ')?\n\n'
-      + 'Nothing reads the draft sheet, so delivery stays on Master Client List.')) return;
-  }
+  if (!confirm('Save '+routes.length+' routes for '+date+' ('+slotsHere.join(', ')+')?\n\n'
+    + 'kitchen.html and the client app will show these straight away, and this date '
+    + 'will reload from the saved copy next time.')) return;
 
   $('save').disabled = true;
+  busy(true);
+  let ok=0, fail=0;
   try {
-    if (!live){
-      let routeCount = 0, clientCount = 0, bad = '';
-      for (const sl of slotsHere){
-        const payload = routes.filter(r=>r.slot === sl).map(r=>({
-          name: r.name, agent: r.agent||'', agentPhone: r.agentPhone||'',
-          phones: r.rows.map(x=>x.phone)
-        }));
-        const res = await api('saveRouteDraft', { date, slot: sl, routes: JSON.stringify(payload) });
-        if (res && res.ok){ routeCount += res.routes; clientCount += res.clients; }
-        else bad += ' ' + sl + ' failed.';
+    for (const r of routes){
+      const res = await api('saveRouteAssignment', {
+        date, slot: r.slot, route: r.name, phones: r.rows.map(x=>x.phone).join(',')
+      });
+      if (res && res.ok) ok++; else fail++;
+      if (r.agent){
+        await api('saveDeliveryAgent', { route:r.name, name:r.agent, agentPhone:r.agentPhone||'' });
       }
-      setStatus('Draft saved — '+routeCount+' routes, '+clientCount+' clients across '
-        + slotsHere.join(', ') + '. Live delivery unchanged.' + bad);
-    } else {
-      let ok=0, fail=0;
-      for (const r of routes){
-        const res = await api('saveRouteAssignment', {
-          date, slot: r.slot, route: r.name, phones: r.rows.map(x=>x.phone).join(',')
-        });
-        if (res && res.ok) ok++; else fail++;
-        if (r.agent) await api('saveDeliveryAgent', { route:r.name, name:r.agent, agentPhone:r.agentPhone||'' });
-      }
-      setStatus('Saved LIVE: '+ok+' routes across '+slotsHere.join(', ')
-        + (fail?', '+fail+' failed':'')+'.');
     }
+    savedForDate = date;
+    fromSaved = true;
+    setStatus('Saved '+ok+' routes for '+date+(fail?', '+fail+' failed':'')
+      +'. Reloading this date will bring these back.');
+    render();
   } catch(e){ setStatus('Save error: '+e.message); }
+  busy(false);
   $('save').disabled = false;
 });
 
 function renderMode(){
-  const live = $('mode').value === 'live';
-  $('modeNote').innerHTML = live
-    ? '<div class="note live"><b>Live mode.</b> Saving writes RouteAssign and DeliveryAgents. '
-      + 'These override Master Client List, so delivery.html and kitchen-status.html will show '
-      + 'these routes immediately.</div>'
-    : '<div class="note draft"><b>Draft mode.</b> Saving writes RouteAssignDraft, which nothing reads. '
-      + 'delivery.html keeps running off Master Client List exactly as before.</div>';
+  if (!routes.length){ $('modeNote').innerHTML = ''; return; }
+  $('modeNote').innerHTML = fromSaved
+    ? '<div class="note draft"><b>Loaded from the saved copy</b> for ' + esc($('date').value) +
+      ', including any changes made by hand. '
+      + '<button class="btn alt sm" style="margin-left:6px" onclick="rebuildFresh()">Rebuild from scratch</button></div>'
+    : '<div class="note live"><b>Newly built</b> &mdash; nothing is stored until you press '
+      + '<b>Save routes</b>. Saving writes RouteAssign and DeliveryAgents, which kitchen.html '
+      + 'and the client app read.</div>';
 }
-$('mode').addEventListener('change', renderMode);
-renderMode();
 
 /* ---------- split ---------- */
 function autoSplit(ri, size){
@@ -1396,7 +1557,7 @@ function renderSlot(){
           chip(m.parcels+' parcels', m.parcels>num('maxP'))+
           chip(m.km.toFixed(1)+' km driven', num('maxTotKm')>0 && m.km>num('maxTotKm'))+
           chip(Math.round(m.total)+' min', m.total>num('maxMin'))+
-          chip('spread '+m.spread.toFixed(1)+' km', num('maxSpread')>0 && m.spread>num('maxSpread'))+
+          chip('spread '+m.spread.toFixed(1)+' km')+
           chip(m.kmpp.toFixed(2)+' km/p')+
         '</div>'+
       '</div>'+
@@ -1421,20 +1582,50 @@ function renderSlot(){
 function routeDetail(i){
   const r = routes[i];
 
-  const agentOpts = ['<option value="">— agent —</option>']
+  const agentOpts = ['<option value="">— pick a rider —</option>']
     .concat(agents.map(a=>'<option value="'+esc(a.name)+'"'+
-       (a.name===r.agent?' selected':'')+'>'+esc(a.name)+'</option>'))
-    .concat('<option value="__new">+ new agent</option>').join('');
+       (a.name===r.agent?' selected':'')+'>'+esc(a.name)+
+       (a.phone?' · '+esc(a.phone):'')+'</option>'))
+    .concat('<option value="__new">+ someone new…</option>').join('');
 
-  return '<div class="actrow">'+
-      '<select onchange="pickAgent('+i+',this)">'+agentOpts+'</select>'+
+  const riderBox =
+    '<div class="riderbox">'+
+      '<div class="riderrow">'+
+        '<span class="riderlbl">Rider</span>'+
+        '<select onchange="pickAgent('+i+',this)">'+agentOpts+'</select>'+
+        (r.agent
+          ? '<span class="ridernow">'+esc(r.agent)+
+            (r.agentPhone ? ' &middot; '+esc(r.agentPhone) : ' &middot; <em>no number</em>')+'</span>'
+          : '<span class="ridernow dim">not assigned yet</span>')+
+      '</div>'+
+      (newAgentFor === i
+        ? '<div class="riderrow">'+
+            '<input id="naName" placeholder="name" value="">'+
+            '<input id="naPhone" placeholder="phone" inputmode="numeric" value="">'+
+            '<button class="btn sm" onclick="addAgent('+i+')">Add</button>'+
+            '<button class="btn alt sm" onclick="cancelNewAgent()">Cancel</button>'+
+          '</div>'
+        : (r.agent
+            ? '<div class="riderrow">'+
+                '<input id="apPhone'+i+'" placeholder="phone for '+esc(r.agent)+'" '+
+                  'inputmode="numeric" value="'+esc(r.agentPhone||'')+'">'+
+                '<button class="btn alt sm" onclick="setAgentPhone('+i+')">Save number</button>'+
+                '<span class="dim">used for the WhatsApp button below</span>'+
+              '</div>'
+            : ''))+
+    '</div>';
+
+  return riderBox +
+
+    '<div class="actrow">'+
       '<button class="btn alt sm" onclick="renameRoute('+i+')">Rename</button>'+
       '<button class="btn alt sm" onclick="toggleAdd('+i+')">'+(addOpen===i?'Close':'+ Add client')+'</button>'+
-      '<button class="btn alt sm" onclick="autoSplit('+i+',4)">Split into 4s</button>'+
+      '<button class="btn alt sm" onclick="autoSplit('+i+','+Math.round(num('porterMax'))+')">Split into '+Math.round(num('porterMax'))+'s</button>'+
       '<button class="btn alt sm" onclick="manualSplit('+i+')">Move ticked out</button>'+
       (routes.filter(x=>x.slot===r.slot).length>1
         ? '<select onchange="mergeInto('+i+',this)"><option value="">merge into…</option>'+
-          routes.map((o,oi)=>(oi===i||o.slot!==r.slot)?'':'<option value="'+oi+'">'+esc(o.name)+'</option>').join('')+
+          routes.map((o,oi)=>(oi===i||o.slot!==r.slot)?''
+            :'<option value="'+oi+'">'+esc(o.name)+(o.kind!==r.kind?' ('+(o.kind==='porter'?'porter':'rider')+')':'')+'</option>').join('')+
           '</select>' : '')+
     '</div>'+
 
@@ -1462,7 +1653,8 @@ function routeDetail(i){
     '<div class="msgbox">'+esc(routeMessage(r))+'</div>'+
     '<div class="actrow">'+
       '<button class="btn alt sm" onclick="copyRouteMsg('+i+')">Copy</button>'+
-      '<button class="btn wa sm" onclick="shareRouteMsg('+i+')">Share on WhatsApp</button>'+
+      '<button class="btn wa sm" onclick="shareRouteMsg('+i+')">'+
+        (r.agentPhone ? 'Send to '+esc(r.agent) : 'Share on WhatsApp')+'</button>'+
     '</div>';
 }
 
@@ -1561,18 +1753,50 @@ function inDriveOrder(r){
   return out;
 }
 
+let newAgentFor = null;
+
 function pickAgent(i, sel){
   if (sel.value === '__new'){
-    const nm = prompt('New agent name'); if (!nm){ sel.value=routes[i].agent||''; return; }
-    const ph = prompt('Agent phone') || '';
-    agents.push({ name:nm, phone:ph }); agents.sort((x,y)=>x.name.localeCompare(y.name));
-    routes[i].agent = nm; routes[i].agentPhone = ph;
-    render(); return;
+    newAgentFor = i;
+    sel.value = routes[i].agent || '';
+    render();
+    const f = document.getElementById('naName'); if (f) f.focus();
+    return;
   }
+  newAgentFor = null;
   routes[i].agent = sel.value;
-  const a = agents.find(x=>(x.name||x)===sel.value);
+  const a = agents.find(x=>(x.name||x) === sel.value);
   routes[i].agentPhone = (a && a.phone) || '';
   render();
+}
+
+function cancelNewAgent(){ newAgentFor = null; render(); }
+
+function addAgent(i){
+  const nm = ($('naName').value || '').trim();
+  const ph = ($('naPhone').value || '').replace(/\D/g,'');
+  if (!nm){ setStatus('Give the rider a name first.'); return; }
+  const existing = agents.find(a=>a.name.toLowerCase() === nm.toLowerCase());
+  if (existing){ existing.phone = ph || existing.phone; }
+  else { agents.push({ name:nm, phone:ph }); agents.sort((x,y)=>x.name.localeCompare(y.name)); }
+  routes[i].agent = nm;
+  routes[i].agentPhone = ph || (existing && existing.phone) || '';
+  newAgentFor = null;
+  render();
+  setStatus('Rider ' + nm + ' assigned to ' + routes[i].name +
+            '. Saved to the sheet when you press Save routes in Live mode.');
+}
+
+/* a number typed against an existing rider updates them everywhere */
+function setAgentPhone(i){
+  const ph = ($('apPhone'+i).value || '').replace(/\D/g,'');
+  routes[i].agentPhone = ph;
+  const a = agents.find(x=>x.name === routes[i].agent);
+  if (a) a.phone = ph;
+  routes.forEach(r=>{ if (r.agent === routes[i].agent) r.agentPhone = ph; });
+  render();
+  setStatus(ph ? ('Number saved for ' + routes[i].agent + '.')
+               : ('Number cleared for ' + routes[i].agent + '.'));
 }
 
 /* readAgents_ returns an object keyed by route, and one person can cover
