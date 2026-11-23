@@ -41,7 +41,7 @@
   input,button,select{ font:inherit; color:inherit; font-variant-numeric:tabular-nums; }
 
   /* ─── opening screen: one question, which day ─── */
-  body.landing .top, body.landing .deck, body.landing .footbar{ display:none; }
+  body.landing .top, body.landing .deck{ display:none; }
   body.working .gate{ display:none; }
 
   .gate{ min-height:100dvh; display:flex; flex-direction:column; justify-content:center;
@@ -55,8 +55,15 @@
   /* ─── working header ─── */
   .top{ position:sticky; top:0; z-index:30; background:var(--deep); color:#fff;
     padding:calc(10px + env(safe-area-inset-top)) 14px 10px; }
-  .top .line1{ display:flex; align-items:center; gap:10px; }
-  .top .day{ font-size:16px; font-weight:600; letter-spacing:-.01em; }
+  .top .line1{ display:flex; align-items:center; gap:9px; }
+  .top .line2{ display:flex; align-items:center; gap:9px; margin-top:10px; }
+  .top .line2 .btn{ flex:1; min-height:42px; font-size:15px; }
+  .top .idn{ min-width:0; }
+  .iconbtn.ghost{ flex:none; width:auto; padding:0 16px; height:42px;
+    background:rgba(255,255,255,.1); }
+  .iconbtn.ghost:disabled{ opacity:.35; }
+  .top .day{ font-size:16px; font-weight:600; letter-spacing:-.01em;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .top .sub{ font-size:12.5px; color:#a9bfe6; margin-top:1px; }
   .top .grow{ flex:1; }
   .iconbtn{ width:var(--tap); height:var(--tap); border:0; background:rgba(255,255,255,.1);
@@ -107,7 +114,7 @@
 
   /* ─── deck ─── */
   .deck{ max-width:720px; margin:0 auto;
-    padding:14px 14px calc(96px + env(safe-area-inset-bottom)); }
+    padding:14px 14px calc(28px + env(safe-area-inset-bottom)); }
 
   .say{ font-size:13px; color:var(--ink-2); min-height:19px; margin-bottom:12px; }
   .say b{ color:var(--ink); font-weight:600; }
@@ -262,19 +269,15 @@
   .rrow input:first-child{ flex:1.4; }
   .rrow input:nth-child(2){ flex:1; }
 
-  /* fixed bar where the thumb is */
-  .footbar{ position:fixed; left:0; right:0; bottom:0; z-index:40;
     background:rgba(246,249,255,.95); backdrop-filter:blur(10px);
     border-top:1px solid var(--rule);
     padding:10px 14px calc(10px + env(safe-area-inset-bottom));
     display:flex; gap:9px; max-width:720px; margin:0 auto; }
-  .footbar .btn{ flex:1; }
-  .footbar .btn.wide{ flex:2.2; }
 
   .empty{ text-align:center; color:var(--ink-2); padding:50px 18px; font-size:14.5px;
     background:var(--surface); border:1px solid var(--rule); border-radius:14px; }
 
-  .toast{ position:fixed; left:50%; bottom:calc(84px + env(safe-area-inset-bottom));
+  .toast{ position:fixed; left:50%; bottom:calc(24px + env(safe-area-inset-bottom));
     transform:translateX(-50%); background:var(--ink); color:#fff;
     padding:12px 20px; border-radius:11px; font-size:14px; font-weight:500;
     opacity:0; transition:opacity .25s; pointer-events:none; z-index:80;
@@ -289,9 +292,7 @@
 
   @media (min-width:640px){
     .deck{ padding-top:18px; }
-    .footbar{ border-radius:14px 14px 0 0; }
-  }
-</style>
+  </style>
 </head>
 <body class="landing">
 
@@ -319,14 +320,18 @@
 <div class="top">
   <div class="line1">
     <button class="iconbtn back" id="backBtn" onclick="go('summary')" aria-label="All slots">&lsaquo;</button>
-    <div>
+    <div class="idn">
       <div class="day" id="hDay">—</div>
       <div class="sub" id="hSub"></div>
     </div>
     <span class="grow"></span>
     <span class="spin" id="spin"></span>
-    <button class="iconbtn" id="ridersBtn" title="Riders">Riders</button>
-    <button class="iconbtn" id="advToggle" title="Limits">Limits</button>
+    <button class="iconbtn" id="ridersBtn">Riders</button>
+    <button class="iconbtn" id="advToggle">Limits</button>
+  </div>
+  <div class="line2">
+    <button class="iconbtn ghost" id="undo" disabled>Undo</button>
+    <button class="btn go" id="save" disabled>Save routes</button>
   </div>
 </div>
 
@@ -337,12 +342,6 @@
   <div id="notRouted"></div>
   <div id="pool"></div>
   <div id="routes"></div>
-</div>
-
-<div class="footbar">
-  <button class="btn line" id="undo" disabled>Undo</button>
-  <button class="btn line" id="rebuild" disabled>Zones</button>
-  <button class="btn go wide" id="save" disabled>Save routes</button>
 </div>
 
 <!-- limits -->
@@ -368,6 +367,11 @@
       <button class="btn go" id="saveSettings" style="width:100%">Save limits for everyone</button>
       <div class="why">Stored in the spreadsheet, so every device builds to the same rules.
         Changes take effect on the next build.</div>
+    </div>
+    <div class="field" style="border-top:1px solid var(--rule); padding-top:14px">
+      <button class="btn line" id="rebuild" style="width:100%" disabled>Redraw the client clusters</button>
+      <div class="why">Groups every delivery point afresh using the distance above.
+        Only needed after adding clients in a new part of the city — not day to day.</div>
     </div>
     <button class="btn line" style="width:100%" onclick="closeSheet('adv')">Close</button>
     <input type="hidden" id="api">
@@ -647,9 +651,14 @@ function tour(pts){
       }
     }
   }
-  let km=0, min=0;
-  for (let k=0;k<path.length-1;k++){ const l=roadPair(path[k],path[k+1]); km+=l.km; min+=l.min; }
-  return { km, min, last: path[path.length-1], order: path.slice(1) };
+  // A leg we have not bought yet must not turn the whole total into Infinity.
+  // Skip it and count it, so the route still reads and the gap is visible.
+  let km=0, min=0, gaps=0;
+  for (let k=0;k<path.length-1;k++){
+    const l = roadPair(path[k],path[k+1]);
+    if (isFinite(l.km)){ km += l.km; min += l.min; } else gaps++;
+  }
+  return { km, min, gaps, last: path[path.length-1], order: path.slice(1) };
 }
 
 /* Local search measures the same route composition many times over, and each
@@ -678,6 +687,7 @@ function measureRaw(rows){
   // longest single hop on the route, kitchen leg included
   let maxLeg = 0, prev = KITCHEN;
   t.order.forEach(p=>{ const d = roadPair(prev,p).km; if (isFinite(d) && d > maxLeg) maxLeg = d; prev = p; });
+  const lastLeg = roadPair(KITCHEN, t.last).km;
 
   // widest straight-line gap between any two stops — how spread out the route is
   let spread = 0;
@@ -688,8 +698,9 @@ function measureRaw(rows){
   return {
     parcels: rows.length, points: pts.length,
     km: t.km, drive: t.min, stop, total: t.min + stop,
-    lastKm: roadPair(KITCHEN, t.last).km,
+    lastKm: isFinite(lastLeg) ? lastLeg : 0,
     kmpp: rows.length ? t.km/rows.length : 0,
+    gaps: t.gaps || 0,
     maxLeg, spread, order: t.order
   };
 }
@@ -1202,6 +1213,15 @@ async function load(){
           history = []; $('undo').disabled = true;
           $('rebuild').disabled = false;
           $('save').disabled = false;
+
+          // a saved route still needs its legs priced, or every number on it
+          // reads as a gap: a client added since, or an address corrected
+          const want = missingRoutePairs();
+          if (want.length){
+            setStatus('Loaded saved routes. Pricing ' + want.length + ' new leg(s)…');
+            render();
+            await measureLegs(want);
+          }
           render(); renderMode();
           setStatus('Loaded ' + routes.length + ' saved routes for ' + $('date').value +
             ' (' + built.placed + ' of ' + clients.length + ' of today\'s parcels matched)' +
@@ -1470,34 +1490,51 @@ function removeClient(ri, phone){
 }
 
 /* pull a client into route ri from the unassigned pool or another route */
-function addClient(ri, phone){
+function addClient(ri, key){
+  const slot = routes[ri].slot;
   snapshot();
+
   let c = null;
-  const ui = unassigned.findIndex(x=>x.phone===phone);
-  if (ui >= 0) c = unassigned.splice(ui,1)[0];
+  const ui = unassigned.findIndex(x=>rowKey(x) === key);
+  if (ui >= 0) c = unassigned[ui];
   else {
     for (let i=0;i<routes.length;i++){
-      const j = routes[i].rows.findIndex(x=>x.phone===phone);
+      const j = routes[i].rows.findIndex(x=>rowKey(x) === key);
+      if (j >= 0){ c = routes[i].rows[j]; break; }
+    }
+  }
+  if (!c) return;
+
+  if (String(c.slot||'').trim() !== slot){
+    setStatus(c.name + ' is a ' + c.slot + ' parcel and cannot ride on a ' + slot + ' route.');
+    return;
+  }
+
+  // now that it is safe, take them out of wherever they were
+  if (ui >= 0) unassigned.splice(ui,1);
+  else {
+    for (let i=0;i<routes.length;i++){
+      const j = routes[i].rows.findIndex(x=>rowKey(x) === key);
       if (j >= 0){
-        c = routes[i].rows.splice(j,1)[0];
+        routes[i].rows.splice(j,1);
         if (!routes[i].rows.length){ routes.splice(i,1); if (i < ri) ri--; }
         else routes[i].m = measure(routes[i].rows);
         break;
       }
     }
   }
-  if (!c) return;
+
   routes[ri].rows.push(c);
   routes[ri].m = measure(routes[ri].rows);
   renumber(); render();
 }
 
 /* send an unassigned client to a route chosen from the dropdown */
-function assignFromPool(phone, sel){
+function assignFromPool(key, sel){
   const ri = parseInt(sel.value);
   sel.value = '';
   if (isNaN(ri)) return;
-  addClient(ri, phone);
+  addClient(ri, key);
 }
 
 /* an unassigned client can also become a route of its own */
@@ -1524,25 +1561,37 @@ function onAddFilter(v){
   if (list) list.innerHTML = addListHtml(addOpen);
 }
 
+/* A client is only a candidate for a route in their own slot — an afternoon
+   order can never ride on an evening route. Clients are matched on slot and
+   phone together, because someone taking two slots is two separate parcels
+   with the same number. */
+const rowKey = c => String(c.slot||'').trim() + '||' + c.phone;
+
 function addListHtml(ri){
+  const slot = routes[ri].slot;
   const inRoute = {};
-  routes[ri].rows.forEach(x=>inRoute[x.phone]=1);
+  routes[ri].rows.forEach(x=>inRoute[rowKey(x)] = 1);
   const f = addFilter.trim().toLowerCase();
 
-  const pool = unassigned.map(c=>({ c, from:'unassigned' }));
+  const pool = unassigned.map(c=>({ c, from:'waiting' }));
   const others = [];
   routes.forEach((r,i)=>{ if (i!==ri) r.rows.forEach(c=>others.push({ c, from:r.name })); });
 
   const rows = pool.concat(others)
-    .filter(x=>!inRoute[x.c.phone])
+    .filter(x=>String(x.c.slot||'').trim() === slot)
+    .filter(x=>!inRoute[rowKey(x.c)])
     .filter(x=>!f || String(x.c.name||'').toLowerCase().includes(f) || x.c.phone.includes(f));
 
-  if (!rows.length) return '<div class="hint">Nothing matches.</div>';
+  if (!rows.length){
+    return '<div class="hint">' +
+      (f ? 'No one in ' + esc(slot) + ' matches that.'
+         : 'Everyone in ' + esc(slot) + ' is already on a route.') + '</div>';
+  }
 
   return rows.map(x=>
-    '<div class="addrow" onclick="addClient('+ri+',\''+x.c.phone+'\')">'+
-      '<span>'+esc(x.c.name)+'</span>'+
-      '<span class="pill">'+x.from+'</span>'+
+    '<div class="frow" onclick="addClient('+ri+',\''+rowKey(x.c)+'\')">'+
+      '<span class="g">'+esc(x.c.name)+'</span>'+
+      '<span class="from">'+esc(x.from)+'</span>'+
       '<span class="dim">'+roadPair(KITCHEN,x.c.coord).km.toFixed(1)+' km</span>'+
     '</div>').join('');
 }
@@ -1671,11 +1720,12 @@ function renderSummary(){
     unassigned.slice().sort((a,b)=>roadPair(KITCHEN,a.coord).km-roadPair(KITCHEN,b.coord).km)
       .map(c=>'<div class="stop"><div class="sbody">'+
         '<div class="sname">'+esc(c.name)+'</div>'+
-        '<div class="saddr">'+esc(c.location||'')+'</div>'+
+        '<div class="saddr">'+esc(c.slot||'')+' &nbsp; '+esc(c.location||'')+'</div>'+
         '<div style="margin-top:7px;display:flex;gap:7px;flex-wrap:wrap">'+
-          '<select onchange="assignFromPool(\''+c.phone+'\',this)" style="flex:1;min-width:120px">'+
+          '<select onchange="assignFromPool(\''+rowKey(c)+'\',this)" style="flex:1;min-width:120px">'+
             '<option value="">Send to…</option>'+
-            routes.map((o,oi)=>'<option value="'+oi+'">'+esc(o.name)+'</option>').join('')+
+            routes.map((o,oi)=>o.slot!==c.slot ? ''
+              : '<option value="'+oi+'">'+esc(o.name)+'</option>').join('')+
           '</select>'+
           '<button class="btn line sm" onclick="poolToNewRoute(\''+c.phone+'\')">Own route</button>'+
         '</div></div>'+
@@ -1765,6 +1815,7 @@ function renderSlot(){
           '<span'+(num('maxTotKm')>0 && m.km>num('maxTotKm')?' class="hot"':'')+'><b>'+m.km.toFixed(1)+'</b> km</span>'+
           '<span'+(m.total>num('maxMin')?' class="hot"':'')+'><b>'+Math.round(m.total)+'</b> min</span>'+
           '<span><b>'+m.kmpp.toFixed(1)+'</b> km each</span>'+
+          (m.gaps ? '<span class="hot"><b>'+m.gaps+'</b> leg'+plural(m.gaps,'')+' unpriced</span>' : '')+
         '</div>'+
       '</div>'+
       (open ? '<div class="rbody">'+routeDetail(i)+'</div>' : '')+
