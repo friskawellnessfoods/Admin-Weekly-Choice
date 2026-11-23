@@ -119,20 +119,8 @@
   .say{ font-size:13px; color:var(--ink-2); min-height:19px; margin-bottom:12px; }
   .say b{ color:var(--ink); font-weight:600; }
 
-  /* coverage — the one loud thing on the page */
-  .cover{ background:var(--deep); color:#fff; border-radius:16px;
     padding:18px 18px 16px; margin-bottom:18px; }
-  .cover .big{ font-size:40px; font-weight:700; letter-spacing:-.035em; line-height:1; }
-  .cover .big em{ font-style:normal; color:#8fa9da; font-weight:600; }
-  .cover .cap{ font-size:14px; color:#bacde9; margin-top:5px; }
-  .cover .meter{ height:7px; border-radius:99px; background:rgba(255,255,255,.2);
     margin-top:14px; display:flex; gap:2px; overflow:hidden; }
-  .cover .meter i{ display:block; height:100%; }
-  .cover .meter .a{ background:#3ad6c4; }
-  .cover .meter .b{ background:#f0ad45; }
-  .cover .key{ display:flex; gap:16px; margin-top:11px; font-size:12.5px; color:#bacde9; }
-  .cover .key u{ text-decoration:none; display:inline-flex; align-items:center; gap:6px; }
-  .cover .key i{ width:8px; height:8px; border-radius:2px; display:inline-block; }
 
   /* a slot is a ruled band, not a card */
   .band{ display:flex; align-items:baseline; gap:10px; margin:22px 0 2px;
@@ -206,6 +194,15 @@
     overflow:hidden; text-overflow:ellipsis; display:-webkit-box;
     -webkit-line-clamp:2; -webkit-box-orient:vertical; }
   .skm{ flex:none; font-size:13px; color:var(--ink-2); padding-top:2px; text-align:right; min-width:52px; }
+  .grip{ flex:none; width:24px; display:flex; flex-direction:column; align-items:center;
+    justify-content:center; gap:1px; }
+  .grip.ghost{ visibility:hidden; }
+  .grip button{ width:24px; height:22px; border:0; background:none; cursor:pointer;
+    color:var(--ink-3); font-size:10px; line-height:1; padding:0; border-radius:5px; }
+  .grip button:active:not(:disabled){ background:var(--rule-2); color:var(--ink); }
+  .grip button:disabled{ opacity:.22; cursor:default; }
+  .grip .dots{ color:var(--rule); font-size:11px; letter-spacing:-2px; line-height:1; }
+
   .sx{ flex:none; width:34px; height:34px; border:0; background:none; color:var(--ink-3);
     font-size:19px; cursor:pointer; border-radius:8px; }
   .sx:active{ background:var(--alarm-bg); color:var(--alarm); }
@@ -440,6 +437,24 @@ $('api').value = (typeof API_URL !== 'undefined' && API_URL) ? API_URL : '';
 const n = new Date();
 $('date').value = n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');
 /* Measure needs the day's client list, so it loads first if you have not. */
+/* Tapping anywhere on a date box opens the calendar, not just the small icon.
+   showPicker() must come from a real user gesture, so it hangs off click —
+   binding pointerdown as well fired it twice and toggled the picker shut.
+   Re-run after inserting markup that contains a date box. */
+function wireDatePickers(root){
+  (root || document).querySelectorAll('input[type=date]').forEach(el=>{
+    if (el.dataset.picker) return;
+    el.dataset.picker = '1';
+    el.addEventListener('click', ()=>{
+      try { el.showPicker(); } catch(e){ /* older browser, or already open */ }
+    });
+    el.addEventListener('keydown', e=>{
+      if (e.key === 'Enter'){ e.preventDefault(); try { el.showPicker(); } catch(err){} }
+    });
+  });
+}
+wireDatePickers();
+
 $('date').addEventListener('change', ()=>{ $('measure').disabled = false; });
 $('measure').disabled = false;
 
@@ -1617,7 +1632,7 @@ function addListHtml(ri){
     '<div class="frow" onclick="addClient('+ri+',\''+rowKey(x.c)+'\')">'+
       '<span class="g">'+esc(x.c.name)+'</span>'+
       '<span class="from">'+esc(x.from)+'</span>'+
-      '<span class="dim">'+roadPair(KITCHEN,x.c.coord).km.toFixed(1)+' km</span>'+
+      '<span class="dim">'+km1(roadPair(KITCHEN,x.c.coord).km)+' km</span>'+
     '</div>').join('');
 }
 
@@ -1668,44 +1683,24 @@ function go(mode, slot){
 function renderChrome(){
   routes.forEach(r=>{ r.m = measure(r.rows); });
 
-  const fx  = routes.filter(r=>r.kind!=='porter');
-  const px  = routes.filter(r=>r.kind==='porter');
-  const totP = routes.reduce((s,r)=>s+r.m.parcels,0);
-  const fxP  = fx.reduce((s,r)=>s+r.m.parcels,0);
-  const pxP  = px.reduce((s,r)=>s+r.m.parcels,0);
+  const totP  = routes.reduce((s,r)=>s+r.m.parcels,0);
   const totKm = routes.reduce((s,r)=>s+r.m.km,0);
 
   // header shows the day and what it adds up to
   const d = $('date').value;
   $('hDay').textContent = d ? prettyDay(d) : 'Dispatch';
   $('hSub').textContent = routes.length
-    ? routes.length + plural(routes.length,' route') + ', ' + totP + plural(totP,' parcel') + ', ' + totKm.toFixed(0) + ' km'
+    ? routes.length + plural(routes.length,' route') + ', ' + totP + plural(totP,' parcel') + ', ' + (isFinite(totKm)?totKm.toFixed(0):'—') + ' km'
     : '';
 
-  if (!routes.length){ $('cards').innerHTML = ''; return; }
-
-  const fxPct = totP ? (fxP/totP*100) : 0;
-  const pxPct = totP ? (pxP/totP*100) : 0;
-
-  $('cards').innerHTML =
-    '<div class="cover">'+
-      '<div class="big">'+fxP+' <em>of '+totP+'</em></div>'+
-      '<div class="cap">parcels on your own riders'+
-        (px.length ? ', '+px.length+' porter booking'+(px.length===1?'':'s')+' for the rest'
-                   : ' — no porter needed today')+'</div>'+
-      '<div class="meter">'+
-        '<i class="a" style="width:'+fxPct.toFixed(1)+'%"></i>'+
-        (pxPct ? '<i class="b" style="width:'+pxPct.toFixed(1)+'%"></i>' : '')+
-      '</div>'+
-      '<div class="key">'+
-        '<u><i style="background:#3ad6c4"></i>'+fx.length+' rider route'+(fx.length===1?'':'s')+'</u>'+
-        (px.length ? '<u><i style="background:#f0ad45"></i>'+px.length+' porter</u>' : '')+
-        '<u>'+(totP ? (totKm/totP).toFixed(1) : '0')+' km each</u>'+
-      '</div>'+
-    '</div>';
+  $('cards').innerHTML = '';
 }
 
 const plural = (n, word) => word + (n === 1 ? '' : 's');
+
+/* A leg Google has not been asked about yet is a gap, not a distance.
+   Printing "Infinity km" made that look broken. */
+const km1 = v => isFinite(v) ? v.toFixed(1) : '—';
 
 function prettyDay(ymd){
   const p = String(ymd).split('-');
@@ -1754,7 +1749,7 @@ function renderSummary(){
           '</select>'+
           '<button class="btn line sm" onclick="poolToNewRoute(\''+c.phone+'\')">Own route</button>'+
         '</div></div>'+
-        '<div class="skm">'+roadPair(KITCHEN,c.coord).km.toFixed(1)+' km</div></div>').join('')+
+        '<div class="skm">'+km1(roadPair(KITCHEN,c.coord).km)+' km</div></div>').join('')+
     '</div>'
   ) : '';
 
@@ -1837,9 +1832,9 @@ function renderSlot(){
         '</div>'+
         '<div class="facts">'+
           '<span><b>'+m.parcels+'</b>'+plural(m.parcels,' parcel')+'</span>'+
-          '<span'+(num('maxTotKm')>0 && m.km>num('maxTotKm')?' class="hot"':'')+'><b>'+m.km.toFixed(1)+'</b> km</span>'+
+          '<span'+(num('maxTotKm')>0 && m.km>num('maxTotKm')?' class="hot"':'')+'><b>'+km1(m.km)+'</b> km</span>'+
           '<span'+(m.total>num('maxMin')?' class="hot"':'')+'><b>'+Math.round(m.total)+'</b> min</span>'+
-          '<span><b>'+m.kmpp.toFixed(1)+'</b> km each</span>'+
+          '<span><b>'+km1(m.kmpp)+'</b> km each</span>'+
           (m.gaps ? '<span class="hot"><b>'+m.gaps+'</b> leg'+plural(m.gaps,'')+' unpriced</span>' : '')+
         '</div>'+
       '</div>'+
@@ -1878,6 +1873,9 @@ function routeDetail(i){
         : '<span class="lock">'+esc(r.agentPhone || 'no number')+'</span>'+
           '<button class="btn line sm" onclick="openPhoneEdit('+i+')">Change</button>');
 
+  const stopRows  = inDriveOrder(r);
+  const stopCount = stopRows.filter(z=>!z.same).length;
+
   return '<div class="rider">'+
       '<select onchange="pickAgent('+i+',this)">'+opts+'</select>'+ phone +
     '</div>'+
@@ -1892,24 +1890,36 @@ function routeDetail(i){
     '<div class="acts">'+
       '<button class="btn line sm" onclick="toggleAdd('+i+')">'+(addOpen===i?'Close search':'Add a client')+'</button>'+
       '<button class="btn line sm" onclick="manualSplit('+i+')">Move ticked out</button>'+
+      '<button class="btn line sm" onclick="reoptimise('+i+')">Re-order stops</button>'+
       '<button class="btn line sm" onclick="sendAgentLink('+i+')">Send link</button>'+
     '</div>'+
+    (r.manualOrder
+      ? '<div class="hint" style="margin-top:8px">Stops are in the order you set. '
+        + '<b>Re-order stops</b> works out the shortest run again.</div>' : '')+
 
     (addOpen===i ? '<div class="finder" style="margin-top:13px">'+
        '<input id="addSearch" placeholder="Search name or phone" oninput="onAddFilter(this.value)">'+
        '<div id="addList" class="flist">'+addListHtml(i)+'</div></div>' : '')+
 
     '<div class="stops" style="margin-top:13px">'+
-      inDriveOrder(r).map(x=>{
+      stopRows.map(x=>{
         const c = x.c;
         return '<div class="stop'+(x.same?' same':'')+'">'+
           '<input type="checkbox" class="pick" data-r="'+i+'" data-p="'+c.phone+'" aria-label="Select '+esc(c.name)+'">'+
+          (x.same ? '<div class="grip ghost"></div>'
+            : '<div class="grip">'+
+                '<button onclick="moveStop('+i+',\''+x.ptk+'\',-1)"'+(x.stop===1?' disabled':'')+
+                  ' aria-label="Move up">&#9650;</button>'+
+                '<span class="dots" aria-hidden="true">&#8942;&#8942;</span>'+
+                '<button onclick="moveStop('+i+',\''+x.ptk+'\',1)"'+(x.stop===stopCount?' disabled':'')+
+                  ' aria-label="Move down">&#9660;</button>'+
+              '</div>')+
           '<div class="sn">'+(x.same?'&#8226;':x.stop)+'</div>'+
           '<div class="sbody">'+
             '<div class="sname">'+esc(c.name)+'</div>'+
             '<div class="saddr">'+esc(c.location||'')+'</div>'+
           '</div>'+
-          '<div class="skm">'+(x.same?'':x.legKm.toFixed(1)+' km')+'</div>'+
+          '<div class="skm">'+(x.same?'':km1(x.legKm)+' km')+'</div>'+
           '<button class="sx" onclick="removeClient('+i+',\''+c.phone+'\')" aria-label="Remove '+esc(c.name)+'">&times;</button>'+
         '</div>';
       }).join('')+
@@ -1959,7 +1969,7 @@ function routeMessage(r){
 
   lines.push('');
   lines.push('Total: ' + r.m.parcels + ' parcels, '
-    + r.m.km.toFixed(1) + ' km, about ' + Math.round(r.m.total) + ' min');
+    + km1(r.m.km) + ' km, about ' + Math.round(r.m.total) + ' min');
   return lines.join('\n');
 }
 
@@ -1996,10 +2006,23 @@ function toast(msg){
 /* Rows in the order the rider actually drives them. Several parcels at one
    building share a stop number, and only the first carries the leg distance —
    you drive to the building once. */
+/* Rows in the order the rider drives them. Several parcels at one building
+   share a stop number — you drive there once. A route reordered by hand keeps
+   that order until it is asked to work one out again. */
 function inDriveOrder(r){
-  const order = r.m.order || [];
   const byPt = {};
   r.rows.forEach(c=>{ const k=ptKey(c.coord); (byPt[k]=byPt[k]||[]).push(c); });
+
+  let order;
+  if (r.manualOrder && r.manualOrder.length){
+    order = r.manualOrder.filter(k=>byPt[k]).map(k=>byPt[k][0].coord);
+    // a building added since the reorder goes on the end, never vanishes
+    Object.keys(byPt).forEach(k=>{
+      if (r.manualOrder.indexOf(k) < 0) order.push(byPt[k][0].coord);
+    });
+  } else {
+    order = r.m.order || [];
+  }
 
   const out = [];
   let prev = KITCHEN, stop = 0;
@@ -2009,15 +2032,55 @@ function inDriveOrder(r){
     if (!group) return;
     stop++;
     const legKm = roadPair(prev, p).km;
-    group.forEach((c,gi)=> out.push({ c, stop, legKm, same: gi>0 }));
+    group.forEach((c,gi)=> out.push({ c, stop, legKm, same: gi>0, ptk:k }));
     delete byPt[k];
     prev = p;
   });
 
   Object.keys(byPt).forEach(k=>{
-    byPt[k].forEach((c,gi)=> out.push({ c, stop:'?', legKm:0, same: gi>0 }));
+    byPt[k].forEach((c,gi)=> out.push({ c, stop:'?', legKm:NaN, same: gi>0, ptk:k }));
   });
   return out;
+}
+
+/* Move one building up or down the run, and remember that we did. */
+function moveStop(ri, ptk, dir){
+  const r = routes[ri];
+  const seq = inDriveOrder(r).filter(x=>!x.same).map(x=>x.ptk);
+  const at = seq.indexOf(ptk), to = at + dir;
+  if (at < 0 || to < 0 || to >= seq.length) return;
+  snapshot();
+  seq.splice(to, 0, seq.splice(at, 1)[0]);
+  r.manualOrder = seq;
+  render();
+}
+
+/* Price whatever this route is missing, drop any hand ordering, and work the
+   run out again. This is what to press after adding someone by hand: their
+   legs were never bought, so the order could not account for them. */
+async function reoptimise(ri){
+  const r = routes[ri];
+  const pts = uniqPts(r.rows);
+  const have = (a,b) => roadCache[roadKey(a,b)] || roadCache[roadKey(b,a)];
+
+  const need = [];
+  pts.forEach(p=>{ if (!have(KITCHEN,p)) need.push([KITCHEN,p]); });
+  for (let a=0;a<pts.length;a++) for (let b=0;b<pts.length;b++){
+    if (a!==b && !have(pts[a],pts[b])) need.push([pts[a],pts[b]]);
+  }
+
+  snapshot();
+  delete r.manualOrder;
+
+  if (need.length){
+    busy(true);
+    setStatus('Pricing ' + need.length + plural(need.length,' leg') + ' on ' + r.name + '…');
+    await measureLegs(need);
+    busy(false);
+  }
+  r.m = measure(r.rows);
+  render();
+  setStatus(r.name + ' re-ordered — ' + km1(r.m.km) + ' km, ' + Math.round(r.m.total) + ' min.');
 }
 
 let newAgentFor = null, editPhoneFor = null;
