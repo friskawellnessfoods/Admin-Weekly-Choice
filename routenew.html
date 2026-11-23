@@ -1,0 +1,1600 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Friska — Delivery Routes</title>
+<script src="config.js"></script>
+<style>
+  :root{
+    --c-bg:#eef2f6; --c-surface:#ffffff; --c-ink:#1f2a37; --c-muted:#5b6b7b; --c-line:#d7e0ea;
+    --grad-a:#0ea5a3; --grad-b:#2563eb; --c-primary:#0ea5a3; --c-primary-d:#0b8482;
+    --wa:#25D366; --warn:#b45309; --bad:#dc2626; --ok:#0b8482;
+    --radius:12px; --shadow:0 6px 24px rgba(20,40,70,.10);
+  }
+  *{ box-sizing:border-box; }
+  body{ font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif; margin:0;
+    background:var(--c-bg); color:var(--c-ink); -webkit-text-size-adjust:100%; }
+
+  .bar{ background:var(--c-surface); }
+  body.landing .bar{
+    position:static; min-height:100vh; display:flex; flex-direction:column; align-items:center;
+    justify-content:center; gap:18px; padding:32px 20px;
+    background:
+      radial-gradient(1200px 500px at 50% -10%, rgba(37,99,235,.10), transparent 60%),
+      radial-gradient(900px 500px at 50% 110%, rgba(14,165,163,.12), transparent 60%),
+      var(--c-bg);
+  }
+  body.landing .content{ display:none; }
+  body.working .bar{
+    position:sticky; top:0; z-index:10; flex-direction:row; min-height:auto; padding:10px 16px;
+    display:flex; gap:10px; align-items:center; flex-wrap:wrap;
+    background:var(--c-surface); border-bottom:1px solid var(--c-line); box-shadow:0 1px 0 rgba(0,0,0,.02);
+  }
+
+  .brand{ display:flex; align-items:center; gap:12px; }
+  .brand img{ height:36px; width:auto; }
+  .brand span{ font-size:16px; font-weight:800; letter-spacing:.2px;
+    background:linear-gradient(90deg,var(--grad-a),var(--grad-b));
+    -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
+  body.landing .brand{ flex-direction:column; gap:10px; margin-bottom:4px; }
+  body.landing .brand img{ height:64px; }
+  body.landing .brand span{ font-size:26px; }
+
+  .hero-sub{ display:none; }
+  body.landing .hero-sub{ display:block; color:var(--c-muted); font-size:14px; margin-top:-6px; text-align:center; }
+
+  .controls{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  body.landing .controls{ flex-direction:column; width:100%; max-width:340px; }
+  body.landing .controls > *{ width:100%; }
+  .field{ position:relative; display:flex; align-items:center; }
+  body.landing .field{ width:100%; }
+  input[type=date], select, input[type=text], input[type=number]{
+    padding:11px 13px; border:1.5px solid var(--c-line); border-radius:var(--radius); font-size:15px;
+    background:var(--c-surface); color:var(--c-ink); font-family:inherit; transition:border-color .15s, box-shadow .15s; }
+  input[type=date]{ cursor:pointer; width:100%; }
+  input:focus, select:focus{ outline:none; border-color:var(--c-primary); box-shadow:0 0 0 3px rgba(14,165,163,.16); }
+
+  .btn{ padding:11px 17px; border:0; border-radius:var(--radius); font-size:15px; font-weight:700;
+    cursor:pointer; color:#fff; font-family:inherit; transition:transform .08s, filter .15s;
+    background:linear-gradient(90deg,var(--grad-a),var(--grad-b)); box-shadow:0 4px 14px rgba(37,99,235,.25); }
+  .btn:hover:not(:disabled){ filter:brightness(1.05); }
+  .btn:active:not(:disabled){ transform:translateY(1px); }
+  .btn.alt{ background:var(--c-surface); color:var(--c-primary-d); border:1.5px solid var(--c-line); box-shadow:none; }
+  .btn.alt:hover:not(:disabled){ border-color:var(--c-primary); }
+  .btn.sm{ padding:7px 12px; font-size:13px; border-radius:9px; box-shadow:none; }
+  .btn.wa{ background:var(--wa); box-shadow:0 4px 14px rgba(37,211,102,.25); }
+  .btn.danger{ background:var(--bad); box-shadow:none; }
+  .btn:disabled{ opacity:.45; cursor:default; box-shadow:none; }
+  body.landing .btn{ padding:14px 18px; font-size:16px; }
+
+  .agents{ display:flex; align-items:center; gap:6px; font-size:13px; color:var(--c-muted);
+    background:var(--c-surface); border:1.5px solid var(--c-line); border-radius:var(--radius);
+    padding:0 12px 0 13px; }
+  .agents input{ width:52px; border:0; padding:11px 0; font-size:15px; font-weight:700;
+    color:var(--c-ink); background:transparent; }
+  .agents input:focus{ outline:none; box-shadow:none; }
+  body.landing .agents{ width:100%; justify-content:space-between; }
+
+  .status{ display:flex; align-items:center; gap:8px; font-size:13px; color:var(--c-muted); }
+  .spinner{ width:14px; height:14px; border:2px solid var(--c-line); border-top-color:var(--c-primary);
+    border-radius:50%; animation:spin .7s linear infinite; display:none; flex:none; }
+  .status.busy .spinner{ display:block; }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+
+  .content{ max-width:980px; margin:0 auto; padding:18px 16px 60px; }
+
+  .cards{ display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px; }
+  .card{ background:var(--c-surface); border:1px solid var(--c-line); border-radius:var(--radius);
+    padding:11px 15px; min-width:96px; box-shadow:var(--shadow); }
+  .card .n{ font-size:20px; font-weight:800; }
+  .card .l{ font-size:10.5px; color:var(--c-muted); text-transform:uppercase; letter-spacing:.06em; margin-top:2px; }
+  .card.bad .n{ color:var(--bad); } .card.ok .n{ color:var(--ok); } .card.info .n{ color:var(--grad-b); }
+
+  .slotcard, .routecard{ background:var(--c-surface); border:1px solid var(--c-line); border-radius:var(--radius);
+    box-shadow:var(--shadow); margin-bottom:12px; transition:border-color .15s; }
+  .slotcard{ padding:16px; cursor:pointer; }
+  .slotcard:hover{ border-color:var(--c-primary); }
+  .slotcard:active{ transform:translateY(1px); }
+
+  .secthead{ font-size:11px; font-weight:800; letter-spacing:.07em; text-transform:uppercase;
+    color:var(--c-primary-d); margin:18px 0 9px; padding-bottom:6px;
+    border-bottom:1.5px solid var(--c-line); }
+  .secthead.porter{ color:var(--warn); }
+  .routecard.porter{ border-left:3px solid var(--warn); }
+
+  .rc-head{ padding:14px 16px; cursor:pointer; user-select:none; }
+  .rc-head:hover{ background:#f8fafc; }
+  .routecard.open{ border-color:var(--c-primary); }
+  .routecard.open .rc-head{ border-bottom:1px solid var(--c-line); background:#f8fafc; }
+  .rc-body{ padding:14px 16px 16px; }
+  .chev{ font-size:11px; margin-left:4px; }
+  .msghead{ font-size:10.5px; color:var(--c-muted); text-transform:uppercase; letter-spacing:.06em;
+    font-weight:700; margin:16px 0 8px; }
+  .sc-top{ display:flex; align-items:baseline; justify-content:space-between; gap:10px; }
+  .sc-name{ font-size:18px; font-weight:800; color:var(--c-primary-d); }
+  .rc-name{ font-size:16px; font-weight:800; }
+  .sc-sub{ font-size:12.5px; color:var(--c-muted); margin-top:4px; }
+  .routecard.over{ border-color:var(--bad); }
+
+  .chips{ display:flex; gap:7px; flex-wrap:wrap; margin-top:10px; }
+  .chip{ font-size:11px; font-weight:700; padding:4px 10px; border-radius:999px;
+    background:#eef2f6; color:var(--c-muted); white-space:nowrap; }
+  .chip.bad{ background:#fee2e2; color:var(--bad); }
+  .chip.ok{ background:#d1fae5; color:var(--ok); }
+  .pill{ display:inline-block; font-size:10px; font-weight:700; padding:2px 7px; border-radius:999px;
+    background:#eef2f6; color:var(--c-muted); }
+
+  .back{ display:inline-flex; align-items:center; gap:6px; font-size:13.5px; font-weight:700;
+    color:var(--c-primary-d); cursor:pointer; margin-bottom:12px; }
+  .back:hover{ text-decoration:underline; }
+
+  .panel{ background:var(--c-surface); border:1px solid var(--c-line); border-radius:var(--radius);
+    box-shadow:var(--shadow); padding:16px; margin-bottom:14px; }
+  .panel h3{ margin:0 0 10px; font-size:14px; font-weight:800; }
+  .panel.warn{ border-color:#fcd34d; } .panel.warn h3{ color:var(--warn); }
+  .panel.info{ border-color:var(--grad-b); } .panel.info h3{ color:var(--grad-b); }
+  .panel.bad{ border-color:var(--bad); } .panel.bad h3{ color:var(--bad); }
+
+  table{ border-collapse:collapse; width:100%; font-size:13px; }
+  th,td{ border-bottom:1px solid var(--c-line); padding:7px 8px; text-align:left; vertical-align:middle; }
+  th{ font-size:10.5px; color:var(--c-muted); text-transform:uppercase; letter-spacing:.05em; font-weight:700; }
+  tr:last-child td{ border-bottom:none; }
+  td.num, th.num{ text-align:right; font-variant-numeric:tabular-nums; }
+  tr.same td{ color:var(--c-muted); }
+  .rowx{ background:none; border:0; color:var(--c-muted); font-size:17px; cursor:pointer; padding:0 4px; }
+  .rowx:hover{ color:var(--bad); }
+  input[type=checkbox]{ width:15px; height:15px; accent-color:var(--grad-b); }
+
+  .hint{ font-size:11.5px; color:var(--c-muted); margin-top:8px; line-height:1.5; }
+  .actrow{ display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; }
+
+  .msgbox{ background:#f8fafc; border:1px solid var(--c-line); border-radius:10px; padding:12px;
+    font-size:12.5px; white-space:pre-wrap; word-break:break-word; max-height:280px; overflow:auto;
+    font-family:ui-monospace,Menlo,Consolas,monospace; }
+
+  .addpanel{ background:#f8fafc; border:1px solid var(--c-line); border-radius:10px; padding:10px; margin-bottom:12px; }
+  .addpanel input{ width:100%; margin-bottom:8px; }
+  .addlist{ max-height:210px; overflow:auto; }
+  .addrow{ display:flex; gap:9px; align-items:center; padding:7px 8px; border-radius:7px;
+    cursor:pointer; font-size:12.5px; }
+  .addrow:hover{ background:#eef2f6; }
+  .addrow span:first-child{ flex:1; }
+  .dim{ color:var(--c-muted); font-size:11px; }
+
+  .adv{ background:var(--c-surface); border:1px solid var(--c-line); border-radius:var(--radius);
+    box-shadow:var(--shadow); padding:14px; margin-bottom:16px; }
+  .advrow{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:10px; }
+  .advrow:last-of-type{ margin-bottom:0; }
+  .adv label{ display:flex; gap:6px; align-items:center; font-size:12px; color:var(--c-muted); }
+  .adv input[type=number]{ width:78px; padding:8px 10px; font-size:14px; }
+
+  .note{ border-radius:10px; padding:10px 13px; margin-bottom:12px; font-size:12.5px; }
+  .note.draft{ background:#eff6ff; border:1px solid var(--grad-b); color:#1d4ed8; }
+  .note.live{ background:#fef2f2; border:1px solid var(--bad); color:var(--bad); }
+
+  .toast{ position:fixed; bottom:22px; left:50%; transform:translateX(-50%); background:var(--c-ink);
+    color:#fff; padding:11px 20px; border-radius:11px; font-size:13.5px; font-weight:600;
+    opacity:0; transition:opacity .3s; pointer-events:none; z-index:100; max-width:90%; text-align:center; }
+  .toast.show{ opacity:1; }
+
+  .empty{ text-align:center; color:var(--c-muted); padding:44px 16px; font-size:14px;
+    background:var(--c-surface); border-radius:var(--radius); box-shadow:var(--shadow); }
+
+  @media (max-width:560px){
+    .content{ padding:14px 12px 60px; }
+    th,td{ padding:6px 5px; font-size:12px; }
+  }
+</style>
+</head>
+<body class="landing">
+
+  <div class="bar">
+    <div class="brand">
+      <img src="logo.png" alt="Friska Wellness Foods">
+      <span>Delivery Routes</span>
+    </div>
+    <div class="hero-sub">Pick a date to build the day's delivery routes.</div>
+    <div class="controls">
+      <div class="field"><input type="date" id="date"></div>
+      <select id="slot">
+        <option value="">All slots</option>
+        <option>Morning</option><option>Afternoon</option><option>Evening</option>
+      </select>
+      <label class="agents" title="how many of your own riders are running today">
+        riders <input type="number" id="agents" value="3" min="0" max="12"></label>
+      <button id="load" class="btn">Generate</button>
+      <select id="mode" title="Draft writes to a sheet nothing reads. Live is what delivery and kitchen read.">
+        <option value="draft">Draft (safe)</option>
+        <option value="live">Live — used by kitchen</option>
+      </select>
+      <button id="save" class="btn alt" disabled>Save routes</button>
+      <button id="undo" class="btn alt" disabled>Undo</button>
+      <button id="advToggle" class="btn alt">Settings</button>
+      <span class="status" id="statusWrap"><span class="spinner"></span><span id="status">Pick a date to begin.</span></span>
+      <span id="cover"></span>
+    </div>
+  </div>
+
+  <div id="content" class="content">
+
+    <div class="adv" id="adv" hidden>
+      <div class="advrow">
+        <label title="most parcels one rider carries">max parcels <input type="number" id="maxP" value="20" min="1"></label>
+        <label title="total driving across the whole route. 0 = no limit">max km driven <input type="number" id="maxTotKm" value="40" min="0"></label>
+        <label title="kitchen to the final parcel. 0 = no limit">max km reach <input type="number" id="maxKm" value="0" min="0"></label>
+        <label title="refuse a route with a single hop longer than this. 0 = no limit">max leg km <input type="number" id="maxLegKm" value="0" min="0" step="0.5"></label>
+      </div>
+      <div class="advrow">
+        <label title="the 2pm cutoff. Lower this on a late dispatch.">max minutes <input type="number" id="maxMin" value="180" min="10"></label>
+        <label title="time spent at each door">min/stop <input type="number" id="stopMin" value="2" min="0" step="0.5"></label>
+        <label title="clients closer together than this always ride together, never split across routes">min km between clients <input type="number" id="zr" value="1" min="0.1" step="0.1"></label>
+        <label title="two clients further apart than this are never put on the same route. 0 = no limit">max km between clients <input type="number" id="maxSpread" value="12" min="0" step="0.5"></label>
+        <label title="most parcels in one Porter booking">porter group <input type="number" id="porterMax" value="4" min="1"></label>
+        <label title="only buy distances between points this close. A spending limit, not a routing rule.">measure within km <input type="number" id="nearKm" value="6" min="1" step="0.5"></label>
+      </div>
+      <div class="advrow">
+        <button class="btn sm" id="saveSettings">Save settings for everyone</button>
+        <button class="btn alt sm" id="measure">Measure distances</button>
+        <button class="btn alt sm" id="rebuild" disabled>Rebuild zones</button>
+        <label style="flex:1; min-width:220px;">web app URL
+          <input type="text" id="api" placeholder="from config.js" style="flex:1; min-width:140px;"></label>
+      </div>
+      <div class="hint">Saved settings live in the spreadsheet, so every device and the automatic run use the same rules.
+        Limits apply on the next Generate; zone radius and measure-within take effect when you measure or rebuild.</div>
+    </div>
+
+    <div id="modeNote"></div>
+    <div id="cards" class="cards"></div>
+    <div id="notRouted"></div>
+    <div id="pool"></div>
+    <div id="routes"></div>
+
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+<script>
+const KITCHEN = { lat: 17.452623115758335, lng: 78.41967516576499 };
+const BOUNDS  = { latMin:17.0, latMax:17.8, lngMin:78.0, lngMax:78.8 };
+const SECTORS = ['N','NE','E','SE','S','SW','W','NW'];
+const SLOT_ORDER  = ['Morning','Afternoon','Evening'];
+const SLOT_PREFIX = { Morning:'M', Afternoon:'A', Evening:'E' };
+const slotsWanted = () => $('slot').value ? [$('slot').value] : SLOT_ORDER;
+const LIMIT_FIELDS = ['maxP','maxTotKm','maxKm','maxLegKm','maxMin','stopMin','zr','nearKm','maxSpread','porterMax','agents'];
+
+/* A missing element used to throw and blank the page. Return a harmless stub
+   instead, so a UI change can never take the whole tool down. */
+const $ = id => document.getElementById(id) || {
+  value:'', textContent:'', innerHTML:'', disabled:false, hidden:true,
+  classList:{ add(){}, remove(){}, toggle(){} },
+  addEventListener(){}, insertAdjacentHTML(){}, focus(){}, click(){}, select(){}
+};
+let cacheNote = '', autoMeasured = false, refined = false;
+let clients = [], notRouted = [], routes = [], zoneMap = {}, roadCache = {},
+    agents = [], measured = null, unassigned = [], addOpen = null, addFilter = '';
+
+/* Everything shared: the URL comes from config.js in the repo, and every
+   measurement lives in the RoadCache sheet. Nothing is stored per-device, so
+   two people on two machines see identical routes and identical costs. */
+$('api').value = (typeof API_URL !== 'undefined' && API_URL) ? API_URL : '';
+const n = new Date();
+$('date').value = n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');
+/* Measure needs the day's client list, so it loads first if you have not. */
+$('date').addEventListener('change', ()=>{ $('measure').disabled = false; });
+$('measure').disabled = false;
+
+$('saveSettings').addEventListener('click', async () => {
+  const payload = {};
+  LIMIT_FIELDS.forEach(k=>{ payload[k] = num(k); });
+  $('saveSettings').disabled = true;
+  try {
+    const res = await api('setRouteLimits', { limits: JSON.stringify(payload) });
+    setStatus(res && res.ok
+      ? 'Settings saved. Every device and the automatic run now use these limits.'
+      : 'Could not save settings: ' + JSON.stringify(res));
+  } catch(e){ setStatus('Could not save settings: ' + e.message); }
+  $('saveSettings').disabled = false;
+});
+
+$('advToggle').addEventListener('click', ()=>{
+  const a = $('adv');
+  a.hidden = !a.hidden;
+  $('advToggle').textContent = a.hidden ? 'Settings' : 'Hide settings';
+});
+
+const setStatus = m => { $('status').textContent = m; };
+function busy(on){ $('statusWrap').classList.toggle('busy', !!on); }
+const num = id => parseFloat($(id).value) || 0;
+
+async function api(action, params={}) {
+  const body = new URLSearchParams({ action, ...params });
+  const res = await fetch($('api').value.trim(), { method:'POST', body, redirect:'follow' });
+  return res.json();
+}
+
+/* ---------- geometry ---------- */
+const toRad = d => d*Math.PI/180;
+function hv(a,b){
+  const dLat=toRad(b.lat-a.lat), dLng=toRad(b.lng-a.lng);
+  const s=Math.sin(dLat/2)**2+Math.cos(toRad(a.lat))*Math.cos(toRad(b.lat))*Math.sin(dLng/2)**2;
+  return 6371*2*Math.atan2(Math.sqrt(s),Math.sqrt(1-s));
+}
+function bearing(a,b){
+  const y=Math.sin(toRad(b.lng-a.lng))*Math.cos(toRad(b.lat));
+  const x=Math.cos(toRad(a.lat))*Math.sin(toRad(b.lat))-Math.sin(toRad(a.lat))*Math.cos(toRad(b.lat))*Math.cos(toRad(b.lng-a.lng));
+  return (Math.atan2(y,x)*180/Math.PI+360)%360;
+}
+const sectorOf = d => SECTORS[Math.round(d/45)%8];
+const inBounds = c => c && c.lat!=null && c.lng!=null &&
+  c.lat>=BOUNDS.latMin && c.lat<=BOUNDS.latMax && c.lng>=BOUNDS.lngMin && c.lng<=BOUNDS.lngMax;
+const ptKey = c => c.lat.toFixed(5)+','+c.lng.toFixed(5);
+const roadKey = (a,b) => a.lat.toFixed(6)+','+a.lng.toFixed(6)+'>'+b.lat.toFixed(6)+','+b.lng.toFixed(6);
+
+/* ---------- distance: real pairwise where measured, estimate otherwise ---------- */
+let legReal = 0, legTotal = 0, missingLegs = 0;   // coverage counters
+
+function roadPair(a, b){
+  const hit = roadCache[roadKey(a,b)] || roadCache[roadKey(b,a)];
+  legTotal++;
+  if (hit){ legReal++; return { km: hit.km, min: hit.min, real: true }; }
+  missingLegs++;
+  return { km: Infinity, min: Infinity, real: false };
+}
+
+/* Which legs are worth buying.
+   Always: kitchen to every point — that is how a route starts and how we
+   know how far out a client is.
+   Between points: only if they are in the same zone, or in zones close
+   enough that the chain could plausibly hop between them. A leg across the
+   city is never chosen by a nearest-neighbour chain, so paying for it is
+   waste. See usablePair(). */
+function usablePair(a, b){
+  if (hv(a,b) <= num('nearKm')) return true;          // simply close together
+  const za = (zoneMap[ptKey(a)]||{}).zone, zb = (zoneMap[ptKey(b)]||{}).zone;
+  return !!(za && zb && za === zb);                    // or same zone regardless
+}
+
+/* Every pair inside a route, however far apart. These are the legs the rider
+   actually drives, so the optimiser must be able to compare all of them —
+   otherwise 2-opt silently skips the swap that would have shortened the run. */
+function missingRoutePairs(){
+  const need = [];
+  const have = (a,b) => roadCache[roadKey(a,b)] || roadCache[roadKey(b,a)];
+  routes.forEach(r=>{
+    const pts = uniqPts(r.rows);
+    for (let i=0;i<pts.length;i++) for (let j=0;j<pts.length;j++){
+      if (i===j) continue;
+      if (!have(pts[i],pts[j])) need.push([pts[i],pts[j]]);
+    }
+  });
+  return need;
+}
+
+function missingPairs(pts){
+  const need = [];
+  const have = (a,b) => roadCache[roadKey(a,b)] || roadCache[roadKey(b,a)];
+
+  pts.forEach(p=>{
+    if (!have(KITCHEN,p)) need.push([KITCHEN,p]);
+    if (!have(p,KITCHEN)) need.push([p,KITCHEN]);
+  });
+
+  for (let i=0;i<pts.length;i++) for (let j=0;j<pts.length;j++){
+    if (i===j) continue;
+    if (!usablePair(pts[i],pts[j])) continue;
+    if (!have(pts[i],pts[j])) need.push([pts[i],pts[j]]);
+  }
+  return need;
+}
+function kmFromKitchen(c){ return roadPair(KITCHEN, c).km; }
+
+/* open path from kitchen, nearest neighbour then 2-opt, on real road km */
+function tour(pts){
+  if (!pts.length) return { km:0, min:0, last:KITCHEN, order:[] };
+  let rem = pts.slice(), cur = KITCHEN, order = [];
+  while (rem.length){
+    let j=-1, best=Infinity;
+    rem.forEach((p,i)=>{ const d=roadPair(cur,p).km; if(isFinite(d) && d<best){best=d;j=i;} });
+    if (j < 0){
+      // nothing measured from here — fall back to distance from the kitchen,
+      // which is always measured, rather than picking an arbitrary point
+      rem.forEach((p,i)=>{ const d=roadPair(KITCHEN,p).km; if(isFinite(d) && d<best){best=d;j=i;} });
+      if (j < 0) j = 0;
+    }
+    cur = rem[j]; order.push(cur); rem.splice(j,1);
+  }
+  const len = p => { let t=0; for(let k=0;k<p.length-1;k++) t+=roadPair(p[k],p[k+1]).km; return t; };
+  let path = [KITCHEN, ...order], improved = true, guard = 0;
+  while (improved && guard++ < 200){
+    improved = false;
+    for (let i=1;i<path.length-1;i++){
+      for (let j=i+1;j<path.length;j++){
+        const a=path[i-1], b=path[i], c=path[j], d=path[j+1];
+        if (!d){
+          const cand=[...path.slice(0,i),...path.slice(i).reverse()];
+          if (len(cand)<len(path)-1e-9){ path=cand; improved=true; }
+        } else if (isFinite(roadPair(a,c).km) && isFinite(roadPair(b,d).km) &&
+                   roadPair(a,c).km+roadPair(b,d).km < roadPair(a,b).km+roadPair(c,d).km-1e-9){
+          path=[...path.slice(0,i),...path.slice(i,j+1).reverse(),...path.slice(j+1)];
+          improved=true;
+        }
+      }
+    }
+  }
+  let km=0, min=0;
+  for (let k=0;k<path.length-1;k++){ const l=roadPair(path[k],path[k+1]); km+=l.km; min+=l.min; }
+  return { km, min, last: path[path.length-1], order: path.slice(1) };
+}
+
+/* Local search measures the same route composition many times over, and each
+   measure runs a 2-opt. Cache on the exact set of points plus the inputs that
+   change the answer. */
+let _mCache = new Map(), _mStamp = '';
+function measureKey(rows){
+  return uniqPts(rows).map(ptKey).sort().join('|') + '#' + rows.length;
+}
+function measure(rows){
+  const stamp = num('stopMin') + ',' + num('maxP') + ',' + num('maxSpread') + ',' + Object.keys(roadCache).length;
+  if (stamp !== _mStamp){ _mCache = new Map(); _mStamp = stamp; }
+  const k = measureKey(rows);
+  const hit = _mCache.get(k);
+  if (hit) return hit;
+  const v = measureRaw(rows);
+  if (_mCache.size < 4000) _mCache.set(k, v);
+  return v;
+}
+
+function measureRaw(rows){
+  const pts = uniqPts(rows);
+  const t = tour(pts);
+  const stop = rows.length * num('stopMin');
+
+  // longest single hop on the route, kitchen leg included
+  let maxLeg = 0, prev = KITCHEN;
+  t.order.forEach(p=>{ const d = roadPair(prev,p).km; if (isFinite(d) && d > maxLeg) maxLeg = d; prev = p; });
+
+  // widest straight-line gap between any two stops — how spread out the route is
+  let spread = 0;
+  for (let i=0;i<pts.length;i++) for (let j=i+1;j<pts.length;j++){
+    const d = hv(pts[i], pts[j]); if (d > spread) spread = d;
+  }
+
+  return {
+    parcels: rows.length, points: pts.length,
+    km: t.km, drive: t.min, stop, total: t.min + stop,
+    lastKm: roadPair(KITCHEN, t.last).km,
+    kmpp: rows.length ? t.km/rows.length : 0,
+    maxLeg, spread, order: t.order
+  };
+}
+function uniqPts(rows){
+  const seen={}, out=[];
+  rows.forEach(r=>{ const k=ptKey(r.coord); if(!seen[k]){seen[k]=1;out.push(r.coord);} });
+  return out;
+}
+function fits(m, parcelCap){
+  const cap = num('maxTotKm'), reach = num('maxKm'), leg = num('maxLegKm');
+  const spread = num('maxSpread');
+  const pc = parcelCap || num('maxP');
+  return m.parcels <= pc
+      && m.total <= num('maxMin')
+      && (cap    <= 0 || m.km      <= cap)
+      && (reach  <= 0 || m.lastKm  <= reach)
+      && (leg    <= 0 || m.maxLeg  <= leg)
+      && (spread <= 0 || m.spread  <= spread);
+}
+
+/* ---------- zones: stable clusters of points ---------- */
+function buildZones(points){
+  // points: [{lat,lng}] distinct. Cluster within sector by radius.
+  const bySec = {};
+  points.forEach(p=>{
+    const s = sectorOf(bearing(KITCHEN,p));
+    (bySec[s] = bySec[s] || []).push(p);
+  });
+
+  const map = {};
+  Object.keys(bySec).sort().forEach(sec=>{
+    // farthest-first seeding keeps clusters stable as clients are added
+    let rem = bySec[sec].slice().sort((a,b)=>hv(KITCHEN,b)-hv(KITCHEN,a));
+    let idx = 0;
+    while (rem.length){
+      const seed = rem.shift();
+      const members = [seed];
+      for (let i=rem.length-1;i>=0;i--){
+        if (hv(seed,rem[i]) <= num('zr')){ members.push(rem[i]); rem.splice(i,1); }
+      }
+      const zone = sec + (++idx);
+      members.forEach(m=>{ const d=roadPair(KITCHEN,m).km;
+        map[ptKey(m)] = { zone, sector:sec, km: isFinite(d) ? +d.toFixed(2) : 0 }; });
+    }
+  });
+  return map;
+}
+
+/* A point we have never seen before — a client's first order to their office,
+   or a brand new client — must join the zone it actually belongs to, not
+   become a lone zone and therefore a route of its own. Slots it into the
+   nearest existing zone when one is close enough, otherwise starts a new one.
+   Returns how many were newly placed. */
+function ensureZones(pts){
+  const unknown = pts.filter(p=>!zoneMap[ptKey(p)]);
+  if (!unknown.length) return 0;
+
+  // centroid of every zone we already know
+  const acc = {};
+  Object.keys(zoneMap).forEach(k=>{
+    const z = zoneMap[k].zone;
+    const [la,ln] = k.split(',').map(Number);
+    if (!acc[z]) acc[z] = { lat:0, lng:0, n:0, sector: zoneMap[k].sector };
+    acc[z].lat += la; acc[z].lng += ln; acc[z].n++;
+  });
+  const centres = Object.keys(acc).map(z=>({
+    zone:z, sector:acc[z].sector,
+    lat:acc[z].lat/acc[z].n, lng:acc[z].lng/acc[z].n
+  }));
+
+  let placed = 0;
+  unknown.forEach(p=>{
+    let best=null, bestD=Infinity;
+    centres.forEach(c=>{ const d=hv(p,c); if (d<bestD){ bestD=d; best=c; } });
+
+    if (best && bestD <= num('zr')){
+      zoneMap[ptKey(p)] = { zone: best.zone, sector: best.sector, km: 0 };
+    } else {
+      const sec = sectorOf(bearing(KITCHEN,p));
+      let n = 1;
+      while (Object.keys(acc).indexOf(sec+n) >= 0 ||
+             Object.values(zoneMap).some(v=>v.zone === sec+n)) n++;
+      zoneMap[ptKey(p)] = { zone: sec+n, sector: sec, km: 0 };
+      centres.push({ zone:sec+n, sector:sec, lat:p.lat, lng:p.lng });
+      acc[sec+n] = { n:1 };
+    }
+    placed++;
+  });
+  return placed;
+}
+
+/* ---------- pack: chain from the kitchen, nearest zone next ---------- *
+ * Start at the kitchen. Take the nearest zone, then the zone nearest to where
+ * that left off, and so on. When parcels / km / minutes would breach, close the
+ * route and start a fresh one from the kitchen. A zone that alone breaks the
+ * limits becomes its own route rather than dragging a good route over.
+ * ------------------------------------------------------------------ */
+/* RouteAssign is keyed by date + slot + route, and a rider runs one slot at a
+   time, so each slot is packed on its own. Names are prefixed M / A / E so a
+   route is identifiable at a glance in kitchen.html and delivery.html. */
+function packRoutes(allRows){
+  const out = [];
+  const N = Math.max(0, Math.round(num('agents')));
+
+  SLOT_ORDER.forEach(slot=>{
+    const rows = allRows.filter(c=>String(c.slot||'').trim() === slot);
+    if (!rows.length) return;
+
+    const packed = packOneSlot(rows, N);
+
+    packed.fixed.forEach((g,i)=>{
+      out.push({ name: SLOT_PREFIX[slot] + (i+1), slot, kind:'fixed', rows:g,
+                 agent:'', agentPhone:'', m: measure(g) });
+    });
+    packed.porter.forEach((g,i)=>{
+      out.push({ name: SLOT_PREFIX[slot] + 'P' + (i+1), slot, kind:'porter', rows:g,
+                 agent:'', agentPhone:'', m: measure(g) });
+    });
+  });
+
+  return out;
+}
+
+/* ---------- two-phase packing ----------
+ * Phase 1 fills the fixed riders with as many clients as they can legally
+ * carry. Phase 2 puts whoever is left into Porter bookings of at most
+ * `porter group` parcels each.
+ *
+ * The phase-1 pick is deliberately "km added PER PARCEL GAINED", not "km
+ * added". Cheapest-km always grabs the next-door client, which packs one
+ * rider into a tight blob and strands everyone else; cost-per-parcel keeps
+ * adding whoever is cheapest to serve, which is what fills the riders.
+ * ------------------------------------------------------------------ */
+function packOneSlot(rows, N){
+  const clusters = clustersOf(rows);
+
+  if (N <= 0) {
+    return { fixed: [], porter: improveGroups(porterGroups(clusters), num('porterMax')) };
+  }
+
+  const filled = fillFixed(clusters, N);
+  let fixed = improveGroups(filled.routes.map(r=>r.rows));
+
+  const taken = new Set();
+  fixed.forEach(g=>g.forEach(r=>taken.add(r)));
+  const rest = clusters.filter(c=>c.rows.every(r=>!taken.has(r)));
+
+  const porter = improveGroups(porterGroups(rest), num('porterMax'));
+  return { fixed, porter };
+}
+
+/* Clients closer than `min km between clients` always travel together, so the
+ * cluster — not the individual client — is what gets moved around. That is
+ * also what keeps a client on the same route when their neighbours pause. */
+function clustersOf(rows){
+  const gap = num('zr');
+  const byPt = new Map();
+  rows.forEach(r=>{ const k = ptKey(r.coord); if(!byPt.has(k)) byPt.set(k,[]); byPt.get(k).push(r); });
+
+  const pts = uniqPts(rows).sort((a,b)=>hv(KITCHEN,a)-hv(KITCHEN,b));
+  const used = new Set(), out = [];
+
+  pts.forEach(p=>{
+    const k = ptKey(p); if (used.has(k)) return;
+    used.add(k);
+    const mem = [p];
+    pts.forEach(q=>{ const qk = ptKey(q);
+      if (!used.has(qk) && hv(p,q) <= gap){ mem.push(q); used.add(qk); } });
+    const rowsIn = [];
+    mem.forEach(m=>rowsIn.push(...byPt.get(ptKey(m))));
+    out.push({ pts: mem, rows: rowsIn, zone: (zoneMap[ptKey(p)]||{}).zone || ptKey(p) });
+  });
+  return out;
+}
+
+/* Grow all N rider routes at once. Filling one to capacity before starting
+ * the next is what produced the lopsided results before. */
+function fillFixed(clusters, N){
+  const left = new Set(clusters.map((_,i)=>i));
+  const routes = [];
+  const gap = num('zr');
+
+  // seed from the biggest clusters, keeping the seeds apart from each other
+  const bySize = [...left].sort((x,y)=>
+    clusters[y].rows.length - clusters[x].rows.length ||
+    hv(KITCHEN, clusters[x].pts[0]) - hv(KITCHEN, clusters[y].pts[0]));
+
+  for (const ci of bySize){
+    if (routes.length >= N) break;
+    if (!fits(measure(clusters[ci].rows))) continue;
+    const far = routes.every(r => hv(clusters[ci].pts[0], clusters[r.seed].pts[0]) > gap*2);
+    if (!far) continue;
+    routes.push({ seed:ci, rows: clusters[ci].rows.slice() });
+    left.delete(ci);
+  }
+  for (const ci of bySize){                 // separation left us short of N
+    if (routes.length >= N) break;
+    if (!left.has(ci)) continue;
+    if (!fits(measure(clusters[ci].rows))) continue;
+    routes.push({ seed:ci, rows: clusters[ci].rows.slice() });
+    left.delete(ci);
+  }
+
+  let guard = 0;
+  while (left.size && guard++ < 3000){
+    let best = null, bestScore = Infinity;
+    for (const r of routes){
+      const baseKm = measure(r.rows).km;
+      for (const ci of left){
+        const cand = r.rows.concat(clusters[ci].rows);
+        const m = measure(cand);
+        if (!fits(m)) continue;
+        const score = (m.km - baseKm) / clusters[ci].rows.length;
+        if (score < bestScore - 1e-9){ bestScore = score; best = { r, ci }; }
+      }
+    }
+    if (!best) break;
+    best.r.rows = best.r.rows.concat(clusters[best.ci].rows);
+    left.delete(best.ci);
+  }
+
+  return { routes, leftover: [...left].map(i=>clusters[i]) };
+}
+
+/* Porter bookings. The client furthest from the kitchen anchors each booking,
+ * so genuine outliers are settled first and never get bolted onto an
+ * unrelated group. One with nobody in range simply travels alone. */
+function porterGroups(clusters){
+  const cap = Math.max(1, Math.round(num('porterMax')));
+  const left = clusters.slice();
+  const out = [];
+  let guard = 0;
+
+  while (left.length && guard++ < 500){
+    let ai = 0, far = -1;
+    left.forEach((c,i)=>{
+      const d = Math.max(...c.pts.map(p=>hv(KITCHEN,p)));
+      if (d > far){ far = d; ai = i; }
+    });
+    let group = left.splice(ai,1)[0].rows.slice();
+
+    let adding = true;
+    while (adding && group.length < cap && left.length){
+      adding = false;
+      let bi = -1, bScore = Infinity;
+      const baseKm = measure(group).km;
+      left.forEach((c,i)=>{
+        if (group.length + c.rows.length > cap) return;
+        const m = measure(group.concat(c.rows));
+        if (!fits(m, cap)) return;
+        const score = m.km - baseKm;
+        if (score < bScore){ bScore = score; bi = i; }
+      });
+      if (bi >= 0){ group = group.concat(left.splice(bi,1)[0].rows); adding = true; }
+    }
+    out.push(group);
+  }
+  return out;
+}
+
+/* Local search over a set of groups: relocate or swap whole clusters wherever
+ * that cuts total km and both groups stay legal. */
+function improveGroups(groups, parcelCap){
+  const clusterKey = r => {
+    const z = (zoneMap[ptKey(r.coord)]||{}).zone;
+    return z || ptKey(r.coord);
+  };
+  const split = rows => {
+    const m = new Map();
+    rows.forEach(r=>{ const k = clusterKey(r); if(!m.has(k)) m.set(k,[]); m.get(k).push(r); });
+    return m;
+  };
+
+  let best = groups.map(g=>g.slice()), improved = true, guard = 0;
+  const kmOf = g => g.length ? measure(g).km : 0;
+  const okOf = g => !g.length || fits(measure(g), parcelCap);
+
+  while (improved && guard++ < 40){
+    improved = false;
+    for (let a=0; a<best.length && !improved; a++){
+      for (let b=0; b<best.length && !improved; b++){
+        if (a === b) continue;
+        const za = split(best[a]);
+        const baseA = kmOf(best[a]), baseB = kmOf(best[b]);
+
+        for (const [,rz] of za){
+          const restA = best[a].filter(r=>!rz.includes(r));
+          const newB  = best[b].concat(rz);
+          if (!okOf(newB)) continue;
+          if (restA.length && !okOf(restA)) continue;
+          const delta = (kmOf(restA) + kmOf(newB)) - (baseA + baseB);
+          if (restA.length ? delta < -0.05 : delta < 0.05){
+            best[a] = restA; best[b] = newB;
+            best = best.filter(g=>g.length);
+            improved = true; break;
+          }
+        }
+        if (improved) break;
+
+        const zb = split(best[b]);
+        for (const [,r1] of za){
+          for (const [,r2] of zb){
+            const newA = best[a].filter(r=>!r1.includes(r)).concat(r2);
+            const newB = best[b].filter(r=>!r2.includes(r)).concat(r1);
+            if (!okOf(newA) || !okOf(newB)) continue;
+            if ((kmOf(newA) + kmOf(newB)) - (baseA + baseB) < -0.05){
+              best[a] = newA; best[b] = newB; improved = true; break;
+            }
+          }
+          if (improved) break;
+        }
+      }
+    }
+  }
+  return best.filter(g=>g.length);
+}
+
+/* ---------- load ---------- */
+$('load').addEventListener('click', load);
+
+async function load(){
+  const url = $('api').value.trim();
+  if (!url){ setStatus('Paste the web app URL first.'); return; }
+  $('load').disabled = true;
+  busy(true);
+  setStatus('Loading…');
+
+  try {
+    const boot = await api('getRouteBootstrap', { date: $('date').value });
+    if (!boot || !boot.ok){ setStatus('Bootstrap failed: '+JSON.stringify(boot)); $('load').disabled=false; return; }
+
+    const geo   = (boot.geo && boot.geo.geo) || {};
+    zoneMap     = (boot.zones && boot.zones.zones) || {};
+
+    // settings are stored in the spreadsheet, not the browser, so the rules are
+    // identical on every device and in the automatic run
+    if (boot.limits){
+      LIMIT_FIELDS.forEach(k=>{ if (boot.limits[k] != null) $(k).value = boot.limits[k]; });
+    }
+    agents      = normAgents((boot.agents && boot.agents.agents) || []);
+
+    const want = slotsWanted();
+    const all = ((boot.orders && boot.orders.clients) || [])
+      .filter(c => want.indexOf(String(c.slot||'').trim()) >= 0);
+
+    clients = []; notRouted = [];
+
+    all.forEach(c=>{
+      const phone = String(c.phone||'').replace(/\D/g,'').slice(-10);
+      const g = geo[phone] || {};
+      const loc = String(c.location||'').trim();
+      const l1  = String(c.location1||'').trim();
+      const l2  = String(c.location2||'').trim();
+
+      // self pickup is a category, not a failure
+      if (!loc || /^\s*(self|pick\s*up|pickup|takeaway|take\s*away)/i.test(loc)){
+        notRouted.push({ ...c, phone, why:'self pickup' }); return;
+      }
+
+      let coord = null, link = '';
+      if (c.overrideLat != null && c.overrideLng != null){
+        coord = { lat:+c.overrideLat, lng:+c.overrideLng };
+        link  = String(c.overrideLink || '').trim();
+      }
+      else if (loc && l2 && loc === l2){ coord = g.loc2; link = g.loc2Link || ''; }
+      else if (loc && l1 && loc === l1){ coord = g.loc1; link = g.loc1Link || ''; }
+      else if (g.loc1){ coord = g.loc1; link = g.loc1Link || ''; }
+      else { coord = g.loc2; link = g.loc2Link || ''; }
+
+      if (!inBounds(coord)){
+        notRouted.push({ ...c, phone, why: coord ? 'coordinates outside Hyderabad' : 'no coordinates' });
+        return;
+      }
+      clients.push({ ...c, phone, link: String(link||'').trim(),
+                     coord: { lat:+coord.lat, lng:+coord.lng } });
+    });
+
+    // only the legs among today's points, so the payload never grows unbounded
+    const keys = uniqPts(clients).map(ptKey).concat([ptKey(KITCHEN)]);
+    let fromSheet = {}, sheetErr = '';
+    try {
+      const rp = await api('getRoadPairsFor', { points: JSON.stringify(keys) });
+      if (rp && rp.ok) fromSheet = rp.pairs || {};
+      else sheetErr = 'RoadCache unreachable — check the getRoadPairsFor line in doPost and redeploy.';
+    } catch(e){ sheetErr = 'RoadCache call failed: '+e.message; }
+
+    roadCache = fromSheet;
+    cacheNote = Object.keys(fromSheet).length + ' legs already measured.'
+              + (sheetErr ? '  ' + sheetErr : '');
+    if (sheetErr) console.warn(sheetErr);
+
+    unassigned = []; addOpen = null; addFilter = '';
+    autoMeasured = false; refined = false;
+    history = []; $('undo').disabled = true;
+    routes = [];
+    $('measure').disabled = false;
+    $('rebuild').disabled = true;
+    $('save').disabled = true;
+
+    buildAndRender();
+
+  } catch(e){ setStatus('Error: '+e.message); }
+  busy(false);
+  $('load').disabled = false;
+}
+
+/* Routes are built only when every leg is a real Google measurement.
+   An unmeasured leg would be a guess, and a guess routes a rider wrongly. */
+function buildAndRender(){
+  const pts = uniqPts(clients);
+  // zones decide which legs are worth measuring, so they come first
+  let newlyZoned = 0;
+  if (!Object.keys(zoneMap).length) zoneMap = buildZones(pts);
+  else newlyZoned = ensureZones(pts);
+  const need = missingPairs(pts);
+
+  if (need.length){
+    routes = [];
+    render();
+    $('rebuild').disabled = true;
+    $('save').disabled = true;
+
+    // Measuring runs by itself, so this is a progress state, not a prompt.
+    // A panel only appears if measuring has already been tried and the legs
+    // are still missing — that is a real failure worth stopping on.
+    if (!autoMeasured){
+      autoMeasured = true;
+      document.body.className = 'working';
+      $('routes').innerHTML = '';
+      setStatus(clients.length + ' parcels loaded. Measuring ' + need.length + ' legs…  ' + cacheNote);
+      setTimeout(()=>$('measure').click(), 50);
+    } else {
+      $('routes').innerHTML =
+        '<div class="note live"><b>' + need.length + ' legs could not be measured.</b> '
+        + 'Routes are not built from estimates, so nothing is shown. '
+        + 'Check that Google Maps loaded and that saveRoadCache is wired up in doPost.</div>';
+      setStatus(need.length + ' legs still unmeasured after trying.  ' + cacheNote);
+    }
+    return;
+  }
+
+  routes = packRoutes(clients);
+  document.body.className = 'working';   // reveal the content area
+
+  // Second pass: the packer decided WHO travels together using nearby legs
+  // only. Now buy every leg inside each route so the order within it can be
+  // optimised properly, then pack once more on the fuller picture.
+  if (!refined){
+    const inner = missingRoutePairs();
+    if (inner.length){
+      refined = true;
+      setStatus('Routes drafted. Measuring ' + inner.length + ' legs inside them to optimise the order…');
+      measureLegs(inner).then(()=>{ buildAndRender(); });
+      return;
+    }
+    refined = true;
+  }
+
+  $('rebuild').disabled = false;
+  $('save').disabled = false;
+  render();
+  setStatus('Built ' + routes.length + ' routes from ' + clients.length + ' parcels, nothing measured this run.  '
+    + cacheNote
+    + (newlyZoned ? '  ' + newlyZoned + ' new location(s) placed into zones — press Rebuild zones to keep that.' : ''));
+}
+
+/* ---------- measure: full pairwise matrix, cached forever ---------- */
+/* Fetch a list of legs from Google and persist them for everyone. */
+async function measureLegs(need){
+  if (!need.length) return 0;
+
+  // group by origin so each request is one origin against up to 25 destinations
+  const byOrigin = new Map();
+  need.forEach(([a,b])=>{
+    const k = ptKey(a);
+    if (!byOrigin.has(k)) byOrigin.set(k, { origin:a, dests:[] });
+    byOrigin.get(k).dests.push(b);
+  });
+
+  const svc = new google.maps.DistanceMatrixService();
+  const fresh = {};
+  let done = 0, failed = 0;
+
+  for (const { origin, dests } of byOrigin.values()){
+    for (let i=0;i<dests.length;i+=25){
+      const chunk = dests.slice(i,i+25);
+      await new Promise(res=>{
+        svc.getDistanceMatrix(
+          { origins:[origin], destinations:chunk, travelMode: google.maps.TravelMode.DRIVING },
+          (r,st)=>{
+            if (st==='OK' && r.rows[0]){
+              r.rows[0].elements.forEach((el,j)=>{
+                if (el.status==='OK'){
+                  const k = roadKey(origin, chunk[j]);
+                  const v = { km: el.distance.value/1000, min: el.duration.value/60 };
+                  roadCache[k] = v; fresh[k] = v;
+                } else failed++;
+              });
+            } else { failed += chunk.length; setStatus('Distance Matrix returned '+st); }
+            res();
+          });
+      });
+      done += chunk.length;
+      setStatus('Measured '+done+' of '+need.length+' legs…');
+      await new Promise(r=>setTimeout(r,120));
+    }
+  }
+
+  let saved = null, saveErr = '';
+  try { saved = await api('saveRoadCache', { pairs: JSON.stringify(fresh) }); }
+  catch(e){ saveErr = e.message; }
+
+  if (!saved || !saved.ok){
+    $('modeNote').insertAdjacentHTML('afterbegin',
+      '<div class="note live"><b>RoadCache did not save.</b> These measurements will have to be '
+      + 'bought again on the next run, and on every other device. '
+      + (saveErr ? 'Error: '+esc(saveErr)+'. ' : '')
+      + 'Check the saveRoadCache line in doPost and that you deployed a new version.</div>');
+  }
+  cacheNote = (saved && saved.ok
+    ? (saved.added||0) + ' new legs saved for everyone.'
+    : 'SHEET WRITE FAILED — nothing was saved.')
+    + (failed ? '  ' + failed + ' legs could not be measured.' : '');
+
+  return Object.keys(fresh).length;
+}
+
+$('measure').addEventListener('click', async () => {
+  if (!window.google || !google.maps || !google.maps.DistanceMatrixService){
+    setStatus('Google Maps still loading — try again in a moment.'); return;
+  }
+  if (!clients.length){ await load(); if (!clients.length) return; }
+
+  const need = missingPairs(uniqPts(clients));
+  if (!need.length){ setStatus('Every leg already measured.'); buildAndRender(); return; }
+
+  $('measure').disabled = true;
+  busy(true);
+  await measureLegs(need);
+  busy(false);
+  $('measure').disabled = false;
+  buildAndRender();
+});
+
+/* ---------- rebuild + save ---------- */
+$('rebuild').addEventListener('click', async () => {
+  if (!confirm('Rebuild the zone map from the points in this slot?\n\nClients in other slots keep their existing zones only if their point also appears here. Rebuild when you have added clients, not daily.')) return;
+  const merged = { ...zoneMap, ...buildZones(uniqPts(clients)) };
+  const r = await api('saveRouteZones', { zones: JSON.stringify(merged) });
+  if (r && r.ok){ zoneMap = merged; routes = packRoutes(clients); render();
+    setStatus('Zone map saved — '+r.written+' points.'); }
+  else setStatus('Zone save failed: '+JSON.stringify(r));
+});
+
+$('save').addEventListener('click', async () => {
+  const date = $('date').value, live = $('mode').value === 'live';
+  const slotsHere = [...new Set(routes.map(r=>r.slot).filter(Boolean))];
+
+  if (unassigned.length && !confirm(unassigned.length+' client(s) are still unassigned and will NOT be saved.\n\nContinue anyway?')) return;
+
+  if (!slotsHere.length){ setStatus('Nothing to save.'); return; }
+
+  if (live){
+    if (!confirm('LIVE SAVE\n\nThis writes RouteAssign, which overrides Master Client List. '
+      + 'delivery.html and kitchen.html will immediately show these routes for '
+      + date + ' — ' + slotsHere.join(', ') + '.\n\nProceed?')) return;
+  } else {
+    if (!confirm('Save '+routes.length+' routes as a DRAFT for '+date+'\n('
+      + slotsHere.join(', ') + ')?\n\n'
+      + 'Nothing reads the draft sheet, so delivery stays on Master Client List.')) return;
+  }
+
+  $('save').disabled = true;
+  try {
+    if (!live){
+      let routeCount = 0, clientCount = 0, bad = '';
+      for (const sl of slotsHere){
+        const payload = routes.filter(r=>r.slot === sl).map(r=>({
+          name: r.name, agent: r.agent||'', agentPhone: r.agentPhone||'',
+          phones: r.rows.map(x=>x.phone)
+        }));
+        const res = await api('saveRouteDraft', { date, slot: sl, routes: JSON.stringify(payload) });
+        if (res && res.ok){ routeCount += res.routes; clientCount += res.clients; }
+        else bad += ' ' + sl + ' failed.';
+      }
+      setStatus('Draft saved — '+routeCount+' routes, '+clientCount+' clients across '
+        + slotsHere.join(', ') + '. Live delivery unchanged.' + bad);
+    } else {
+      let ok=0, fail=0;
+      for (const r of routes){
+        const res = await api('saveRouteAssignment', {
+          date, slot: r.slot, route: r.name, phones: r.rows.map(x=>x.phone).join(',')
+        });
+        if (res && res.ok) ok++; else fail++;
+        if (r.agent) await api('saveDeliveryAgent', { route:r.name, name:r.agent, agentPhone:r.agentPhone||'' });
+      }
+      setStatus('Saved LIVE: '+ok+' routes across '+slotsHere.join(', ')
+        + (fail?', '+fail+' failed':'')+'.');
+    }
+  } catch(e){ setStatus('Save error: '+e.message); }
+  $('save').disabled = false;
+});
+
+function renderMode(){
+  const live = $('mode').value === 'live';
+  $('modeNote').innerHTML = live
+    ? '<div class="note live"><b>Live mode.</b> Saving writes RouteAssign and DeliveryAgents. '
+      + 'These override Master Client List, so delivery.html and kitchen-status.html will show '
+      + 'these routes immediately.</div>'
+    : '<div class="note draft"><b>Draft mode.</b> Saving writes RouteAssignDraft, which nothing reads. '
+      + 'delivery.html keeps running off Master Client List exactly as before.</div>';
+}
+$('mode').addEventListener('change', renderMode);
+renderMode();
+
+/* ---------- split ---------- */
+function autoSplit(ri, size){
+  snapshot();
+  const r = routes[ri];
+  const pts = r.m.order;
+  const ordered = [];
+  pts.forEach(p=>{ r.rows.forEach(x=>{ if (ptKey(x.coord)===ptKey(p)) ordered.push(x); }); });
+  r.rows.forEach(x=>{ if (!ordered.includes(x)) ordered.push(x); });
+
+  const nGroups = Math.ceil(ordered.length/size);
+  const per = Math.ceil(ordered.length/nGroups);   // balanced, so 5 -> 3+2 not 4+1
+  const chunks = [];
+  for (let i=0;i<ordered.length;i+=per) chunks.push(ordered.slice(i,i+per));
+
+  routes.splice(ri, 1, ...chunks.map((rows,i)=>({
+    name: r.name+'-'+String.fromCharCode(97+i), rows, renamed: true,
+    slot: r.slot, kind: r.kind, agent:r.agent, agentPhone:r.agentPhone, m: measure(rows)
+  })));
+  renumber(); render();
+  setStatus('Split into '+chunks.length+' bookings. Press Undo to put it back.');
+}
+
+function manualSplit(ri){
+  const picked = [...document.querySelectorAll('input.pick[data-r="'+ri+'"]:checked')]
+    .map(el=>el.dataset.p);
+  if (!picked.length){ setStatus('Tick the clients to move out first.'); return; }
+  snapshot();
+  const r = routes[ri];
+  const out = r.rows.filter(x=>picked.includes(x.phone));
+  const stay = r.rows.filter(x=>!picked.includes(x.phone));
+  if (!stay.length){ setStatus('That would empty the route.'); return; }
+  routes.splice(ri, 1,
+    { ...r, rows:stay, m:measure(stay) },
+    { name:r.name+'-b', rows:out, slot:r.slot, kind:r.kind,
+      agent:'', agentPhone:'', m:measure(out) });
+  renumber(); render();
+}
+
+function mergeInto(ri, sel){
+  const ti = parseInt(sel.value);
+  sel.value = '';
+  if (isNaN(ti) || ti === ri) return;
+  snapshot();
+  const target = routes[ti], src = routes[ri];
+  const rows = target.rows.concat(src.rows);
+  routes[ti] = { ...target, rows, m: measure(rows) };
+  routes.splice(ri, 1);
+  renumber(); render();
+  setStatus('Merged into ' + routes[ti > ri ? ti-1 : ti].name + '. Undo is available.');
+}
+
+/* ---------- undo ---------- */
+let history = [];
+function snapshot(){
+  history.push(routes.map(r=>({ ...r, rows: r.rows.slice() })));
+  if (history.length > 30) history.shift();
+  $('undo').disabled = false;
+}
+$('undo').addEventListener('click', () => {
+  if (!history.length) return;
+  routes = history.pop();
+  $('undo').disabled = !history.length;
+  render();
+  setStatus('Reverted.');
+});
+
+function removeClient(ri, phone){
+  snapshot();
+  const r = routes[ri];
+  const idx = r.rows.findIndex(x=>x.phone===phone);
+  if (idx < 0) return;
+  unassigned.push(r.rows[idx]);
+  r.rows.splice(idx,1);
+  if (!r.rows.length) routes.splice(ri,1); else r.m = measure(r.rows);
+  renumber(); render();
+}
+
+/* pull a client into route ri from the unassigned pool or another route */
+function addClient(ri, phone){
+  snapshot();
+  let c = null;
+  const ui = unassigned.findIndex(x=>x.phone===phone);
+  if (ui >= 0) c = unassigned.splice(ui,1)[0];
+  else {
+    for (let i=0;i<routes.length;i++){
+      const j = routes[i].rows.findIndex(x=>x.phone===phone);
+      if (j >= 0){
+        c = routes[i].rows.splice(j,1)[0];
+        if (!routes[i].rows.length){ routes.splice(i,1); if (i < ri) ri--; }
+        else routes[i].m = measure(routes[i].rows);
+        break;
+      }
+    }
+  }
+  if (!c) return;
+  routes[ri].rows.push(c);
+  routes[ri].m = measure(routes[ri].rows);
+  renumber(); render();
+}
+
+/* send an unassigned client to a route chosen from the dropdown */
+function assignFromPool(phone, sel){
+  const ri = parseInt(sel.value);
+  sel.value = '';
+  if (isNaN(ri)) return;
+  addClient(ri, phone);
+}
+
+/* an unassigned client can also become a route of its own */
+function poolToNewRoute(phone){
+  snapshot();
+  const i = unassigned.findIndex(x=>x.phone===phone);
+  if (i < 0) return;
+  const c = unassigned.splice(i,1)[0];
+  routes.push({ name:'', slot:String(c.slot||'').trim(), kind:'porter', rows:[c],
+                agent:'', agentPhone:'', m:measure([c]) });
+  renumber(); render();
+}
+
+function toggleAdd(ri){
+  addOpen = (addOpen === ri) ? null : ri;
+  addFilter = '';
+  render();
+  const box = document.getElementById('addSearch');
+  if (box) box.focus();
+}
+function onAddFilter(v){
+  addFilter = v;
+  const list = document.getElementById('addList');
+  if (list) list.innerHTML = addListHtml(addOpen);
+}
+
+function addListHtml(ri){
+  const inRoute = {};
+  routes[ri].rows.forEach(x=>inRoute[x.phone]=1);
+  const f = addFilter.trim().toLowerCase();
+
+  const pool = unassigned.map(c=>({ c, from:'unassigned' }));
+  const others = [];
+  routes.forEach((r,i)=>{ if (i!==ri) r.rows.forEach(c=>others.push({ c, from:r.name })); });
+
+  const rows = pool.concat(others)
+    .filter(x=>!inRoute[x.c.phone])
+    .filter(x=>!f || String(x.c.name||'').toLowerCase().includes(f) || x.c.phone.includes(f));
+
+  if (!rows.length) return '<div class="hint">Nothing matches.</div>';
+
+  return rows.map(x=>
+    '<div class="addrow" onclick="addClient('+ri+',\''+x.c.phone+'\')">'+
+      '<span>'+esc(x.c.name)+'</span>'+
+      '<span class="pill">'+x.from+'</span>'+
+      '<span class="dim">'+roadPair(KITCHEN,x.c.coord).km.toFixed(1)+' km</span>'+
+    '</div>').join('');
+}
+
+/* Route names end up in RouteAssign, DeliveryAgents, delivery.html and
+   kitchen.html, so a name you choose here is the name everyone sees. */
+function renameRoute(i){
+  const cur = routes[i].name;
+  const next = (prompt('Route name', cur) || '').replace(/\s+/g,' ').trim();
+  if (!next || next === cur) return;
+  if (routes.some((r,j)=>j!==i && r.name.toLowerCase() === next.toLowerCase())){
+    setStatus('A route called "'+next+'" already exists.'); return;
+  }
+  snapshot();
+  routes[i].name = next;
+  routes[i].renamed = true;      // survives renumber()
+  render();
+}
+
+function renumber(){
+  const seen = {};
+  routes.forEach(r=>{
+    const p = (SLOT_PREFIX[r.slot] || 'R') + (r.kind === 'porter' ? 'P' : '');
+    seen[p] = (seen[p] || 0) + 1;
+    if (!r.renamed && !/-/.test(r.name)) r.name = p + seen[p];
+  });
+}
+
+
+
+/* =================== VIEW LAYER ===================
+ * Three screens, the way delivery.html works:
+ *   summary -> one card per slot
+ *   slot    -> one card per route in that slot
+ *   route   -> the client list, with the rider's WhatsApp message
+ * ================================================== */
+let view = { mode:'summary', slot:null, open:null };
+
+function go(mode, slot){
+  view = { mode, slot: slot==null?null:slot, open: null };
+  render();
+  window.scrollTo({ top:0, behavior:'smooth' });
+}
+
+
+/* chrome shared by every screen */
+function renderChrome(){
+  routes.forEach(r=>{ r.m = measure(r.rows); });
+
+  let driven = 0, drivenReal = 0;
+  routes.forEach(r=>{
+    let prev = KITCHEN;
+    (r.m.order || []).forEach(p=>{
+      const hit = roadCache[roadKey(prev,p)] || roadCache[roadKey(p,prev)];
+      driven++; if (hit) drivenReal++;
+      prev = p;
+    });
+  });
+  const pct = driven ? Math.round(drivenReal/driven*100) : 0;
+  $('cover').innerHTML = driven
+    ? '<span class="chip'+(pct<100?' bad':' ok')+'" title="'+drivenReal+' of '+driven+
+      ' legs on the built routes come from Google">'+pct+'% measured</span>' : '';
+
+  const totKm = routes.reduce((s,r)=>s+r.m.km,0);
+  const totP  = routes.reduce((s,r)=>s+r.m.parcels,0);
+  const over  = routes.filter(r=>!fits(r.m)).length;
+
+  const fx = routes.filter(r=>r.kind!=='porter');
+  const px = routes.filter(r=>r.kind==='porter');
+  const fxP = fx.reduce((s,r)=>s+r.m.parcels,0);
+
+  $('cards').innerHTML = routes.length ? [
+    cardEl(fxP + ' / ' + totP, 'on your riders', fxP===totP?'ok':'info'),
+    cardEl(fx.length,'rider routes'),
+    cardEl(px.length,'porter bookings', px.length?'':'ok'),
+    cardEl(totKm.toFixed(1)+' km','driven'),
+    cardEl(totP?(totKm/totP).toFixed(2):'0','km / parcel','info'),
+    cardEl(notRouted.length,'not routed', notRouted.length?'bad':''),
+    cardEl(over,'over limit', over?'bad':'ok')
+  ].join('') : '';
+}
+
+function render(){
+  renderChrome();
+  if (view.mode === 'slot' && view.slot) return renderSlot();
+  view = { mode:'summary', slot:null, open:null };
+  renderSummary();
+}
+
+/* ---------- screen 1: slots ---------- */
+function renderSummary(){
+  $('notRouted').innerHTML = notRouted.length ? (
+    '<div class="panel warn"><h3>Not routed &mdash; '+notRouted.length+'</h3><table>'+
+    '<tr><th>name</th><th>phone</th><th>slot</th><th>location</th><th>reason</th></tr>'+
+    notRouted.map(c=>'<tr><td>'+esc(c.name)+'</td><td>'+c.phone+'</td><td>'+esc(c.slot||'')+'</td><td>'+
+      esc(c.location||'—')+'</td><td><span class="pill">'+c.why+'</span></td></tr>').join('')+
+    '</table><div class="hint">Self-pickup clients belong here. Anything else needs its Master location fixed.</div></div>'
+  ) : '';
+
+  $('pool').innerHTML = unassigned.length ? (
+    '<div class="panel info"><h3>Unassigned &mdash; '+unassigned.length+
+    ' <span class="dim">(these will NOT be saved)</span></h3><table>'+
+    '<tr><th>name</th><th>phone</th><th class="num">km</th><th>location</th><th>send to</th></tr>'+
+    unassigned.slice().sort((a,b)=>roadPair(KITCHEN,a.coord).km-roadPair(KITCHEN,b.coord).km)
+      .map(c=>'<tr><td>'+esc(c.name)+'</td><td>'+c.phone+'</td>'+
+        '<td class="num">'+roadPair(KITCHEN,c.coord).km.toFixed(1)+'</td>'+
+        '<td>'+esc(c.location||'')+'</td>'+
+        '<td><select onchange="assignFromPool(\''+c.phone+'\',this)">'+
+          '<option value="">route…</option>'+
+          routes.map((o,oi)=>'<option value="'+oi+'">'+esc(o.name)+'</option>').join('')+
+        '</select> <button class="btn alt sm" onclick="poolToNewRoute(\''+c.phone+'\')">new route</button></td></tr>').join('')+
+    '</table></div>'
+  ) : '';
+
+  if (!routes.length){ $('routes').innerHTML = ''; return; }
+
+  const slots = SLOT_ORDER.filter(s => routes.some(r=>r.slot===s));
+  $('routes').innerHTML = slots.map(s=>{
+    const rs = routes.filter(r=>r.slot===s);
+    const fxr = rs.filter(r=>r.kind!=='porter'), pxr = rs.filter(r=>r.kind==='porter');
+    const p  = rs.reduce((a,r)=>a+r.m.parcels,0);
+    const fp = fxr.reduce((a,r)=>a+r.m.parcels,0);
+    const km = rs.reduce((a,r)=>a+r.m.km,0);
+    const bad = rs.filter(r=>!fits(r.m)).length;
+    return '<div class="slotcard" onclick="go(\'slot\',\''+s+'\')">'+
+      '<div class="sc-top"><span class="sc-name">'+esc(s)+'</span>'+
+        '<span class="dim">'+rs.length+' route'+(rs.length>1?'s':'')+' &rsaquo;</span></div>'+
+      '<div class="sc-sub">'+p+' parcels &middot; '+km.toFixed(1)+' km driven</div>'+
+      '<div class="chips">'+
+        '<span class="chip ok">'+fp+' on '+fxr.length+' rider route'+(fxr.length===1?'':'s')+'</span>'+
+        (pxr.length ? '<span class="chip">'+pxr.length+' porter booking'+(pxr.length===1?'':'s')+'</span>'
+                    : '<span class="chip ok">no porter needed</span>')+
+        (bad ? '<span class="chip bad">'+bad+' over limit</span>' : '')+
+      '</div></div>';
+  }).join('');
+}
+
+/* ---------- screen 2: routes in a slot, one expanding inline ---------- */
+function toggleRoute(i){
+  const name = routes[i] && routes[i].name;
+  view.open = (view.open === name) ? null : name;
+  render();
+}
+function isOpen(i){ return !!routes[i] && routes[i].name === view.open; }
+
+function renderSlot(){
+  $('notRouted').innerHTML = ''; $('pool').innerHTML = '';
+  const s = view.slot;
+  const idxs = routes.map((r,i)=>i).filter(i=>routes[i].slot===s);
+  const fxi = idxs.filter(i=>routes[i].kind!=='porter');
+  const pxi = idxs.filter(i=>routes[i].kind==='porter');
+  const par = ar => ar.reduce((a,i)=>a+routes[i].m.parcels,0);
+
+  const card = i => {
+    const r = routes[i], m = r.m, bad = !fits(m), open = isOpen(i);
+    return '<div class="routecard'+(bad?' over':'')+(open?' open':'')+
+             (r.kind==='porter'?' porter':'')+'">'+
+      '<div class="rc-head" onclick="toggleRoute('+i+')">'+
+        '<div class="sc-top"><span class="rc-name">'+esc(r.name)+'</span>'+
+          '<span class="dim">'+(r.agent ? esc(r.agent) : (r.kind==='porter'?'porter':'no rider'))+
+          ' <span class="chev">'+(open?'&#9652;':'&#9662;')+'</span></span></div>'+
+        '<div class="chips">'+
+          chip(m.parcels+' parcels', m.parcels>num('maxP'))+
+          chip(m.km.toFixed(1)+' km driven', num('maxTotKm')>0 && m.km>num('maxTotKm'))+
+          chip(Math.round(m.total)+' min', m.total>num('maxMin'))+
+          chip('spread '+m.spread.toFixed(1)+' km', num('maxSpread')>0 && m.spread>num('maxSpread'))+
+          chip(m.kmpp.toFixed(2)+' km/p')+
+        '</div>'+
+      '</div>'+
+      (open ? '<div class="rc-body">'+routeDetail(i)+'</div>' : '')+
+    '</div>';
+  };
+
+  $('routes').innerHTML =
+    '<span class="back" onclick="go(\'summary\')">&lsaquo; All slots</span>'+
+
+    '<div class="panel"><h3>'+esc(s)+' &mdash; '+par(idxs)+' parcels</h3>'+
+      '<div class="hint">'+par(fxi)+' on '+fxi.length+' rider route'+(fxi.length===1?'':'s')+
+      (pxi.length ? ', '+par(pxi)+' across '+pxi.length+' porter booking'+(pxi.length===1?'':'s') : ', no porter needed')+
+      '. Tap a route to open it.</div></div>'+
+
+    (fxi.length ? '<div class="secthead">Your riders</div>' + fxi.map(card).join('') : '')+
+    (pxi.length ? '<div class="secthead porter">Porter bookings &mdash; max '+
+                  Math.round(num('porterMax'))+' parcels each</div>' + pxi.map(card).join('') : '');
+}
+
+/* the expanded contents of one route card */
+function routeDetail(i){
+  const r = routes[i];
+
+  const agentOpts = ['<option value="">— agent —</option>']
+    .concat(agents.map(a=>'<option value="'+esc(a.name)+'"'+
+       (a.name===r.agent?' selected':'')+'>'+esc(a.name)+'</option>'))
+    .concat('<option value="__new">+ new agent</option>').join('');
+
+  return '<div class="actrow">'+
+      '<select onchange="pickAgent('+i+',this)">'+agentOpts+'</select>'+
+      '<button class="btn alt sm" onclick="renameRoute('+i+')">Rename</button>'+
+      '<button class="btn alt sm" onclick="toggleAdd('+i+')">'+(addOpen===i?'Close':'+ Add client')+'</button>'+
+      '<button class="btn alt sm" onclick="autoSplit('+i+',4)">Split into 4s</button>'+
+      '<button class="btn alt sm" onclick="manualSplit('+i+')">Move ticked out</button>'+
+      (routes.filter(x=>x.slot===r.slot).length>1
+        ? '<select onchange="mergeInto('+i+',this)"><option value="">merge into…</option>'+
+          routes.map((o,oi)=>(oi===i||o.slot!==r.slot)?'':'<option value="'+oi+'">'+esc(o.name)+'</option>').join('')+
+          '</select>' : '')+
+    '</div>'+
+
+    (addOpen===i ? '<div class="addpanel">'+
+       '<input id="addSearch" placeholder="search name or phone…" oninput="onAddFilter(this.value)">'+
+       '<div id="addList" class="addlist">'+addListHtml(i)+'</div></div>' : '')+
+
+    '<table>'+
+      '<tr><th class="num">#</th><th></th><th>name</th><th>phone</th><th>zone</th>'+
+      '<th class="num">leg km</th><th>location</th><th></th></tr>'+
+      inDriveOrder(r).map(x=>{
+        const c=x.c, z=(zoneMap[ptKey(c.coord)]||{}).zone||'—';
+        return '<tr'+(x.same?' class="same"':'')+'>'+
+          '<td class="num">'+(x.same?'&#8226;':x.stop)+'</td>'+
+          '<td><input type="checkbox" class="pick" data-r="'+i+'" data-p="'+c.phone+'"></td>'+
+          '<td>'+esc(c.name)+'</td><td>'+c.phone+'</td>'+
+          '<td><span class="pill">'+z+'</span></td>'+
+          '<td class="num">'+(x.same?'—':x.legKm.toFixed(1))+'</td>'+
+          '<td>'+esc(c.location||'')+'</td>'+
+          '<td><button class="rowx" title="remove from route" onclick="removeClient('+i+',\''+c.phone+'\')">&times;</button></td></tr>';
+      }).join('')+
+    '</table>'+
+
+    '<div class="msghead">Message for the rider</div>'+
+    '<div class="msgbox">'+esc(routeMessage(r))+'</div>'+
+    '<div class="actrow">'+
+      '<button class="btn alt sm" onclick="copyRouteMsg('+i+')">Copy</button>'+
+      '<button class="btn wa sm" onclick="shareRouteMsg('+i+')">Share on WhatsApp</button>'+
+    '</div>';
+}
+
+/* ---------- the rider's message ---------- */
+/* The saved Google Maps link from Master opens on the real place, with its
+   name and pin, which is what the riders are used to. Only when a client has
+   no saved link do we fall back to raw coordinates. Commas are encoded as
+   %2C so WhatsApp does not cut the link short. */
+function mapLink(c){
+  const saved = String((c && c.link) || '').trim();
+  if (saved) return saved.replace(/,/g, '%2C');
+  const co = (c && c.coord) ? c.coord : c;
+  if (!co || co.lat == null) return '';
+  return 'https://www.google.com/maps/search/?api=1&query='
+       + co.lat.toFixed(6) + '%2C' + co.lng.toFixed(6);
+}
+
+function routeMessage(r){
+  const lines = [];
+  lines.push(r.name + ' — ' + r.slot + ' — ' + $('date').value);
+  if (r.agent) lines.push('Agent: ' + r.agent + (r.agentPhone ? ' (' + r.agentPhone + ')' : ''));
+  lines.push('');
+
+  inDriveOrder(r).forEach(x=>{
+    const c = x.c;
+    if (x.same){
+      lines.push('    • ' + c.name + ' — ' + c.phone);
+    } else {
+      lines.push(x.stop + '. ' + c.name + ' — ' + c.phone);
+      if (c.location) lines.push('   ' + c.location);
+      const ml = mapLink(c);
+      if (ml) lines.push('   ' + ml);
+    }
+  });
+
+  lines.push('');
+  lines.push('Total: ' + r.m.parcels + ' parcels, '
+    + r.m.km.toFixed(1) + ' km, about ' + Math.round(r.m.total) + ' min');
+  return lines.join('\n');
+}
+
+function copyRouteMsg(i){
+  const t = routeMessage(routes[i]);
+  const done = ok => toast(ok ? 'Copied to clipboard' : 'Copy failed — long-press the text to copy');
+  if (navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(t).then(()=>done(true)).catch(()=>done(fallbackCopy(t)));
+  } else done(fallbackCopy(t));
+}
+function fallbackCopy(text){
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.position='fixed'; ta.style.opacity='0';
+    document.body.appendChild(ta); ta.focus(); ta.select();
+    const ok = document.execCommand('copy'); document.body.removeChild(ta);
+    return ok;
+  } catch(e){ return false; }
+}
+function shareRouteMsg(i){
+  const r = routes[i];
+  const text = routeMessage(r);
+  const phone = String(r.agentPhone||'').replace(/\D/g,'');
+  const to = phone ? (phone.length === 10 ? '91'+phone : phone) : '';
+  window.open('https://wa.me/' + to + '?text=' + encodeURIComponent(text), '_blank');
+}
+
+function toast(msg){
+  const t = $('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 1900);
+}
+
+/* Rows in the order the rider actually drives them. Several parcels at one
+   building share a stop number, and only the first carries the leg distance —
+   you drive to the building once. */
+function inDriveOrder(r){
+  const order = r.m.order || [];
+  const byPt = {};
+  r.rows.forEach(c=>{ const k=ptKey(c.coord); (byPt[k]=byPt[k]||[]).push(c); });
+
+  const out = [];
+  let prev = KITCHEN, stop = 0;
+
+  order.forEach(p=>{
+    const k = ptKey(p), group = byPt[k];
+    if (!group) return;
+    stop++;
+    const legKm = roadPair(prev, p).km;
+    group.forEach((c,gi)=> out.push({ c, stop, legKm, same: gi>0 }));
+    delete byPt[k];
+    prev = p;
+  });
+
+  Object.keys(byPt).forEach(k=>{
+    byPt[k].forEach((c,gi)=> out.push({ c, stop:'?', legKm:0, same: gi>0 }));
+  });
+  return out;
+}
+
+function pickAgent(i, sel){
+  if (sel.value === '__new'){
+    const nm = prompt('New agent name'); if (!nm){ sel.value=routes[i].agent||''; return; }
+    const ph = prompt('Agent phone') || '';
+    agents.push({ name:nm, phone:ph }); agents.sort((x,y)=>x.name.localeCompare(y.name));
+    routes[i].agent = nm; routes[i].agentPhone = ph;
+    render(); return;
+  }
+  routes[i].agent = sel.value;
+  const a = agents.find(x=>(x.name||x)===sel.value);
+  routes[i].agentPhone = (a && a.phone) || '';
+  render();
+}
+
+/* readAgents_ returns an object keyed by route, and one person can cover
+   several routes, so flatten to a unique list of people. */
+function normAgents(raw){
+  const list = Array.isArray(raw) ? raw : Object.keys(raw||{}).map(k=>raw[k]);
+  const seen = {}, out = [];
+  list.forEach(a=>{
+    if (!a) return;
+    const name = String((typeof a === 'string') ? a : (a.name||'')).trim();
+    if (!name || seen[name.toLowerCase()]) return;
+    seen[name.toLowerCase()] = 1;
+    out.push({ name, phone: String((a && a.phone) || '') });
+  });
+  return out.sort((x,y)=>x.name.localeCompare(y.name));
+}
+
+const chip = (t,bad) => '<span class="chip'+(bad?' bad':'')+'">'+t+'</span>';
+const cardEl = (n,l,cls) => '<div class="card '+(cls||'')+'"><div class="n">'+n+'</div><div class="l">'+l+'</div></div>';
+const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+</script>
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCqVJgCfV0C1KBF0u1Jc02p_RHE7K7g1V8" async defer></script>
+</body>
+</html>
