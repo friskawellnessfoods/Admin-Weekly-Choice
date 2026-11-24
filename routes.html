@@ -454,6 +454,13 @@ const $ = id => document.getElementById(id) || {
   addEventListener(){}, insertAdjacentHTML(){}, focus(){}, click(){}, select(){}
 };
 let cacheNote = '', autoMeasured = false, refined = false;
+/* Measuring and packing feed each other: fuller distances change who travels
+   together, and a changed route exposes legs nobody has priced yet. One pass
+   is not enough, which is what left a leg reading "unpriced". Keep going until
+   nothing is missing, with a hard stop so a route that cannot be priced at all
+   does not spin. */
+const MAX_REFINE = 5;
+let refinePass = 0, toppedUp = false;
 let fromSaved = false, savedForDate = null, forceRebuild = false, setStatusText = '';
 let clients = [], notRouted = [], routes = [], zoneMap = {}, roadCache = {},
     agents = [], measured = null, unassigned = [], addOpen = null, addFilter = '';
@@ -1216,12 +1223,13 @@ async function load(){
          boot.roster  — the people themselves, which is what the picker needs
        The roster is fetched separately when the backend predates it, so this
        works whether or not getRouteBootstrap has been redeployed. */
-    savedAgentsByRoute = {};
+    /* Riders are picked fresh every day, so the pre-fill comes from THIS
+       date's own RouteAssign rows, not from DeliveryAgents — that sheet has
+       no date and would hand us whoever drove this route last. Reopening a
+       saved day brings its riders back; a new day starts at "no rider".
+       Route names still carry over, via inheritNames(). */
+    savedAgentsByRoute = boot.routeAgents || {};
     const rawAg = (boot.agents && boot.agents.agents) || {};
-    Object.keys(rawAg).forEach(k=>{
-      const a = rawAg[k];
-      if (a && a.route) savedAgentsByRoute[String(a.route).toLowerCase().trim()] = a;
-    });
 
     if (Array.isArray(boot.roster)){
       agents = boot.roster.map(a=>({ name:String(a.name||''), phone:String(a.phone||'') }))
@@ -1323,7 +1331,7 @@ async function load(){
       } catch(e){ /* no saved copy, or the call failed: just build */ }
     }
     forceRebuild = false;
-    autoMeasured = false; refined = false;
+    autoMeasured = false; refined = false; refinePass = 0; toppedUp = false;
     history = []; $('undo').disabled = true;
     routes = [];
     $('measure').disabled = false;
@@ -1375,26 +1383,45 @@ function buildAndRender(){
   routes = packRoutes(clients);
   document.body.className = 'working';   // reveal the content area
 
-  // Second pass: the packer decided WHO travels together using nearby legs
-  // only. Now buy every leg inside each route so the order within it can be
-  // optimised properly, then pack once more on the fuller picture.
-  if (!refined){
-    const inner = missingRoutePairs();
-    if (inner.length){
+  /* The packer decided WHO travels together from nearby legs only. Buy every
+     leg inside each route, pack again on the fuller picture, and repeat: each
+     repack can move a cluster and create an adjacency nobody has priced. */
+  const inner = missingRoutePairs();
+  if (inner.length){
+    if (refinePass < MAX_REFINE){
+      refinePass++;
       refined = true;
-      setStatus('Routes drafted. Measuring ' + inner.length + ' legs inside them to optimise the order…');
-      measureLegs(inner).then(()=>{ buildAndRender(); });
+      $('rebuild').disabled = true; $('save').disabled = true;
+      busy(true, 'Measuring ' + inner.length + plural(inner.length,' leg') +
+                 ' (pass ' + refinePass + ' of ' + MAX_REFINE + ')…');
+      setStatus('Routes drafted. Measuring ' + inner.length +
+                plural(inner.length,' leg') + ' inside them…');
+      measureLegs(inner).then(()=>{ busy(false); buildAndRender(); });
       return;
     }
-    refined = true;
+    /* Out of passes. Price whatever is still missing but leave the routes
+       alone, so the numbers on screen are complete even though the shape of
+       the day has stopped changing. */
+    if (!toppedUp){
+      toppedUp = true;
+      busy(true, 'Pricing the last ' + inner.length + plural(inner.length,' leg') + '…');
+      measureLegs(inner).then(()=>{ busy(false); finishBuild(newlyZoned); });
+      return;
+    }
   }
+  refined = true;
+  finishBuild(newlyZoned);
+}
 
+function finishBuild(newlyZoned){
   $('rebuild').disabled = false;
   $('save').disabled = false;
   render(); renderMode();
 
+  const short = routes.reduce((n,r)=>n + (r.gaps || 0), 0);
   setStatusText = 'Built ' + routes.length + ' routes from ' + clients.length + ' parcels.  ' + cacheNote
-    + (newlyZoned ? '  ' + newlyZoned + ' new location(s) placed into zones.' : '');
+    + (newlyZoned ? '  ' + newlyZoned + ' new location(s) placed into zones.' : '')
+    + (short ? '  ' + short + plural(short,' leg') + ' could not be priced by Google — those km are short by that much.' : '');
   setStatus(setStatusText);
 
   // a route you named by hand keeps that name the next day
@@ -1525,7 +1552,11 @@ $('save').addEventListener('click', async () => {
       });
       if (res && res.ok) ok++; else fail++;
       if (r.agent){
+        // DeliveryAgents is what the client app and kitchen board read
         await api('saveDeliveryAgent', { route:r.name, name:r.agent, agentPhone:r.agentPhone||'' });
+        // and the same rider against this date, so reopening the day is exact
+        await api('saveRouteAgent', { date, slot:r.slot, route:r.name,
+                                      name:r.agent, agentPhone:r.agentPhone||'' });
       }
     }
     savedForDate = date;
