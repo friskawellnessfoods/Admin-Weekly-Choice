@@ -388,12 +388,12 @@
     <div class="field">
       <button class="btn go" id="saveSettings" style="width:100%">Save limits for everyone</button>
       <div class="why">Stored in the spreadsheet, so every device builds to the same rules.
-        Changes take effect on the next build.</div>
+        Saving offers to build this day again straight away.</div>
     </div>
     <div class="field" style="border-top:1px solid var(--rule); padding-top:14px">
-      <button class="btn line" id="rebuild" style="width:100%" disabled>Redraw the client clusters</button>
-      <div class="why">Groups every delivery point afresh using the distance above.
-        Only needed after adding clients in a new part of the city — not day to day.</div>
+      <button class="btn line" id="rebuild" style="width:100%" disabled>Build this day again with these limits</button>
+      <div class="why">Throws away today's routes and packs them from scratch under the
+        limits above. Anything you changed by hand is lost.</div>
     </div>
     <button class="btn line" style="width:100%" onclick="closeSheet('adv')">Close</button>
     <input type="hidden" id="api">
@@ -505,9 +505,23 @@ $('saveSettings').addEventListener('click', async () => {
   busy(true, 'Saving limits…');
   try {
     const res = await api('setRouteLimits', { limits: JSON.stringify(payload) });
-    setStatus(res && res.ok
-      ? 'Settings saved. Every device and the automatic run now use these limits.'
-      : 'Could not save settings: ' + JSON.stringify(res));
+    if (!res || !res.ok){
+      setStatus('Could not save settings: ' + JSON.stringify(res));
+    } else {
+      setStatus('Settings saved. Every device and the automatic run now use these limits.');
+      busy(false);
+      $('saveSettings').disabled = false;
+      /* New limits mean nothing until the day is packed again, and hunting for
+         a second button to make that happen is how a staff member ends up
+         dispatching yesterday's rules. */
+      if (routes.length && confirm('Limits saved.\n\nBuild this day again with them now?\n\n'
+            + 'Anything you changed by hand will be lost.')){
+        closeSheet('adv');
+        forceRebuild = true;
+        load();
+      }
+      return;
+    }
   } catch(e){ setStatus('Could not save settings: ' + e.message); }
   busy(false);
   $('saveSettings').disabled = false;
@@ -1225,8 +1239,9 @@ function routeAgentName(routeName){
 let savedAgentsByRoute = {};
 
 function rebuildFresh(){
-  if (!confirm('Throw away the saved routes for this date and build them again from scratch?\n\n'
+  if (!confirm('Build this day again with the limits above?\n\n'
     + 'Any changes you made by hand will be lost.')) return;
+  closeSheet('adv');          // get out of the way so the progress is visible
   forceRebuild = true;
   load();
 }
