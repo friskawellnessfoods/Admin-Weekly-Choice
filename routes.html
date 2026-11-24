@@ -380,6 +380,11 @@
     <div class="field"><label>Clients closer than this always ride together (km)</label>
       <input type="number" id="zr" value="1" min="0.1" step="0.1">
       <div class="why">One building never gets split across two routes.</div></div>
+    <div class="field"><label>Longest distance between two clients on a route (km)</label>
+      <input type="number" id="hopKm" value="10" min="0" step="0.5">
+      <div class="why">Two clients never share a route — your rider's or a Porter — if the
+        drive from one to the next is longer than this. 0 turns the limit off. Set it low
+        and you get more, tighter routes.</div></div>
     <div class="field">
       <button class="btn go" id="saveSettings" style="width:100%">Save limits for everyone</button>
       <div class="why">Stored in the spreadsheet, so every device builds to the same rules.
@@ -435,7 +440,7 @@ const slotsWanted = () => {
   const on = [...document.querySelectorAll('.slotbox:checked')].map(b=>b.value);
   return on.length ? on : SLOT_ORDER;   // nothing ticked means everything
 };
-const LIMIT_FIELDS = ['maxP','maxTotKm','maxMin','stopMin','zr','agents'];
+const LIMIT_FIELDS = ['maxP','maxTotKm','maxMin','stopMin','zr','hopKm','agents'];
 
 /* Settings that were dials but never earned one.
    PORTER_MAX   a Porter booking takes four parcels.
@@ -749,7 +754,8 @@ function measureKey(rows){
   return uniqPts(rows).map(ptKey).sort().join('|') + '#' + rows.length;
 }
 function measure(rows){
-  const stamp = num('stopMin') + ',' + num('maxP') + ',' + num('maxTotKm') + ',' + num('maxMin') + ',' + Object.keys(roadCache).length;
+  const stamp = num('stopMin') + ',' + num('maxP') + ',' + num('maxTotKm') + ',' + num('maxMin')
+              + ',' + num('hopKm') + ',' + Object.keys(roadCache).length;
   if (stamp !== _mStamp){ _mCache = new Map(); _mStamp = stamp; }
   const k = measureKey(rows);
   const hit = _mCache.get(k);
@@ -764,9 +770,20 @@ function measureRaw(rows){
   const t = tour(pts);
   const stop = rows.length * num('stopMin');
 
-  // longest single hop on the route, kitchen leg included
-  let maxLeg = 0, prev = KITCHEN;
-  t.order.forEach(p=>{ const d = roadPair(prev,p).km; if (isFinite(d) && d > maxLeg) maxLeg = d; prev = p; });
+  /* Two longest-hop figures, and the difference matters. maxLeg counts the
+     run out from the kitchen, which is legitimately long for a far-flung
+     group. maxHop is between stops only — that is what says whether these
+     clients are actually near each other. */
+  let maxLeg = 0, maxHop = 0, maxHopHv = 0, prev = KITCHEN;
+  t.order.forEach((p,i)=>{
+    const d = roadPair(prev,p).km;
+    if (isFinite(d)){
+      if (d > maxLeg) maxLeg = d;
+      if (i > 0 && d > maxHop) maxHop = d;
+    }
+    if (i > 0){ const h = hv(prev,p); if (h > maxHopHv) maxHopHv = h; }
+    prev = p;
+  });
   const lastLeg = roadPair(KITCHEN, t.last).km;
 
   // widest straight-line gap between any two stops — how spread out the route is
@@ -781,7 +798,7 @@ function measureRaw(rows){
     lastKm: isFinite(lastLeg) ? lastLeg : 0,
     kmpp: rows.length ? t.km/rows.length : 0,
     gaps: t.gaps || 0,
-    maxLeg, spread, order: t.order
+    maxLeg, maxHop, maxHopHv, spread, order: t.order
   };
 }
 function uniqPts(rows){
@@ -789,15 +806,34 @@ function uniqPts(rows){
   rows.forEach(r=>{ const k=ptKey(r.coord); if(!seen[k]){seen[k]=1;out.push(r.coord);} });
   return out;
 }
-/* Total km driven and total minutes are what actually bind a route. The
-   spread (widest gap between two stops) is shown on the card so a stretched
-   route is visible, but it is not a limit. */
+/* Total km driven and total minutes bind a route, and so does how far apart
+   two consecutive clients are: a 20 km jump between doors is two trips being
+   sold as one, whoever is riding it. */
+function hopOk(m){
+  const lim = num('hopKm');
+  if (lim <= 0 || m.parcels <= 1) return true;
+
+  /* Straight line is always shorter than the drive, so a straight-line gap
+     over the limit means the real hop is over it too — that much is certain
+     before anything is measured, and it is what stops a far pair being
+     bundled on the first pass while the cache is still filling. */
+  if (m.maxHopHv > lim) return false;
+
+  /* An unmeasured leg is skipped by maxHop, so a group with gaps reads tighter
+     than it is. Allow it for now rather than deadlock — the next pass measures
+     those legs and checks again, and the build does not stop until none are
+     missing. */
+  if (m.gaps) return true;
+  return m.maxHop <= lim;
+}
+
 function fits(m, parcelCap){
   const cap = num('maxTotKm');
   const pc  = parcelCap || num('maxP');
   return m.parcels <= pc
       && m.total <= num('maxMin')
-      && (cap <= 0 || m.km <= cap);
+      && (cap <= 0 || m.km <= cap)
+      && hopOk(m);
 }
 
 /* ---------- zones: stable clusters of points ---------- */
