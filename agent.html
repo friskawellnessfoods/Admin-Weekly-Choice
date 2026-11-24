@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Friska — My Deliveries</title>
+<link rel="manifest" href="agent-manifest.json">
+<meta name="theme-color" content="#15306b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Friska Deliveries">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="config.js"></script>
+<style>
+  :root{
+    --ink:#15306b; --ink-2:#56699a; --ink-3:#8b9cc2;
+    --paper:#ebf0fa; --surface:#fff; --rule:#cfdaf0; --rule-2:#e4ebf8; --tint:#f6f9ff;
+    --go:#0d9488; --go-bg:#dcf3f0; --warn:#a4620a; --warn-bg:#fdf1dd;
+    --bad:#c2282c; --wa:#1faa52;
+    --deep:linear-gradient(145deg,#15306b 0%,#1d3f8f 58%,#1b4fa8 100%);
+    --tap:50px;
+  }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html{ -webkit-text-size-adjust:100%; }
+  body{ margin:0; background:var(--paper); color:var(--ink);
+    font-family:"IBM Plex Sans",system-ui,-apple-system,sans-serif;
+    font-size:16px; line-height:1.45; font-variant-numeric:tabular-nums;
+    overscroll-behavior-y:contain; }
+  input,button,select{ font:inherit; color:inherit; }
+
+  /* An id beats a class, so the hidden state has to be stated per screen —
+     otherwise #sGate's own display wins and the sign-in sits under everything. */
+  .screen{ display:none; }
+  body[data-at="gate"]  #sGate{ display:flex; }
+  body[data-at="slots"] #sSlots,
+  body[data-at="route"] #sRoute{ display:block; }
+
+  /* sign in */
+  #sGate{ min-height:100dvh; flex-direction:column; align-items:center;
+    justify-content:center; gap:20px; padding:30px 22px; }
+  #sGate img{ height:58px; }
+  #sGate h1{ margin:0; font-size:25px; font-weight:700; letter-spacing:-.02em; }
+  #sGate p{ margin:0; color:var(--ink-2); font-size:14.5px; text-align:center; max-width:280px; }
+  #sGate .f{ width:100%; max-width:320px; display:flex; flex-direction:column; gap:12px; }
+
+  input[type=tel], input[type=date]{ width:100%; min-height:var(--tap); padding:13px 15px;
+    font-size:17px; background:var(--surface); color:var(--ink);
+    border:1px solid var(--rule); border-radius:12px; }
+  input:focus{ outline:none; border-color:var(--go); box-shadow:0 0 0 3px rgba(13,148,136,.16); }
+
+  .btn{ min-height:var(--tap); width:100%; padding:14px 18px; border:0; border-radius:12px;
+    font-size:16.5px; font-weight:600; cursor:pointer; background:var(--ink); color:#fff; }
+  .btn:active:not(:disabled){ transform:translateY(1px); }
+  .btn.go{ background:var(--go); }
+  .btn.line{ background:var(--surface); color:var(--ink); border:1px solid var(--rule); }
+  .btn.wa{ background:var(--wa); }
+  .btn.sm{ min-height:42px; width:auto; padding:9px 15px; font-size:14.5px; border-radius:10px; }
+  .btn:disabled{ opacity:.4; }
+
+  /* header */
+  .top{ position:sticky; top:0; z-index:20; background:var(--deep); color:#fff;
+    padding:calc(11px + env(safe-area-inset-top)) 15px 12px; }
+  .top .r1{ display:flex; align-items:center; gap:10px; }
+  .top .me{ font-size:17px; font-weight:600; letter-spacing:-.01em; }
+  .top .sub{ font-size:12.5px; color:#a9bfe6; margin-top:1px; }
+  .top .grow{ flex:1; }
+  .tbtn{ min-height:40px; padding:0 13px; border:0; border-radius:10px;
+    background:rgba(255,255,255,.12); color:#fff; font-size:14px; font-weight:600; cursor:pointer; }
+  .top .r2{ margin-top:11px; display:flex; gap:9px; align-items:center; }
+  .top input[type=date]{ min-height:40px; padding:8px 12px; font-size:14.5px;
+    background:rgba(255,255,255,.12); border:0; color:#fff; }
+  .top input[type=date]::-webkit-calendar-picker-indicator{ filter:invert(1); opacity:.8; }
+
+  .wrap{ max-width:620px; margin:0 auto; padding:15px 15px calc(30px + env(safe-area-inset-bottom)); }
+
+  /* slot cards */
+  .slotcard{ background:var(--surface); border:1px solid var(--rule); border-radius:14px;
+    padding:17px; margin-bottom:12px; cursor:pointer; width:100%; text-align:left; }
+  .slotcard:active{ background:var(--tint); }
+  .slotcard .m{ font-size:19px; font-weight:700; letter-spacing:-.015em; }
+  .slotcard .d{ font-size:13.5px; color:var(--ink-2); margin-top:4px; }
+  .slotcard .tag{ display:inline-block; margin-top:9px; font-size:12px; font-weight:600;
+    padding:4px 10px; border-radius:7px; background:var(--rule-2); color:var(--ink-2); }
+  .slotcard .tag.out{ background:var(--go-bg); color:var(--go); }
+  .slotcard .tag.done{ background:var(--go); color:#fff; }
+
+  /* the run */
+  .runhead{ background:var(--surface); border:1px solid var(--rule); border-radius:14px;
+    padding:16px 17px; margin-bottom:14px; }
+  .runhead .m{ font-size:19px; font-weight:700; letter-spacing:-.015em; }
+  .runhead .d{ font-size:13.5px; color:var(--ink-2); margin-top:3px; }
+  .meter{ height:8px; border-radius:99px; background:var(--rule-2); margin-top:13px; overflow:hidden; }
+  .meter i{ display:block; height:100%; background:var(--go); transition:width .3s; }
+
+  .pickbar{ background:var(--warn-bg); border:1px solid #e8c88a; border-radius:14px;
+    padding:16px 17px; margin-bottom:14px; }
+  .pickbar .t{ font-weight:700; font-size:16px; color:var(--warn); }
+  .pickbar .s{ font-size:13.5px; color:var(--warn); margin:5px 0 13px; line-height:1.45; }
+
+  /* stops */
+  .stop{ background:var(--surface); border:1px solid var(--rule); border-radius:13px;
+    padding:13px 14px; margin-bottom:10px; display:flex; gap:12px; }
+  .stop.done{ background:var(--tint); border-color:var(--go); }
+  .n{ flex:none; width:30px; height:30px; border-radius:9px; background:var(--ink); color:#fff;
+    font-size:13.5px; font-weight:700; display:flex; align-items:center; justify-content:center; }
+  .stop.done .n{ background:var(--go); }
+  .mid{ flex:1; min-width:0; }
+  .nm{ font-weight:600; font-size:16px; }
+  .lo{ font-size:13.5px; color:var(--ink-2); margin-top:2px; word-break:break-word; }
+  a.lo{ color:var(--ink); text-decoration:underline; text-underline-offset:2px; display:inline-block; }
+  .at{ font-size:12.5px; color:var(--go); font-weight:600; margin-top:4px; }
+  .row{ display:flex; gap:8px; margin-top:11px; flex-wrap:wrap; }
+  .row .btn{ flex:1; min-width:84px; }
+
+  .note{ background:var(--surface); border:1px solid var(--rule); border-radius:13px;
+    padding:14px 15px; font-size:14px; color:var(--ink-2); margin-bottom:12px; }
+  .empty{ text-align:center; color:var(--ink-2); padding:48px 18px; font-size:15px;
+    background:var(--surface); border:1px solid var(--rule); border-radius:14px; }
+  .say{ font-size:13px; color:var(--ink-2); min-height:18px; margin-bottom:11px; }
+
+  .veil{ position:fixed; inset:0; z-index:90; display:none; align-items:center;
+    justify-content:center; padding:24px; background:rgba(21,48,107,.55); backdrop-filter:blur(3px); }
+  .veil.on{ display:flex; }
+  .veil .box{ background:var(--surface); border-radius:16px; padding:26px 28px;
+    min-width:210px; max-width:300px; text-align:center; box-shadow:0 18px 50px rgba(12,28,64,.3); }
+  .veil .ring{ width:38px; height:38px; margin:0 auto 15px; border:3px solid var(--rule);
+    border-top-color:var(--go); border-radius:50%; animation:sp .8s linear infinite; }
+  .veil .w{ font-size:15.5px; font-weight:600; }
+  .veil .k{ font-size:12.5px; color:var(--ink-2); margin-top:7px; }
+  @keyframes sp{ to{ transform:rotate(360deg); } }
+  @media (prefers-reduced-motion:reduce){ *{ animation:none !important; transition:none !important; } }
+
+  .toast{ position:fixed; left:50%; bottom:calc(24px + env(safe-area-inset-bottom));
+    transform:translateX(-50%); background:var(--ink); color:#fff; padding:13px 20px;
+    border-radius:12px; font-size:14.5px; font-weight:500; opacity:0; transition:opacity .25s;
+    pointer-events:none; z-index:95; max-width:88%; text-align:center; }
+  .toast.show{ opacity:1; }
+</style>
+</head>
+<body data-at="gate">
+
+<!-- 1 · sign in, once -->
+<div class="screen" id="sGate">
+  <img src="logo.png" alt="Friska">
+  <h1>My Deliveries</h1>
+  <p>Enter the phone number your routes are saved under. You only need to do this once.</p>
+  <div class="f">
+    <input type="tel" id="phone" inputmode="numeric" placeholder="Phone number" autocomplete="tel">
+    <button class="btn go" id="signin">Show my deliveries</button>
+    <div class="say" id="gateSay" style="text-align:center"></div>
+  </div>
+</div>
+
+<!-- 2 · which slot -->
+<div class="screen" id="sSlots">
+  <div class="top">
+    <div class="r1">
+      <div><div class="me" id="me2">—</div><div class="sub" id="sub2"></div></div>
+      <span class="grow"></span>
+      <button class="tbtn" onclick="signOut()">Sign out</button>
+    </div>
+    <div class="r2">
+      <input type="date" id="date2" max="">
+      <button class="tbtn" onclick="load()">Refresh</button>
+    </div>
+  </div>
+  <div class="wrap"><div class="say" id="say2"></div><div id="slotList"></div></div>
+</div>
+
+<!-- 3 · the run -->
+<div class="screen" id="sRoute">
+  <div class="top">
+    <div class="r1">
+      <button class="tbtn" id="backBtn" onclick="toSlots()">&lsaquo;</button>
+      <div><div class="me" id="me3">—</div><div class="sub" id="sub3"></div></div>
+      <span class="grow"></span>
+      <button class="tbtn" onclick="load()">Refresh</button>
+    </div>
+  </div>
+  <div class="wrap"><div class="say" id="say3"></div><div id="runBody"></div></div>
+</div>
+
+<div class="veil" id="veil"><div class="box">
+  <div class="ring"></div><div class="w" id="veilW">Working…</div>
+  <div class="k">Keep this page open</div>
+</div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+const API = (typeof API_URL !== 'undefined' && API_URL) ? API_URL : '';
+const $ = id => document.getElementById(id) || {};
+
+let DAY = null, me = '', slot = null;
+
+/* A rider reopens this app a dozen times on one run. Remembering which slot
+   they are on means a reload drops them back into the run, not onto a menu.
+   Scoped to the date so tomorrow starts clean. */
+const slotKey = d => 'friska_agent_slot_' + d;
+function rememberSlot(d, s){ try { s ? localStorage.setItem(slotKey(d), s)
+                                     : localStorage.removeItem(slotKey(d)); } catch(e){} }
+function recallSlot(d){ try { return localStorage.getItem(slotKey(d)) || null; } catch(e){ return null; } }
+
+const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
+                   .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const plural = (n,w) => w + (n===1?'':'s');
+
+function todayStr(){ const n=new Date();
+  return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0'); }
+
+function prettyDay(ymd){
+  const p=String(ymd).split('-'), d=new Date(+p[0],+p[1]-1,+p[2]);
+  if (isNaN(d)) return ymd;
+  const t=new Date(); t.setHours(0,0,0,0);
+  const diff=Math.round((d-t)/86400000);
+  const mon=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()];
+  return diff===0 ? 'Today' : diff===-1 ? 'Yesterday' : (d.getDate()+' '+mon);
+}
+
+function toast(m){ const t=$('toast'); t.textContent=m; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 2300); }
+function say(m){ ['say2','say3','gateSay'].forEach(id=>{ if($(id).textContent!==undefined) $(id).textContent=m; }); }
+
+function busy(on, what){
+  if (on && what) $('veilW').textContent = what;
+  $('veil').classList.toggle('on', !!on);
+}
+window.addEventListener('error',              ()=>busy(false));
+window.addEventListener('unhandledrejection', ()=>busy(false));
+
+async function api(action, params={}){
+  if (!API) throw new Error('config.js did not load');
+  const res = await fetch(API, { method:'POST', body:new URLSearchParams({ action, ...params }) });
+  return res.json();
+}
+
+/* Tapping anywhere on the date box opens the calendar, not just the icon. */
+document.querySelectorAll('input[type=date]').forEach(el=>{
+  el.addEventListener('click', ()=>{ try { el.showPicker(); } catch(e){} });
+});
+
+/* ---------- signing in, once ---------- */
+try { me = localStorage.getItem('friska_agent_phone') || ''; } catch(e){}
+
+$('signin').addEventListener('click', ()=>{
+  const p = ($('phone').value||'').replace(/\D/g,'');
+  if (p.length < 10){ $('gateSay').textContent = 'Enter all ten digits.'; return; }
+  me = p.slice(-10);
+  try { localStorage.setItem('friska_agent_phone', me); } catch(e){}
+  load();
+});
+$('phone').addEventListener('keydown', e=>{ if (e.key==='Enter') $('signin').click(); });
+
+function signOut(){
+  if (!confirm('Sign out of this device?')) return;
+  try { localStorage.removeItem('friska_agent_phone'); } catch(e){}
+  try { Object.keys(localStorage).filter(k=>k.indexOf('friska_agent_slot_')===0)
+          .forEach(k=>localStorage.removeItem(k)); } catch(e){}
+  me=''; DAY=null; slot=null;
+  document.body.dataset.at='gate';
+  $('phone').value=''; $('gateSay').textContent='';
+}
+
+/* the rider can look back, never forward — tomorrow is not settled yet */
+['date2'].forEach(id=>{ $(id).max = todayStr(); $(id).value = todayStr(); });
+$('date2').addEventListener('change', load);
+
+/* ---------- loading the day ---------- */
+async function load(){
+  if (!me){ document.body.dataset.at='gate'; return; }
+  const date = $('date2').value || todayStr();
+  busy(true, 'Loading your deliveries…');
+  say('Loading…');
+  try {
+    const r = await api('getAgentDay', { phone: me, date });
+    if (!r || !r.ok) throw new Error((r && r.message) || 'Could not load');
+
+    if (!r.found){
+      DAY = null;
+      document.body.dataset.at = 'gate';
+      $('gateSay').textContent = r.message ||
+        'That number is not set against any route. Ask the kitchen to add you.';
+      return;
+    }
+
+    DAY = r;
+    $('me2').textContent = $('me3').textContent = r.name || 'My deliveries';
+    const totals = (r.slots||[]).reduce((a,s)=>a+s.parcels,0);
+    $('sub2').textContent = prettyDay(date) + ' · ' + totals + plural(totals,' parcel');
+
+    if (!r.slots || !r.slots.length){
+      document.body.dataset.at = 'slots';
+      $('slotList').innerHTML =
+        '<div class="empty">Nothing assigned to you for ' + esc(prettyDay(date).toLowerCase()) +
+        '.<br><span style="font-size:13.5px">If routes have not been saved yet, check again shortly.</span></div>';
+      say('');
+      return;
+    }
+
+    // one slot means there is nothing to choose — go straight to the run
+    const want = slot || recallSlot(date);
+    if (r.slots.length === 1){ slot = r.slots[0].slot; showRun(); }
+    else if (want && r.slots.some(s=>s.slot===want)){ slot = want; showRun(); }
+    else showSlots();
+    say('');
+  } catch(e){
+    say('Could not load: ' + e.message);
+    $('gateSay').textContent = 'Could not load: ' + e.message;
+  } finally { busy(false); }
+}
+
+/* ---------- which slot ---------- */
+function showSlots(){
+  slot = null;
+  rememberSlot(DAY && DAY.date, null);
+  document.body.dataset.at = 'slots';
+  $('slotList').innerHTML = (DAY.slots||[]).map(s=>{
+    const allDone = s.parcels && s.delivered >= s.parcels;
+    return '<button class="slotcard" onclick="pickSlot(\''+esc(s.slot)+'\')">'+
+      '<div class="m">'+esc(s.meal||s.slot)+'</div>'+
+      '<div class="d">'+s.route+' · '+s.parcels+plural(s.parcels,' parcel')+
+        (s.pickedUp ? ' · '+s.delivered+' delivered' : '')+'</div>'+
+      '<span class="tag'+(allDone?' done':(s.pickedUp?' out':''))+'">'+
+        (allDone ? 'All delivered' : s.pickedUp ? 'Picked up' : 'Not picked up yet')+
+      '</span></button>';
+  }).join('');
+}
+function pickSlot(s){ slot = s; rememberSlot(DAY.date, s); showRun(); }
+function toSlots(){ if ((DAY.slots||[]).length > 1) showSlots(); }
+
+/* ---------- the run ---------- */
+function slotInfo(){ return (DAY.slots||[]).find(s=>s.slot===slot) || null; }
+
+function showRun(){
+  document.body.dataset.at = 'route';
+  const info = slotInfo();
+  if (!info){ showSlots(); return; }
+
+  const stops = (DAY.stops||[]).filter(s=>s.slot===slot);
+  const done  = stops.filter(s=>s.delivered).length;
+  const multi = (DAY.slots||[]).length > 1;
+
+  $('backBtn').style.display = multi ? '' : 'none';
+  $('me3').textContent = (info.meal||info.slot) + ' · ' + info.route;
+  $('sub3').textContent = prettyDay($('date2').value) + ' · ' + DAY.name;
+
+  /* Before pickup the banner below already gives the count, so a second card
+     saying the same thing is just a card to scroll past. */
+  const head = info.pickedUp
+    ? '<div class="runhead">'+
+        '<div class="m">'+stops.length+plural(stops.length,' parcel')+'</div>'+
+        '<div class="d">'+done+' of '+stops.length+' delivered</div>'+
+        '<div class="meter"><i style="width:'+(stops.length?done/stops.length*100:0)+'%"></i></div>'+
+      '</div>'
+    : '';
+
+  /* Before pickup the list is for checking against what is in your hands, so
+     nothing is tappable — a half-tapped Delivered on parcels still in the
+     kitchen is worse than no list at all. */
+  const body = info.pickedUp ? stops.map(liveStop).join('') : stops.map(quietStop).join('');
+
+  const pick = info.pickedUp
+    ? '<div class="note">Picked up'+(info.pickedUpAt ? ' at '+esc(String(info.pickedUpAt).slice(11,16)) : '')+
+      '. Clients on this run can see it is on the way.'+
+      (done===0 ? ' <a href="#" onclick="undoPick(event)">Undo</a>' : '')+'</div>'
+    : '<div class="pickbar">'+
+        '<div class="t">'+stops.length+plural(stops.length,' parcel')+' to collect</div>'+
+        '<div class="s">Check them against the list below. Pressing Picked up tells every '+
+          'client on this run that their meal is on the way.</div>'+
+        '<button class="btn go" onclick="pickUp()">Picked up — start delivering</button>'+
+      '</div>';
+
+  $('runBody').innerHTML = head + pick + body;
+}
+
+function quietStop(s){
+  return '<div class="stop">'+
+    '<div class="n">'+s.stop+'</div>'+
+    '<div class="mid"><div class="nm">'+esc(s.name)+'</div>'+
+      '<div class="lo">'+esc(s.location||'')+'</div></div>'+
+  '</div>';
+}
+
+function liveStop(s){
+  const i = DAY.stops.indexOf(s);
+  const link = s.link ? String(s.link).replace(/,/g,'%2C')
+    : 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(s.name);
+  return '<div class="stop'+(s.delivered?' done':'')+'">'+
+    '<div class="n">'+(s.delivered?'&#10003;':s.stop)+'</div>'+
+    '<div class="mid">'+
+      '<div class="nm">'+esc(s.name)+'</div>'+
+      '<a class="lo" href="'+esc(link)+'" target="_blank" rel="noopener">'+
+        esc(s.location||'Open in Maps')+'</a>'+
+      (s.delivered && s.at ? '<div class="at">Delivered '+esc(String(s.at).slice(11,16))+'</div>' : '')+
+      '<div class="row">'+
+        '<a class="btn line sm" href="tel:'+esc(s.phone)+'">Call</a>'+
+        (s.delivered
+          ? '<button class="btn line sm" onclick="undoStop('+i+')">Undo</button>'
+          : '<button class="btn wa sm" onclick="deliver('+i+')">Delivered</button>')+
+      '</div>'+
+    '</div>'+
+  '</div>';
+}
+
+/* ---------- picking up ---------- */
+async function pickUp(){
+  const info = slotInfo();
+  if (!info) return;
+  busy(true, 'Marking picked up…');
+  try {
+    const r = await api('markPickedUp', {
+      date: DAY.date, slot: info.slot, route: info.route, undo:'false'
+    });
+    if (r && r.ok){
+      info.pickedUp = true;
+      showRun();
+      toast('Clients on this run now see it is on the way');
+    } else toast('Could not mark it: ' + ((r&&r.message)||'try again'));
+  } catch(e){ toast('Could not mark it: ' + e.message); }
+  finally { busy(false); }
+}
+
+async function undoPick(ev){
+  if (ev) ev.preventDefault();
+  const info = slotInfo();
+  if (!info || !confirm('Undo picked up for this run?')) return;
+  busy(true, 'Undoing…');
+  try {
+    const r = await api('markPickedUp', {
+      date: DAY.date, slot: info.slot, route: info.route, undo:'true'
+    });
+    if (r && r.ok){ info.pickedUp = false; showRun(); }
+    else toast('Could not undo');
+  } catch(e){ toast('Could not undo: ' + e.message); }
+  finally { busy(false); }
+}
+
+/* ---------- delivering ---------- */
+async function deliver(i){
+  const s = DAY.stops[i];
+  busy(true, 'Marking ' + s.name + ' delivered…');
+  let ok = false;
+  try {
+    const r = await api('markDelivered', {
+      date: DAY.date, slot: s.slot, route: s.route, phone: s.phone, by: DAY.name || me
+    });
+    if (r && r.ok){ s.delivered = true; s.at = r.at || ''; ok = true; }
+    else toast('Could not save that — try again');
+  } catch(e){ toast('Could not save: ' + e.message); }
+  finally { busy(false); }
+
+  if (!ok) return;
+  const info = slotInfo(); if (info) info.delivered = (info.delivered||0) + 1;
+  showRun();
+
+  const msg = 'Hi ' + s.name + ', your delivery by Friska Wellness is done.';
+  const num = s.phone.length === 10 ? '91' + s.phone : s.phone;
+  window.open('https://wa.me/' + num + '?text=' + encodeURIComponent(msg), '_blank');
+}
+
+async function undoStop(i){
+  const s = DAY.stops[i];
+  if (!confirm('Mark ' + s.name + ' as not delivered?')) return;
+  busy(true, 'Undoing…');
+  try {
+    const r = await api('undoDelivered', { date: DAY.date, slot: s.slot, phone: s.phone });
+    if (r && r.ok){
+      s.delivered = false; s.at = '';
+      const info = slotInfo(); if (info) info.delivered = Math.max(0, (info.delivered||1) - 1);
+      showRun();
+    } else toast('Could not undo');
+  } catch(e){ toast('Could not undo: ' + e.message); }
+  finally { busy(false); }
+}
+
+/* ---------- start ---------- */
+if (me){ $('phone').value = me; load(); }
+
+if ('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>navigator.serviceWorker.register('agent-sw.js').catch(()=>{}));
+}
+</script>
+</body>
+</html>

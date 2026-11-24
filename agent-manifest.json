@@ -1,0 +1,17 @@
+{
+  "name": "Friska Deliveries",
+  "short_name": "Friska",
+  "description": "Today's delivery run for Friska Wellness Foods riders.",
+  "start_url": "agent.html",
+  "scope": "agent.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ebf0fa",
+  "theme_color": "#15306b",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-192-maskable.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

@@ -209,7 +209,12 @@
   .stop input[type=checkbox]{ width:19px; height:19px; accent-color:var(--signal);
     margin:3px 0 0; flex:none; }
 
-  .acts{ display:flex; gap:8px; flex-wrap:wrap; margin-top:13px; }
+  .acts{ display:flex; gap:8px; flex-wrap:wrap; margin-top:13px; align-items:center; }
+  .picknote{ flex:1; min-width:150px; font-size:12px; color:var(--ink-2); line-height:1.4; }
+  .picknote b{ color:var(--signal); }
+  .route.sent{ border-color:var(--signal); }
+  .rwho .out{ font-size:11.5px; font-weight:600; padding:3px 8px; border-radius:6px;
+    background:var(--signal); color:#fff; }
   .acts .btn{ flex:1 1 auto; }
 
   .msg{ margin-top:16px; }
@@ -280,6 +285,21 @@
     opacity:0; transition:opacity .25s; pointer-events:none; z-index:80;
     max-width:88%; text-align:center; }
   .toast.show{ opacity:1; }
+
+  /* A write in progress has to be impossible to miss, or someone closes the
+     tab halfway through saving the day. */
+  .working-veil{ position:fixed; inset:0; z-index:90; display:none;
+    align-items:center; justify-content:center; padding:24px;
+    background:rgba(21,48,107,.55); backdrop-filter:blur(3px); }
+  .working-veil.on{ display:flex; }
+  .working-veil .box{ background:var(--surface); border-radius:16px;
+    padding:26px 28px; min-width:220px; max-width:320px; text-align:center;
+    box-shadow:0 18px 50px rgba(12,28,64,.3); }
+  .working-veil .ring{ width:38px; height:38px; margin:0 auto 16px;
+    border:3px solid var(--rule); border-top-color:var(--signal);
+    border-radius:50%; animation:sp .8s linear infinite; }
+  .working-veil .what{ font-size:15.5px; font-weight:600; color:var(--ink); }
+  .working-veil .warn{ font-size:12.5px; color:var(--ink-2); margin-top:7px; }
 
   .spin{ width:15px; height:15px; border:2px solid rgba(255,255,255,.3);
     border-top-color:#fff; border-radius:50%; animation:sp .7s linear infinite; display:none; }
@@ -394,6 +414,14 @@
   </div>
 </div>
 
+<div class="working-veil" id="veil" role="alert" aria-live="assertive">
+  <div class="box">
+    <div class="ring"></div>
+    <div class="what" id="veilWhat">Working…</div>
+    <div class="warn" id="veilWarn">Keep this page open</div>
+  </div>
+</div>
+
 <button id="measure" hidden aria-hidden="true"></button>
 <div class="toast" id="toast"></div>
 
@@ -462,12 +490,14 @@ $('saveSettings').addEventListener('click', async () => {
   const payload = {};
   LIMIT_FIELDS.forEach(k=>{ payload[k] = num(k); });
   $('saveSettings').disabled = true;
+  busy(true, 'Saving limits…');
   try {
     const res = await api('setRouteLimits', { limits: JSON.stringify(payload) });
     setStatus(res && res.ok
       ? 'Settings saved. Every device and the automatic run now use these limits.'
       : 'Could not save settings: ' + JSON.stringify(res));
   } catch(e){ setStatus('Could not save settings: ' + e.message); }
+  busy(false);
   $('saveSettings').disabled = false;
 });
 
@@ -526,6 +556,7 @@ $('addRider').addEventListener('click', ()=>{
 
 $('saveRiders').addEventListener('click', async ()=>{
   $('saveRiders').disabled = true;
+  busy(true, 'Saving riders…');
   try {
     const r = await api('saveAgentRoster', { roster: JSON.stringify(agents) });
     if (r && r.ok){
@@ -543,6 +574,7 @@ $('saveRiders').addEventListener('click', async ()=>{
       setStatus('Could not save riders: ' + JSON.stringify(r));
     }
   } catch(e){ setStatus('Could not save riders: '+e.message); }
+  busy(false);
   $('saveRiders').disabled = false;
 });
 
@@ -552,7 +584,24 @@ const setStatus = m => {
   $('status').textContent = m;
   if (document.body.classList.contains('landing')) $('gateSay').textContent = m;
 };
-function busy(on){ document.body.classList.toggle('busy', !!on); }
+/* One call drives both the small header spinner and the blocking overlay.
+   Pass the text so the overlay says which job is running. */
+function busy(on, what){
+  document.body.classList.toggle('busy', !!on);
+  const v = $('veil');
+  if (on){
+    if (what) $('veilWhat').textContent = what;
+    v.classList.add('on');
+  } else {
+    v.classList.remove('on');
+  }
+}
+function busyText(what){ $('veilWhat').textContent = what; }
+
+/* If something throws in a place I have not guarded, the overlay must still
+   come down — a locked page is worse than a lost message. */
+window.addEventListener('error',              ()=>busy(false));
+window.addEventListener('unhandledrejection', ()=>busy(false));
 const num = id => {
   if (id === 'porterMax') return PORTER_MAX;
   if (id === 'nearKm')    return MEASURE_NEAR;
@@ -1146,7 +1195,7 @@ async function load(){
   const url = $('api').value.trim();
   if (!url){ setStatus('Paste the web app URL first.'); return; }
   $('load').disabled = true;
-  busy(true);
+  busy(true, 'Loading ' + $('date').value + '…');
   setStatus('Loading…');
 
   try {
@@ -1258,6 +1307,7 @@ async function load(){
           // reads as a gap: a client added since, or an address corrected
           const want = missingRoutePairs();
           if (want.length){
+            busy(true, 'Pricing ' + want.length + plural(want.length,' new leg') + '…');
             setStatus('Loaded saved routes. Pricing ' + want.length + ' new leg(s)…');
             render();
             await measureLegs(want);
@@ -1282,7 +1332,7 @@ async function load(){
 
     buildAndRender();
 
-  } catch(e){ setStatus('Error: '+e.message); }
+  } catch(e){ setStatus('Could not load that day: ' + e.message); }
   busy(false);
   $('load').disabled = false;
 }
@@ -1390,6 +1440,7 @@ async function measureLegs(need){
           });
       });
       done += chunk.length;
+      busyText('Measuring distances — ' + done + ' of ' + need.length);
       setStatus('Measured '+done+' of '+need.length+' legs…');
       await new Promise(r=>setTimeout(r,120));
     }
@@ -1415,30 +1466,39 @@ async function measureLegs(need){
 }
 
 $('measure').addEventListener('click', async () => {
-  if (!window.google || !google.maps || !google.maps.DistanceMatrixService){
-    setStatus('Google Maps still loading — try again in a moment.'); return;
-  }
-  if (!clients.length){ await load(); if (!clients.length) return; }
-
-  const need = missingPairs(uniqPts(clients));
-  if (!need.length){ setStatus('Every leg already measured.'); buildAndRender(); return; }
-
+  busy(true, 'Measuring distances…');
   $('measure').disabled = true;
-  busy(true);
-  await measureLegs(need);
-  busy(false);
-  $('measure').disabled = false;
-  buildAndRender();
+  try {
+    if (!window.google || !google.maps || !google.maps.DistanceMatrixService){
+      setStatus('Google Maps has not loaded yet. Try again in a moment.'); return;
+    }
+    if (!clients.length){ await load(); if (!clients.length) return; }
+
+    const need = missingPairs(uniqPts(clients));
+    if (!need.length){ setStatus('Every leg is already measured.'); buildAndRender(); return; }
+
+    await measureLegs(need);
+    buildAndRender();
+  } catch(e){
+    setStatus('Measuring failed: ' + e.message);
+  } finally {
+    busy(false);
+    $('measure').disabled = false;
+  }
 });
 
 /* ---------- rebuild + save ---------- */
 $('rebuild').addEventListener('click', async () => {
   if (!confirm('Rebuild the zone map from the points in this slot?\n\nClients in other slots keep their existing zones only if their point also appears here. Rebuild when you have added clients, not daily.')) return;
   const merged = { ...zoneMap, ...buildZones(uniqPts(clients)) };
-  const r = await api('saveRouteZones', { zones: JSON.stringify(merged) });
-  if (r && r.ok){ zoneMap = merged; routes = packRoutes(clients); render();
-    setStatus('Zone map saved — '+r.written+' points.'); }
-  else setStatus('Zone save failed: '+JSON.stringify(r));
+  busy(true, 'Redrawing the clusters…');
+  try {
+    const r = await api('saveRouteZones', { zones: JSON.stringify(merged) });
+    if (r && r.ok){ zoneMap = merged; routes = packRoutes(clients); render();
+      setStatus('Clusters redrawn — '+r.written+' points saved.'); }
+    else setStatus('Could not save the clusters: '+JSON.stringify(r));
+  } catch(e){ setStatus('Could not save the clusters: '+e.message); }
+  busy(false);
 });
 
 $('save').addEventListener('click', async () => {
@@ -1454,10 +1514,12 @@ $('save').addEventListener('click', async () => {
     + 'will reload from the saved copy next time.')) return;
 
   $('save').disabled = true;
-  busy(true);
+  busy(true, 'Saving ' + routes.length + plural(routes.length,' route') + '…');
   let ok=0, fail=0;
   try {
+    let done = 0;
     for (const r of routes){
+      busyText('Saving ' + (++done) + ' of ' + routes.length + ' — ' + r.name);
       const res = await api('saveRouteAssignment', {
         date, slot: r.slot, route: r.name, phones: r.rows.map(x=>x.phone).join(',')
       });
@@ -1471,9 +1533,12 @@ $('save').addEventListener('click', async () => {
     setStatus('Saved '+ok+' routes for '+date+(fail?', '+fail+' failed':'')
       +'. Reloading this date will bring these back.');
     render();
-  } catch(e){ setStatus('Save error: '+e.message); }
-  busy(false);
-  $('save').disabled = false;
+  } catch(e){
+    setStatus('Could not finish saving: ' + e.message + '. Press Save routes again.');
+  } finally {
+    busy(false);
+    $('save').disabled = false;
+  }
 });
 
 function renderMode(){
@@ -1818,7 +1883,7 @@ function renderSlot(){
   const card = i => {
     const r = routes[i], m = r.m, bad = !fits(m), open = isOpen(i);
     return '<div class="route'+(bad?' over':'')+(open?' open':'')+
-             (r.kind==='porter'?' porter':'')+'">'+
+             (r.pickedUp?' sent':'')+(r.kind==='porter'?' porter':'')+'">'+
       '<div class="rhead" onclick="toggleRoute('+i+')">'+
         '<div class="rtitle">'+
           '<input class="rname" value="'+esc(r.name)+'" '+
@@ -1891,7 +1956,16 @@ function routeDetail(i){
       '<button class="btn line sm" onclick="toggleAdd('+i+')">'+(addOpen===i?'Close search':'Add a client')+'</button>'+
       '<button class="btn line sm" onclick="manualSplit('+i+')">Move ticked out</button>'+
       '<button class="btn line sm" onclick="reoptimise('+i+')">Re-order stops</button>'+
-      '<button class="btn line sm" onclick="sendAgentLink('+i+')">Send link</button>'+
+      '<button class="btn line sm" onclick="sendAgentLink('+i+')">Send agent link</button>'+
+    '</div>'+
+    '<div class="acts">'+
+      (r.pickedUp
+        ? '<button class="btn line sm" onclick="setPickedUp('+i+',true)">Undo picked up</button>'+
+          '<span class="picknote">Client sees <b>Dispatched</b>'+
+            (r.pickedUpAt ? ' since '+esc(String(r.pickedUpAt).slice(11,16)) : '')+'</span>'
+        : '<button class="btn go sm" onclick="setPickedUp('+i+',false)">Picked up</button>'+
+          '<span class="picknote">Marks the route out for delivery. '+
+            'The rider pressing Picked up does the same thing.</span>')+
     '</div>'+
     (r.manualOrder
       ? '<div class="hint" style="margin-top:8px">Stops are in the order you set. '
@@ -2073,8 +2147,7 @@ async function reoptimise(ri){
   delete r.manualOrder;
 
   if (need.length){
-    busy(true);
-    setStatus('Pricing ' + need.length + plural(need.length,' leg') + ' on ' + r.name + '…');
+    busy(true, 'Pricing ' + need.length + plural(need.length,' leg') + ' on ' + r.name + '…');
     await measureLegs(need);
     busy(false);
   }
@@ -2132,6 +2205,33 @@ function saveAgentPhone(i){
   render();
   setStatus(ph ? ('Number saved for ' + who + '. Save routes to store it.')
                : ('Number cleared for ' + who + '.'));
+}
+
+/* Picked up and Dispatched are one event under two names: the rider collects
+   the parcels, the client is told it is on the way. Writing it here or on the
+   rider's page comes to the same row in DeliveryStatus. */
+async function setPickedUp(i, undo){
+  const r = routes[i];
+  if (!savedForDate || savedForDate !== $('date').value){
+    setStatus('Save the routes first — the client is shown whatever is saved.');
+    return;
+  }
+  busy(true, (undo ? 'Undoing ' : 'Marking ') + r.name + '…');
+  try {
+    const res = await api('markPickedUp', {
+      date: $('date').value, slot: r.slot, route: r.name, undo: undo ? 'true' : 'false'
+    });
+    if (res && res.ok){
+      r.pickedUp = !!res.pickedUp;
+      r.pickedUpAt = '';
+      render();
+      setStatus(undo ? (r.name + ' is no longer marked out.')
+                     : (r.name + ' is out for delivery — clients on it now see Dispatched.'));
+    } else {
+      setStatus('Could not update ' + r.name + ': ' + JSON.stringify(res));
+    }
+  } catch(e){ setStatus('Could not update ' + r.name + ': ' + e.message); }
+  busy(false);
 }
 
 /* Send the rider their own page. WhatsApp Business first, since that is the
