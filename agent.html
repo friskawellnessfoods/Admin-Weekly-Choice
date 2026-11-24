@@ -178,6 +178,10 @@
       <button class="tbtn" id="backBtn" onclick="toSlots()">&lsaquo;</button>
       <div><div class="me" id="me3">—</div><div class="sub" id="sub3"></div></div>
       <span class="grow"></span>
+      <button class="tbtn" onclick="signOut()">Sign out</button>
+    </div>
+    <div class="r2">
+      <input type="date" id="date3" max="">
       <button class="tbtn" onclick="load()">Refresh</button>
     </div>
   </div>
@@ -264,14 +268,24 @@ function signOut(){
   $('phone').value=''; $('gateSay').textContent='';
 }
 
-/* the rider can look back, never forward — tomorrow is not settled yet */
-['date2'].forEach(id=>{ $(id).max = todayStr(); $(id).value = todayStr(); });
-$('date2').addEventListener('change', load);
+/* The date box sits on both screens — a rider who steps back a day on a
+   single-slot run never sees the slot list, so without it there is no way
+   back to today. Two inputs, one value. Back only: tomorrow is not settled. */
+const DATE_BOXES = ['date2','date3'];
+const theDate = () => $('date2').value || todayStr();
+function setDate(v){ DATE_BOXES.forEach(id=>{ if ($(id).value !== undefined) $(id).value = v; }); }
+
+DATE_BOXES.forEach(id=>{
+  const el = $(id);
+  el.max = todayStr();
+  el.value = todayStr();
+  el.addEventListener('change', ()=>{ setDate(el.value); load(); });
+});
 
 /* ---------- loading the day ---------- */
 async function load(){
   if (!me){ document.body.dataset.at='gate'; return; }
-  const date = $('date2').value || todayStr();
+  const date = theDate();
   busy(true, 'Loading your deliveries…');
   say('Loading…');
   try {
@@ -290,6 +304,7 @@ async function load(){
     $('me2').textContent = $('me3').textContent = r.name || 'My deliveries';
     const totals = (r.slots||[]).reduce((a,s)=>a+s.parcels,0);
     $('sub2').textContent = prettyDay(date) + ' · ' + totals + plural(totals,' parcel');
+    setDate(date);
 
     if (!r.slots || !r.slots.length){
       document.body.dataset.at = 'slots';
@@ -343,9 +358,9 @@ function showRun(){
   const done  = stops.filter(s=>s.delivered).length;
   const multi = (DAY.slots||[]).length > 1;
 
-  $('backBtn').style.display = multi ? '' : 'none';
+  $('backBtn').style.visibility = multi ? '' : 'hidden';
   $('me3').textContent = (info.meal||info.slot) + ' · ' + info.route;
-  $('sub3').textContent = prettyDay($('date2').value) + ' · ' + DAY.name;
+  $('sub3').textContent = prettyDay(theDate()) + ' · ' + DAY.name;
 
   /* Before pickup the banner below already gives the count, so a second card
      saying the same thing is just a card to scroll past. */
