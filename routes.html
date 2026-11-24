@@ -391,9 +391,14 @@
         Saving offers to build this day again straight away.</div>
     </div>
     <div class="field" style="border-top:1px solid var(--rule); padding-top:14px">
-      <button class="btn line" id="rebuild" style="width:100%" disabled>Build this day again with these limits</button>
-      <div class="why">Throws away today's routes and packs them from scratch under the
-        limits above. Anything you changed by hand is lost.</div>
+      <button class="btn line" id="rebuildDay" style="width:100%" disabled>Build this day again with these limits</button>
+      <div class="why">Packs today from scratch under the limits above.
+        Anything you changed by hand is lost.</div>
+    </div>
+    <div class="field">
+      <button class="btn line" id="rebuild" style="width:100%" disabled>Redraw the client clusters</button>
+      <div class="why">Groups every delivery point afresh using the distance above.
+        Only needed after adding clients in a new part of the city — not day to day.</div>
     </div>
     <button class="btn line" style="width:100%" onclick="closeSheet('adv')">Close</button>
     <input type="hidden" id="api">
@@ -1238,6 +1243,13 @@ function routeAgentName(routeName){
 }
 let savedAgentsByRoute = {};
 
+/* Two buttons, two jobs, and mixing them up is what put the wrong name on the
+   wrong one: #rebuild redraws the zone map, #rebuildDay repacks the day. */
+function setRebuildEnabled(on){
+  $('rebuild').disabled = !on;
+  $('rebuildDay').disabled = !on;
+}
+
 function rebuildFresh(){
   if (!confirm('Build this day again with the limits above?\n\n'
     + 'Any changes you made by hand will be lost.')) return;
@@ -1359,7 +1371,7 @@ async function load(){
           fromSaved = true;
           document.body.className = 'working';
           history = []; $('undo').disabled = true;
-          $('rebuild').disabled = false;
+          setRebuildEnabled(true);
           $('save').disabled = false;
 
           // a saved route still needs its legs priced, or every number on it
@@ -1386,7 +1398,7 @@ async function load(){
     history = []; $('undo').disabled = true;
     routes = [];
     $('measure').disabled = false;
-    $('rebuild').disabled = true;
+    setRebuildEnabled(false);
     $('save').disabled = true;
 
     buildAndRender();
@@ -1409,7 +1421,7 @@ function buildAndRender(){
   if (need.length){
     routes = [];
     render();
-    $('rebuild').disabled = true;
+    setRebuildEnabled(false);
     $('save').disabled = true;
 
     // Measuring runs by itself, so this is a progress state, not a prompt.
@@ -1442,7 +1454,7 @@ function buildAndRender(){
     if (refinePass < MAX_REFINE){
       refinePass++;
       refined = true;
-      $('rebuild').disabled = true; $('save').disabled = true;
+      setRebuildEnabled(false); $('save').disabled = true;
       busy(true, 'Measuring ' + inner.length + plural(inner.length,' leg') +
                  ' (pass ' + refinePass + ' of ' + MAX_REFINE + ')…');
       setStatus('Routes drafted. Measuring ' + inner.length +
@@ -1465,7 +1477,7 @@ function buildAndRender(){
 }
 
 function finishBuild(newlyZoned){
-  $('rebuild').disabled = false;
+  setRebuildEnabled(true);
   $('save').disabled = false;
   render(); renderMode();
 
@@ -1566,6 +1578,8 @@ $('measure').addEventListener('click', async () => {
 });
 
 /* ---------- rebuild + save ---------- */
+$('rebuildDay').addEventListener('click', rebuildFresh);
+
 $('rebuild').addEventListener('click', async () => {
   if (!confirm('Rebuild the zone map from the points in this slot?\n\nClients in other slots keep their existing zones only if their point also appears here. Rebuild when you have added clients, not daily.')) return;
   const merged = { ...zoneMap, ...buildZones(uniqPts(clients)) };
