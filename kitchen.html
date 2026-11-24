@@ -260,6 +260,11 @@
   table.client td.num{ text-align:center; width:24px; color:#666; }
   /* "(New)" beside a client's name — client list and meal list only, never tags */
   .newtag{ font-size:.72em; font-weight:700; color:#0a7a4a; margin-left:4px; white-space:nowrap; }
+  /* The client list is read at a glance across a wide table, so a new client
+     gets the whole name cell inverted. !important beats the inline background
+     applyCell() writes for conditional formatting. */
+  table.client td.isnew{ background:#111 !important; color:#fff !important; font-weight:600; }
+  table.client td.isnew .newtag{ color:#8fe3bb; }
   table.client tr.slotsep td{ border-top:2.5px solid #111 !important; }
   table.client tr.totals td{ font-weight:700; border:none; border-top:2px solid #555; padding-top:3px; }
 
@@ -1181,10 +1186,11 @@
     }catch(e){}
   }
 
-  // name + the tag, as one cell
-  function fillNameCell(td, name, phone){
+  // name + the tag, as one cell. invert = black cell, for the client list only.
+  function fillNameCell(td, name, phone, invert){
     td.textContent = name || '';
     if(!isNew(phone)) return;
+    if(invert) td.classList.add('isnew');
     const s = document.createElement('span');
     s.className = 'newtag'; s.textContent = '(New)';
     td.appendChild(s);
@@ -1366,8 +1372,8 @@
           applyCell(td, r.type);           // colour still keys off the raw value
         }
         else if(c.key === 'name'){
-          fillNameCell(td, r.name, r.phone);
           applyCell(td, r.name || '');
+          fillNameCell(td, r.name, r.phone, true);   // inverted in the client list
         }
         else {
           const val = r[c.key] || '';
