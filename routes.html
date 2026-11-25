@@ -380,6 +380,19 @@
     <div class="field"><label>Clients closer than this always ride together (km)</label>
       <input type="number" id="zr" value="1" min="0.1" step="0.1">
       <div class="why">One building never gets split across two routes.</div></div>
+    <div class="field"><label>Your rider — cost per km (₹)</label>
+      <input type="number" id="fixKm" value="12" min="0" step="0.5">
+      <div class="why">What a fixed rider is paid per kilometre.</div></div>
+    <div class="field"><label>Your rider — cost per parcel (₹)</label>
+      <input type="number" id="fixParcel" value="10" min="0" step="1">
+      <div class="why">Paid on top of the kilometres, so a fixed rider is never free.</div></div>
+    <div class="field"><label>Porter — cost per km (₹)</label>
+      <input type="number" id="porterKmCost" value="13" min="0" step="0.5">
+      <div class="why">Set all three to 0 to go back to simply packing the most clients
+        onto your own riders.</div></div>
+    <div class="field"><label>Porter — minimum per booking (₹)</label>
+      <input type="number" id="porterMin" value="0" min="0" step="5">
+      <div class="why">Base fare. Leave 0 if there is none.</div></div>
     <div class="field"><label>Longest distance between two clients on a route (km)</label>
       <input type="number" id="hopKm" value="10" min="0" step="0.5">
       <div class="why">Two clients never share a route — your rider's or a Porter — if the
@@ -445,7 +458,7 @@ const slotsWanted = () => {
   const on = [...document.querySelectorAll('.slotbox:checked')].map(b=>b.value);
   return on.length ? on : SLOT_ORDER;   // nothing ticked means everything
 };
-const LIMIT_FIELDS = ['maxP','maxTotKm','maxMin','stopMin','zr','hopKm','agents'];
+const LIMIT_FIELDS = ['maxP','maxTotKm','maxMin','stopMin','zr','hopKm','fixKm','fixParcel','porterKmCost','porterMin','agents'];
 
 /* Settings that were dials but never earned one.
    PORTER_MAX   a Porter booking takes four parcels.
@@ -828,6 +841,36 @@ function uniqPts(rows){
 /* Total km driven and total minutes bind a route, and so does how far apart
    two consecutive clients are: a 20 km jump between doors is two trips being
    sold as one, whoever is riding it. */
+/* ------------------------------------------------------------------
+ * WHAT A PARCEL ACTUALLY COSTS
+ *
+ * A fixed rider is paid per km AND per parcel, so at 12/10 against Porter's
+ * 13 a km the two are within a rupee a kilometre and the rider carries a fee
+ * on top. "Put as many as possible on our own riders" was never the cheap
+ * answer — it only looked like one because they are already on payroll.
+ *
+ * So routes are costed in rupees. Set all three rates to 0 and the old
+ * behaviour comes back: pack the most clients onto fixed riders.
+ * ------------------------------------------------------------------ */
+function costingOn(){
+  return num('fixKm') > 0 || num('fixParcel') > 0 || num('porterKmCost') > 0;
+}
+
+function fixedCost(km, parcels){
+  return num('fixKm') * (isFinite(km) ? km : 0) + num('fixParcel') * parcels;
+}
+
+function porterCost(km){
+  return Math.max(num('porterMin'), num('porterKmCost') * (isFinite(km) ? km : 0));
+}
+
+/* What this cluster would cost on its own Porter booking — the fallback any
+   fixed route has to beat. */
+function soloPorterCost(cluster){
+  const m = measure(cluster.rows);
+  return isFinite(m.km) ? porterCost(m.km) : Infinity;
+}
+
 function hopOk(m){
   const lim = num('hopKm');
   if (lim <= 0 || m.parcels <= 1) return true;
@@ -982,8 +1025,88 @@ function packOneSlot(rows, N){
   fixed.forEach(g=>g.forEach(r=>taken.add(r)));
   const rest = clusters.filter(c=>c.rows.every(r=>!taken.has(r)));
 
-  const porter = improveGroups(porterGroups(rest), num('porterMax'));
+  let porter = improveGroups(porterGroups(rest), num('porterMax'));
+
+  if (costingOn()) ({ fixed, porter } = rebalanceToPorter(fixed, porter));
   return { fixed, porter };
+}
+
+/* ------------------------------------------------------------------
+ * THE PASS THAT CATCHES THE SIRI CASE
+ *
+ * Fixed routes are filled first, so a client ten km out gets absorbed before
+ * Porter grouping has even run — and the Porter group that should have taken
+ * her then forms next door without her. Nothing afterwards ever moved a
+ * client from a fixed route to Porter, so it stayed wrong all day.
+ *
+ * Here every cluster on a fixed route is offered to Porter and kept there
+ * only if it is genuinely cheaper: the rupees the fixed route sheds against
+ * the rupees Porter wants. Joining an existing group is checked before
+ * opening a new booking, because that is the case where Porter wins big — a
+ * 7 km detour at 12/km plus the parcel fee is 94 rupees, while 2 km onto a
+ * group that is already going there is 26.
+ * ------------------------------------------------------------------ */
+function rebalanceToPorter(fixed, porter){
+  const cap = Math.max(1, Math.round(num('porterMax')));
+  let moved = 0, guard = 0;
+
+  while (guard++ < 200){
+    let best = null, bestGain = 1e-9;   // only ever move to save money
+
+    fixed.forEach((route, fi) => {
+      if (route.length <= 1) return;                 // never empty a rider out
+      const groups = clustersOf(route);
+      if (groups.length < 2) return;                 // one blob: nothing to lift
+
+      const whole = measure(route);
+      if (!isFinite(whole.km)) return;
+
+      groups.forEach(cl => {
+        const keep = route.filter(r => cl.rows.indexOf(r) === -1);
+        if (!keep.length) return;
+        const after = measure(keep);
+        if (!isFinite(after.km)) return;
+
+        // what the fixed side stops paying
+        const saved = fixedCost(whole.km - after.km, cl.rows.length);
+
+        // the cheapest home Porter can offer it
+        let costTo = soloPorterCost(cl), target = -1;
+        porter.forEach((g, gi) => {
+          if (g.length + cl.rows.length > cap) return;
+          const was = measure(g), now = measure(g.concat(cl.rows));
+          if (!isFinite(was.km) || !isFinite(now.km)) return;
+          if (!porterSpreadOk(now)) return;
+          const extra = porterCost(now.km) - porterCost(was.km);
+          if (extra < costTo){ costTo = extra; target = gi; }
+        });
+
+        const gain = saved - costTo;
+        if (gain > bestGain){ bestGain = gain; best = { fi, cl, keep, target }; }
+      });
+    });
+
+    if (!best) break;
+    fixed[best.fi] = best.keep;
+    if (best.target >= 0) porter[best.target] = porter[best.target].concat(best.cl.rows);
+    else porter.push(best.cl.rows.slice());
+    moved++;
+  }
+
+  if (moved){
+    fixed  = improveGroups(fixed.filter(g => g.length));
+    porter = improveGroups(porter.filter(g => g.length), cap);
+  }
+  return { fixed, porter };
+}
+
+/* A Porter group must still be tight — the same rule porterGroups uses. */
+function porterSpreadOk(m){
+  const lim = num('hopKm');
+  if (lim <= 0 || m.parcels <= 1) return true;
+  if (m.maxHopHv > lim) return false;
+  if (m.gaps) return true;
+  return m.maxHop <= lim;
 }
 
 /* Clients closer than `min km between clients` always travel together, so the
@@ -1038,6 +1161,8 @@ function fillFixed(clusters, N){
     left.delete(ci);
   }
 
+  const money = costingOn();
+
   let guard = 0;
   while (left.size && guard++ < 3000){
     let best = null, bestScore = Infinity;
@@ -1047,8 +1172,22 @@ function fillFixed(clusters, N){
         const cand = r.rows.concat(clusters[ci].rows);
         const m = measure(cand);
         if (!fits(m)) continue;
-        const score = (m.km - baseKm) / clusters[ci].rows.length;
-        if (score < bestScore - 1e-9){ bestScore = score; best = { r, ci }; }
+
+        const dKm = m.km - baseKm;
+        const n   = clusters[ci].rows.length;
+
+        if (money){
+          /* Taking this cluster costs the detour plus the per-parcel fee.
+             It is only worth doing if that beats sending it by Porter on its
+             own — and the rebalance pass below then checks the cheaper case
+             of it joining a Porter group that already exists. */
+          const add = fixedCost(dKm, n);
+          if (add > soloPorterCost(clusters[ci])) continue;
+          if (add / n < bestScore - 1e-9){ bestScore = add / n; best = { r, ci }; }
+        } else {
+          const score = dKm / n;
+          if (score < bestScore - 1e-9){ bestScore = score; best = { r, ci }; }
+        }
       }
     }
     if (!best) break;
@@ -1223,7 +1362,7 @@ function routesFromSaved(byRoute){
       });
       if (!rows.length) return;
       const slot = rows[0].slot;
-      const ag = agents.find(a=>a.name && routeAgentName(name) === a.name);
+      const ag = agents.find(a=>a.name && routeAgentName(name, slot) === a.name);
       out.push({ name, slot,
                  kind: /P\d/.test(name) ? 'porter' : 'fixed',
                  rows, renamed: true,
@@ -1235,10 +1374,12 @@ function routesFromSaved(byRoute){
   return { routes: out, extra, placed: used.size };
 }
 
-/* DeliveryAgents is keyed by route, and the roster call already folded those
- * people in, so a saved route finds its rider by name when one was set. */
-function routeAgentName(routeName){
-  const hit = (savedAgentsByRoute || {})[String(routeName).toLowerCase().trim()];
+/* The rider recorded for THIS date, this slot, this route. Slot is part of the
+ * key: route names repeat across slots, and matching on the name alone put a
+ * rider on a route nobody had assigned them to. */
+function routeAgentName(routeName, slot){
+  const key = String(slot || '').trim() + '||' + String(routeName).replace(/\s+/g,' ').trim().toLowerCase();
+  const hit = (savedAgentsByRoute || {})[key];
   return hit ? hit.name : '';
 }
 let savedAgentsByRoute = {};
@@ -2052,6 +2193,7 @@ function routeDetail(i){
       '<button class="btn line sm" onclick="toggleAdd('+i+')">'+(addOpen===i?'Close search':'Add a client')+'</button>'+
       '<button class="btn line sm" onclick="manualSplit('+i+')">Move ticked out</button>'+
       '<button class="btn line sm" onclick="reoptimise('+i+')">Re-order stops</button>'+
+      '<button class="btn line sm" onclick="openMerge('+i+')">Merge with…</button>'+
       '<button class="btn line sm" onclick="sendAgentLink('+i+')">Send agent link</button>'+
     '</div>'+
     '<div class="acts">'+
@@ -2228,6 +2370,66 @@ function moveStop(ri, ptk, dir){
 /* Price whatever this route is missing, drop any hand ordering, and work the
    run out again. This is what to press after adding someone by hand: their
    legs were never bought, so the order could not account for them. */
+/* ------------------------------------------------------------------
+ * MERGE TWO ROUTES
+ * Same slot only, and it shows what the merge costs or saves before you
+ * commit — two routes becoming one is rarely free, and the number decides
+ * it better than the shape on screen does.
+ * ------------------------------------------------------------------ */
+function openMerge(ri){
+  const r = routes[ri];
+  const mates = routes
+    .map((x, i) => ({ x, i }))
+    .filter(o => o.i !== ri && o.x.slot === r.slot);
+
+  if (!mates.length){ setStatus('Nothing else in that slot to merge with.'); return; }
+
+  const lines = mates.map(o => {
+    const m = measure(r.rows.concat(o.x.rows));
+    const was = (measure(r.rows).km || 0) + (measure(o.x.rows).km || 0);
+    if (!isFinite(m.km)) return (o.i + 1) + '. ' + o.x.name + '  (not measured yet)';
+    const d = m.km - was;
+    const over = !fits(m, o.x.kind === 'porter' && r.kind === 'porter' ? num('porterMax') : 0);
+    return (o.i + 1) + '. ' + o.x.name + '  → ' + m.parcels + 'p, ' + km1(m.km) + ' km'
+         + '  (' + (d >= 0 ? '+' : '') + km1(d) + ' km)'
+         + (over ? '  ⚠ over your limits' : '');
+  }).join('\n');
+
+  const pick = prompt('Merge "' + r.name + '" into which route?\n\n' + lines +
+                      '\n\nType the number:');
+  if (!pick) return;
+  const n = parseInt(pick, 10) - 1;
+  const hit = mates.find(o => o.i === n);
+  if (!hit){ setStatus('No route numbered ' + pick + ' in this slot.'); return; }
+  doMerge(ri, hit.i);
+}
+
+function doMerge(a, b){
+  const A = routes[a], B = routes[b];
+  if (A.slot !== B.slot){ setStatus('Those are in different slots.'); return; }
+
+  const m = measure(A.rows.concat(B.rows));
+  const cap = (A.kind === 'porter' && B.kind === 'porter') ? num('porterMax') : 0;
+  if (!fits(m, cap) &&
+      !confirm('That merge breaks your limits:\n\n'
+        + m.parcels + ' parcels, ' + km1(m.km) + ' km, ' + Math.round(m.total) + ' min\n\n'
+        + 'Merge anyway?')) return;
+
+  snapshot();
+  B.rows = B.rows.concat(A.rows);
+  B.kind = (A.kind === 'fixed' || B.kind === 'fixed') ? 'fixed' : 'porter';
+  if (!B.agent && A.agent){ B.agent = A.agent; B.agentPhone = A.agentPhone; }
+  /* A hand-set stop order describes the route that existed before the merge,
+     so it is dropped. measure() then works out the driving order itself —
+     inDriveOrder is a render helper and does not belong here. */
+  B.manualOrder = null;
+  B.m = measure(B.rows);
+  routes.splice(a, 1);
+  renumber();
+  render();
+  setStatus('Merged into ' + B.name + ' — ' + B.rows.length + ' parcels, ' + km1(B.m.km) + ' km.');
+}
+
 async function reoptimise(ri){
   const r = routes[ri];
   const pts = uniqPts(r.rows);
