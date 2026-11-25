@@ -44,7 +44,7 @@
   body.landing .top, body.landing .deck{ display:none; }
   body.working .gate{ display:none; }
 
-  .gate{ min-height:100dvh; display:flex; flex-direction:column; justify-content:center;
+  .gate{ position:relative; min-height:100dvh; display:flex; flex-direction:column; justify-content:center;
     align-items:center; gap:22px; padding:30px 22px calc(30px + env(safe-area-inset-bottom)); }
   .mark{ display:flex; flex-direction:column; align-items:center; gap:12px; }
   .mark img{ height:54px; width:auto; }
@@ -105,9 +105,15 @@
     display:flex; align-items:center; justify-content:center; font-size:11px; color:transparent; }
   .slots label:has(input:checked) .tick{ background:var(--signal); border-color:var(--signal); color:#fff; }
 
-  .gatebtns{ display:flex; gap:9px; }
-  .gatebtns .iconbtn{ flex:1; }
-  .gate .btn.line{ background:var(--surface); color:var(--ink); border:1px solid var(--rule); }
+  /* The header pair sits at the top here too, so they are where the hand
+     already expects them. .iconbtn is white-on-translucent for the dark
+     header and would vanish on this light background, so these are outlined. */
+  .gatetop{ position:absolute; top:calc(14px + env(safe-area-inset-top)); right:15px;
+            display:flex; gap:9px; }
+  .gbtn{ min-height:40px; padding:0 15px; border:1px solid var(--rule); border-radius:11px;
+         background:var(--surface); color:var(--ink); font-size:13.5px; font-weight:600;
+         cursor:pointer; }
+  .gbtn:active{ background:var(--rule-2); }
   .riders-in{ display:flex; align-items:center; gap:0; border:1px solid var(--rule);
     border-radius:11px; background:var(--surface); overflow:hidden; min-height:var(--tap); }
   .riders-in span{ padding-left:14px; font-size:14px; color:var(--ink-2); white-space:nowrap; }
@@ -328,6 +334,10 @@
 
 <!-- which day -->
 <div class="gate">
+  <div class="gatetop">
+    <button class="gbtn" id="ridersBtn2">Riders</button>
+    <button class="gbtn" id="advToggle2">Limits</button>
+  </div>
   <div class="mark">
     <img src="logo.png" alt="Friska">
     <b>Dispatch</b>
@@ -341,10 +351,6 @@
       <label><input type="checkbox" class="slotbox" value="Evening" checked><i class="tick">&#10003;</i>Evening</label>
     </div>
     <div class="riders-in"><span>Riders out today</span><input type="number" id="agents" value="3" min="0" max="12"></div>
-    <div class="gatebtns">
-      <button class="iconbtn" id="ridersBtn2">Riders</button>
-      <button class="iconbtn" id="advToggle2">Limits</button>
-    </div>
     <button class="btn go" id="loadSaved" style="display:none">Open saved routes</button>
     <button class="btn go" id="load">Build routes</button>
     <div class="say" id="gateSay" style="text-align:center"></div>
@@ -1070,6 +1076,7 @@ function ensureZones(pts){
 function packRoutes(allRows){
   thinDropped = [];
   porterPulled = 0;
+  levelled = 0;
   const out = [];
   const N = Math.max(0, Math.round(num('agents')));
 
@@ -1126,7 +1133,7 @@ function packOneSlot(rows, N){
   if (costingOn()) ({ fixed, porter } = rebalanceToPorter(fixed, porter));
   ({ fixed, porter } = capPorterBookings(fixed, porter));
   ({ fixed, porter } = dropThinRiders(fixed, porter));
-  ({ fixed, porter } = capPorterBookings(fixed, porter));
+  ({ fixed, porter } = capPorterBookings(fixed, porter, true));
   return { fixed, porter };
 }
 
@@ -1142,7 +1149,7 @@ function packOneSlot(rows, N){
  * A booking that no rider can take stays with Porter whatever the count. The
  * limits still bind; this never pushes a route past them.
  * ------------------------------------------------------------------ */
-function capPorterBookings(fixed, porter){
+function capPorterBookings(fixed, porter, guardPay){
   if (!fixed.length) return { fixed, porter };
 
   let guard = 0;
@@ -1164,7 +1171,7 @@ function capPorterBookings(fixed, porter){
     porterPulled++;
   }
 
-  return { fixed: improveGroups(fixed.filter(g => g.length)), porter };
+  return { fixed: improveGroups(fixed.filter(g => g.length), 0, guardPay), porter };
 }
 
 let porterPulled = 0;
@@ -1180,7 +1187,88 @@ let porterPulled = 0;
  * Using three riders properly beats using four badly. The last route standing
  * is never dissolved — somebody has to carry the day.
  * ------------------------------------------------------------------ */
+/* ------------------------------------------------------------------
+ * KEEP THE RIDERS YOU ASKED FOR
+ *
+ * Dissolving a thin rider was too quick an answer. You said three, so first
+ * try to MAKE three work: move clusters from the riders who are comfortably
+ * over the minimum down to the one who is short, until everybody clears it.
+ *
+ * A donor never drops below the floor itself, and the cheapest move in km is
+ * taken each round, so levelling costs as little distance as it can. Only if
+ * no amount of shuffling can pay somebody is their round broken up.
+ * ------------------------------------------------------------------ */
+function levelRiders(fixed){
+  const floor = num('minPay');
+  if (floor <= 0 || fixed.filter(g=>g.length).length < 2) return fixed;
+
+  const pay = r => { const m = measure(r); return isFinite(m.km) ? fixedCost(m.km, m.parcels) : 0; };
+  const km  = r => { const m = measure(r); return isFinite(m.km) ? m.km : Infinity; };
+
+  /* One short route at a time, and all or nothing. Feeding a route part of
+     the way to the floor is worse than leaving it alone: it is still too thin
+     to send out, and now the donors have nothing spare either, so it cannot
+     be broken up afterwards. If it cannot be brought all the way up, put
+     everything back. */
+  let outer = 0;
+  while (outer++ < 20){
+    const live = fixed.map((r,i)=>i).filter(i=>fixed[i].length);
+    const short = live.filter(i => pay(fixed[i]) < floor)
+                      .sort((a,b)=>pay(fixed[a]) - pay(fixed[b]))[0];
+    if (short === undefined) break;
+
+    const snapshot = fixed.map(g => g.slice());
+    let gained = 0, inner = 0;
+
+    while (pay(fixed[short]) < floor && inner++ < 40){
+      let best = null, bestCost = Infinity;
+      fixed.forEach((donor, src) => {
+        if (src === short || !donor.length) return;
+        clustersOf(donor).forEach(cl => {
+          const keep = donor.filter(r => cl.rows.indexOf(r) === -1);
+          if (!keep.length) return;
+          if (pay(keep) < floor) return;              // never rob one to pay another
+          const grown = fixed[short].concat(cl.rows);
+          if (!fits(measure(grown)) || !fits(measure(keep))) return;
+          const cost = (km(grown) - km(fixed[short])) + (km(keep) - km(donor));
+          if (cost < bestCost){ bestCost = cost; best = { src, keep, grown }; }
+        });
+      });
+      if (!best) break;
+      fixed[best.src] = best.keep;
+      fixed[short]    = best.grown;
+      gained++;
+    }
+
+    if (pay(fixed[short]) < floor){
+      for (let i = 0; i < fixed.length; i++) fixed[i] = snapshot[i];
+      break;                                          // cannot be done; leave it to be dissolved
+    }
+    levelled += gained;
+  }
+  return fixed;
+}
+
+let levelled = 0;
+
 function dropThinRiders(fixed, porter){
+  /* Try to make the count you asked for work — but only keep the attempt if
+     it leaves EVERY rider above the floor. Levelling shuffles clusters about,
+     and a half-successful shuffle leaves the thin route's clients with nowhere
+     to go afterwards, so the route that used to be dissolved cleanly survives
+     at a hundred rupees instead. All of it, or none of it. */
+  const floorNow = num('minPay');
+  if (floorNow > 0){
+    const before = fixed.map(g => g.slice());
+    const beforeLevelled = levelled;
+    fixed = levelRiders(fixed);
+    const allPaid = fixed.every(g => {
+      if (!g.length) return true;
+      const m = measure(g);
+      return isFinite(m.km) && fixedCost(m.km, m.parcels) >= floorNow;
+    });
+    if (!allPaid){ fixed = before; levelled = beforeLevelled; }
+  }
   const floor = num('minPay');
   if (floor <= 0) return { fixed, porter };
 
@@ -1242,7 +1330,7 @@ function dropThinRiders(fixed, porter){
     fixed[worst] = [];
   }
 
-  fixed  = improveGroups(fixed.filter(g => g.length));
+  fixed  = improveGroups(fixed.filter(g => g.length), 0, true);
   porter = capPorter(improveGroups(capPorter(porter.filter(g => g.length), cap), cap), cap);
   if (dropNotes.length) thinDropped.push(...dropNotes);
   return { fixed, porter };
@@ -1313,6 +1401,11 @@ function rebalanceToPorter(fixed, porter){
           if (!keep.length) break;                   // never empty a rider out
           const after = measure(keep);
           if (!isFinite(after.km)) continue;
+          /* The route LEFT BEHIND has to stand on its own. Lifting clients out
+             of the middle joins the two stops either side, and that new jump
+             can be longer than the furthest-apart limit allows — which is how
+             a 16 km hop appeared on a route limited to 12. */
+          if (!fits(after)) continue;
 
           const now = measure(home.rows.concat(rows));
           if (!isFinite(now.km)) continue;
@@ -1520,7 +1613,12 @@ function porterGroups(clusters){
 
 /* Local search over a set of groups: relocate or swap whole clusters wherever
  * that cuts total km and both groups stay legal. */
-function improveGroups(groups, parcelCap){
+/* guardPay: once the thin rounds have been dealt with, no shuffle may put a
+   rider back under the minimum. Without it this pass optimises purely for
+   kilometres and quietly recreates the 4-parcel round that was just
+   dissolved. Only passed after dropThinRiders, when every route already
+   clears the floor. */
+function improveGroups(groups, parcelCap, guardPay){
   const clusterKey = r => {
     const z = (zoneMap[ptKey(r.coord)]||{}).zone;
     return z || ptKey(r.coord);
@@ -1533,7 +1631,14 @@ function improveGroups(groups, parcelCap){
 
   let best = groups.map(g=>g.slice()), improved = true, guard = 0;
   const kmOf = g => g.length ? measure(g).km : 0;
-  const okOf = g => !g.length || fits(measure(g), parcelCap);
+  const okOf = g => {
+    if (!g.length) return true;
+    const m = measure(g);
+    if (!fits(m, parcelCap)) return false;
+    if (guardPay && num('minPay') > 0 && isFinite(m.km) &&
+        fixedCost(m.km, m.parcels) < num('minPay')) return false;
+    return true;
+  };
 
   while (improved && guard++ < 40){
     improved = false;
@@ -1932,6 +2037,9 @@ function finishBuild(newlyZoned){
     thinNote = '  ' + thinDropped.length + plural(thinDropped.length,' rider') +
       ' left out \u2014 their round would only have paid ' + each +
       ', under the \u20b9' + num('minPay') + ' minimum. That work went to Porter.';
+  } else if (levelled){
+    thinNote = '  Work moved between ' + (levelled + 1) + ' riders so each one clears the \u20b9' +
+      num('minPay') + ' minimum.';
   } else if (porterPulled){
     thinNote = '  ' + porterPulled + plural(porterPulled,' Porter booking') +
       ' handed back to your riders to keep the day near ' + PORTER_TARGET + '.';
