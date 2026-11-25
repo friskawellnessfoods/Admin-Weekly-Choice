@@ -232,6 +232,11 @@
   .frow{ display:flex; gap:10px; align-items:center; min-height:42px; padding:7px 9px;
     border-radius:8px; cursor:pointer; font-size:14px; }
   .frow:active{ background:var(--rule-2); }
+  .frow .sub{ font-size:12px; color:var(--ink-2); margin-top:2px; white-space:normal; }
+  .fhead{ font-size:12.5px; font-weight:600; color:var(--ink-2); margin-bottom:7px; }
+  .fnone{ font-size:13px; color:var(--ink-3); padding:8px 9px; }
+  .warnpill{ flex:none; font-size:11.5px; font-weight:600; padding:4px 9px; border-radius:7px;
+             background:#fdf1dd; color:var(--porter); }
   .frow .g{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .frow .from{ font-size:11.5px; color:var(--ink-2); background:var(--rule-2);
     padding:2px 7px; border-radius:6px; }
@@ -519,7 +524,7 @@ const MAX_REFINE = 5;
 let refinePass = 0, toppedUp = false;
 let fromSaved = false, savedForDate = null, forceRebuild = false, setStatusText = '';
 let clients = [], notRouted = [], routes = [], zoneMap = {}, roadCache = {},
-    agents = [], measured = null, unassigned = [], addOpen = null, addFilter = '';
+    agents = [], measured = null, unassigned = [], addOpen = null, addFilter = '', mergeOpen = null;
 
 /* Everything shared: the URL comes from config.js in the repo, and every
    measurement lives in the RoadCache sheet. Nothing is stored per-device, so
@@ -1223,48 +1228,66 @@ function rebalanceToPorter(fixed, porter){
   let moved = 0, guard = 0;
 
   /* Worth making, not merely cheaper. Chasing every few rupees booked Porter
-     eight times a day; the Siri case was 68, so a real saving still gets
-     through and the noise does not. */
+     eight times a day; a real saving still gets through and the noise does not. */
   while (guard++ < 200){
     let best = null, bestGain = PORTER_WORTH_IT;
 
+    /* Bundles, not one cluster at a time. Taking Chitra off a route on her own
+       saves almost nothing, because the rider still drives out that way for the
+       two clients behind her — only all three leaving sheds the 10 km. The
+       saving is superadditive, so moving one at a time can never find it.
+       An empty slot at the end stands for opening a new booking. */
+    const homes = porter.map((g, gi) => ({ gi, rows: g })).concat([{ gi: -1, rows: [] }]);
+
     fixed.forEach((route, fi) => {
-      if (route.length <= 1) return;                 // never empty a rider out
       const groups = clustersOf(route);
       if (groups.length < 2) return;                 // one blob: nothing to lift
-
       const whole = measure(route);
       if (!isFinite(whole.km)) return;
 
-      groups.forEach(cl => {
-        const keep = route.filter(r => cl.rows.indexOf(r) === -1);
-        if (!keep.length) return;
-        const after = measure(keep);
-        if (!isFinite(after.km)) return;
+      homes.forEach(home => {
+        const room = cap - home.rows.length;
+        if (room <= 0) return;
+        const wasKm = home.rows.length ? (measure(home.rows).km || 0) : 0;
+        if (home.rows.length && !isFinite(wasKm)) return;
 
-        // what the fixed side stops paying
-        const saved = fixedCost(whole.km - after.km, cl.rows.length);
+        /* Nearest to that booking first, so a bundle is a run of neighbours
+           rather than an arbitrary handful. */
+        const anchor = home.rows.length ? home.rows[0].coord : null;
+        const order = groups.slice().sort((a, b) =>
+          anchor ? hv(anchor, a.pts[0]) - hv(anchor, b.pts[0])
+                 : hv(KITCHEN, b.pts[0]) - hv(KITCHEN, a.pts[0]));
 
-        // the cheapest home Porter can offer it
-        let costTo = soloPorterCost(cl), target = -1;
-        porter.forEach((g, gi) => {
-          if (g.length + cl.rows.length > cap) return;
-          const was = measure(g), now = measure(g.concat(cl.rows));
-          if (!isFinite(was.km) || !isFinite(now.km)) return;
-          if (!porterSpreadOk(now)) return;
-          const extra = porterCost(now.km) - porterCost(was.km);
-          if (extra < costTo){ costTo = extra; target = gi; }
-        });
+        let take = [], rows = [];
+        for (const cl of order){
+          if (rows.length + cl.rows.length > room) continue;
+          take = take.concat([cl]);
+          rows = rows.concat(cl.rows);
 
-        const gain = saved - costTo;
-        if (gain > bestGain){ bestGain = gain; best = { fi, cl, keep, target }; }
+          const keep = route.filter(r => rows.indexOf(r) === -1);
+          if (!keep.length) break;                   // never empty a rider out
+          const after = measure(keep);
+          if (!isFinite(after.km)) continue;
+
+          const now = measure(home.rows.concat(rows));
+          if (!isFinite(now.km)) continue;
+          if (!porterSpreadOk(now)) continue;
+
+          const saved = fixedCost(whole.km - after.km, rows.length);
+          const costTo = porterCost(now.km) - porterCost(wasKm);
+          const gain = saved - costTo;
+          if (gain > bestGain){
+            bestGain = gain;
+            best = { fi, keep, rows: rows.slice(), target: home.gi };
+          }
+        }
       });
     });
 
     if (!best) break;
     fixed[best.fi] = best.keep;
-    if (best.target >= 0) porter[best.target] = porter[best.target].concat(best.cl.rows);
-    else porter.push(best.cl.rows.slice());
+    if (best.target >= 0) porter[best.target] = porter[best.target].concat(best.rows);
+    else porter.push(best.rows.slice());
     moved++;
   }
 
@@ -1712,7 +1735,7 @@ async function load(){
               + (sheetErr ? '  ' + sheetErr : '');
     if (sheetErr) console.warn(sheetErr);
 
-    unassigned = []; addOpen = null; addFilter = ''; newAgentFor = null; editPhoneFor = null;
+    unassigned = []; addOpen = null; addFilter = ''; mergeOpen = null; newAgentFor = null; editPhoneFor = null;
     fromSaved = false;
 
     // A date that was saved before comes back exactly as it was left, hand
@@ -2439,7 +2462,7 @@ function routeDetail(i){
       '<button class="btn line sm" onclick="toggleAdd('+i+')">'+(addOpen===i?'Close search':'Add a client')+'</button>'+
       '<button class="btn line sm" onclick="manualSplit('+i+')">Move ticked out</button>'+
       '<button class="btn line sm" onclick="reoptimise('+i+')">Re-order stops</button>'+
-      '<button class="btn line sm" onclick="openMerge('+i+')">Merge with…</button>'+
+      '<button class="btn line sm" onclick="openMerge('+i+')">'+(mergeOpen===i?'Close merge':'Merge with…')+'</button>'+
       '<button class="btn line sm" onclick="sendAgentLink('+i+')">Send agent link</button>'+
     '</div>'+
     '<div class="acts">'+
@@ -2458,6 +2481,10 @@ function routeDetail(i){
     (addOpen===i ? '<div class="finder" style="margin-top:13px">'+
        '<input id="addSearch" placeholder="Search name or phone" oninput="onAddFilter(this.value)">'+
        '<div id="addList" class="flist">'+addListHtml(i)+'</div></div>' : '')+
+
+    (mergeOpen===i ? '<div class="finder" style="margin-top:13px">'+
+       '<div class="fhead">Merge '+esc(r.name)+' into…</div>'+
+       '<div class="flist">'+mergeListHtml(i)+'</div></div>' : '')+
 
     '<div class="stops" style="margin-top:13px">'+
       stopRows.map(x=>{
@@ -2624,30 +2651,38 @@ function moveStop(ri, ptk, dir){
  * ------------------------------------------------------------------ */
 function openMerge(ri){
   const r = routes[ri];
-  const mates = routes
-    .map((x, i) => ({ x, i }))
-    .filter(o => o.i !== ri && o.x.slot === r.slot);
-
+  const mates = routes.map((x, i) => ({ x, i })).filter(o => o.i !== ri && o.x.slot === r.slot);
   if (!mates.length){ setStatus('Nothing else in that slot to merge with.'); return; }
+  mergeOpen = (mergeOpen === ri) ? null : ri;
+  addOpen = null;
+  render();
+}
 
-  const lines = mates.map(o => {
-    const m = measure(r.rows.concat(o.x.rows));
-    const was = (measure(r.rows).km || 0) + (measure(o.x.rows).km || 0);
-    if (!isFinite(m.km)) return (o.i + 1) + '. ' + o.x.name + '  (not measured yet)';
-    const d = m.km - was;
-    const over = !fits(m, o.x.kind === 'porter' && r.kind === 'porter' ? num('porterMax') : 0);
-    return (o.i + 1) + '. ' + o.x.name + '  → ' + m.parcels + 'p, ' + km1(m.km) + ' km'
-         + '  (' + (d >= 0 ? '+' : '') + km1(d) + ' km)'
-         + (over ? '  ⚠ over your limits' : '');
-  }).join('\n');
+/* The routes you could merge into, as rows you tap. Each shows what the
+   merged route becomes and what it costs in km, because two routes becoming
+   one is rarely free and the number decides it better than the map does. */
+function mergeListHtml(ri){
+  const r = routes[ri];
+  const mates = routes.map((x, i) => ({ x, i })).filter(o => o.i !== ri && o.x.slot === r.slot);
+  if (!mates.length) return '<div class="fnone">Nothing else in this slot.</div>';
 
-  const pick = prompt('Merge "' + r.name + '" into which route?\n\n' + lines +
-                      '\n\nType the number:');
-  if (!pick) return;
-  const n = parseInt(pick, 10) - 1;
-  const hit = mates.find(o => o.i === n);
-  if (!hit){ setStatus('No route numbered ' + pick + ' in this slot.'); return; }
-  doMerge(ri, hit.i);
+  const mine = measure(r.rows).km || 0;
+  return mates.map(o => {
+    const m    = measure(r.rows.concat(o.x.rows));
+    const was  = mine + (measure(o.x.rows).km || 0);
+    const cap  = (r.kind === 'porter' && o.x.kind === 'porter') ? num('porterMax') : 0;
+    const over = isFinite(m.km) && !fits(m, cap);
+    const d    = isFinite(m.km) ? m.km - was : NaN;
+    return '<div class="frow" onclick="doMerge(' + ri + ',' + o.i + ')">'+
+        '<div class="g"><b>' + esc(o.x.name) + '</b>'+
+          (o.x.agent ? ' \u00b7 ' + esc(o.x.agent) : '')+
+          '<div class="sub">' + m.parcels + plural(m.parcels,' parcel') + ' \u00b7 ' +
+            km1(m.km) + ' km after' +
+            (isFinite(d) ? '  (' + (d >= 0 ? '+' : '') + km1(d) + ' km)' : '') +
+          '</div></div>'+
+        (over ? '<span class="warnpill">over limits</span>' : '<span class="addpill">Merge</span>')+
+      '</div>';
+  }).join('');
 }
 
 function doMerge(a, b){
@@ -2671,6 +2706,7 @@ function doMerge(a, b){
   B.manualOrder = null;
   B.m = measure(B.rows);
   routes.splice(a, 1);
+  mergeOpen = null;
   renumber();
   render();
   setStatus('Merged into ' + B.name + ' — ' + B.rows.length + ' parcels, ' + km1(B.m.km) + ' km.');
