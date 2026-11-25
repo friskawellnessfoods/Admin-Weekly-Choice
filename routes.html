@@ -266,6 +266,10 @@
   .field{ margin-bottom:12px; }
   .field label{ display:block; font-size:13px; color:var(--ink-2); margin-bottom:5px; }
   .field .why{ font-size:12px; color:var(--ink-3); margin-top:4px; }
+  .sheet .why{ font-size:12px; color:var(--ink-3); line-height:1.5; margin:-2px 0 16px; }
+  .grp{ font-size:11.5px; font-weight:700; letter-spacing:.07em; text-transform:uppercase;
+        color:var(--ink-3); margin:18px 0 9px; }
+  .grp:first-of-type{ margin-top:6px; }
   .pair{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
   .rrow{ display:flex; gap:8px; align-items:center; margin-bottom:9px; }
   .rrow input:first-child{ flex:1.4; }
@@ -367,37 +371,56 @@
   <div class="card">
     <div class="grip"></div>
     <h3>Route limits</h3>
+
+    <div class="grp">A rider’s day</div>
     <div class="pair">
-      <div class="field"><label>Parcels per route</label>
+      <div class="field"><label>Parcels, at most</label>
         <input type="number" id="maxP" value="20" min="1"></div>
-      <div class="field"><label>Minutes per route</label>
-        <input type="number" id="maxMin" value="180" min="10"></div>
-      <div class="field"><label>Km driven per route</label>
+      <div class="field"><label>Km driven, at most</label>
         <input type="number" id="maxTotKm" value="40" min="0"></div>
+      <div class="field"><label>Minutes, at most</label>
+        <input type="number" id="maxMin" value="180" min="10"></div>
       <div class="field"><label>Minutes at each door</label>
         <input type="number" id="stopMin" value="2" min="0" step="0.5"></div>
+      <div class="field"><label>A round must pay the rider at least (₹)</label>
+        <input type="number" id="minPay" value="250" min="0" step="10"></div>
     </div>
-    <div class="field"><label>Clients closer than this always ride together (km)</label>
-      <input type="number" id="zr" value="1" min="0.1" step="0.1">
-      <div class="why">One building never gets split across two routes.</div></div>
-    <div class="field"><label>Your rider — cost per km (₹)</label>
-      <input type="number" id="fixKm" value="12" min="0" step="0.5">
-      <div class="why">What a fixed rider is paid per kilometre.</div></div>
-    <div class="field"><label>Your rider — cost per parcel (₹)</label>
-      <input type="number" id="fixParcel" value="10" min="0" step="1">
-      <div class="why">Paid on top of the kilometres, so a fixed rider is never free.</div></div>
-    <div class="field"><label>Porter — cost per km (₹)</label>
-      <input type="number" id="porterKmCost" value="13" min="0" step="0.5">
-      <div class="why">Set all three to 0 to go back to simply packing the most clients
-        onto your own riders.</div></div>
-    <div class="field"><label>Porter — minimum per booking (₹)</label>
-      <input type="number" id="porterMin" value="0" min="0" step="5">
-      <div class="why">Base fare. Leave 0 if there is none.</div></div>
-    <div class="field"><label>Longest distance between two clients on a route (km)</label>
-      <input type="number" id="hopKm" value="10" min="0" step="0.5">
-      <div class="why">Two clients never share a route — your rider's or a Porter — if the
-        drive from one to the next is longer than this. 0 turns the limit off. Set it low
-        and you get more, tighter routes.</div></div>
+    <div class="why">15 km and 5 parcels comes to ₹230 at the rates below, so that is
+      what the minimum really means — one number instead of two, and it does not
+      punish a dense round. A rider who cannot be paid this much is not used at all;
+      their work goes to the other riders or to Porter. Three riders working beats
+      four where one has two parcels. 0 turns it off.</div>
+
+    <div class="grp">What it costs</div>
+    <div class="pair">
+      <div class="field"><label>Your rider, ₹ per km</label>
+        <input type="number" id="fixKm" value="12" min="0" step="0.5"></div>
+      <div class="field"><label>Your rider, ₹ per parcel</label>
+        <input type="number" id="fixParcel" value="10" min="0" step="1"></div>
+      <div class="field"><label>Porter, ₹ per km</label>
+        <input type="number" id="porterKmCost" value="13" min="0" step="0.5"></div>
+      <div class="field"><label>Porter, ₹ minimum fare</label>
+        <input type="number" id="porterMin" value="0" min="0" step="5"></div>
+    </div>
+    <div class="why">Your rider is paid per parcel as well as per km, so at these rates
+      they are not free — routes are chosen on rupees, not on filling riders up.
+      Set all four to 0 to go back to packing the most clients onto your own riders.</div>
+
+    <div class="grp">How clients are grouped</div>
+    <div class="pair">
+      <div class="field"><label>Always together, within km</label>
+        <input type="number" id="zr" value="1" min="0.1" step="0.1"></div>
+      <div class="field"><label>Furthest apart, km</label>
+        <input type="number" id="hopKm" value="10" min="0" step="0.5"></div>
+    </div>
+    <div class="why">The first keeps one building on one route. The second stops two
+      clients sharing a route — your rider’s or a Porter — when the drive between
+      them is longer than this. Lower it and you get more, tighter routes.</div>
+
+    <div class="why" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--rule)">
+      A Porter booking carries four parcels. That is not a setting — it is enforced,
+      and a bigger group is split into as many bookings as it needs.</div>
+
     <div class="field">
       <button class="btn go" id="saveSettings" style="width:100%">Save limits for everyone</button>
       <div class="why">Stored in the spreadsheet, so every device builds to the same rules.
@@ -458,7 +481,7 @@ const slotsWanted = () => {
   const on = [...document.querySelectorAll('.slotbox:checked')].map(b=>b.value);
   return on.length ? on : SLOT_ORDER;   // nothing ticked means everything
 };
-const LIMIT_FIELDS = ['maxP','maxTotKm','maxMin','stopMin','zr','hopKm','fixKm','fixParcel','porterKmCost','porterMin','agents'];
+const LIMIT_FIELDS = ['maxP','maxTotKm','maxMin','stopMin','zr','hopKm','minPay','fixKm','fixParcel','porterKmCost','porterMin','agents'];
 
 /* Settings that were dials but never earned one.
    PORTER_MAX   a Porter booking takes four parcels.
@@ -1015,7 +1038,7 @@ function packOneSlot(rows, N){
   const clusters = clustersOf(rows);
 
   if (N <= 0) {
-    return { fixed: [], porter: improveGroups(porterGroups(clusters), num('porterMax')) };
+    return { fixed: [], porter: capPorter(improveGroups(capPorter(porterGroups(clusters)), num('porterMax'))) };
   }
 
   const filled = fillFixed(clusters, N);
@@ -1025,9 +1048,85 @@ function packOneSlot(rows, N){
   fixed.forEach(g=>g.forEach(r=>taken.add(r)));
   const rest = clusters.filter(c=>c.rows.every(r=>!taken.has(r)));
 
-  let porter = improveGroups(porterGroups(rest), num('porterMax'));
+  let porter = capPorter(improveGroups(capPorter(porterGroups(rest)), num('porterMax')));
 
   if (costingOn()) ({ fixed, porter } = rebalanceToPorter(fixed, porter));
+  ({ fixed, porter } = dropThinRiders(fixed, porter));
+  return { fixed, porter };
+}
+
+/* ------------------------------------------------------------------
+ * A RIDER WILL NOT COME OUT FOR TWO PARCELS
+ *
+ * The packer is told how many riders it has and tries to use them all, so a
+ * thin day leaves somebody with two drops and a ten minute round. That is not
+ * a route anyone accepts, so a route below the minimum is dissolved and its
+ * work handed to the other riders, or to Porter.
+ *
+ * Using three riders properly beats using four badly. The last route standing
+ * is never dissolved — somebody has to carry the day.
+ * ------------------------------------------------------------------ */
+function dropThinRiders(fixed, porter){
+  const floor = num('minPay');
+  if (floor <= 0) return { fixed, porter };
+
+  const cap = Math.max(1, Math.round(num('porterMax')));
+  /* Pay, not kilometres or parcels. Twenty drops inside fourteen km is a good
+     day's work and a short one measured in km — two separate minimums threw it
+     away. What a rider turns down is a thin envelope. */
+  const thin = r => {
+    const m = measure(r);
+    if (!isFinite(m.km)) return false;
+    return fixedCost(m.km, m.parcels) < floor;
+  };
+
+  let guard = 0;
+  while (guard++ < 50){
+    if (fixed.filter(g => g.length).length <= 1) break;   // never dissolve the last one
+
+    // the thinnest route is the one to let go of first
+    let worst = -1, worstN = Infinity;
+    fixed.forEach((r, i) => {
+      if (!r.length || !thin(r)) return;
+      if (r.length < worstN){ worstN = r.length; worst = i; }
+    });
+    if (worst < 0) break;
+
+    const orphans = clustersOf(fixed[worst]);
+    const others  = fixed.map((r, i) => i).filter(i => i !== worst && fixed[i].length);
+    const placed  = [];
+
+    orphans.forEach(cl => {
+      // another rider first — it is already paid for
+      let best = -1, bestAdd = Infinity;
+      others.forEach(i => {
+        const m = measure(fixed[i].concat(cl.rows));
+        if (!fits(m)) return;
+        const add = m.km - (measure(fixed[i]).km || 0);
+        if (add < bestAdd){ bestAdd = add; best = i; }
+      });
+      if (best >= 0){ fixed[best] = fixed[best].concat(cl.rows); placed.push(cl); return; }
+
+      // otherwise Porter, joining a group if one has room and is close enough
+      let gi = -1, gAdd = Infinity;
+      porter.forEach((g, j) => {
+        if (g.length + cl.rows.length > cap) return;
+        const m = measure(g.concat(cl.rows));
+        if (!porterSpreadOk(m)) return;
+        const add = (m.km || 0) - (measure(g).km || 0);
+        if (add < gAdd){ gAdd = add; gi = j; }
+      });
+      if (gi >= 0) porter[gi] = porter[gi].concat(cl.rows);
+      else porter.push(...capPorter([cl.rows.slice()], cap));
+      placed.push(cl);
+    });
+
+    if (placed.length !== orphans.length) break;   // could not rehome it all — leave it alone
+    fixed[worst] = [];
+  }
+
+  fixed  = improveGroups(fixed.filter(g => g.length));
+  porter = capPorter(improveGroups(capPorter(porter.filter(g => g.length), cap), cap), cap);
   return { fixed, porter };
 }
 
@@ -1095,7 +1194,7 @@ function rebalanceToPorter(fixed, porter){
 
   if (moved){
     fixed  = improveGroups(fixed.filter(g => g.length));
-    porter = improveGroups(porter.filter(g => g.length), cap);
+    porter = capPorter(improveGroups(capPorter(porter.filter(g => g.length), cap), cap), cap);
   }
   return { fixed, porter };
 }
@@ -1201,6 +1300,38 @@ function fillFixed(clusters, N){
 /* Porter bookings. The client furthest from the kitchen anchors each booking,
  * so genuine outliers are settled first and never get bolted onto an
  * unrelated group. One with nobody in range simply travels alone. */
+/* ------------------------------------------------------------------
+ * FOUR PARCELS IS A BOOKING, NOT A PREFERENCE
+ *
+ * porterGroups seeds each group with a whole cluster and only caps what it
+ * ADDS afterwards — so twenty clients inside the grouping radius came out as
+ * one group of twenty, which is five bookings being shown as one. The cap has
+ * to be applied to the finished groups, wherever they came from.
+ *
+ * Splitting follows the driving order so each booking is a contiguous run of
+ * stops rather than an arbitrary slice.
+ * ------------------------------------------------------------------ */
+function capPorter(groups, cap){
+  const lim = Math.max(1, Math.round(cap || num('porterMax')));
+  const out = [];
+  groups.forEach(g => {
+    if (!g.length) return;
+    if (g.length <= lim){ out.push(g); return; }
+
+    const byPt = new Map();
+    g.forEach(r => { const k = ptKey(r.coord); if (!byPt.has(k)) byPt.set(k, []); byPt.get(k).push(r); });
+    const seq = [];
+    (measure(g).order || []).forEach(pt => {
+      const k = ptKey(pt);
+      if (byPt.has(k)){ seq.push(...byPt.get(k)); byPt.delete(k); }
+    });
+    byPt.forEach(v => seq.push(...v));          // anything unmeasured still ships
+
+    for (let i = 0; i < seq.length; i += lim) out.push(seq.slice(i, i + lim));
+  });
+  return out;
+}
+
 function porterGroups(clusters){
   const cap = Math.max(1, Math.round(num('porterMax')));
   const left = clusters.slice();
