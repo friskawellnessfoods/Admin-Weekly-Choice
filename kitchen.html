@@ -2210,14 +2210,27 @@
   //  Only ever for today: reprinting last Tuesday's list must not reopen a
   //  closed day. Fire-and-forget; a failure here never blocks the PDF.
   // ------------------------------------------------------------
-  function markCooking(date){
-    if(!API || date !== todayLocalStr()) return;
+  async function markCooking(date){
+    if(!API) return;
+    if(date !== todayLocalStr()){
+      setStatus('PDF saved. Cooking status not set — that is not today\'s date.', false);
+      return;
+    }
     try{
-      fetch(API, { method:'POST', body:new URLSearchParams({
+      const res = await fetch(API, { method:'POST', body:new URLSearchParams({
         action:'setKitchenStatus', date:date, slot:'__DAY__', route:'__ALL__', status:'Cooking'
-      })}).catch(()=>{});
-    }catch(e){}
+      })});
+      const d = await res.json();
+      if(d && d.ok) setStatus('Kitchen List downloaded. Clients can now see Cooking.', false);
+      else setStatus('PDF saved, but Cooking status failed: ' + JSON.stringify(d), true);
+    }catch(e){
+      setStatus('PDF saved, but Cooking status failed: ' + e.message, true);
+    }
   }
+
+  /* Run this from the browser console to test the status write on its own,
+     without building a PDF:   testCooking()                                  */
+  window.testCooking = () => markCooking(todayLocalStr());
 
   async function downloadKitchenPdf(){
     if(!guard()) return;
@@ -2386,8 +2399,8 @@
       if(pauseCanvas) addImageFitOnePage(pdf, pauseCanvas, place, 'portrait');
 
       pdf.save('Kitchen_List_' + date + '.pdf');
-      markCooking(date);   // clients now see Cooking
       setStatus('Kitchen List PDF downloaded for ' + date + '.', false);
+      await markCooking(date);   // says so in the status line either way
     }catch(e){
       setStatus('PDF error: ' + e.message, false);
     }finally{
