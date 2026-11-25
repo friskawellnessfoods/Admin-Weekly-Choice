@@ -372,6 +372,16 @@
     <div class="grip"></div>
     <h3>Route limits</h3>
 
+    <div class="grp">Today</div>
+    <div class="pair">
+      <div class="field"><label>Riders out today</label>
+        <input type="number" id="agents2" min="0" max="12"></div>
+      <div class="field" style="align-self:end">
+        <button class="btn line" id="rebuildDay2" style="width:100%">Build again</button></div>
+    </div>
+    <div class="why">Change the number and press Build again — no need to go back
+      to the first screen.</div>
+
     <div class="grp">A rider’s day</div>
     <div class="pair">
       <div class="field"><label>Parcels, at most</label>
@@ -380,8 +390,6 @@
         <input type="number" id="maxTotKm" value="40" min="0"></div>
       <div class="field"><label>Minutes, at most</label>
         <input type="number" id="maxMin" value="180" min="10"></div>
-      <div class="field"><label>Minutes at each door</label>
-        <input type="number" id="stopMin" value="2" min="0" step="0.5"></div>
       <div class="field"><label>A round must pay the rider at least (₹)</label>
         <input type="number" id="minPay" value="250" min="0" step="10"></div>
     </div>
@@ -399,27 +407,22 @@
         <input type="number" id="fixParcel" value="10" min="0" step="1"></div>
       <div class="field"><label>Porter, ₹ per km</label>
         <input type="number" id="porterKmCost" value="13" min="0" step="0.5"></div>
-      <div class="field"><label>Porter, ₹ minimum fare</label>
-        <input type="number" id="porterMin" value="0" min="0" step="5"></div>
     </div>
     <div class="why">Your rider is paid per parcel as well as per km, so at these rates
       they are not free — routes are chosen on rupees, not on filling riders up.
       Set all four to 0 to go back to packing the most clients onto your own riders.</div>
 
     <div class="grp">How clients are grouped</div>
-    <div class="pair">
-      <div class="field"><label>Always together, within km</label>
-        <input type="number" id="zr" value="1" min="0.1" step="0.1"></div>
-      <div class="field"><label>Furthest apart, km</label>
-        <input type="number" id="hopKm" value="10" min="0" step="0.5"></div>
-    </div>
-    <div class="why">The first keeps one building on one route. The second stops two
-      clients sharing a route — your rider’s or a Porter — when the drive between
-      them is longer than this. Lower it and you get more, tighter routes.</div>
+    <div class="field"><label>Two clients on one route — furthest apart (km)</label>
+      <input type="number" id="hopKm" value="10" min="0" step="0.5">
+      <div class="why">No two stops in a row further apart than this, on your rider’s
+        round or a Porter. Lower it for more, tighter routes.</div></div>
 
     <div class="why" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--rule)">
-      A Porter booking carries four parcels. That is not a setting — it is enforced,
-      and a bigger group is split into as many bookings as it needs.</div>
+      Fixed, because they never change: four parcels to a Porter booking, two minutes
+      at each door, and the same address always rides together. The day aims for about
+      <b>four Porter bookings</b> — past that the cheapest ones go back to your riders,
+      even where the rupees favour Porter.</div>
 
     <div class="field">
       <button class="btn go" id="saveSettings" style="width:100%">Save limits for everyone</button>
@@ -481,7 +484,7 @@ const slotsWanted = () => {
   const on = [...document.querySelectorAll('.slotbox:checked')].map(b=>b.value);
   return on.length ? on : SLOT_ORDER;   // nothing ticked means everything
 };
-const LIMIT_FIELDS = ['maxP','maxTotKm','maxMin','stopMin','zr','hopKm','minPay','fixKm','fixParcel','porterKmCost','porterMin','agents'];
+const LIMIT_FIELDS = ['maxP','maxTotKm','maxMin','hopKm','minPay','fixKm','fixParcel','porterKmCost','agents'];
 
 /* Settings that were dials but never earned one.
    PORTER_MAX   a Porter booking takes four parcels.
@@ -489,7 +492,14 @@ const LIMIT_FIELDS = ['maxP','maxTotKm','maxMin','stopMin','zr','hopKm','minPay'
                 distance for. Pure cost control; the refine pass buys every leg
                 inside a finished route anyway, so this only shapes the first
                 pass. */
-const PORTER_MAX   = 4;
+const PORTER_MAX   = 4;    // parcels in one Porter booking — physical
+const STOP_MIN     = 2;    // minutes at each door
+/* Porter is the exception, not the plan. Two to four bookings on a normal day
+   is what the kitchen actually does by hand, so beyond that the cheapest
+   bookings are handed back to the riders even though the rupees say Porter.
+   A rule, not a box: the number that works is the number we know works. */
+const PORTER_TARGET = 4;
+const PORTER_WORTH_IT = 50;   // rupees a move to Porter must actually save
 const MEASURE_NEAR = 8;
 
 /* A missing element used to throw and blank the page. Return a harmless stub
@@ -645,7 +655,7 @@ $('saveRiders').addEventListener('click', async ()=>{
   $('saveRiders').disabled = false;
 });
 
-$('advToggle').addEventListener('click', ()=>openSheet('adv'));
+$('advToggle').addEventListener('click', ()=>{ $('agents2').value = $('agents').value; openSheet('adv'); });
 
 const setStatus = m => {
   $('status').textContent = m;
@@ -669,10 +679,16 @@ function busyText(what){ $('veilWhat').textContent = what; }
    come down — a locked page is worse than a lost message. */
 window.addEventListener('error',              ()=>busy(false));
 window.addEventListener('unhandledrejection', ()=>busy(false));
+/* Fixed facts, not settings. Each of these was a box on screen that nobody
+   ever changed, and every extra box is one more thing to get wrong on a
+   morning when the routes have to go out. */
 const num = id => {
   if (id === 'porterMax') return PORTER_MAX;
   if (id === 'nearKm')    return MEASURE_NEAR;
   if (id === 'maxSpread') return 0;          // no spread limit; see fits()
+  if (id === 'zr')        return 0;          // only the exact same address rides together
+  if (id === 'stopMin')   return STOP_MIN;
+  if (id === 'porterMin') return 0;          // Porter quotes no base fare here
   return parseFloat($(id).value) || 0;
 };
 
@@ -809,7 +825,7 @@ function measureKey(rows){
   return uniqPts(rows).map(ptKey).sort().join('|') + '#' + rows.length;
 }
 function measure(rows){
-  const stamp = num('stopMin') + ',' + num('maxP') + ',' + num('maxTotKm') + ',' + num('maxMin')
+  const stamp = num('maxP') + ',' + num('maxTotKm') + ',' + num('maxMin')
               + ',' + num('hopKm') + ',' + Object.keys(roadCache).length;
   if (stamp !== _mStamp){ _mCache = new Map(); _mStamp = stamp; }
   const k = measureKey(rows);
@@ -1002,6 +1018,8 @@ function ensureZones(pts){
    time, so each slot is packed on its own. Names are prefixed M / A / E so a
    route is identifiable at a glance in kitchen.html and delivery.html. */
 function packRoutes(allRows){
+  thinDropped = [];
+  porterPulled = 0;
   const out = [];
   const N = Math.max(0, Math.round(num('agents')));
 
@@ -1050,10 +1068,56 @@ function packOneSlot(rows, N){
 
   let porter = capPorter(improveGroups(capPorter(porterGroups(rest)), num('porterMax')));
 
+  /* Order matters more than any one of these. Rebalancing thins the riders,
+     the thin-pay rule then dissolves them, and a cap that runs last finds the
+     only rider left already full — three sensible steps that together gutted
+     the riders. So: pull Porter back to target FIRST, judge thinness on the
+     refilled picture, then cap again in case that last step added bookings. */
   if (costingOn()) ({ fixed, porter } = rebalanceToPorter(fixed, porter));
+  ({ fixed, porter } = capPorterBookings(fixed, porter));
   ({ fixed, porter } = dropThinRiders(fixed, porter));
+  ({ fixed, porter } = capPorterBookings(fixed, porter));
   return { fixed, porter };
 }
+
+/* ------------------------------------------------------------------
+ * PORTER IS THE EXCEPTION, NOT THE PLAN
+ *
+ * Costing alone keeps finding small savings in Porter and ends up booking
+ * eight of them, which is not how the day actually runs. Two to four is what
+ * the kitchen does by hand, so past PORTER_TARGET the cheapest bookings to
+ * absorb go back to the riders — in that order, so the ones that stay are the
+ * genuine outliers where Porter earns its fare.
+ *
+ * A booking that no rider can take stays with Porter whatever the count. The
+ * limits still bind; this never pushes a route past them.
+ * ------------------------------------------------------------------ */
+function capPorterBookings(fixed, porter){
+  if (!fixed.length) return { fixed, porter };
+
+  let guard = 0;
+  while (porter.length > PORTER_TARGET && guard++ < 100){
+    let best = null, bestAdd = Infinity;
+
+    porter.forEach((g, gi) => {
+      fixed.forEach((r, fi) => {
+        const m = measure(r.concat(g));
+        if (!fits(m)) return;                       // parcels, time, km, hop
+        const add = (m.km || 0) - (measure(r).km || 0);
+        if (add < bestAdd){ bestAdd = add; best = { gi, fi }; }
+      });
+    });
+
+    if (!best) break;                               // nobody can take any of them
+    fixed[best.fi] = fixed[best.fi].concat(porter[best.gi]);
+    porter.splice(best.gi, 1);
+    porterPulled++;
+  }
+
+  return { fixed: improveGroups(fixed.filter(g => g.length)), porter };
+}
+
+let porterPulled = 0;
 
 /* ------------------------------------------------------------------
  * A RIDER WILL NOT COME OUT FOR TWO PARCELS
@@ -1071,6 +1135,7 @@ function dropThinRiders(fixed, porter){
   if (floor <= 0) return { fixed, porter };
 
   const cap = Math.max(1, Math.round(num('porterMax')));
+  const dropNotes = [];
   /* Pay, not kilometres or parcels. Twenty drops inside fourteen km is a good
      day's work and a short one measured in km — two separate minimums threw it
      away. What a rider turns down is a thin envelope. */
@@ -1122,13 +1187,21 @@ function dropThinRiders(fixed, porter){
     });
 
     if (placed.length !== orphans.length) break;   // could not rehome it all — leave it alone
+    const m = measure(fixed[worst]);
+    dropNotes.push(Math.round(fixedCost(m.km, m.parcels)));
     fixed[worst] = [];
   }
 
   fixed  = improveGroups(fixed.filter(g => g.length));
   porter = capPorter(improveGroups(capPorter(porter.filter(g => g.length), cap), cap), cap);
+  if (dropNotes.length) thinDropped.push(...dropNotes);
   return { fixed, porter };
 }
+
+/* Why a rider you asked for did not get a route. Without this the tool simply
+   hands back fewer routes than you asked for and says nothing, which reads as
+   a bug rather than a decision. */
+let thinDropped = [];
 
 /* ------------------------------------------------------------------
  * THE PASS THAT CATCHES THE SIRI CASE
@@ -1149,8 +1222,11 @@ function rebalanceToPorter(fixed, porter){
   const cap = Math.max(1, Math.round(num('porterMax')));
   let moved = 0, guard = 0;
 
+  /* Worth making, not merely cheaper. Chasing every few rupees booked Porter
+     eight times a day; the Siri case was 68, so a real saving still gets
+     through and the noise does not. */
   while (guard++ < 200){
-    let best = null, bestGain = 1e-9;   // only ever move to save money
+    let best = null, bestGain = PORTER_WORTH_IT;
 
     fixed.forEach((route, fi) => {
       if (route.length <= 1) return;                 // never empty a rider out
@@ -1262,10 +1338,16 @@ function fillFixed(clusters, N){
 
   const money = costingOn();
 
+  /* Round by round, EVERY rider takes their own cheapest cluster — not one
+     global winner per pass. Picking the single best add each time fills the
+     densest route to its parcel cap first and leaves the others with scraps,
+     which the thin-pay rule then dissolves. Riders should grow together. */
   let guard = 0;
   while (left.size && guard++ < 3000){
-    let best = null, bestScore = Infinity;
+    let took = false;
     for (const r of routes){
+      if (!left.size) break;
+      let best = null, bestScore = Infinity;
       const baseKm = measure(r.rows).km;
       for (const ci of left){
         const cand = r.rows.concat(clusters[ci].rows);
@@ -1282,16 +1364,19 @@ function fillFixed(clusters, N){
              of it joining a Porter group that already exists. */
           const add = fixedCost(dKm, n);
           if (add > soloPorterCost(clusters[ci])) continue;
-          if (add / n < bestScore - 1e-9){ bestScore = add / n; best = { r, ci }; }
+          if (add / n < bestScore - 1e-9){ bestScore = add / n; best = ci; }
         } else {
           const score = dKm / n;
-          if (score < bestScore - 1e-9){ bestScore = score; best = { r, ci }; }
+          if (score < bestScore - 1e-9){ bestScore = score; best = ci; }
         }
       }
+      if (best !== null){
+        r.rows = r.rows.concat(clusters[best].rows);
+        left.delete(best);
+        took = true;
+      }
     }
-    if (!best) break;
-    best.r.rows = best.r.rows.concat(clusters[best.ci].rows);
-    left.delete(best.ci);
+    if (!took) break;
   }
 
   return { routes, leftover: [...left].map(i=>clusters[i]) };
@@ -1754,8 +1839,29 @@ function finishBuild(newlyZoned){
   render(); renderMode();
 
   const short = routes.reduce((n,r)=>n + (r.gaps || 0), 0);
+  const asked = Math.max(0, Math.round(num('agents')));
+  const slots = new Set(routes.filter(r=>r.kind==='fixed').map(r=>r.slot)).size || 1;
+  const gotFixed = routes.filter(r=>r.kind==='fixed').length;
+
+  /* Asking for three riders and getting two back looks broken unless the
+     tool says why it let one go. */
+  let thinNote = '';
+  if (thinDropped.length){
+    const each = thinDropped.map(v=>'\u20b9'+v).join(', ');
+    thinNote = '  ' + thinDropped.length + plural(thinDropped.length,' rider') +
+      ' left out \u2014 their round would only have paid ' + each +
+      ', under the \u20b9' + num('minPay') + ' minimum. That work went to Porter.';
+  } else if (porterPulled){
+    thinNote = '  ' + porterPulled + plural(porterPulled,' Porter booking') +
+      ' handed back to your riders to keep the day near ' + PORTER_TARGET + '.';
+  } else if (asked && gotFixed < asked * slots){
+    thinNote = '  Used ' + gotFixed + ' of ' + (asked * slots) +
+      ' rider slots \u2014 the rest of the day was cheaper by Porter.';
+  }
+
   setStatusText = 'Built ' + routes.length + ' routes from ' + clients.length + ' parcels.  ' + cacheNote
     + (newlyZoned ? '  ' + newlyZoned + ' new location(s) placed into zones.' : '')
+    + thinNote
     + (short ? '  ' + short + plural(short,' leg') + ' could not be priced by Google — those km are short by that much.' : '');
   setStatus(setStatusText);
 
@@ -1851,6 +1957,15 @@ $('measure').addEventListener('click', async () => {
 
 /* ---------- rebuild + save ---------- */
 $('rebuildDay').addEventListener('click', rebuildFresh);
+$('rebuildDay2').addEventListener('click', rebuildFresh);
+
+/* One rider count, two boxes — the landing screen's and the one in Limits. */
+['agents','agents2'].forEach(id=>{
+  $(id).addEventListener('input', () => {
+    const v = $(id).value;
+    ['agents','agents2'].forEach(o=>{ if (o !== id) $(o).value = v; });
+  });
+});
 
 $('rebuild').addEventListener('click', async () => {
   if (!confirm('Rebuild the zone map from the points in this slot?\n\nClients in other slots keep their existing zones only if their point also appears here. Rebuild when you have added clients, not daily.')) return;
