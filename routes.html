@@ -105,6 +105,9 @@
     display:flex; align-items:center; justify-content:center; font-size:11px; color:transparent; }
   .slots label:has(input:checked) .tick{ background:var(--signal); border-color:var(--signal); color:#fff; }
 
+  .gatebtns{ display:flex; gap:9px; }
+  .gatebtns .iconbtn{ flex:1; }
+  .gate .btn.line{ background:var(--surface); color:var(--ink); border:1px solid var(--rule); }
   .riders-in{ display:flex; align-items:center; gap:0; border:1px solid var(--rule);
     border-radius:11px; background:var(--surface); overflow:hidden; min-height:var(--tap); }
   .riders-in span{ padding-left:14px; font-size:14px; color:var(--ink-2); white-space:nowrap; }
@@ -232,6 +235,7 @@
   .frow{ display:flex; gap:10px; align-items:center; min-height:42px; padding:7px 9px;
     border-radius:8px; cursor:pointer; font-size:14px; }
   .frow:active{ background:var(--rule-2); }
+  .split{ font-size:12px; color:var(--ink-2); padding:9px 2px 2px; }
   .frow .sub{ font-size:12px; color:var(--ink-2); margin-top:2px; white-space:normal; }
   .fhead{ font-size:12.5px; font-weight:600; color:var(--ink-2); margin-bottom:7px; }
   .fnone{ font-size:13px; color:var(--ink-3); padding:8px 9px; }
@@ -337,6 +341,11 @@
       <label><input type="checkbox" class="slotbox" value="Evening" checked><i class="tick">&#10003;</i>Evening</label>
     </div>
     <div class="riders-in"><span>Riders out today</span><input type="number" id="agents" value="3" min="0" max="12"></div>
+    <div class="gatebtns">
+      <button class="iconbtn" id="ridersBtn2">Riders</button>
+      <button class="iconbtn" id="advToggle2">Limits</button>
+    </div>
+    <button class="btn go" id="loadSaved" style="display:none">Open saved routes</button>
     <button class="btn go" id="load">Build routes</button>
     <div class="say" id="gateSay" style="text-align:center"></div>
   </div>
@@ -395,6 +404,8 @@
         <input type="number" id="maxTotKm" value="40" min="0"></div>
       <div class="field"><label>Minutes, at most</label>
         <input type="number" id="maxMin" value="180" min="10"></div>
+      <div class="field"><label>Minutes at each door</label>
+        <input type="number" id="stopMin" value="2" min="0" step="0.5"></div>
       <div class="field"><label>A round must pay the rider at least (₹)</label>
         <input type="number" id="minPay" value="250" min="0" step="10"></div>
     </div>
@@ -424,8 +435,8 @@
         round or a Porter. Lower it for more, tighter routes.</div></div>
 
     <div class="why" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--rule)">
-      Fixed, because they never change: four parcels to a Porter booking, two minutes
-      at each door, and the same address always rides together. The day aims for about
+      Fixed, because they never change: four parcels to a Porter booking, and the
+      same address always rides together. The day aims for about
       <b>four Porter bookings</b> — past that the cheapest ones go back to your riders,
       even where the rupees favour Porter.</div>
 
@@ -489,7 +500,7 @@ const slotsWanted = () => {
   const on = [...document.querySelectorAll('.slotbox:checked')].map(b=>b.value);
   return on.length ? on : SLOT_ORDER;   // nothing ticked means everything
 };
-const LIMIT_FIELDS = ['maxP','maxTotKm','maxMin','hopKm','minPay','fixKm','fixParcel','porterKmCost','agents'];
+const LIMIT_FIELDS = ['maxP','maxTotKm','maxMin','stopMin','hopKm','minPay','fixKm','fixParcel','porterKmCost','agents'];
 
 /* Settings that were dials but never earned one.
    PORTER_MAX   a Porter booking takes four parcels.
@@ -498,7 +509,6 @@ const LIMIT_FIELDS = ['maxP','maxTotKm','maxMin','hopKm','minPay','fixKm','fixPa
                 inside a finished route anyway, so this only shapes the first
                 pass. */
 const PORTER_MAX   = 4;    // parcels in one Porter booking — physical
-const STOP_MIN     = 2;    // minutes at each door
 /* Porter is the exception, not the plan. Two to four bookings on a normal day
    is what the kitchen actually does by hand, so beyond that the cheapest
    bookings are handed back to the riders even though the rupees say Porter.
@@ -551,7 +561,7 @@ function wireDatePickers(root){
 }
 wireDatePickers();
 
-$('date').addEventListener('change', ()=>{ $('measure').disabled = false; });
+$('date').addEventListener('change', ()=>{ $('measure').disabled = false; probeSaved(); });
 $('measure').disabled = false;
 
 $('saveSettings').addEventListener('click', async () => {
@@ -661,6 +671,42 @@ $('saveRiders').addEventListener('click', async ()=>{
 });
 
 $('advToggle').addEventListener('click', ()=>{ $('agents2').value = $('agents').value; openSheet('adv'); });
+$('advToggle2').addEventListener('click', ()=>{ $('agents2').value = $('agents').value; openSheet('adv'); });
+$('ridersBtn2').addEventListener('click', ()=>openSheet('riders'));
+
+/* ---------- is there already a saved copy of this day? ----------
+ * Asked the moment a date is picked, so the first screen can offer the right
+ * thing: open what was saved, or build it fresh. Before this, every build
+ * quietly loaded the saved copy and you then had to find Build again — which
+ * is two waits where there should be one choice. */
+let probeFor = null, probeTimer = null;
+
+function probeSaved(){
+  clearTimeout(probeTimer);
+  probeTimer = setTimeout(async () => {
+    const date = $('date').value;
+    const url  = ($('api').value || '').trim();
+    $('loadSaved').style.display = 'none';
+    $('load').textContent = 'Build routes';
+    if (!date || !url) return;
+    probeFor = date;
+    try {
+      const sv = await api('getRouteAssignments', { date });
+      if (probeFor !== date) return;                 // the date moved on while we asked
+      const n = sv && sv.ok ? Object.keys(sv.routes || {}).length : 0;
+      if (n){
+        $('loadSaved').style.display = '';
+        $('loadSaved').textContent = 'Open saved routes (' + n + ')';
+        $('load').textContent = 'Build new routes';
+        $('gateSay').textContent = prettyDay(date) + ' was saved earlier. Open it, or build it again from scratch.';
+      } else {
+        $('gateSay').textContent = '';
+      }
+    } catch(e){ /* no probe, no harm — Build routes still works */ }
+  }, 250);
+}
+
+$('loadSaved').addEventListener('click', ()=>{ forceRebuild = false; load(); });
 
 const setStatus = m => {
   $('status').textContent = m;
@@ -692,7 +738,6 @@ const num = id => {
   if (id === 'nearKm')    return MEASURE_NEAR;
   if (id === 'maxSpread') return 0;          // no spread limit; see fits()
   if (id === 'zr')        return 0;          // only the exact same address rides together
-  if (id === 'stopMin')   return STOP_MIN;
   if (id === 'porterMin') return 0;          // Porter quotes no base fare here
   return parseFloat($(id).value) || 0;
 };
@@ -830,7 +875,7 @@ function measureKey(rows){
   return uniqPts(rows).map(ptKey).sort().join('|') + '#' + rows.length;
 }
 function measure(rows){
-  const stamp = num('maxP') + ',' + num('maxTotKm') + ',' + num('maxMin')
+  const stamp = num('stopMin') + ',' + num('maxP') + ',' + num('maxTotKm') + ',' + num('maxMin')
               + ',' + num('hopKm') + ',' + Object.keys(roadCache).length;
   if (stamp !== _mStamp){ _mCache = new Map(); _mStamp = stamp; }
   const k = measureKey(rows);
@@ -1639,7 +1684,12 @@ function rebuildFresh(){
 }
 
 /* ---------- load ---------- */
-$('load').addEventListener('click', load);
+$('load').addEventListener('click', ()=>{
+  /* If a saved copy was found, this button is the "build it again" one — the
+     other button opens what was saved. With no saved copy it is just Build. */
+  forceRebuild = ($('loadSaved').style.display !== 'none');
+  load();
+});
 
 async function load(){
   const url = $('api').value.trim();
@@ -1781,7 +1831,10 @@ async function load(){
     setRebuildEnabled(false);
     $('save').disabled = true;
 
-    buildAndRender();
+    busyText('Working out the routes…');
+    buildAndRender();          // keeps the overlay; finishBuild closes it
+    $('load').disabled = false;
+    return;
 
   } catch(e){ setStatus('Could not load that day: ' + e.message); }
   busy(false);
@@ -1819,6 +1872,7 @@ function buildAndRender(){
         + 'Routes are not built from estimates, so nothing is shown. '
         + 'Check that Google Maps loaded and that saveRoadCache is wired up in doPost.</div>';
       setStatus(need.length + ' legs still unmeasured after trying.  ' + cacheNote);
+      busy(false);
     }
     return;
   }
@@ -1835,11 +1889,14 @@ function buildAndRender(){
       refinePass++;
       refined = true;
       setRebuildEnabled(false); $('save').disabled = true;
+      /* The overlay stays up for the whole build. Closing it between passes
+         made it flash, then leave a blank-looking page while the packing ran,
+         then flash again — which reads as the page having hung. */
       busy(true, 'Measuring ' + inner.length + plural(inner.length,' leg') +
-                 ' (pass ' + refinePass + ' of ' + MAX_REFINE + ')…');
+                 ' — pass ' + refinePass + ' of ' + MAX_REFINE);
       setStatus('Routes drafted. Measuring ' + inner.length +
                 plural(inner.length,' leg') + ' inside them…');
-      measureLegs(inner).then(()=>{ busy(false); buildAndRender(); });
+      measureLegs(inner).then(()=>{ busyText('Working out the routes…'); buildAndRender(); });
       return;
     }
     /* Out of passes. Price whatever is still missing but leave the routes
@@ -1848,7 +1905,7 @@ function buildAndRender(){
     if (!toppedUp){
       toppedUp = true;
       busy(true, 'Pricing the last ' + inner.length + plural(inner.length,' leg') + '…');
-      measureLegs(inner).then(()=>{ busy(false); finishBuild(newlyZoned); });
+      measureLegs(inner).then(()=>{ busyText('Working out the routes…'); finishBuild(newlyZoned); });
       return;
     }
   }
@@ -1857,6 +1914,7 @@ function buildAndRender(){
 }
 
 function finishBuild(newlyZoned){
+  busy(false);                      // the build is over — the one place it closes
   setRebuildEnabled(true);
   $('save').disabled = false;
   render(); renderMode();
@@ -1961,19 +2019,18 @@ $('measure').addEventListener('click', async () => {
   $('measure').disabled = true;
   try {
     if (!window.google || !google.maps || !google.maps.DistanceMatrixService){
-      setStatus('Google Maps has not loaded yet. Try again in a moment.'); return;
+      setStatus('Google Maps has not loaded yet. Try again in a moment.'); busy(false); return;
     }
-    if (!clients.length){ await load(); if (!clients.length) return; }
+    if (!clients.length){ await load(); if (!clients.length){ busy(false); return; } }
 
     const need = missingPairs(uniqPts(clients));
-    if (!need.length){ setStatus('Every leg is already measured.'); buildAndRender(); return; }
-
-    await measureLegs(need);
-    buildAndRender();
+    if (need.length) await measureLegs(need);
+    busyText('Working out the routes…');
+    buildAndRender();          // closes the overlay itself, in finishBuild
   } catch(e){
     setStatus('Measuring failed: ' + e.message);
-  } finally {
     busy(false);
+  } finally {
     $('measure').disabled = false;
   }
 });
@@ -2404,7 +2461,9 @@ function renderSlot(){
         '<div class="facts">'+
           '<span><b>'+m.parcels+'</b>'+plural(m.parcels,' parcel')+'</span>'+
           '<span'+(num('maxTotKm')>0 && m.km>num('maxTotKm')?' class="hot"':'')+'><b>'+km1(m.km)+'</b> km</span>'+
-          '<span'+(m.total>num('maxMin')?' class="hot"':'')+'><b>'+Math.round(m.total)+'</b> min</span>'+
+          '<span'+(m.total>num('maxMin')?' class="hot"':'')+
+            ' title="'+Math.round(m.drive||0)+' min driving + '+Math.round(m.stop||0)+
+            ' min at the doors"><b>'+Math.round(m.total)+'</b> min</span>'+
           '<span><b>'+km1(m.kmpp)+'</b> km each</span>'+
           (m.gaps ? '<span class="hot"><b>'+m.gaps+'</b> leg'+plural(m.gaps,'')+' unpriced</span>' : '')+
         '</div>'+
@@ -2508,6 +2567,18 @@ function routeDetail(i){
           '<button class="sx" onclick="removeClient('+i+',\''+c.phone+'\')" aria-label="Remove '+esc(c.name)+'">&times;</button>'+
         '</div>';
       }).join('')+
+    '</div>'+
+
+    /* The minutes on the header are driving plus time at the doors. Nobody
+       can tell that from one number, and the door time is the half you can
+       actually change. */
+    '<div class="split">'+
+      Math.round(r.m.total) + ' min = ' + Math.round(r.m.drive||0) + ' driving + ' +
+      Math.round(r.m.stop||0) + ' at ' + r.m.parcels + plural(r.m.parcels,' door') +
+      ' (' + num('stopMin') + ' min each)' +
+      (costingOn() ? ' \u00b7 ' + (r.kind === 'porter'
+          ? 'Porter \u20b9' + Math.round(porterCost(r.m.km))
+          : 'rider \u20b9' + Math.round(fixedCost(r.m.km, r.m.parcels))) : '')+
     '</div>'+
 
     '<div class="msg"><h4>What the rider gets</h4>'+
@@ -2855,6 +2926,10 @@ function normAgents(raw){
 const chip = (t,bad) => '<span class="chip'+(bad?' bad':'')+'">'+t+'</span>';
 const cardEl = (n,l,cls) => '<div class="card '+(cls||'')+'"><div class="n">'+n+'</div><div class="l">'+l+'</div></div>';
 const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+/* Ask about today the moment the page is up, so the first screen already
+   knows whether there is something saved to open. */
+probeSaved();
 
 </script>
 <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCqVJgCfV0C1KBF0u1Jc02p_RHE7K7g1V8" async defer></script>
