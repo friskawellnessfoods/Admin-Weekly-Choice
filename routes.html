@@ -3095,6 +3095,9 @@ async function setPickedUp(i, undo){
   busy(false);
 }
 
+/* The rider's own page. One place to change it if the repo ever moves. */
+const AGENT_URL = 'https://friskawellnessfoods.github.io/Admin-Weekly-Choice/agent.html';
+
 /* WhatsApp link, per platform. The intent:// scheme is Android-only — fired
    on an iPad or a desktop it is what produces "the address is invalid", so it
    is gated. Reads the same friska_wa_mode key the kitchen panel writes, so
@@ -3129,7 +3132,11 @@ function sendAgentLink(i){
     setStatus('Set ' + (r.agent || 'the rider') + "'s number first — Change no. above.");
     return;
   }
-  const link = location.href.replace(/[^/]*$/, 'agent.html').split('?')[0];
+  /* Pinned, not derived. Deriving it from location.href broke the moment the
+     page was opened any way other than .../routes.html — from a bare folder
+     URL, with a query string, or saved to the home screen — and the rider got
+     a link that went nowhere. */
+  const link = AGENT_URL;
   const msg  = 'Hi ' + (r.agent||'') + ', here is your delivery list for today.\n'
              + 'Open this link and enter your phone number ' + r.agentPhone + '\n\n' + link;
   waOpen(r.agentPhone, msg);
