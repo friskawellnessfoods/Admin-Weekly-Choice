@@ -576,12 +576,57 @@
   let pauseCtx = null;           // {data, date} so the queue can re-render the sheet
 
   const waKey = phone => String(phone || '').replace(/\D/g,'').slice(-10);
+
+  /* intent:// is an Android URL scheme and nothing else understands it — on an
+     iPad Safari just reports the address as invalid. Android keeps it, because
+     it is the only way to force WhatsApp BUSINESS rather than personal
+     WhatsApp. Everywhere else wa.me hands off to whichever WhatsApp is
+     installed, which on the iPad is the one linked to the business account. */
+  const isAndroid = () => /Android/i.test(navigator.userAgent || '');
+
+  /* iOS gives no documented way to target WhatsApp Business: both apps claim
+     whatsapp:// and the wa.me universal link, so which one opens is undefined
+     — usually whichever was installed first. whatsapp-business:// is reported
+     to work on some builds and not others, and an unregistered scheme just
+     shows an error page. So it is a choice, not a guess: pick it once per
+     device and it is remembered. Android is unaffected; the package name
+     pins WhatsApp Business there reliably. */
+  const WA_MODES = {
+    auto:     'Automatic (Business on Android)',
+    business: 'WhatsApp Business (try on iPhone)',
+    normal:   'WhatsApp'
+  };
+  let waMode = 'auto';
+  try { waMode = localStorage.getItem('friska_wa_mode') || 'auto'; } catch(e){}
+  function setWaMode(m){
+    waMode = m;
+    try { localStorage.setItem('friska_wa_mode', m); } catch(e){}
+  }
+
   function waLink(phone, msg){
     let p = String(phone || '').replace(/\D/g,'');
     if(p.length === 10) p = '91' + p;               // default to India country code
-    // hard-target WhatsApp Business (com.whatsapp.w4b) on Android
-    return 'intent://send?phone=' + p + '&text=' + encodeURIComponent(msg) +
-           '#Intent;scheme=whatsapp;package=com.whatsapp.w4b;end';
+    const text = encodeURIComponent(msg);
+
+    if(isAndroid() && waMode !== 'normal'){
+      return 'intent://send?phone=' + p + '&text=' + text +
+             '#Intent;scheme=whatsapp;package=com.whatsapp.w4b;end';
+    }
+    if(!isAndroid() && waMode === 'business'){
+      return 'whatsapp-business://send?phone=' + p + '&text=' + text;
+    }
+    return 'https://wa.me/' + p + '?text=' + text;
+  }
+
+  /* On Android the intent leaves the page in place, so coming back is what
+     marks a client done. wa.me would navigate this page away and lose the
+     list, so off Android it opens in a new tab and the client is marked sent
+     on the tap itself. */
+  function waOpen(phone, msg){
+    const url = waLink(phone, msg);
+    if(isAndroid()){ location.href = url; return false; }
+    window.open(url, '_blank', 'noopener');
+    return true;                                     // caller advances the queue
   }
   // coming back from WhatsApp = that client is done; step to the next one
   document.addEventListener('visibilitychange', () => {
@@ -1945,7 +1990,13 @@
 
     const open = mkBtn('Open WhatsApp \u2192 ' + current.name, '', () => {
       waAwaitingReturn = true;                 // visibilitychange advances when we get back
-      location.href = waLink(current.phone, REMIND_MSG);
+      if(waOpen(current.phone, REMIND_MSG)){
+        // a new tab: this page never went away, so step on ourselves
+        waAwaitingReturn = false;
+        waSent.add(waKey(current.phone));
+        waIdx++;
+        rerender();
+      }
     });
     row.appendChild(open);
     row.appendChild(mkBtn('Skip', 'alt', () => { waIdx++; rerender(); }));
@@ -1976,6 +2027,23 @@
     tg.appendChild(document.createTextNode('Show inactive clients'));
     wrap.appendChild(tg);
 
+    /* Which WhatsApp the reminder buttons should open, remembered per device.
+       Android needs no choice — the package name already pins Business. */
+    if(!isAndroid()){
+      const pick = document.createElement('label'); pick.className = 'pause-toggle';
+      pick.appendChild(document.createTextNode('Open reminders in'));
+      const sel = document.createElement('select');
+      sel.style.cssText = 'font:inherit;padding:3px 6px;border:1px solid #b0bec5;border-radius:6px';
+      Object.keys(WA_MODES).forEach(k => {
+        const o = document.createElement('option');
+        o.value = k; o.textContent = WA_MODES[k]; o.selected = (k === waMode);
+        sel.appendChild(o);
+      });
+      sel.addEventListener('change', () => { setWaMode(sel.value); renderPause(data, date); });
+      pick.appendChild(sel);
+      wrap.appendChild(pick);
+    }
+
     wrap.appendChild(buildQueueBar(paused, data, date));
 
     const table = document.createElement('table'); table.className = 'pause';
@@ -1993,6 +2061,7 @@
         const a = document.createElement('a');
         a.className = 'wa-btn' + (done ? ' done' : ''); a.href = waLink(c.phone, REMIND_MSG);
         a.rel = 'noopener'; a.textContent = done ? 'Sent \u2713' : 'WhatsApp';
+        if(!isAndroid()) a.target = '_blank';        // keep the list open
         a.addEventListener('click', () => { waSent.add(waKey(c.phone)); });
         act.appendChild(a);
       }
