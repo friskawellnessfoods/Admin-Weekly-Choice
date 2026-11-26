@@ -1805,6 +1805,8 @@ function routesFromSaved(byRoute){
       out.push({ name, slot,
                  kind: /P\d/.test(name) ? 'porter' : 'fixed',
                  rows, renamed: true,
+                 savedSeq: (byRoute[name]||[]).map(e =>
+                   String(e.phone||'').replace(/\D/g,'').slice(-10)),
                  agent: ag ? ag.name : '', agentPhone: ag ? (ag.phone||'') : '',
                  m: measure(rows) });
     });
@@ -1823,6 +1825,36 @@ function routeAgentName(routeName, slot){
 }
 let savedAgentsByRoute = {};
 
+/* What is already in the sheet, per route. A save then sends only the routes
+   whose signature moved. Booking Porter means coming back to type one number
+   at a time, and rewriting all seven routes for each of them was two calls a
+   route plus a lock each — half a minute of waiting to record one rider.
+   null means nothing is known to be stored, so everything is sent. */
+let savedSig = null;
+
+function routeSig(r){
+  return JSON.stringify([ r.slot, r.name, inDriveOrder(r).map(x=>x.c.phone) ]);
+}
+function agentSig(r){ return (r.agent||'') + '|' + (r.agentPhone||''); }
+
+function markAllSaved(){
+  savedSig = {};
+  routes.forEach(r => { savedSig[r.name] = { route: routeSig(r), agent: agentSig(r) }; });
+}
+
+/* Only a route whose drawn order is byte-for-byte the sheet's counts as
+   clean. A client paused since the day was saved, or a run that re-measured
+   to a different order, leaves that route dirty so the next save corrects it. */
+function markSavedFromSheet(){
+  savedSig = {};
+  routes.forEach(r => {
+    const now = inDriveOrder(r).map(x=>x.c.phone);
+    const was = r.savedSeq || [];
+    if (was.length === now.length && was.every((p,i)=>p === now[i]))
+      savedSig[r.name] = { route: routeSig(r), agent: agentSig(r) };
+  });
+}
+
 /* Back to the day picker. Building a day replaced the gate with the working
    screen and left no way to change the date, so on a phone the only way back
    was a hard refresh. */
@@ -1832,7 +1864,7 @@ function toGate(){
         + 'This day has not been saved — what is on screen will be lost.')) return;
 
   routes = []; unassigned = []; history = [];
-  fromSaved = false; savedForDate = null; forceRebuild = false;
+  fromSaved = false; savedForDate = null; forceRebuild = false; savedSig = null;
   addOpen = null; addFilter = ''; mergeOpen = null; newAgentFor = null; editPhoneFor = null;
 
   closeSheet('adv'); closeSheet('riders');
@@ -1993,6 +2025,7 @@ async function load(){
             render();
             await measureLegs(want);
           }
+          markSavedFromSheet();     // what is on screen now equals the sheet
           render(); renderMode();
           setStatus('Loaded ' + routes.length + ' saved routes for ' + $('date').value +
             ' (' + built.placed + ' of ' + clients.length + ' of today\'s parcels matched)' +
@@ -2004,6 +2037,7 @@ async function load(){
       } catch(e){ /* no saved copy, or the call failed: just build */ }
     }
     forceRebuild = false;
+    savedSig = null;                 // freshly packed: none of it is in the sheet
     autoMeasured = false; refined = false; refinePass = 0; toppedUp = false;
     history = []; $('undo').disabled = true;
     routes = [];
@@ -2254,13 +2288,29 @@ $('save').addEventListener('click', async () => {
   /* No confirm here: pressing "Save routes" already said so. The only thing
      worth stopping for is work about to be thrown away, which is the
      unassigned-clients check above. */
+  /* Only what moved. The riders go in one call that replaces the whole day,
+     so adding a Porter number costs a single request instead of two per
+     route. */
+  const base = savedSig || {};
+  const known = !!savedSig && routes.length === Object.keys(base).length
+                && routes.every(r => base[r.name]);
+  const dirty      = routes.filter(r => !savedSig || !base[r.name] || base[r.name].route !== routeSig(r));
+  const agentMoved = routes.filter(r => !savedSig || !base[r.name] || base[r.name].agent !== agentSig(r));
+
+  if (known && !dirty.length && !agentMoved.length){
+    setStatus('Nothing has changed since the last save.');
+    return;
+  }
+
   $('save').disabled = true;
-  busy(true, 'Saving ' + routes.length + plural(routes.length,' route') + '…');
+  busy(true, dirty.length
+    ? 'Saving ' + dirty.length + plural(dirty.length,' changed route') + '…'
+    : 'Saving the riders…');
   let ok=0, fail=0;
   try {
     let done = 0;
-    for (const r of routes){
-      busyText('Saving ' + (++done) + ' of ' + routes.length + ' — ' + r.name);
+    for (const r of dirty){
+      busyText('Saving ' + (++done) + ' of ' + dirty.length + ' — ' + r.name);
       /* The ORDER of this list is the run: RouteAssign keeps the rows as they
          are sent and the rider app reads them back in that order. r.rows is
          only who is on the route — the sequence the packer happened to add
@@ -2272,10 +2322,12 @@ $('save').addEventListener('click', async () => {
         date, slot: r.slot, route: r.name, phones: seq.join(',')
       });
       if (res && res.ok) ok++; else fail++;
-      if (r.agent){
-        // still written for the kitchen board, which reads DeliveryAgents
-        await api('saveDeliveryAgent', { route:r.name, name:r.agent, agentPhone:r.agentPhone||'' });
-      }
+    }
+
+    // the kitchen board reads DeliveryAgents; only touch the ones that moved
+    for (const r of agentMoved){
+      if (!r.agent) continue;
+      await api('saveDeliveryAgent', { route:r.name, name:r.agent, agentPhone:r.agentPhone||'' });
     }
 
     /* The riders for this day go in one call, which REPLACES everything
@@ -2290,8 +2342,14 @@ $('save').addEventListener('click', async () => {
     });
     savedForDate = date;
     fromSaved = true;
-    setStatus('Saved '+ok+' routes for '+date+(fail?', '+fail+' failed':'')
-      +'. Reloading this date will bring these back.');
+    if (!fail) markAllSaved();      // a failure leaves that route dirty on purpose
+    const skipped = routes.length - dirty.length;
+    setStatus(
+      (dirty.length ? 'Saved ' + ok + plural(ok,' route') : 'Riders saved')
+      + ' for ' + date
+      + (fail ? ', ' + fail + ' failed' : '')
+      + (skipped > 0 ? ' — ' + skipped + ' unchanged ' + (skipped > 1 ? 'routes were' : 'route was')
+                       + ' left alone.' : '.'));
     render();
     renderMode();        // the "nothing is stored yet" banner is no longer true
   } catch(e){
