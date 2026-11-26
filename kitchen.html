@@ -561,6 +561,7 @@
   let cache = { date:null, tags:null, client:null, mise:null, workplan:null, pause:null };  // raw data per date
   // phones with fewer than NEW_CLIENT_DAYS delivery days behind them, for the date on screen
   let NEWSET = new Set();
+  let newsetDate = null;        // which date NEWSET belongs to, so it can stand alone
   const isNew = ph => !!ph && NEWSET.has(ph);
   let showInactive = false;   // pause-list toggle
 
@@ -1150,7 +1151,7 @@
 
   function invalidate(){
     cache = { date:null, tags:null, client:null, mise:null, workplan:null, pause:null };
-    NEWSET = new Set();
+    NEWSET = new Set(); newsetDate = null;
     loadedView.tags = loadedView.client = loadedView.meal = loadedView.overview = loadedView.mise = loadedView.workplan = loadedView.pause = false;
     pagesEl.innerHTML = ''; clientWrap.innerHTML = ''; mealWrap.innerHTML = '';
     overviewWrap.innerHTML = '';
@@ -1223,7 +1224,14 @@
     return cache.tags;
   }
   async function ensureClient(date){
-    if(cache.client && cache.date === date) return cache.client;
+    if(cache.client && cache.date === date){
+      /* A cache hit used to return here and skip the new-client set entirely.
+         The auto link invalidates after writing the Mise totals and then
+         builds the PDF off the warm client cache, so the tags vanished there
+         while the normal Generate path kept them. Ask for it either way. */
+      await ensureNewClients(date);
+      return cache.client;
+    }
     const res = await fetch(API + '?action=getClientListForDate&date=' + encodeURIComponent(date));
     const data = await res.json();
     if(!data.success || !data.rows) throw new Error('No client data returned');
@@ -1235,11 +1243,12 @@
   // Who is still new. A failure here is silent on purpose: an untagged list is
   // a working list, and this must never be the reason a kitchen list won't print.
   async function ensureNewClients(date){
-    NEWSET = new Set();
+    if(newsetDate === date) return;         // already have this date
+    NEWSET = new Set(); newsetDate = null;
     try{
       const res = await fetch(API + '?action=getNewClients&date=' + encodeURIComponent(date));
       const d = await res.json();
-      if(d && d.ok && d.phones) NEWSET = new Set(d.phones);
+      if(d && d.ok && d.phones){ NEWSET = new Set(d.phones); newsetDate = date; }
     }catch(e){}
   }
 
