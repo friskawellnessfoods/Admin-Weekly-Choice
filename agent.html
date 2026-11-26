@@ -105,6 +105,24 @@
   .stop{ background:var(--surface); border:1px solid var(--rule); border-radius:13px;
     padding:13px 14px; margin-bottom:10px; display:flex; gap:12px; }
   .stop.done{ background:var(--tint); border-color:var(--go); }
+
+  /* The run reads as a stack you work down: the stop in your hand is the loud
+     one, what is behind you fades, what is ahead waits its turn. */
+  .stop.now{ border-color:var(--ink); border-width:2px; padding:16px 16px;
+    box-shadow:0 6px 18px rgba(12,28,64,.13); }
+  .stop.now .nm{ font-size:19px; }
+  .stop.now .lo{ font-size:15px; margin-top:4px; }
+  .stop.now .n{ width:34px; height:34px; font-size:15px; }
+  .stop.later{ opacity:.58; padding:11px 13px; }
+  .stop.later .nm{ font-size:15px; }
+  /* behind him: one quiet line, still undoable */
+  .stop.done{ opacity:.52; padding:8px 11px; align-items:center; gap:10px; }
+  .stop.done .nm{ font-size:14.5px; font-weight:500; }
+  .stop.done .n{ width:24px; height:24px; border-radius:7px; font-size:12px; }
+  .stop.done .mid{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
+  .stop.done .row{ margin-top:0; flex:none; }
+  .stop.done .row .btn{ flex:none; font-size:12px; padding:4px 10px; min-width:0; }
+  .stop .lo, .stop .row{ transition:opacity .16s ease; }
   .n{ flex:none; width:30px; height:30px; border-radius:9px; background:var(--ink); color:#fff;
     font-size:13.5px; font-weight:700; display:flex; align-items:center; justify-content:center; }
   .stop.done .n{ background:var(--go); }
@@ -113,6 +131,8 @@
   .lo{ font-size:13.5px; color:var(--ink-2); margin-top:2px; word-break:break-word; }
   a.lo{ color:var(--ink); text-decoration:underline; text-underline-offset:2px; display:inline-block; }
   .at{ font-size:12.5px; color:var(--go); font-weight:600; margin-top:4px; }
+  /* how far this stop is from the one before it */
+  .leg{ font-weight:500; color:var(--ink-2); font-size:.86em; }
   .row{ display:flex; gap:8px; margin-top:11px; flex-wrap:wrap; }
   .row .btn{ flex:1; min-width:84px; }
 
@@ -283,11 +303,34 @@ DATE_BOXES.forEach(id=>{
 });
 
 /* ---------- loading the day ---------- */
+/* The run barely changes once the kitchen has saved it, so the last copy is
+   painted straight away and the fresh one replaces it when it lands. On a
+   patchy mobile signal that is the difference between a usable list and a
+   spinner, and his own Delivered marks are already on the stored copy. */
+const dayKey = d => 'friska_agent_day_' + me + '_' + d;
+
+function storeDay(d, r){
+  try { localStorage.setItem(dayKey(d), JSON.stringify(r)); } catch(e){}
+}
+function recallDay(d){
+  try { const v = localStorage.getItem(dayKey(d)); return v ? JSON.parse(v) : null; }
+  catch(e){ return null; }
+}
+
 async function load(){
   if (!me){ document.body.dataset.at='gate'; return; }
   const date = theDate();
-  busy(true, 'Loading your deliveries…');
-  say('Loading…');
+
+  const cached = recallDay(date);
+  const warm = !!(cached && cached.ok && cached.found && (cached.slots||[]).length);
+  if (warm){
+    paintDay(cached, date);          // on screen now, no network waited on
+    say('Checking for changes…');
+  } else {
+    busy(true, 'Loading your deliveries…');
+    say('Loading…');
+  }
+
   try {
     const r = await api('getAgentDay', { phone: me, date });
     if (!r || !r.ok) throw new Error((r && r.message) || 'Could not load');
@@ -300,31 +343,56 @@ async function load(){
       return;
     }
 
-    DAY = r;
-    $('me2').textContent = $('me3').textContent = r.name || 'My deliveries';
-    const totals = (r.slots||[]).reduce((a,s)=>a+s.parcels,0);
-    $('sub2').textContent = prettyDay(date) + ' · ' + totals + plural(totals,' parcel');
-    setDate(date);
-
-    if (!r.slots || !r.slots.length){
-      document.body.dataset.at = 'slots';
-      $('slotList').innerHTML =
-        '<div class="empty">Nothing assigned to you for ' + esc(prettyDay(date).toLowerCase()) +
-        '.<br><span style="font-size:13.5px">If routes have not been saved yet, check again shortly.</span></div>';
-      say('');
-      return;
-    }
-
-    // one slot means there is nothing to choose — go straight to the run
-    const want = slot || recallSlot(date);
-    if (r.slots.length === 1){ slot = r.slots[0].slot; showRun(); }
-    else if (want && r.slots.some(s=>s.slot===want)){ slot = want; showRun(); }
-    else showSlots();
+    storeDay(date, r);
+    paintDay(r, date);
     say('');
   } catch(e){
-    say('Could not load: ' + e.message);
-    $('gateSay').textContent = 'Could not load: ' + e.message;
+    /* A warm list already on screen is worth more than an error in place of
+       it — he can keep delivering and the marks will go up when the signal
+       comes back. */
+    if (warm) say('Showing your saved list — could not reach the kitchen.');
+    else {
+      say('Could not load: ' + e.message);
+      $('gateSay').textContent = 'Could not load: ' + e.message;
+    }
   } finally { busy(false); }
+}
+
+/* Delivered marks made on this phone this session. A refresh that lands a
+   moment before the write does must not un-tick a stop under his thumb. */
+const localDone = {};
+const doneKey = s => s.slot + '||' + s.phone;
+
+function paintDay(r, date){
+  DAY = r;
+  (DAY.stops||[]).forEach(s=>{
+    const k = doneKey(s);
+    if (localDone[k] && !s.delivered){ s.delivered = true; s.at = localDone[k]; }
+    if (localDone[k] === false && s.delivered){ s.delivered = false; s.at = ''; }
+  });
+  // the server's own counts can disagree with that, so recount from the stops
+  (DAY.slots||[]).forEach(sl=>{
+    sl.delivered = (DAY.stops||[]).filter(s=>s.slot===sl.slot && s.delivered).length;
+  });
+
+  $('me2').textContent = $('me3').textContent = r.name || 'My deliveries';
+  const totals = (r.slots||[]).reduce((a,s)=>a+s.parcels,0);
+  $('sub2').textContent = prettyDay(date) + ' · ' + totals + plural(totals,' parcel');
+  setDate(date);
+
+  if (!r.slots || !r.slots.length){
+    document.body.dataset.at = 'slots';
+    $('slotList').innerHTML =
+      '<div class="empty">Nothing assigned to you for ' + esc(prettyDay(date).toLowerCase()) +
+      '.<br><span style="font-size:13.5px">If routes have not been saved yet, check again shortly.</span></div>';
+    return;
+  }
+
+  // one slot means there is nothing to choose — go straight to the run
+  const want = slot || recallSlot(date);
+  if (r.slots.length === 1){ slot = r.slots[0].slot; showRun(); }
+  else if (want && r.slots.some(s=>s.slot===want)){ slot = want; showRun(); }
+  else showSlots();
 }
 
 /* ---------- which slot ---------- */
@@ -375,7 +443,11 @@ function showRun(){
   /* Before pickup the list is for checking against what is in your hands, so
      nothing is tappable — a half-tapped Delivered on parcels still in the
      kitchen is worse than no list at all. */
-  const body = info.pickedUp ? stops.map(liveStop).join('') : stops.map(quietStop).join('');
+  /* The first one not yet delivered is the one he is driving to. */
+  const nowAt = stops.findIndex(s=>!s.delivered);
+  const body = info.pickedUp
+    ? stops.map((s,k)=>liveStop(s, s.delivered ? 'done' : (k===nowAt ? 'now' : 'later'))).join('')
+    : stops.map(quietStop).join('');
 
   const pick = info.pickedUp
     ? '<div class="note">Picked up'+(info.pickedUpAt ? ' at '+esc(String(info.pickedUpAt).slice(11,16)) : '')+
@@ -392,29 +464,43 @@ function showRun(){
 }
 
 function quietStop(s){
+  const leg = (s.legKm || s.legKm === 0) && isFinite(s.legKm)
+    ? ' <span class="leg">(' + s.legKm + ' km)</span>' : '';
   return '<div class="stop">'+
     '<div class="n">'+s.stop+'</div>'+
-    '<div class="mid"><div class="nm">'+esc(s.name)+'</div>'+
+    '<div class="mid"><div class="nm">'+esc(s.name)+leg+'</div>'+
       '<div class="lo">'+esc(s.location||'')+'</div></div>'+
   '</div>';
 }
 
-function liveStop(s){
+function liveStop(s, state){
   const i = DAY.stops.indexOf(s);
   const link = s.link ? String(s.link).replace(/,/g,'%2C')
     : 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(s.name);
-  return '<div class="stop'+(s.delivered?' done':'')+'">'+
-    '<div class="n">'+(s.delivered?'&#10003;':s.stop)+'</div>'+
+  const leg = (s.legKm || s.legKm === 0) && isFinite(s.legKm)
+    ? ' <span class="leg">(' + s.legKm + ' km)</span>' : '';
+
+  // done collapses to a line you can still undo; ahead keeps Maps and Call
+  if (state === 'done'){
+    return '<div class="stop done">'+
+      '<div class="n">&#10003;</div>'+
+      '<div class="mid">'+
+        '<div class="nm">'+esc(s.name)+
+          (s.at ? ' · <span class="at">'+esc(String(s.at).slice(11,16))+'</span>' : '')+'</div>'+
+        '<div class="row"><button class="btn line sm" onclick="undoStop('+i+')">Undo</button></div>'+
+      '</div>'+
+    '</div>';
+  }
+
+  return '<div class="stop '+state+'"'+(state==='now'?' id="nowStop"':'')+'>'+
+    '<div class="n">'+s.stop+'</div>'+
     '<div class="mid">'+
-      '<div class="nm">'+esc(s.name)+'</div>'+
+      '<div class="nm">'+esc(s.name)+leg+'</div>'+
       '<a class="lo" href="'+esc(link)+'" target="_blank" rel="noopener">'+
         esc(s.location||'Open in Maps')+'</a>'+
-      (s.delivered && s.at ? '<div class="at">Delivered '+esc(String(s.at).slice(11,16))+'</div>' : '')+
       '<div class="row">'+
         '<a class="btn line sm" href="tel:'+esc(s.phone)+'">Call</a>'+
-        (s.delivered
-          ? '<button class="btn line sm" onclick="undoStop('+i+')">Undo</button>'
-          : '<button class="btn wa sm" onclick="deliver('+i+')">Delivered</button>')+
+        '<button class="btn wa sm" onclick="deliver('+i+')">Delivered</button>'+
       '</div>'+
     '</div>'+
   '</div>';
@@ -454,41 +540,76 @@ async function undoPick(ev){
 }
 
 /* ---------- delivering ---------- */
-async function deliver(i){
-  const s = DAY.stops[i];
-  busy(true, 'Marking ' + s.name + ' delivered…');
-  let ok = false;
-  try {
-    const r = await api('markDelivered', {
-      date: DAY.date, slot: s.slot, route: s.route, phone: s.phone, by: DAY.name || me
-    });
-    if (r && r.ok){ s.delivered = true; s.at = r.at || ''; ok = true; }
-    else toast('Could not save that — try again');
-  } catch(e){ toast('Could not save: ' + e.message); }
-  finally { busy(false); }
-
-  if (!ok) return;
-  const info = slotInfo(); if (info) info.delivered = (info.delivered||0) + 1;
-  showRun();
-
-  const msg = 'Hi ' + s.name + ', your delivery by Friska Wellness is done.';
-  const num = s.phone.length === 10 ? '91' + s.phone : s.phone;
-  window.open('https://wa.me/' + num + '?text=' + encodeURIComponent(msg), '_blank');
+/* A rider is at a door with the parcel in his hand. Waiting on a round trip
+   to Sheets, behind a blocking overlay, is the slowest part of his day, so
+   the screen moves the moment he presses and the write follows behind. If the
+   write fails the stop comes back exactly as it was, with a toast telling him
+   to press again — nothing is quietly lost. */
+function nowHM(){
+  const n = new Date(), p = v => String(v).padStart(2,'0');
+  return n.getFullYear()+'-'+p(n.getMonth()+1)+'-'+p(n.getDate())+
+         ' '+p(n.getHours())+':'+p(n.getMinutes());
 }
 
-async function undoStop(i){
+/* Keep the stop he is driving to under his thumb after the list reflows. */
+function focusNow(){
+  const el = $('nowStop');
+  if (el && el.scrollIntoView) {
+    try { el.scrollIntoView({ block:'center', behavior:'smooth' }); } catch(e){ el.scrollIntoView(); }
+  }
+}
+
+function deliver(i){
   const s = DAY.stops[i];
+  if (!s || s.delivered || s.busy) return;
+  const info = slotInfo();
+
+  s.delivered = true; s.at = nowHM(); s.busy = true;
+  localDone[doneKey(s)] = s.at;
+  if (info) info.delivered = (info.delivered||0) + 1;
+  showRun(); focusNow();                      // instant, before the network
+  storeDay(DAY.date, DAY);
+
+  const undo = () => {
+    s.delivered = false; s.at = ''; s.busy = false;
+    delete localDone[doneKey(s)];
+    if (info) info.delivered = Math.max(0, (info.delivered||1) - 1);
+    showRun(); storeDay(DAY.date, DAY);
+    toast('Could not save ' + s.name + ' — press Delivered again');
+  };
+
+  api('markDelivered', {
+    date: DAY.date, slot: s.slot, route: s.route, phone: s.phone, by: DAY.name || me
+  }).then(r => {
+    s.busy = false;
+    if (r && r.ok){ if (r.at) { s.at = r.at; showRun(); } }
+    else undo();
+  }).catch(undo);
+}
+
+function undoStop(i){
+  const s = DAY.stops[i];
+  if (!s || !s.delivered || s.busy) return;
   if (!confirm('Mark ' + s.name + ' as not delivered?')) return;
-  busy(true, 'Undoing…');
-  try {
-    const r = await api('undoDelivered', { date: DAY.date, slot: s.slot, phone: s.phone });
-    if (r && r.ok){
-      s.delivered = false; s.at = '';
-      const info = slotInfo(); if (info) info.delivered = Math.max(0, (info.delivered||1) - 1);
-      showRun();
-    } else toast('Could not undo');
-  } catch(e){ toast('Could not undo: ' + e.message); }
-  finally { busy(false); }
+  const info = slotInfo();
+  const was = s.at;
+
+  s.delivered = false; s.at = ''; s.busy = true;
+  localDone[doneKey(s)] = false;
+  if (info) info.delivered = Math.max(0, (info.delivered||1) - 1);
+  showRun(); focusNow(); storeDay(DAY.date, DAY);
+
+  const back = () => {
+    s.delivered = true; s.at = was; s.busy = false;
+    localDone[doneKey(s)] = was;
+    if (info) info.delivered = (info.delivered||0) + 1;
+    showRun(); storeDay(DAY.date, DAY);
+    toast('Could not undo ' + s.name + ' — try again');
+  };
+
+  api('undoDelivered', { date: DAY.date, slot: s.slot, phone: s.phone })
+    .then(r => { s.busy = false; if (!r || !r.ok) back(); })
+    .catch(back);
 }
 
 /* ---------- start ---------- */

@@ -2192,8 +2192,15 @@ $('save').addEventListener('click', async () => {
     let done = 0;
     for (const r of routes){
       busyText('Saving ' + (++done) + ' of ' + routes.length + ' — ' + r.name);
+      /* The ORDER of this list is the run: RouteAssign keeps the rows as they
+         are sent and the rider app reads them back in that order. r.rows is
+         only who is on the route — the sequence the packer happened to add
+         them in — so sending that saved a lineup nobody had ever seen, and
+         re-ordering on screen could not fix it because the reorder lives in
+         manualOrder, which r.rows knows nothing about. Send what is drawn. */
+      const seq = inDriveOrder(r).map(x=>x.c.phone);
       const res = await api('saveRouteAssignment', {
-        date, slot: r.slot, route: r.name, phones: r.rows.map(x=>x.phone).join(',')
+        date, slot: r.slot, route: r.name, phones: seq.join(',')
       });
       if (res && res.ok) ok++; else fail++;
       if (r.agent){
@@ -2728,27 +2735,32 @@ function mapLink(c){
        + co.lat.toFixed(6) + '%2C' + co.lng.toFixed(6);
 }
 
+/* One block per stop, blank line between them: a wall of text is what gets
+   a stop missed on a phone. The km in brackets is that leg only — how far
+   from the stop before, not the running total. */
 function routeMessage(r){
   const lines = [];
   lines.push(r.name + ' — ' + r.slot + ' — ' + $('date').value);
   if (r.agent) lines.push('Agent: ' + r.agent + (r.agentPhone ? ' (' + r.agentPhone + ')' : ''));
-  lines.push('');
+  lines.push(r.m.parcels + plural(r.m.parcels,' parcel') + ' · ' + km1(r.m.km)
+    + ' km · about ' + Math.round(r.m.total) + ' min');
 
   inDriveOrder(r).forEach(x=>{
     const c = x.c;
     if (x.same){
-      lines.push('    • ' + c.name + ' — ' + c.phone);
-    } else {
-      lines.push(x.stop + '. ' + c.name + ' — ' + c.phone);
-      if (c.location) lines.push('   ' + c.location);
-      const ml = mapLink(c);
-      if (ml) lines.push('   ' + ml);
+      // already at this door — no number, no second map link
+      lines.push('+ ' + c.name + ' — ' + c.phone);
+      return;
     }
+    lines.push('');
+    lines.push(x.stop + '. ' + c.name
+      + (isFinite(x.legKm) ? ' (' + km1(x.legKm) + ' km)' : ''));
+    lines.push(c.phone);
+    if (c.location) lines.push(c.location);
+    const ml = mapLink(c);
+    if (ml) lines.push(ml);
   });
 
-  lines.push('');
-  lines.push('Total: ' + r.m.parcels + ' parcels, '
-    + km1(r.m.km) + ' km, about ' + Math.round(r.m.total) + ' min');
   return lines.join('\n');
 }
 
