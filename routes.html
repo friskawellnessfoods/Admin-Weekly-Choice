@@ -572,10 +572,43 @@ function wireDatePickers(root){
 }
 wireDatePickers();
 
+/* The limits live in the spreadsheet, but until now nothing read them back
+   until load() ran — so the panel on the landing page showed the values
+   hardcoded in this file, and pressing Save there wrote THOSE over the real
+   ones. Pull them in at start, and keep Save locked until they are in. */
+let limitsReady = false;
+
+function fillLimits(src){
+  if (!src) return false;
+  LIMIT_FIELDS.forEach(k=>{ if (src[k] != null && $(k)) $(k).value = src[k]; });
+  $('agents2').value = $('agents').value;
+  limitsReady = true;
+  $('saveSettings').disabled = false;
+  return true;
+}
+
+async function primeLimits(){
+  $('saveSettings').disabled = true;
+  if (!($('api').value || '').trim()) return;
+  try {
+    const r = await api('getRouteLimits');
+    if (r && r.ok && r.limits && fillLimits(r.limits)) return;
+  } catch(e){}
+  // never leave Save able to write this file's defaults over the stored ones
+  setStatus('Could not read the saved limits. Open a day first, or reload — '
+          + 'saving now would overwrite them with the defaults.');
+}
+primeLimits();
+
 $('date').addEventListener('change', ()=>{ $('measure').disabled = false; probeSaved(); });
 $('measure').disabled = false;
 
 $('saveSettings').addEventListener('click', async () => {
+  if (!limitsReady){
+    setStatus('The saved limits have not loaded yet — reload the page before saving, '
+            + 'or what is on screen will replace them.');
+    return;
+  }
   const payload = {};
   LIMIT_FIELDS.forEach(k=>{ payload[k] = num(k); });
   $('saveSettings').disabled = true;
@@ -1817,9 +1850,7 @@ async function load(){
 
     // settings are stored in the spreadsheet, not the browser, so the rules are
     // identical on every device and in the automatic run
-    if (boot.limits){
-      LIMIT_FIELDS.forEach(k=>{ if (boot.limits[k] != null) $(k).value = boot.limits[k]; });
-    }
+    if (boot.limits) fillLimits(boot.limits);
     /* Two different things, and mixing them up is what hid newly added riders:
          boot.agents  — DeliveryAgents, keyed by route, so a rider only appears
                         once they are already on one
