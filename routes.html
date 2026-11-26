@@ -158,9 +158,14 @@
   .rhead{ padding:13px 15px; cursor:pointer; user-select:none; min-height:var(--tap); }
   .route.open .rhead{ background:var(--tint); border-bottom:1px solid var(--rule); }
   .rtitle{ display:flex; align-items:center; gap:9px; }
+  /* An input with width:auto is about twenty characters wide whatever it
+     holds, so the blank space to the right of "A1" was still the text box and
+     tapping the card there opened the editor. size= makes it hug the name;
+     field-sizing keeps it hugging as you type, where the browser supports it. */
   .rname{ font-size:17px; font-weight:700; letter-spacing:-.015em; color:var(--ink);
     background:transparent; border:1px solid transparent; border-radius:8px;
-    padding:4px 8px; margin:-4px 0 -4px -8px; width:auto; max-width:9.5em; min-height:0; }
+    padding:4px 8px; margin:-4px 0 -4px -8px; max-width:9.5em; min-height:0;
+    field-sizing:content; }
   .rname:focus{ border-color:var(--signal); background:var(--surface); }
   .rwho{ margin-left:auto; display:flex; align-items:center; gap:8px;
     font-size:13.5px; color:var(--ink-2); }
@@ -2192,18 +2197,27 @@ $('save').addEventListener('click', async () => {
       });
       if (res && res.ok) ok++; else fail++;
       if (r.agent){
-        // DeliveryAgents is what the client app and kitchen board read
+        // still written for the kitchen board, which reads DeliveryAgents
         await api('saveDeliveryAgent', { route:r.name, name:r.agent, agentPhone:r.agentPhone||'' });
-        // and the same rider against this date, so reopening the day is exact
-        await api('saveRouteAgent', { date, slot:r.slot, route:r.name,
-                                      name:r.agent, agentPhone:r.agentPhone||'' });
       }
     }
+
+    /* The riders for this day go in one call, which REPLACES everything
+       stored for this date. Saving them one at a time left a renamed or
+       deleted route's rider behind, and that ghost is what the rider app
+       and the client app were picking up. */
+    busyText('Saving the riders…');
+    await api('saveRouteAgents', { date, list: JSON.stringify(
+      routes.filter(r=>r.agent).map(r=>({
+        slot: r.slot, route: r.name, name: r.agent, phone: r.agentPhone || ''
+      })))
+    });
     savedForDate = date;
     fromSaved = true;
     setStatus('Saved '+ok+' routes for '+date+(fail?', '+fail+' failed':'')
       +'. Reloading this date will bring these back.');
     render();
+    renderMode();        // the "nothing is stored yet" banner is no longer true
   } catch(e){
     setStatus('Could not finish saving: ' + e.message + '. Press Save routes again.');
   } finally {
@@ -2558,6 +2572,7 @@ function renderSlot(){
       '<div class="rhead" onclick="toggleRoute('+i+')">'+
         '<div class="rtitle">'+
           '<input class="rname" value="'+esc(r.name)+'" '+
+            'size="'+Math.max(2, String(r.name||'').length)+'" '+
             'onclick="event.stopPropagation()" onchange="renameRoute('+i+',this.value)" '+
             'onkeydown="if(event.key===\'Enter\')this.blur()" aria-label="Route name">'+
           '<span class="rwho">'+
