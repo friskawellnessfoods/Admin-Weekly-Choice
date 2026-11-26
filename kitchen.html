@@ -1123,6 +1123,18 @@
     if(tab === 'pause')    return loadPause();
   }
 
+  async function loadPause(){
+    if(!guard()) return;
+    const date = dateEl.value;
+    busy('Loading pause list for ' + date + '…');
+    try{
+      const data = await ensurePause(date);
+      renderPause(data, date);
+      loadedView.pause = true;
+      done((data.paused || []).length + ' paused clients for ' + date, 'pause');
+    }catch(e){ fail(e); }
+  }
+
   // ---- pause fetch + cache (master clients with no order for the date) ----
   async function ensurePause(date){
     if(cache.pause && cache.date === date) return cache.pause;
