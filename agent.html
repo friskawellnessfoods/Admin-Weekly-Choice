@@ -362,6 +362,8 @@ async function load(){
    moment before the write does must not un-tick a stop under his thumb. */
 const localDone = {};
 const doneKey = s => s.slot + '||' + s.phone;
+const localPicked = {};
+const pickKey = i => i.slot + '||' + i.route;
 
 function paintDay(r, date){
   DAY = r;
@@ -370,8 +372,11 @@ function paintDay(r, date){
     if (localDone[k] && !s.delivered){ s.delivered = true; s.at = localDone[k]; }
     if (localDone[k] === false && s.delivered){ s.delivered = false; s.at = ''; }
   });
-  // the server's own counts can disagree with that, so recount from the stops
   (DAY.slots||[]).forEach(sl=>{
+    const k = pickKey(sl);
+    if (localPicked[k] === true  && !sl.pickedUp){ sl.pickedUp = true;  sl.pickedUpAt = sl.pickedUpAt || nowHM(); }
+    if (localPicked[k] === false &&  sl.pickedUp){ sl.pickedUp = false; sl.pickedUpAt = ''; }
+    // the server's own counts can disagree with that, so recount from the stops
     sl.delivered = (DAY.stops||[]).filter(s=>s.slot===sl.slot && s.delivered).length;
   });
 
@@ -507,36 +512,52 @@ function liveStop(s, state){
 }
 
 /* ---------- picking up ---------- */
-async function pickUp(){
+/* Same reasoning as Delivered: he presses this with his hands full, on the
+   way to the bike. The run list comes up at once and the status write goes
+   out behind him — by the time he has the engine on, the clients have seen
+   it. A failure puts the pick bar back and says so. */
+function pickUp(){
   const info = slotInfo();
-  if (!info) return;
-  busy(true, 'Marking picked up…');
-  try {
-    const r = await api('markPickedUp', {
-      date: DAY.date, slot: info.slot, route: info.route, undo:'false'
-    });
-    if (r && r.ok){
-      info.pickedUp = true;
-      showRun();
-      toast('Clients on this run now see it is on the way');
-    } else toast('Could not mark it: ' + ((r&&r.message)||'try again'));
-  } catch(e){ toast('Could not mark it: ' + e.message); }
-  finally { busy(false); }
+  if (!info || info.busy) return;
+
+  info.pickedUp = true; info.pickedUpAt = nowHM(); info.busy = true;
+  localPicked[pickKey(info)] = true;
+  showRun();                                  // straight to the stops
+  storeDay(DAY.date, DAY);
+  toast('Clients on this run now see it is on the way');
+
+  const back = () => {
+    info.pickedUp = false; info.pickedUpAt = ''; info.busy = false;
+    delete localPicked[pickKey(info)];
+    showRun(); storeDay(DAY.date, DAY);
+    toast('Could not mark picked up — press it again');
+  };
+
+  api('markPickedUp', { date: DAY.date, slot: info.slot, route: info.route, undo:'false' })
+    .then(r => { info.busy = false; if (!r || !r.ok) back(); })
+    .catch(back);
 }
 
-async function undoPick(ev){
+function undoPick(ev){
   if (ev) ev.preventDefault();
   const info = slotInfo();
-  if (!info || !confirm('Undo picked up for this run?')) return;
-  busy(true, 'Undoing…');
-  try {
-    const r = await api('markPickedUp', {
-      date: DAY.date, slot: info.slot, route: info.route, undo:'true'
-    });
-    if (r && r.ok){ info.pickedUp = false; showRun(); }
-    else toast('Could not undo');
-  } catch(e){ toast('Could not undo: ' + e.message); }
-  finally { busy(false); }
+  if (!info || info.busy || !confirm('Undo picked up for this run?')) return;
+  const was = info.pickedUpAt;
+
+  info.pickedUp = false; info.pickedUpAt = ''; info.busy = true;
+  localPicked[pickKey(info)] = false;
+  showRun(); storeDay(DAY.date, DAY);
+
+  const back = () => {
+    info.pickedUp = true; info.pickedUpAt = was; info.busy = false;
+    localPicked[pickKey(info)] = true;
+    showRun(); storeDay(DAY.date, DAY);
+    toast('Could not undo — try again');
+  };
+
+  api('markPickedUp', { date: DAY.date, slot: info.slot, route: info.route, undo:'true' })
+    .then(r => { info.busy = false; if (!r || !r.ok) back(); })
+    .catch(back);
 }
 
 /* ---------- delivering ---------- */
