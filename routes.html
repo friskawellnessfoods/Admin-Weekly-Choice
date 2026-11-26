@@ -3008,9 +3008,34 @@ async function setPickedUp(i, undo){
   busy(false);
 }
 
-/* Send the rider their own page. WhatsApp Business first, since that is the
-   app the riders are messaged from; the web link is the fallback when the
-   intent is not understood (desktop, iPhone). */
+/* WhatsApp link, per platform. The intent:// scheme is Android-only — fired
+   on an iPad or a desktop it is what produces "the address is invalid", so it
+   is gated. Reads the same friska_wa_mode key the kitchen panel writes, so
+   one choice covers both pages. */
+const isAndroid = () => /Android/i.test(navigator.userAgent || '');
+let waMode = 'auto';
+try { waMode = localStorage.getItem('friska_wa_mode') || 'auto'; } catch(e){}
+
+function waLink(phone, msg){
+  let p = String(phone||'').replace(/\D/g,'');
+  if (p.length === 10) p = '91' + p;
+  const text = encodeURIComponent(msg);
+  if (isAndroid() && waMode !== 'normal')
+    return 'intent://send?phone=' + p + '&text=' + text +
+           '#Intent;scheme=whatsapp;package=com.whatsapp.w4b;end';
+  if (!isAndroid() && waMode === 'business')
+    return 'whatsapp-business://send?phone=' + p + '&text=' + text;
+  return 'https://wa.me/' + p + '?text=' + text;
+}
+
+function waOpen(phone, msg){
+  const url = waLink(phone, msg);
+  if (isAndroid()){ location.href = url; return false; }   // intent:// needs a navigation
+  window.open(url, '_blank', 'noopener');
+  return true;
+}
+
+/* Send the rider their own page. */
 function sendAgentLink(i){
   const r = routes[i];
   if (!r.agentPhone){
@@ -3020,14 +3045,7 @@ function sendAgentLink(i){
   const link = location.href.replace(/[^/]*$/, 'agent.html').split('?')[0];
   const msg  = 'Hi ' + (r.agent||'') + ', here is your delivery list for today.\n'
              + 'Open this link and enter your phone number ' + r.agentPhone + '\n\n' + link;
-  const num  = r.agentPhone.length === 10 ? '91'+r.agentPhone : r.agentPhone;
-
-  const intent = 'intent://send?phone=' + num + '&text=' + encodeURIComponent(msg)
-               + '#Intent;scheme=smsto;package=com.whatsapp.w4b;end';
-  const web    = 'https://wa.me/' + num + '?text=' + encodeURIComponent(msg);
-
-  const w = window.open(intent, '_blank');
-  if (!w) window.open(web, '_blank');
+  waOpen(r.agentPhone, msg);
   setStatus('Sending the agent link to ' + (r.agent||'the rider') + '.');
 }
 
