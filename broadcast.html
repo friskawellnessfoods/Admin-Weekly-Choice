@@ -108,15 +108,17 @@
   <div class="card">
     <h3>1. Message</h3>
     <textarea id="msg" placeholder="Type the message to send…"></textarea>
-    <div class="hint">Use <code>{{name}}</code> anywhere to insert the client's name.</div>
+    <div class="hint">Use <code>{{name}}</code> for the client's name. On a route you can also use
+      <code>{{route}}</code> and <code>{{agent}}</code> — the route and the rider delivering it.</div>
     <div class="preview" id="preview" style="display:none"></div>
   </div>
 
   <div class="card">
     <h3>2. Recipients</h3>
     <div class="seg" id="srcSeg">
-      <button data-src="all" class="on">All active clients</button>
-      <button data-src="day">Active on a date</button>
+      <button data-src="all" class="on">All clients</button>
+      <button data-src="day">On a date</button>
+      <button data-src="route">On a route</button>
     </div>
 
     <div id="dayOpts" style="display:none">
@@ -127,6 +129,15 @@
         <button class="chip on" data-slot="Morning">Morning</button>
         <button class="chip on" data-slot="Afternoon">Afternoon</button>
         <button class="chip on" data-slot="Evening">Evening</button>
+      </div>
+    </div>
+
+    <div id="routeOpts" style="display:none">
+      <div class="sublbl">Date</div>
+      <div class="row"><input type="date" id="routeDate" style="flex:1 1 160px"></div>
+      <div class="sublbl">Routes — tap to include</div>
+      <div class="chips" id="routeChips">
+        <span class="hint" style="margin:0">Press Load clients to see the routes saved for this date.</span>
       </div>
     </div>
 
@@ -180,15 +191,32 @@
     try{ localStorage.setItem(SENT_STORE, JSON.stringify({ msg: msgEl.value, keys: [...sent] })); }catch(e){}
   }
 
-  // ---- WhatsApp Business intent (same as the kitchen panel) ----
+  /* WhatsApp link, per platform. intent:// is Android-only — fired on an iPad
+     or a desktop it is what produces "the address is invalid". Reads the same
+     friska_wa_mode key the kitchen panel writes, so one choice covers both. */
+  const isAndroid = () => /Android/i.test(navigator.userAgent || '');
+  let waMode = 'auto';
+  try{ waMode = localStorage.getItem('friska_wa_mode') || 'auto'; }catch(e){}
+
   function waLink(phone, text){
     let p = String(phone || '').replace(/\D/g, '');
     if(p.length === 10) p = '91' + p;
-    return 'intent://send?phone=' + p + '&text=' + encodeURIComponent(text) +
-           '#Intent;scheme=whatsapp;package=com.whatsapp.w4b;end';
+    const t = encodeURIComponent(text);
+    if(isAndroid() && waMode !== 'normal')
+      return 'intent://send?phone=' + p + '&text=' + t +
+             '#Intent;scheme=whatsapp;package=com.whatsapp.w4b;end';
+    if(!isAndroid() && waMode === 'business')
+      return 'whatsapp-business://send?phone=' + p + '&text=' + t;
+    return 'https://wa.me/' + p + '?text=' + t;
   }
-  const personalise = (tpl, name) =>
-    String(tpl || '').replace(/\{\{\s*name\s*\}\}/gi, String(name || '').trim());
+
+  const firstName = c => String((c && c.name) || '').trim().split(' ')[0];
+  /* Takes the client, not just a name, so a route broadcast can name the route
+     and the rider — which is the whole point of messaging one route. */
+  const personalise = (tpl, c) => String(tpl || '')
+    .replace(/\{\{\s*name\s*\}\}/gi,  firstName(c))
+    .replace(/\{\{\s*route\s*\}\}/gi, String((c && c.route) || '').trim())
+    .replace(/\{\{\s*agent\s*\}\}/gi, String((c && c.agent) || '').trim());
 
   // ---- audience source ----------------------------------------------------
   // 'all' -> every client on the Master Client List (status Active unless the
@@ -205,11 +233,12 @@
     source = src;
     document.querySelectorAll('#srcSeg button').forEach(b =>
       b.classList.toggle('on', b.dataset.src === src));
-    el('dayOpts').style.display  = (src === 'day') ? 'block' : 'none';
-    el('inactWrap').style.display = (src === 'day') ? 'none'  : 'inline-flex';
+    el('dayOpts').style.display   = (src === 'day')   ? 'block' : 'none';
+    el('routeOpts').style.display = (src === 'route') ? 'block' : 'none';
+    el('inactWrap').style.display = (src === 'all')   ? 'inline-flex' : 'none';
     clients = []; selected = new Set(); queue = null; qIdx = 0;
     render();
-    setStatus(src === 'day' ? 'Pick a date, then load.' : 'Load the client list to begin.');
+    setStatus(src === 'all' ? 'Load the client list to begin.' : 'Pick a date, then load.');
   }
   document.querySelectorAll('#srcSeg button').forEach(b =>
     b.addEventListener('click', () => setSource(b.dataset.src)));
@@ -255,20 +284,102 @@
     return Object.values(byPhone).filter(c => c.name);
   }
 
+  function activeRoutes(){
+    return Array.from(document.querySelectorAll('#routeChips .chip.on')).map(b => b.dataset.route);
+  }
+
+  function drawRouteChips(names){
+    const box = el('routeChips');
+    box.innerHTML = '';
+    if(!names.length){
+      box.innerHTML = '<span class="hint" style="margin:0">No routes saved for this date yet — '
+                    + 'build and save them in the dispatch tool first.</span>';
+      return;
+    }
+    names.forEach(n => {
+      const b = document.createElement('button');
+      b.className = 'chip on'; b.dataset.route = n; b.textContent = n;
+      b.addEventListener('click', () => {
+        b.classList.toggle('on');
+        if(!activeRoutes().length) b.classList.add('on');   // never leave zero routes on
+        selected = new Set(visible().map(c => key(c.phone)));
+        render();
+        const on = activeRoutes();
+        setStatus(visible().length + ' on ' + on.join(', ') + '.');
+      });
+      box.appendChild(b);
+    });
+  }
+
+  /* Who is on which route for a date. RouteAssign holds route -> [{slot,phone}],
+     the names and numbers come from the same orders call the delivery list
+     uses, and RouteAgents gives the rider so {{agent}} can be filled. */
+  async function loadRoute(date){
+    const post = action => fetch(API, { method:'POST',
+      body:new URLSearchParams({ action, date }) }).then(r => r.json());
+
+    const [ra, ord, ag] = await Promise.all([
+      post('getRouteAssignments'),
+      post('getOrdersForDate'),
+      post('getRouteAgents').catch(() => null)
+    ]);
+    if(!ra || !ra.ok) throw new Error((ra && ra.message) || 'No routes for that date');
+    if(!ord || !ord.success) throw new Error((ord && ord.message) || 'No orders returned');
+
+    const rkey = r => String(r || '').replace(/\s+/g, ' ').trim().toLowerCase();
+    const riders = {};
+    const agents = (ag && ag.ok && ag.agents) || {};
+    Object.keys(agents).forEach(k => { riders[k] = agents[k].name || ''; });
+
+    // name + number by slot||phone, exactly as the delivery list keys them
+    const info = {};
+    (ord.clients || []).forEach(c => {
+      info[String(c.slot || '').trim() + '||' + key(c.phone)] =
+        { name: String(c.name || '').trim(), phone: key(c.phone) };
+    });
+
+    const byPhone = {}, names = [];
+    Object.keys(ra.routes || {}).sort((a, b) => a.localeCompare(b, undefined, { numeric:true }))
+      .forEach(route => {
+        if(names.indexOf(route) === -1) names.push(route);
+        (ra.routes[route] || []).forEach(e => {
+          const slot = String(e.slot || '').trim();
+          const k = key(e.phone);
+          const c = info[slot + '||' + k];
+          if(!c || !c.name) return;                   // paused since the route was saved
+          if(!byPhone[k]){
+            byPhone[k] = { name:c.name, phone:k, active:true, slots:[], routes:[],
+                           route:route, agent:riders[slot + '||' + rkey(route)] || '' };
+          }
+          if(slot && byPhone[k].slots.indexOf(slot) === -1) byPhone[k].slots.push(slot);
+          if(byPhone[k].routes.indexOf(route) === -1) byPhone[k].routes.push(route);
+        });
+      });
+
+    drawRouteChips(names);
+    return Object.values(byPhone);
+  }
+
   el('load').addEventListener('click', async () => {
     if(!API){ setStatus('No API URL found in config.js.'); return; }
-    const date = el('dayDate').value;
-    if(source === 'day' && !date){ setStatus('Pick a date first.'); return; }
+    const date = (source === 'route') ? el('routeDate').value : el('dayDate').value;
+    if(source !== 'all' && !date){ setStatus('Pick a date first.'); return; }
 
     el('load').disabled = true;
-    setStatus(source === 'day' ? 'Loading clients active on ' + date + '…' : 'Loading clients…');
+    setStatus(source === 'all' ? 'Loading clients…' : 'Loading clients for ' + date + '…');
     try{
-      clients = (source === 'day' ? await loadDay(date) : await loadAll())
+      clients = (source === 'route' ? await loadRoute(date)
+               : source === 'day'   ? await loadDay(date)
+                                    : await loadAll())
         .sort((a, b) => a.name.localeCompare(b.name));
       selected = new Set(visible().map(c => key(c.phone)));
       loadSent();
       render();
-      setStatus(clients.length + (source === 'day' ? ' active on ' + date + '.' : ' clients loaded.'));
+      setStatus(
+        source === 'route' ? visible().length + ' on ' + activeRoutes().length
+                             + ' route' + (activeRoutes().length > 1 ? 's' : '') + ' for ' + date + '.'
+      : source === 'day'   ? clients.length + ' active on ' + date + '.'
+                           : clients.length + ' clients loaded.');
     }catch(e){ setStatus('Load error: ' + e.message); }
     el('load').disabled = false;
   });
@@ -277,8 +388,11 @@
     const q = searchEl.value.trim().toLowerCase();
     const inc = el('showInactive').checked;
     const slots = activeSlots();
+    const routes = activeRoutes();
     return clients.filter(c => {
-      if(source === 'day'){
+      if(source === 'route'){
+        if(!(c.routes || []).some(r => routes.indexOf(r) !== -1)) return false;
+      } else if(source === 'day'){
         if(!c.slots.some(s => slots.indexOf(s) !== -1)) return false;
       } else if(!inc && !c.active) return false;
       return !q || c.name.toLowerCase().includes(q) || key(c.phone).includes(q.replace(/\D/g, ''));
@@ -306,7 +420,12 @@
       const nm = document.createElement('div'); nm.className = 'nm'; nm.textContent = c.name;
       const ph = document.createElement('div'); ph.className = 'ph'; ph.textContent = k;
       row.appendChild(cb); row.appendChild(nm);
-      if(source === 'day' && c.slots.length){
+      if(source === 'route' && (c.routes || []).length){
+        const b = document.createElement('span'); b.className = 'inact';
+        b.style.background = '#e8eaf6'; b.style.color = '#283593';
+        b.textContent = c.routes.join(' + ') + (c.slots.length ? ' · ' + c.slots.join(' + ') : '');
+        row.appendChild(b);
+      } else if(source === 'day' && c.slots.length){
         const b = document.createElement('span'); b.className = 'inact';
         b.style.background = '#e0f2f1'; b.style.color = '#00695c';
         b.textContent = c.slots.join(' + '); row.appendChild(b);
@@ -329,7 +448,7 @@
     const txt = msgEl.value.trim();
     if(!txt || !first){ previewEl.style.display = 'none'; return; }
     previewEl.style.display = 'block';
-    previewEl.textContent = personalise(txt, first.name.split(' ')[0]);
+    previewEl.textContent = personalise(txt, first);
   }
 
   // ---- send panel / queue ----
@@ -385,7 +504,9 @@
 
     row.appendChild(mk('Open WhatsApp → ' + cur.name.split(' ')[0], '', () => {
       awaitingReturn = true;
-      location.href = waLink(cur.phone, personalise(msgEl.value, cur.name.split(' ')[0]));
+      const url = waLink(cur.phone, personalise(msgEl.value, cur));
+      if(isAndroid()) location.href = url;          // intent:// needs a navigation
+      else window.open(url, '_blank', 'noopener');
     }));
     row.appendChild(mk('Skip', 'alt', () => { qIdx++; render(); }));
     row.appendChild(mk('Stop', 'alt', () => { queue = null; qIdx = 0; awaitingReturn = false; render(); }));
@@ -413,7 +534,7 @@
   el('selAll').addEventListener('click', () => { visible().forEach(c => selected.add(key(c.phone))); render(); });
   el('selNone').addEventListener('click', () => { visible().forEach(c => selected.delete(key(c.phone))); render(); });
 
-  el('dayDate').value = todayStr();
+  el('dayDate').value = el('routeDate').value = todayStr();
   setSource('all');
   renderSend();
 </script>
