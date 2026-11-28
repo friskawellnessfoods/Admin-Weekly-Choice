@@ -175,26 +175,6 @@
   .rgrip button:disabled{ opacity:.22; cursor:default; }
   .rgrip .dots{ color:var(--ink-3); opacity:.5; font-size:12px; letter-spacing:-2px; line-height:1; }
   .rhead > .rtitle, .rhead > .facts{ min-width:0; }
-  .namedrop{ flex:none; border:1px solid var(--rule); background:var(--surface);
-    color:var(--ink-2); width:26px; height:26px; border-radius:7px; cursor:pointer;
-    font-size:10px; line-height:1; padding:0; }
-  .namedrop:active{ background:var(--rule-2); }
-  .namemenu{ border-top:1px solid var(--rule); background:var(--tint);
-    padding:7px 11px 9px; max-height:230px; overflow:auto; }
-  .namemenu .nhead{ font-size:11.5px; font-weight:700; color:var(--ink-3);
-    text-transform:uppercase; letter-spacing:.04em; margin:2px 0 6px; }
-  .namemenu .nrow{ display:flex; align-items:center; gap:8px; padding:9px 10px;
-    background:var(--surface); border:1px solid var(--rule); border-radius:9px;
-    margin-bottom:5px; cursor:pointer; font-size:14px; font-weight:600; color:var(--ink); }
-  .namemenu .nrow:active{ background:var(--rule-2); }
-  .namemenu .nrow span:first-child{ flex:1; min-width:0; overflow:hidden;
-    text-overflow:ellipsis; white-space:nowrap; }
-  .namemenu .nrow.on{ border-color:var(--signal); cursor:default; }
-  .namemenu .nrow.off{ opacity:.45; cursor:not-allowed; }
-  .namemenu .nnote{ flex:none; font-size:11px; font-weight:600; color:var(--ink-3); }
-  .namemenu .nx{ flex:none; border:0; background:none; color:var(--ink-3);
-    font-size:16px; line-height:1; padding:0 2px; cursor:pointer; }
-  .namemenu .nx:active{ color:var(--alarm); }
   .rhead .rmid{ flex:1; min-width:0; }
   .route.open .rhead{ background:var(--tint); border-bottom:1px solid var(--rule); }
   .rtitle{ display:flex; align-items:center; gap:9px; }
@@ -1780,7 +1760,6 @@ async function inheritNames(){
   if (!prev || !prev.ok || !prev.found) return 0;
 
   // who was on each old route, by slot||phone
-  rememberNames(Object.keys(prev.routes || {}));
   const oldSets = Object.keys(prev.routes || {}).map(name=>({
     name,
     keys: new Set((prev.routes[name]||[]).map(e=>
@@ -2065,8 +2044,6 @@ async function load(){
             render();
             await measureLegs(want);
           }
-          rememberNames(routes.map(r=>r.name));
-          applyStoredOrder();
           markSavedFromSheet();     // what is on screen now equals the sheet
           render(); renderMode();
           setStatus('Loaded ' + routes.length + ' saved routes for ' + $('date').value +
@@ -2080,8 +2057,6 @@ async function load(){
     }
     forceRebuild = false;
     savedSig = null;                 // freshly packed: none of it is in the sheet
-    rememberNames(routes.map(r=>r.name));
-    applyStoredOrder();
     autoMeasured = false; refined = false; refinePass = 0; toppedUp = false;
     history = []; $('undo').disabled = true;
     routes = [];
@@ -2386,8 +2361,6 @@ $('save').addEventListener('click', async () => {
     });
     savedForDate = date;
     fromSaved = true;
-    rememberNames(routes.map(r=>r.name));   // a name you saved is one you use
-    rememberOrder();
     if (!fail) markAllSaved();      // a failure leaves that route dirty on purpose
     const skipped = routes.length - dirty.length;
     setStatus(
@@ -2584,8 +2557,6 @@ function renameRoute(i, value){
   });
   routes[i].name = next;
   routes[i].renamed = true;      // survives renumber()
-  rememberNames([next]);
-  rememberOrder();
   render();
   setStatus('Renamed to '+next+'. Save routes to keep it for next time.');
 }
@@ -2613,74 +2584,6 @@ function renumber(){
    `open` name made this an accordion: opening one shut whichever was open,
    which is unworkable when you are scrolling a day with five routes. */
 let view = { mode:'summary', slot:null, closed:new Set() };
-
-/* Names this kitchen has used before, so a route can be given a name you
-   already work with instead of retyping it. Kept on this device: the list is
-   a convenience, not data the business depends on, and storing it server-side
-   would mean a schema change to a table the client app also reads. */
-const NAMES_KEY = 'friska_route_names';
-let knownNames = [];
-try { knownNames = JSON.parse(localStorage.getItem(NAMES_KEY) || '[]') || []; } catch(e){ knownNames = []; }
-
-function rememberNames(list){
-  let added = 0;
-  (list || []).forEach(n=>{
-    const v = String(n || '').replace(/\s+/g,' ').trim();
-    if (!v) return;
-    if (knownNames.some(x=>x.toLowerCase() === v.toLowerCase())) return;
-    knownNames.push(v); added++;
-  });
-  if (!added) return;
-  knownNames.sort((a,b)=>a.localeCompare(b, undefined, { numeric:true }));
-  try { localStorage.setItem(NAMES_KEY, JSON.stringify(knownNames.slice(0,200))); } catch(e){}
-}
-
-function forgetName(n){
-  knownNames = knownNames.filter(x=>x.toLowerCase() !== String(n||'').toLowerCase());
-  try { localStorage.setItem(NAMES_KEY, JSON.stringify(knownNames)); } catch(e){}
-  render();
-}
-
-let nameMenuFor = null;
-function toggleNameMenu(i){
-  nameMenuFor = (nameMenuFor === i) ? null : i;
-  render();
-}
-
-function pickName(i, n){
-  nameMenuFor = null;
-  renameRoute(i, n);
-}
-
-/* The order you put the cards in, per date. Display order only — the sheet
-   keys everything by route name — so it lives on this device rather than
-   costing a write to a shared table. */
-const orderKey = d => 'friska_route_order_' + d;
-
-function rememberOrder(){
-  const d = $('date').value;
-  if (!d) return;
-  try { localStorage.setItem(orderKey(d), JSON.stringify(routes.map(r=>r.slot + '||' + r.name))); } catch(e){}
-}
-
-/* Put the routes back the way they were left. Anything not in the stored
-   list keeps its relative position at the end, so a route added since then
-   still shows up. */
-function applyStoredOrder(){
-  const d = $('date').value;
-  if (!d) return;
-  let want = [];
-  try { want = JSON.parse(localStorage.getItem(orderKey(d)) || '[]') || []; } catch(e){ return; }
-  if (!want.length) return;
-  const at = r => {
-    const k = want.indexOf(r.slot + '||' + r.name);
-    return k < 0 ? Number.MAX_SAFE_INTEGER : k;
-  };
-  routes = routes
-    .map((r,i)=>({ r, i }))
-    .sort((a,b)=> (at(a.r) - at(b.r)) || (a.i - b.i))
-    .map(o=>o.r);
-}
 
 /* Routes whose rider message is open, by name so it survives a re-render. */
 const msgOpen = new Set();
@@ -2853,10 +2756,6 @@ function renderSlot(){
             'size="'+Math.max(2, String(r.name||'').length)+'" '+
             'onclick="event.stopPropagation()" onchange="renameRoute('+i+',this.value)" '+
             'onkeydown="if(event.key===\'Enter\')this.blur()" aria-label="Route name">'+
-          (knownNames.length
-            ? '<button class="namedrop" onclick="event.stopPropagation();toggleNameMenu('+i+')" '+
-                'aria-label="Pick a name you have used before">&#9662;</button>'
-            : '')+
           '<span class="rwho">'+
             (r.agent ? '<span class="tag">'+esc(r.agent)+'</span>'
                      : '<span class="none">'+(r.kind==='porter'?'porter':'no rider')+'</span>')+
@@ -2874,7 +2773,6 @@ function renderSlot(){
         '</div>'+
         '</div>'+
       '</div>'+
-      (nameMenuFor === i ? nameMenuHtml(i) : '')+
       (open ? '<div class="rbody">'+routeDetail(i)+'</div>' : '')+
     '</div>';
   };
@@ -2891,31 +2789,6 @@ function renderSlot(){
 /* Move a route within its slot. Deliberately no renumber() afterwards: the
    route name is the key for RouteAssign and the rider table, so shuffling the
    cards must not quietly rename anything. */
-/* Names already on another route in this slot are shown but not tappable —
-   two routes cannot share a name, and saying why beats a silent no-op. */
-function nameMenuHtml(ri){
-  const r = routes[ri];
-  const used = {};
-  routes.forEach((x,j)=>{ if (j !== ri && x.slot === r.slot) used[x.name.toLowerCase()] = x.name; });
-
-  const rows = knownNames.map(n=>{
-    if (n.toLowerCase() === r.name.toLowerCase())
-      return '<div class="nrow on"><span>'+esc(n)+'</span><span class="nnote">current</span></div>';
-    if (used[n.toLowerCase()])
-      return '<div class="nrow off"><span>'+esc(n)+'</span><span class="nnote">in use</span></div>';
-    return '<div class="nrow" onclick="pickName('+ri+',\''+esc(n).replace(/'/g,"\\'")+'\')">'+
-             '<span>'+esc(n)+'</span>'+
-             '<button class="nx" onclick="event.stopPropagation();forgetName(\''+
-               esc(n).replace(/'/g,"\\'")+'\')" aria-label="Forget this name">&times;</button>'+
-           '</div>';
-  }).join('');
-
-  return '<div class="namemenu">'+
-      '<div class="nhead">Names you have used</div>'+
-      (rows || '<div class="fnone">No saved names yet.</div>')+
-    '</div>';
-}
-
 function moveRoute(i, dir){
   const slot = routes[i].slot;
   const sib = routes.map((r,k)=>k).filter(k=>routes[k].slot===slot);
@@ -2923,7 +2796,6 @@ function moveRoute(i, dir){
   if (at < 0 || to < 0 || to >= sib.length) return;
   const j = sib[to];
   const tmp = routes[i]; routes[i] = routes[j]; routes[j] = tmp;
-  rememberOrder();
   render();
 }
 
