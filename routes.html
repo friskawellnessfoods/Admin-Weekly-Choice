@@ -164,7 +164,38 @@
   .route.porter{ border-left:3px solid var(--porter); }
   .route.over{ border-color:var(--alarm); }
 
-  .rhead{ padding:13px 15px; cursor:pointer; user-select:none; min-height:var(--tap); }
+  .rhead{ padding:13px 15px 13px 7px; cursor:pointer; user-select:none; min-height:var(--tap);
+    display:flex; align-items:flex-start; gap:4px; }
+  /* same grip as a stop, one level up: reorders the routes themselves */
+  .rgrip{ flex:none; width:26px; display:flex; flex-direction:column; align-items:center;
+    justify-content:center; gap:1px; align-self:center; }
+  .rgrip button{ width:26px; height:23px; border:0; background:none; cursor:pointer;
+    color:var(--ink-3); font-size:10px; line-height:1; padding:0; border-radius:5px; }
+  .rgrip button:active:not(:disabled){ background:var(--rule-2); color:var(--ink); }
+  .rgrip button:disabled{ opacity:.22; cursor:default; }
+  .rgrip .dots{ color:var(--ink-3); opacity:.5; font-size:12px; letter-spacing:-2px; line-height:1; }
+  .rhead > .rtitle, .rhead > .facts{ min-width:0; }
+  .namedrop{ flex:none; border:1px solid var(--rule); background:var(--surface);
+    color:var(--ink-2); width:26px; height:26px; border-radius:7px; cursor:pointer;
+    font-size:10px; line-height:1; padding:0; }
+  .namedrop:active{ background:var(--rule-2); }
+  .namemenu{ border-top:1px solid var(--rule); background:var(--tint);
+    padding:7px 11px 9px; max-height:230px; overflow:auto; }
+  .namemenu .nhead{ font-size:11.5px; font-weight:700; color:var(--ink-3);
+    text-transform:uppercase; letter-spacing:.04em; margin:2px 0 6px; }
+  .namemenu .nrow{ display:flex; align-items:center; gap:8px; padding:9px 10px;
+    background:var(--surface); border:1px solid var(--rule); border-radius:9px;
+    margin-bottom:5px; cursor:pointer; font-size:14px; font-weight:600; color:var(--ink); }
+  .namemenu .nrow:active{ background:var(--rule-2); }
+  .namemenu .nrow span:first-child{ flex:1; min-width:0; overflow:hidden;
+    text-overflow:ellipsis; white-space:nowrap; }
+  .namemenu .nrow.on{ border-color:var(--signal); cursor:default; }
+  .namemenu .nrow.off{ opacity:.45; cursor:not-allowed; }
+  .namemenu .nnote{ flex:none; font-size:11px; font-weight:600; color:var(--ink-3); }
+  .namemenu .nx{ flex:none; border:0; background:none; color:var(--ink-3);
+    font-size:16px; line-height:1; padding:0 2px; cursor:pointer; }
+  .namemenu .nx:active{ color:var(--alarm); }
+  .rhead .rmid{ flex:1; min-width:0; }
   .route.open .rhead{ background:var(--tint); border-bottom:1px solid var(--rule); }
   .rtitle{ display:flex; align-items:center; gap:9px; }
   /* An input with width:auto is about twenty characters wide whatever it
@@ -241,7 +272,15 @@
   .acts .btn{ flex:1 1 auto; }
 
   .msg{ margin-top:16px; }
-  .msg h4{ margin:0 0 7px; font-size:13px; font-weight:600; color:var(--ink-2); }
+  /* shut by default — open it on the few occasions the text itself matters */
+  .msg h4{ margin:0; font-size:13px; font-weight:600; color:var(--ink-2);
+    cursor:pointer; user-select:none; display:flex; align-items:center; gap:7px;
+    padding:9px 11px; border:1px solid var(--rule); border-radius:10px;
+    background:var(--tint); }
+  .msg h4:active{ background:var(--rule-2); }
+  .msg h4 .chev{ font-size:9px; color:var(--ink-3); }
+  .msg.on h4{ border-bottom-left-radius:0; border-bottom-right-radius:0; }
+  .msg.on .msgbox{ border-top:0; border-top-left-radius:0; border-top-right-radius:0; }
   .msgbox{ background:var(--tint); border:1px solid var(--rule); border-radius:11px;
     padding:12px; font-family:"IBM Plex Mono",ui-monospace,monospace; font-size:12px;
     line-height:1.55; white-space:pre-wrap; word-break:break-word;
@@ -1741,6 +1780,7 @@ async function inheritNames(){
   if (!prev || !prev.ok || !prev.found) return 0;
 
   // who was on each old route, by slot||phone
+  rememberNames(Object.keys(prev.routes || {}));
   const oldSets = Object.keys(prev.routes || {}).map(name=>({
     name,
     keys: new Set((prev.routes[name]||[]).map(e=>
@@ -2025,6 +2065,8 @@ async function load(){
             render();
             await measureLegs(want);
           }
+          rememberNames(routes.map(r=>r.name));
+          applyStoredOrder();
           markSavedFromSheet();     // what is on screen now equals the sheet
           render(); renderMode();
           setStatus('Loaded ' + routes.length + ' saved routes for ' + $('date').value +
@@ -2038,6 +2080,8 @@ async function load(){
     }
     forceRebuild = false;
     savedSig = null;                 // freshly packed: none of it is in the sheet
+    rememberNames(routes.map(r=>r.name));
+    applyStoredOrder();
     autoMeasured = false; refined = false; refinePass = 0; toppedUp = false;
     history = []; $('undo').disabled = true;
     routes = [];
@@ -2342,6 +2386,8 @@ $('save').addEventListener('click', async () => {
     });
     savedForDate = date;
     fromSaved = true;
+    rememberNames(routes.map(r=>r.name));   // a name you saved is one you use
+    rememberOrder();
     if (!fail) markAllSaved();      // a failure leaves that route dirty on purpose
     const skipped = routes.length - dirty.length;
     setStatus(
@@ -2372,8 +2418,7 @@ function renderMode(){
 
 /* ---------- split ---------- */
 function manualSplit(ri){
-  const picked = [...document.querySelectorAll('input.pick[data-r="'+ri+'"]:checked')]
-    .map(el=>el.dataset.p);
+  const picked = tickedIn(ri);
   if (!picked.length){ setStatus('Tick the clients to move out first.'); return; }
   snapshot();
   const r = routes[ri];
@@ -2384,6 +2429,7 @@ function manualSplit(ri){
     { ...r, rows:stay, m:measure(stay) },
     { name:r.name+'-b', rows:out, slot:r.slot, kind:r.kind,
       agent:'', agentPhone:'', m:measure(out) });
+  clearPicks();
   renumber(); render();
 }
 
@@ -2531,8 +2577,15 @@ function renameRoute(i, value){
   }
   snapshot();
   if (view.closed.has(cur)){ view.closed.delete(cur); view.closed.add(next); }
+  if (msgOpen.has(cur)){ msgOpen.delete(cur); msgOpen.add(next); }
+  // ticks are keyed by route name, so carry them across the rename
+  routes[i].rows.forEach(x=>{
+    if (pickedSet.delete(pkey(cur, x.phone))) pickedSet.add(pkey(next, x.phone));
+  });
   routes[i].name = next;
   routes[i].renamed = true;      // survives renumber()
+  rememberNames([next]);
+  rememberOrder();
   render();
   setStatus('Renamed to '+next+'. Save routes to keep it for next time.');
 }
@@ -2560,6 +2613,81 @@ function renumber(){
    `open` name made this an accordion: opening one shut whichever was open,
    which is unworkable when you are scrolling a day with five routes. */
 let view = { mode:'summary', slot:null, closed:new Set() };
+
+/* Names this kitchen has used before, so a route can be given a name you
+   already work with instead of retyping it. Kept on this device: the list is
+   a convenience, not data the business depends on, and storing it server-side
+   would mean a schema change to a table the client app also reads. */
+const NAMES_KEY = 'friska_route_names';
+let knownNames = [];
+try { knownNames = JSON.parse(localStorage.getItem(NAMES_KEY) || '[]') || []; } catch(e){ knownNames = []; }
+
+function rememberNames(list){
+  let added = 0;
+  (list || []).forEach(n=>{
+    const v = String(n || '').replace(/\s+/g,' ').trim();
+    if (!v) return;
+    if (knownNames.some(x=>x.toLowerCase() === v.toLowerCase())) return;
+    knownNames.push(v); added++;
+  });
+  if (!added) return;
+  knownNames.sort((a,b)=>a.localeCompare(b, undefined, { numeric:true }));
+  try { localStorage.setItem(NAMES_KEY, JSON.stringify(knownNames.slice(0,200))); } catch(e){}
+}
+
+function forgetName(n){
+  knownNames = knownNames.filter(x=>x.toLowerCase() !== String(n||'').toLowerCase());
+  try { localStorage.setItem(NAMES_KEY, JSON.stringify(knownNames)); } catch(e){}
+  render();
+}
+
+let nameMenuFor = null;
+function toggleNameMenu(i){
+  nameMenuFor = (nameMenuFor === i) ? null : i;
+  render();
+}
+
+function pickName(i, n){
+  nameMenuFor = null;
+  renameRoute(i, n);
+}
+
+/* The order you put the cards in, per date. Display order only — the sheet
+   keys everything by route name — so it lives on this device rather than
+   costing a write to a shared table. */
+const orderKey = d => 'friska_route_order_' + d;
+
+function rememberOrder(){
+  const d = $('date').value;
+  if (!d) return;
+  try { localStorage.setItem(orderKey(d), JSON.stringify(routes.map(r=>r.slot + '||' + r.name))); } catch(e){}
+}
+
+/* Put the routes back the way they were left. Anything not in the stored
+   list keeps its relative position at the end, so a route added since then
+   still shows up. */
+function applyStoredOrder(){
+  const d = $('date').value;
+  if (!d) return;
+  let want = [];
+  try { want = JSON.parse(localStorage.getItem(orderKey(d)) || '[]') || []; } catch(e){ return; }
+  if (!want.length) return;
+  const at = r => {
+    const k = want.indexOf(r.slot + '||' + r.name);
+    return k < 0 ? Number.MAX_SAFE_INTEGER : k;
+  };
+  routes = routes
+    .map((r,i)=>({ r, i }))
+    .sort((a,b)=> (at(a.r) - at(b.r)) || (a.i - b.i))
+    .map(o=>o.r);
+}
+
+/* Routes whose rider message is open, by name so it survives a re-render. */
+const msgOpen = new Set();
+function toggleMsg(name){
+  if (msgOpen.has(name)) msgOpen.delete(name); else msgOpen.add(name);
+  render();
+}
 
 function go(mode, slot){
   view = { mode, slot: slot==null?null:slot, closed:new Set() };
@@ -2699,22 +2827,36 @@ function visualIndex(i){
 function renderSlot(){
   $('notRouted').innerHTML = ''; $('pool').innerHTML = '';
   const s = view.slot;
+  /* One list, in the order you put them in. Splitting Porter into its own
+     section meant the two halves of the same slot could not be compared or
+     reordered against each other; the card still carries the porter colour,
+     which is all the distinction that was doing any work. */
   const idxs = routes.map((r,i)=>i).filter(i=>routes[i].slot===s);
-  const fxi = idxs.filter(i=>routes[i].kind!=='porter');
-  const pxi = idxs.filter(i=>routes[i].kind==='porter');
   const par = ar => ar.reduce((a,i)=>a+routes[i].m.parcels,0);
   const meal = { Morning:'Breakfast', Afternoon:'Lunch', Evening:'Dinner' }[s] || s;
 
-  const card = i => {
+  const card = (i, pos, last) => {
     const r = routes[i], m = r.m, bad = !fits(m), open = isOpen(i);
     return '<div class="route'+(bad?' over':'')+(open?' open':'')+
              (r.pickedUp?' sent':'')+(r.kind==='porter'?' porter':'')+'">'+
       '<div class="rhead" onclick="toggleRoute('+i+')">'+
+        '<div class="rgrip" onclick="event.stopPropagation()">'+
+          '<button onclick="moveRoute('+i+',-1)"'+(pos===0?' disabled':'')+
+            ' aria-label="Move route up">&#9650;</button>'+
+          '<span class="dots" aria-hidden="true">&#8942;&#8942;</span>'+
+          '<button onclick="moveRoute('+i+',1)"'+(last?' disabled':'')+
+            ' aria-label="Move route down">&#9660;</button>'+
+        '</div>'+
+        '<div class="rmid">'+
         '<div class="rtitle">'+
           '<input class="rname" value="'+esc(r.name)+'" '+
             'size="'+Math.max(2, String(r.name||'').length)+'" '+
             'onclick="event.stopPropagation()" onchange="renameRoute('+i+',this.value)" '+
             'onkeydown="if(event.key===\'Enter\')this.blur()" aria-label="Route name">'+
+          (knownNames.length
+            ? '<button class="namedrop" onclick="event.stopPropagation();toggleNameMenu('+i+')" '+
+                'aria-label="Pick a name you have used before">&#9662;</button>'
+            : '')+
           '<span class="rwho">'+
             (r.agent ? '<span class="tag">'+esc(r.agent)+'</span>'
                      : '<span class="none">'+(r.kind==='porter'?'porter':'no rider')+'</span>')+
@@ -2730,19 +2872,59 @@ function renderSlot(){
           '<span><b>'+km1(m.kmpp)+'</b> km each</span>'+
           (m.gaps ? '<span class="hot"><b>'+m.gaps+'</b> leg'+plural(m.gaps,'')+' unpriced</span>' : '')+
         '</div>'+
+        '</div>'+
       '</div>'+
+      (nameMenuFor === i ? nameMenuHtml(i) : '')+
       (open ? '<div class="rbody">'+routeDetail(i)+'</div>' : '')+
     '</div>';
   };
 
+  const pn = idxs.filter(i=>routes[i].kind==='porter').length;
   $('routes').innerHTML =
-    '<div class="band" style="margin-top:4px"><h2>'+esc(meal)+'</h2><span class="n">'+par(idxs)+' parcels</span></div>'+
-    (fxi.length ? fxi.map(card).join('')
-                : '<div class="empty">No rider routes in this slot.</div>')+
-    (pxi.length ? '<div class="band" style="border-bottom-color:var(--porter)">'+
-                    '<h2 style="color:var(--porter)">Porter</h2>'+
-                    '<span class="n">'+par(pxi)+plural(par(pxi),' parcel')+', up to '+PORTER_MAX+' each</span></div>'+
-                  pxi.map(card).join('') : '');
+    '<div class="band" style="margin-top:4px"><h2>'+esc(meal)+'</h2>'+
+      '<span class="n">'+par(idxs)+' parcels'+
+        (pn ? ' \u00b7 '+pn+' Porter' : '')+'</span></div>'+
+    (idxs.length ? idxs.map((i,k)=>card(i, k, k===idxs.length-1)).join('')
+                 : '<div class="empty">No routes in this slot.</div>');
+}
+
+/* Move a route within its slot. Deliberately no renumber() afterwards: the
+   route name is the key for RouteAssign and the rider table, so shuffling the
+   cards must not quietly rename anything. */
+/* Names already on another route in this slot are shown but not tappable —
+   two routes cannot share a name, and saying why beats a silent no-op. */
+function nameMenuHtml(ri){
+  const r = routes[ri];
+  const used = {};
+  routes.forEach((x,j)=>{ if (j !== ri && x.slot === r.slot) used[x.name.toLowerCase()] = x.name; });
+
+  const rows = knownNames.map(n=>{
+    if (n.toLowerCase() === r.name.toLowerCase())
+      return '<div class="nrow on"><span>'+esc(n)+'</span><span class="nnote">current</span></div>';
+    if (used[n.toLowerCase()])
+      return '<div class="nrow off"><span>'+esc(n)+'</span><span class="nnote">in use</span></div>';
+    return '<div class="nrow" onclick="pickName('+ri+',\''+esc(n).replace(/'/g,"\\'")+'\')">'+
+             '<span>'+esc(n)+'</span>'+
+             '<button class="nx" onclick="event.stopPropagation();forgetName(\''+
+               esc(n).replace(/'/g,"\\'")+'\')" aria-label="Forget this name">&times;</button>'+
+           '</div>';
+  }).join('');
+
+  return '<div class="namemenu">'+
+      '<div class="nhead">Names you have used</div>'+
+      (rows || '<div class="fnone">No saved names yet.</div>')+
+    '</div>';
+}
+
+function moveRoute(i, dir){
+  const slot = routes[i].slot;
+  const sib = routes.map((r,k)=>k).filter(k=>routes[k].slot===slot);
+  const at = sib.indexOf(i), to = at + dir;
+  if (at < 0 || to < 0 || to >= sib.length) return;
+  const j = sib[to];
+  const tmp = routes[i]; routes[i] = routes[j]; routes[j] = tmp;
+  rememberOrder();
+  render();
 }
 
 /* ---------- inside one route ---------- */
@@ -2784,7 +2966,8 @@ function routeDetail(i){
       '<button class="btn line sm" onclick="toggleAdd('+i+')">'+(addOpen===i?'Close search':'Add a client')+'</button>'+
       '<button class="btn line sm" onclick="manualSplit('+i+')">Move ticked out</button>'+
       '<button class="btn line sm" onclick="reoptimise('+i+')">Re-order stops</button>'+
-      '<button class="btn line sm" onclick="openMerge('+i+')">'+(mergeOpen===i?'Close merge':'Merge with…')+'</button>'+
+      '<button class="btn line sm" id="mergeBtn'+i+'" onclick="openMerge('+i+')">'+
+        (mergeOpen===i?'Close merge':'Merge with…')+'</button>'+
       '<button class="btn line sm" onclick="sendAgentLink('+i+')">Send agent link</button>'+
     '</div>'+
     '<div class="acts">'+
@@ -2805,14 +2988,16 @@ function routeDetail(i){
        '<div id="addList" class="flist">'+addListHtml(i)+'</div></div>' : '')+
 
     (mergeOpen===i ? '<div class="finder" style="margin-top:13px">'+
-       '<div class="fhead">Merge '+esc(r.name)+' into…</div>'+
-       '<div class="flist">'+mergeListHtml(i)+'</div></div>' : '')+
+       '<div class="fhead" id="mergeHead'+i+'">'+mergeHeadText(i)+'</div>'+
+       '<div class="flist" id="mergeList'+i+'">'+mergeListHtml(i)+'</div></div>' : '')+
 
     '<div class="stops" style="margin-top:13px">'+
       stopRows.map(x=>{
         const c = x.c;
         return '<div class="stop'+(x.same?' same':'')+'">'+
-          '<input type="checkbox" class="pick" data-r="'+i+'" data-p="'+c.phone+'" aria-label="Select '+esc(c.name)+'">'+
+          '<input type="checkbox" class="pick" data-r="'+i+'" data-p="'+c.phone+'"'+
+            (isPicked(i, c.phone)?' checked':'')+
+            ' onchange="pickChanged(this)" aria-label="Select '+esc(c.name)+'">'+
           (x.same ? '<div class="grip ghost"></div>'
             : '<div class="grip">'+
                 '<button onclick="moveStop('+i+',\''+x.ptk+'\',-1)"'+(x.stop===1?' disabled':'')+
@@ -2844,13 +3029,21 @@ function routeDetail(i){
           : 'rider \u20b9' + Math.round(fixedCost(r.m.km, r.m.parcels))) : '')+
     '</div>'+
 
-    '<div class="msg"><h4>What the rider gets</h4>'+
-      '<div class="msgbox">'+esc(routeMessage(r))+'</div>'+
-      '<div class="acts">'+
-        '<button class="btn line sm" onclick="copyRouteMsg('+i+')">Copy</button>'+
-        '<button class="btn go sm" onclick="shareRouteMsg('+i+')">'+
-          (r.agentPhone ? 'Send to '+esc(r.agent) : 'Share on WhatsApp')+'</button>'+
-      '</div>'+
+    /* The whole message, one block per stop, used to sit open inside every
+       route — on a seven-route day that is most of the scrolling. It is still
+       here, one tap away. */
+    '<div class="msg'+(msgOpen.has(r.name)?' on':'')+'">'+
+      '<h4 onclick="toggleMsg(\''+esc(r.name).replace(/'/g,"\\'")+'\')">'+
+        '<span class="chev">'+(msgOpen.has(r.name)?'&#9650;':'&#9660;')+'</span>'+
+        'What the rider gets</h4>'+
+      (msgOpen.has(r.name)
+        ? '<div class="msgbox">'+esc(routeMessage(r))+'</div>'+
+          '<div class="acts">'+
+            '<button class="btn line sm" onclick="copyRouteMsg('+i+')">Copy</button>'+
+            '<button class="btn go sm" onclick="shareRouteMsg('+i+')">'+
+              (r.agentPhone ? 'Send to '+esc(r.agent) : 'Share on WhatsApp')+'</button>'+
+          '</div>'
+        : '')+
     '</div>';
 }
 
@@ -2988,6 +3181,50 @@ function moveStop(ri, ptk, dir){
  * commit — two routes becoming one is rarely free, and the number decides
  * it better than the shape on screen does.
  * ------------------------------------------------------------------ */
+/* Ticked clients, held in state rather than only in the DOM. Opening the
+   merge panel re-renders the card, and a DOM-only tick does not survive that
+   — so "Merge 2 ticked into…" would open the panel, silently lose the ticks,
+   and move the whole route instead. */
+const pickedSet = new Set();
+const pkey = (name, phone) => name + '||' + phone;
+
+function tickedIn(ri){
+  const r = routes[ri];
+  if (!r) return [];
+  return r.rows.filter(x => pickedSet.has(pkey(r.name, x.phone))).map(x => x.phone);
+}
+
+function isPicked(ri, phone){
+  const r = routes[ri];
+  return !!r && pickedSet.has(pkey(r.name, phone));
+}
+
+function clearPicks(){ pickedSet.clear(); }
+
+function mergeHeadText(ri){
+  const n = tickedIn(ri).length;
+  return n ? 'Move ' + n + ' ticked client' + plural(n,'') + ' into…'
+           : 'Merge ' + routes[ri].name + ' into…';
+}
+
+/* Ticking a client changes what Merge will do, so the button and the open
+   merge panel are relabelled in place — not re-rendered, which would drop
+   the ticks. */
+function pickChanged(el){
+  const i = +el.dataset.r;
+  if (!routes[i]) return;
+  const k = pkey(routes[i].name, el.dataset.p);
+  if (el.checked) pickedSet.add(k); else pickedSet.delete(k);
+  const n = tickedIn(i).length;
+  const btn = $('mergeBtn' + i);
+  if (btn) btn.textContent = (mergeOpen === i) ? 'Close merge'
+         : (n ? 'Merge ' + n + ' ticked into…' : 'Merge with…');
+  const head = $('mergeHead' + i);
+  if (head) head.textContent = mergeHeadText(i);
+  const list = $('mergeList' + i);
+  if (list) list.innerHTML = mergeListHtml(i);
+}
+
 function openMerge(ri){
   const r = routes[ri];
   const mates = routes.map((x, i) => ({ x, i })).filter(o => o.i !== ri && o.x.slot === r.slot);
@@ -3005,9 +3242,13 @@ function mergeListHtml(ri){
   const mates = routes.map((x, i) => ({ x, i })).filter(o => o.i !== ri && o.x.slot === r.slot);
   if (!mates.length) return '<div class="fnone">Nothing else in this slot.</div>';
 
-  const mine = measure(r.rows).km || 0;
+  // ticked clients move on their own; nothing ticked means the whole route
+  const picked = tickedIn(ri);
+  const moving = picked.length ? r.rows.filter(x => picked.includes(x.phone)) : r.rows;
+
+  const mine = measure(moving).km || 0;
   return mates.map(o => {
-    const m    = measure(r.rows.concat(o.x.rows));
+    const m    = measure(moving.concat(o.x.rows));
     const was  = mine + (measure(o.x.rows).km || 0);
     const cap  = (r.kind === 'porter' && o.x.kind === 'porter') ? num('porterMax') : 0;
     const over = isFinite(m.km) && !fits(m, cap);
@@ -3028,7 +3269,15 @@ function doMerge(a, b){
   const A = routes[a], B = routes[b];
   if (A.slot !== B.slot){ setStatus('Those are in different slots.'); return; }
 
-  const m = measure(A.rows.concat(B.rows));
+  /* Ticked clients move by themselves and A stays behind with the rest.
+     Nothing ticked, or everything ticked, is the whole route as before. */
+  const picked = tickedIn(a);
+  const moving = picked.length ? A.rows.filter(x => picked.includes(x.phone)) : A.rows.slice();
+  if (!moving.length){ setStatus('None of the ticked clients are on this route.'); return; }
+  const stay = picked.length ? A.rows.filter(x => !picked.includes(x.phone)) : [];
+  const partial = stay.length > 0;
+
+  const m = measure(moving.concat(B.rows));
   const cap = (A.kind === 'porter' && B.kind === 'porter') ? num('porterMax') : 0;
   if (!fits(m, cap) &&
       !confirm('That merge breaks your limits:\n\n'
@@ -3036,19 +3285,32 @@ function doMerge(a, b){
         + 'Merge anyway?')) return;
 
   snapshot();
-  B.rows = B.rows.concat(A.rows);
-  B.kind = (A.kind === 'fixed' || B.kind === 'fixed') ? 'fixed' : 'porter';
-  if (!B.agent && A.agent){ B.agent = A.agent; B.agentPhone = A.agentPhone; }
+  B.rows = B.rows.concat(moving);
+  if (!partial) B.kind = (A.kind === 'fixed' || B.kind === 'fixed') ? 'fixed' : 'porter';
+  if (!B.agent && A.agent && !partial){ B.agent = A.agent; B.agentPhone = A.agentPhone; }
   /* A hand-set stop order describes the route that existed before the merge,
      so it is dropped. measure() then works out the driving order itself —
      inDriveOrder is a render helper and does not belong here. */
   B.manualOrder = null;
   B.m = measure(B.rows);
-  routes.splice(a, 1);
+
+  if (partial){
+    A.rows = stay;
+    A.manualOrder = null;
+    A.m = measure(stay);
+  } else {
+    routes.splice(a, 1);
+    renumber();
+  }
+
+  clearPicks();
   mergeOpen = null;
-  renumber();
   render();
-  setStatus('Merged into ' + B.name + ' — ' + B.rows.length + ' parcels, ' + km1(B.m.km) + ' km.');
+  setStatus(partial
+    ? 'Moved ' + moving.length + plural(moving.length,' client') + ' into ' + B.name +
+      ' — ' + B.rows.length + ' parcels, ' + km1(B.m.km) + ' km. ' +
+      A.name + ' keeps ' + stay.length + '.'
+    : 'Merged into ' + B.name + ' — ' + B.rows.length + ' parcels, ' + km1(B.m.km) + ' km.');
 }
 
 async function reoptimise(ri){
